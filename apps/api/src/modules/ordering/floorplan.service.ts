@@ -62,6 +62,36 @@ export class FloorplanService {
     }))
   }
 
+  /**
+   * T1 "bàn nào đây" — điện thoại khách chỉ cầm token, không biết mình ngồi bàn
+   * mấy. Trả đúng phần khách cần thấy để chào bàn, không kèm tiền nong hay ai mở
+   * bàn: những thứ đó có màn riêng và có quyền riêng.
+   */
+  async sessionSummary(sessionId: number) {
+    const [row] = await this.db
+      .select({ session: tableSessions, table: tables, area: areas })
+      .from(tableSessions)
+      .innerJoin(tables, eq(tables.id, tableSessions.tableId))
+      .leftJoin(areas, eq(areas.id, tables.areaId))
+      .where(eq(tableSessions.id, sessionId))
+    if (!row) throw new NotFoundException('Không có phiên bàn này')
+
+    return {
+      id: row.session.id,
+      branchId: row.session.branchId,
+      status: row.session.status,
+      guestCount: row.session.guestCount,
+      openedAt: row.session.openedAt,
+      table: {
+        id: row.table.id,
+        code: row.table.code,
+        area: row.area?.name ?? null,
+        hasGrill: row.table.hasGrill,
+        seatMax: row.table.seatMax,
+      },
+    }
+  }
+
   /** P3 mở bàn */
   async openTable(
     tableId: number,

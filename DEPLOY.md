@@ -99,7 +99,12 @@ thấy `/api` cùng origin với trang. Nếu gọi chéo thì buộc phải h�
 `SameSite=None`, yếu hơn hẳn.
 
 **Biến môi trường** — project `sora-api` cần: `DATABASE_URL`, `DATABASE_MIGRATION_URL`,
-`SUPABASE_JWT_SECRET`. Bốn SPA cần: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+`SUPABASE_JWT_SECRET`, `BANK_WEBHOOK_SECRET`. Bốn SPA cần: `VITE_SUPABASE_URL`,
+`VITE_SUPABASE_ANON_KEY`.
+
+Riêng `sora-pos` cần thêm `VITE_TABLE_ORIGIN=https://ban.tokyosora.vn` — mã QR dán bàn
+in từ POS phải trỏ sang tên miền của Sora Table. Bỏ trống thì mã trỏ về chính POS và
+khách quét xong không mở được gì.
 
 ## Bước 3 — Kiểm chứng sau khi deploy
 

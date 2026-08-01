@@ -24,6 +24,8 @@ const SEED_DEVICE = 'seed-device-token'
 const BANK_SECRET = 'dev-bank-secret'
 let cashier: string
 let sessionId: number
+/** Bàn bên cạnh — dùng để chứng minh token bàn này không mở được bàn kia */
+let otherSession: number
 let tableToken: string
 /** Cookie phiên bàn của "điện thoại" khách */
 let phoneA: string
@@ -138,6 +140,22 @@ describe('1. Quét QR vào bàn (T1)', () => {
     })
     expect(res.statusCode).toBe(401)
   })
+
+  it('điện thoại đọc được mình đang ngồi bàn nào — T1 mới chào bàn được', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/table-sessions/${sessionId}`,
+      headers: { cookie: phoneA },
+    })
+    expect(res.statusCode).toBe(200)
+    const body = res.json<{
+      guestCount: number
+      table: { code: string; hasGrill: boolean }
+    }>()
+    expect(body.guestCount).toBe(4)
+    expect(body.table.code).toBeTruthy()
+    expect(body.table.hasGrill).toBe(true)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -162,7 +180,7 @@ describe('2. Khách tự gọi món (T2 · T6 · T7)', () => {
   })
 
   it('khách KHÔNG gọi món hộ bàn khác được', async () => {
-    const other = (
+    otherSession = (
       await inject({
         method: 'POST',
         url: `/api/tables/${fx.plainTableId}/open`,
@@ -173,11 +191,35 @@ describe('2. Khách tự gọi món (T2 · T6 · T7)', () => {
 
     const res = await inject({
       method: 'POST',
-      url: `/api/table-sessions/${other}/requests`,
+      url: `/api/table-sessions/${otherSession}/requests`,
       headers: { cookie: phoneA },
       payload: { kind: 'phuc-vu' },
     })
     expect(res.statusCode).toBe(400)
+  })
+
+  /**
+   * Mã phiên là số chạy nên đoán được. Không có chốt này thì sửa số trên thanh
+   * địa chỉ là đọc được đơn và tạm tính của bàn bên cạnh.
+   */
+  it('khách KHÔNG đọc được đơn, tạm tính hay thông tin của bàn khác', async () => {
+    for (const path of ['', '/order', '/bill']) {
+      const res = await inject({
+        method: 'GET',
+        url: `/api/table-sessions/${otherSession}${path}`,
+        headers: { cookie: phoneA },
+      })
+      expect(res.statusCode, `GET ${path || '/'}`).toBe(403)
+    }
+  })
+
+  it('nhân viên vẫn nhìn được cả sàn', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/table-sessions/${otherSession}/order`,
+      headers: staffAuth(),
+    })
+    expect(res.statusCode).toBe(200)
   })
 
   it('gửi bếp rồi thì món xuống đúng trạm', async () => {
@@ -321,6 +363,18 @@ describe('4. Chia tiền — hai điện thoại không thể trả trùng (T11 
     })
     expect(res.statusCode).toBe(409)
     expect(res.json<{ code: string }>().code).toBe('line_already_claimed')
+  })
+
+  it('tạm tính báo món nào đã có người nhận — máy kia khoá trước khi bấm, không đợi lỗi', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/table-sessions/${sessionId}/bill`,
+      headers: { cookie: phoneB },
+    })
+    const claimed = res
+      .json<{ claimedLines: { orderLineId: number }[] }>()
+      .claimedLines.map((c) => c.orderLineId)
+    expect(claimed).toEqual(expect.arrayContaining(lineIds.slice(0, 2)))
   })
 
   it('điện thoại B nhận món KHÁC thì được', async () => {

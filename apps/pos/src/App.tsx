@@ -1,13 +1,15 @@
 import { watchConnectivity } from '@sora/core'
 import { Button, OutboxBanner, ToastProvider } from '@sora/ui'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router'
+import { api } from './api'
 import { usePwaUpdate } from './pwa'
 import { Floorplan } from './routes/Floorplan'
 import { Pay } from './routes/Pay'
 import { ShiftLogin } from './routes/ShiftLogin'
 import { TableOrder } from './routes/TableOrder'
+import { TableRequests } from './routes/TableRequests'
 import { SessionProvider, useSession } from './session-context'
 
 const queryClient = new QueryClient({
@@ -34,6 +36,7 @@ export function App() {
               <Route path="/shift" element={<ShiftLogin />} />
               <Route element={<Shell />}>
                 <Route path="/floor" element={<Floorplan />} />
+                <Route path="/yeu-cau" element={<TableRequests />} />
                 <Route path="/table/:sessionId" element={<TableOrder />} />
                 <Route path="/table/:sessionId/pay" element={<Pay />} />
               </Route>
@@ -48,9 +51,18 @@ export function App() {
 
 /** Khung chung: chưa đăng nhập ca thì mọi màn vận hành đều đẩy về P1 */
 function Shell() {
-  const { staff, ready, signOut } = useSession()
+  const { staff, ready, branchId, signOut } = useSession()
   const { needRefresh, applyUpdate } = usePwaUpdate()
   const navigate = useNavigate()
+
+  // Chuông yêu cầu từ bàn: khách bấm gọi trên điện thoại thì phải thấy được ở
+  // MỌI màn của POS, không phải chỉ khi ai đó nhớ mở P12.
+  const requests = useQuery({
+    queryKey: ['table-requests', branchId],
+    queryFn: () => api.tableRequests(branchId!),
+    enabled: Boolean(branchId) && Boolean(staff),
+    refetchInterval: 15_000,
+  })
 
   if (!ready) {
     return (
@@ -62,6 +74,8 @@ function Shell() {
 
   if (!staff) return <Navigate to="/shift" replace />
 
+  const pendingRequests = requests.data?.requests.length ?? 0
+
   return (
     <div className="min-h-dvh bg-canvas text-ink-body">
       <header className="flex h-14 items-center justify-between border-b border-line-1 px-4">
@@ -70,6 +84,12 @@ function Shell() {
           <span className="text-[length:var(--fs-b2)] text-ink-hi">{staff.fullName}</span>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant={pendingRequests > 0 ? 'primary' : 'ghost'}
+            onClick={() => void navigate('/yeu-cau')}
+          >
+            Yêu cầu từ bàn{pendingRequests > 0 ? ` · ${pendingRequests}` : ''}
+          </Button>
           {needRefresh ? (
             <button
               type="button"

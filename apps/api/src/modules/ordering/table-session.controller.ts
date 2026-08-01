@@ -15,6 +15,7 @@ import {
 import type { FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
+import { assertOwnTableSession } from '../identity/actor'
 import { Public, TABLE_COOKIE, type RequestWithActor } from '../identity/auth.guard'
 import { IdentityService } from '../identity/identity.service'
 import { RequirePermission } from '../identity/permission.guard'
@@ -71,6 +72,13 @@ export class TableSessionController {
     })
 
     return { sessionId: actor.tableSessionId, branchId: actor.branchId }
+  }
+
+  /** T1: điện thoại khách hỏi "tôi đang ngồi bàn nào" sau khi có cookie */
+  @Get('table-sessions/:id')
+  session(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
+    assertOwnTableSession(req.actor!, id)
+    return this.floorplan.sessionSummary(id)
   }
 
   /** T9: khách gọi nhân viên */

@@ -16,6 +16,7 @@
     "@sora/contracts": "workspace:*",
     "@sora/core": "workspace:*",
     "@sora/tokens": "workspace:*",
+    "qrcode-generator": "^2.0.4",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

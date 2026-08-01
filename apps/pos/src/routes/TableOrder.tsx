@@ -1,6 +1,16 @@
-import { Badge, Button, Card, MenuItemCard, Modal, Money, SectionLabel, useToast } from '@sora/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  MenuItemCard,
+  Modal,
+  Money,
+  QrCode,
+  SectionLabel,
+  useToast,
+} from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { api, type OrderLineRow } from '../api'
 import { useSession } from '../session-context'
@@ -30,6 +40,7 @@ export function TableOrder() {
   const [category, setCategory] = useState<string | null>(null)
   const [pad, setPad] = useState<PadLine[]>([])
   const [voiding, setVoiding] = useState<OrderLineRow | null>(null)
+  const [showQr, setShowQr] = useState(false)
 
   const id = Number(sessionId)
 
@@ -184,9 +195,12 @@ export function TableOrder() {
               </span>
             ) : null}
           </div>
-          <Button variant="ghost" onClick={() => void navigate('/floor')}>
-            Sơ đồ
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setShowQr(true)}>Mã QR bàn</Button>
+            <Button variant="ghost" onClick={() => void navigate('/floor')}>
+              Sơ đồ
+            </Button>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4">
@@ -277,6 +291,13 @@ export function TableOrder() {
         </footer>
       </aside>
 
+      <TableQrDialog
+        sessionId={id}
+        tableCode={tableCode}
+        open={showQr}
+        onClose={() => setShowQr(false)}
+      />
+
       <VoidDialog
         line={voiding}
         onClose={() => setVoiding(null)}
@@ -308,6 +329,71 @@ function LineRow({ line, onVoid }: { line: OrderLineRow; onVoid: () => void }) {
         Huỷ
       </button>
     </div>
+  )
+}
+
+/**
+ * Mã QR dán bàn cho khách quét vào Sora Table.
+ *
+ * Mỗi lần mở là cấp mã MỚI và mã cũ chết ngay — không có đường nào xem lại mã đã
+ * cấp, vì máy chủ chỉ giữ bản băm. Đánh đổi có chủ ý: khách bàn trước không bao
+ * giờ đọc được đơn của khách bàn sau.
+ *
+ * Sora Table nằm ở tên miền khác POS nên địa chỉ lấy từ `VITE_TABLE_ORIGIN`; máy
+ * dev không đặt biến này thì lấy chính gốc của POS.
+ */
+function TableQrDialog({
+  sessionId,
+  tableCode,
+  open,
+  onClose,
+}: {
+  sessionId: number
+  tableCode: string
+  open: boolean
+  onClose: () => void
+}) {
+  const toast = useToast()
+
+  const token = useQuery({
+    queryKey: ['qr-token', sessionId],
+    queryFn: () => api.issueQrToken(sessionId),
+    enabled: open,
+    // Mỗi lần mở hộp thoại là một mã mới: giữ cache ở đây là hiện lại mã đã chết
+    gcTime: 0,
+    staleTime: 0,
+  })
+
+  useEffect(() => {
+    if (token.error) toast((token.error as Error).message, 'danger')
+  }, [token.error, toast])
+
+  const origin = import.meta.env.VITE_TABLE_ORIGIN ?? window.location.origin
+  const url = token.data ? `${origin}${token.data.url}` : null
+
+  return (
+    <Modal
+      open={open}
+      title={`Mã QR bàn ${tableCode}`}
+      onClose={onClose}
+      footer={<Button onClick={onClose}>Đóng</Button>}
+    >
+      <div className="flex flex-col items-center gap-4">
+        {url ? (
+          <>
+            <div className="rounded-md bg-[var(--sora-washi-100)] p-4">
+              <QrCode value={url} size={240} label={`Mã QR vào bàn ${tableCode}`} />
+            </div>
+            <p className="text-center text-[length:var(--fs-b2)] text-ink-body">
+              Khách quét mã này để tự gọi món và tự thanh toán. Cấp mã mới sẽ làm mã cũ hết hiệu
+              lực ngay.
+            </p>
+          </>
+        ) : (
+          <p className="text-ink-mute">{token.isError ? 'Không cấp được mã' : 'Đang cấp mã…'}</p>
+        )}
+      </div>
+    </Modal>
   )
 }
 

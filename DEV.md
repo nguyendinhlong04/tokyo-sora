@@ -41,7 +41,7 @@ psql "$DATABASE_MIGRATION_URL" -v app_password="$SORA_APP_PASSWORD" -f deploy/db
 ## Chạy
 
 ```bash
-pnpm dev:api      # API   :3000
+pnpm dev:api      # API   :3000 — chạy trước, các app đều proxy /api về đây
 pnpm dev:pos      # POS   :5174
 pnpm dev:kitchen  # KDS   :5175
 pnpm dev:table    # Table :5173
@@ -103,6 +103,35 @@ location.reload()
 > Ở môi trường thật hai app nằm trên hai tên miền khác nhau nên không có chuyện đó.
 > Hệ thống xử lý đúng trong cả hai trường hợp: quyền là hợp của vai trò người đăng
 > nhập và vai trò của thiết bị họ đang đứng.
+>
+> Với Sora Table thì va chạm này gắt hơn: cookie bàn (`sora_table`) và cookie nhân
+> viên (`sora_staff`) cùng nằm trên `localhost`, mà thứ tự ưu tiên là **nhân viên
+> trước, bàn sau**. Đang đăng nhập POS thì mở app bàn sẽ thấy "Chưa vào được bàn
+> nào"; ngược lại, đang có cookie bàn thì POS không đăng nhập được ("Thiếu thiết bị
+> đã ghép"). Cách làm việc: **mở Sora Table ở cửa sổ ẩn danh hoặc trình duyệt khác**
+> với POS. Ngoài đời `pos.tokyosora.vn` và `ban.tokyosora.vn` là hai tên miền nên
+> không bao giờ gặp.
+
+## Chạy thử vòng khách tự phục vụ (GĐ2)
+
+1. Mở bàn ở POS (P2 → chạm bàn trống), vào màn đơn bàn.
+2. Bấm **Mã QR bàn** — POS cấp token mới và hiện mã QR. Quét bằng điện thoại cùng
+   mạng LAN, hoặc chép địa chỉ `/t/<token>` rồi mở ở cửa sổ ẩn danh trỏ vào
+   `http://localhost:5173`.
+3. Khách gọi món trên điện thoại → vé xuống màn bếp; bấm **Gọi nhân viên** → yêu cầu
+   hiện ở màn **Yêu cầu từ bàn** (P12) của POS.
+4. Tự thanh toán tới màn VietQR rồi giả lập ngân hàng báo có:
+
+```bash
+node -e "const {createHmac}=require('crypto');const raw=JSON.stringify({bankRef:'FT-DEV-1',vaNumber:'<VA trên màn>',amount:<số tiền>});fetch('http://localhost:3000/api/webhooks/bank',{method:'POST',headers:{'content-type':'application/json','x-bank-signature':createHmac('sha256',process.env.BANK_WEBHOOK_SECRET||'dev-bank-secret').update(raw).digest('hex')},body:raw}).then(r=>r.text()).then(console.log)"
+```
+
+Chỉ webhook này mới đổi trạng thái sang **đã trả** — nút "Đã chuyển xong" của khách
+chỉ đổi màn hình chờ.
+
+Mã QR in từ POS trỏ về `VITE_TABLE_ORIGIN`; máy dev không đặt biến này thì mã trỏ về
+chính POS (`:5174`), nên khi thử bằng điện thoại thật hãy đặt
+`VITE_TABLE_ORIGIN=http://<IP máy dev>:5173`.
 
 ## Tài khoản dev
 

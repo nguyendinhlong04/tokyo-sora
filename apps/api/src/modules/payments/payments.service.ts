@@ -16,6 +16,7 @@ import {
   branches,
   journalEntries,
   orders,
+  paymentLines,
   payments,
   shifts,
   tableSessions,
@@ -154,6 +155,15 @@ export class PaymentsService {
       .from(payments)
       .where(and(eq(payments.orderId, order.id), eq(payments.state, 'paid')))
 
+    // T12: món người khác đã nhận trả thì khoá ngay trên máy khách, chứ không để
+    // họ chọn xong mới ăn lỗi 409. `live = 'yes'` khớp đúng điều kiện của partial
+    // unique index — lượt trả hỏng hay hết hạn tự nhả món ra.
+    const claimed = await this.db
+      .select({ orderLineId: paymentLines.orderLineId, paymentId: paymentLines.paymentId })
+      .from(paymentLines)
+      .innerJoin(payments, eq(payments.id, paymentLines.paymentId))
+      .where(and(eq(payments.orderId, order.id), eq(paymentLines.live, 'yes')))
+
     const paid = paidRows.reduce((sum, p) => sum + p.amount, 0)
     return {
       sessionId,
@@ -164,6 +174,7 @@ export class PaymentsService {
       outstanding: Math.max(0, order.moneyTotal - paid),
       paymentState: order.paymentState,
       payments: paidRows.map((p) => ({ id: p.id, kind: p.kind, amount: p.amount, paidAt: p.paidAt })),
+      claimedLines: claimed,
     }
   }
 

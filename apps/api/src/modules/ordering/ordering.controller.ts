@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Req, UseInterceptors } from '@nestjs/common'
 import { z } from 'zod'
 import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
+import { assertOwnTableSession } from '../identity/actor'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { FloorplanService } from './floorplan.service'
@@ -72,9 +73,10 @@ export class OrderingController {
     return this.floorplan.closeSession(id, req.actor!)
   }
 
-  /** P7 chi tiết đơn của bàn */
+  /** P7 chi tiết đơn của bàn · T8 đơn của bàn trên điện thoại khách */
   @Get('table-sessions/:id/order')
-  sessionOrder(@Param('id', ParseIntPipe) id: number) {
+  sessionOrder(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
+    assertOwnTableSession(req.actor!, id)
     return this.ordering.getSessionOrder(id)
   }
 

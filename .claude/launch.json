@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@sora/api", "dev"],
+      "port": 3000
+    },
+    {
       "name": "ui-lab",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@sora/ui", "dev"],

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -217,14 +218,25 @@ export class SplitPaymentService {
     })
   }
 
-  /** Trạng thái một lượt trả — T14 hỏi lại cho tới khi ngân hàng báo về */
-  async paymentStatus(paymentId: number) {
+  /**
+   * Trạng thái một lượt trả — T14 hỏi lại cho tới khi ngân hàng báo về.
+   *
+   * Trả kèm cả VA và chuỗi QR để màn T13 dựng lại được sau khi khách lỡ tải lại
+   * trang: mã QR chỉ sinh một lần lúc tạo lượt trả, mất nó là khách phải bỏ lượt
+   * này và tạo lượt khác.
+   */
+  async paymentStatus(paymentId: number, actor: Actor) {
     const [row] = await this.db.select().from(payments).where(eq(payments.id, paymentId))
     if (!row) throw new NotFoundException('Không có lượt trả này')
+    if (actor.kind === 'customer' && row.tableSessionId !== actor.tableSessionId) {
+      throw new ForbiddenException('Lượt trả này không thuộc bàn của bạn')
+    }
     return {
       id: row.id,
       state: row.state,
       amount: row.amount,
+      vaNumber: row.vaNumber,
+      qrString: row.qrString,
       expiresAt: row.expiresAt,
       paidAt: row.paidAt,
     }

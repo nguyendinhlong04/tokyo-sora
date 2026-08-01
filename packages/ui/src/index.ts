@@ -6,4 +6,5 @@ export { Badge, Card, EmptyState, ErrorState, Money, SectionLabel, Skeleton } fr
 export { TableTile, type TableState, type TableTileProps } from './TableTile'
 export { OrderTicket, type OrderTicketProps, type TicketItemView } from './OrderTicket'
 export { MenuItemCard, type MenuItemCardProps } from './MenuItemCard'
+export { QrCode } from './QrCode'
 export { OutboxBanner } from './OutboxBanner'

@@ -52,8 +52,8 @@ export class SplitPaymentController {
    * cho biết ngân hàng đã báo về hay chưa.
    */
   @Get('payments/:id/status')
-  status(@Param('id', ParseIntPipe) id: number) {
-    return this.split.paymentStatus(id)
+  status(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
+    return this.split.paymentStatus(id, req.actor!)
   }
 
   /**

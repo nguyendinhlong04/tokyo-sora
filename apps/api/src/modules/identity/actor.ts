@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common'
 import type { Role } from '@sora/contracts'
 
 /**
@@ -61,6 +62,19 @@ export function actorRoles(actor: Actor): Role[] {
 
 export function actorBranchId(actor: Actor): string | null {
   return actor.kind === 'system' ? null : actor.branchId
+}
+
+/**
+ * Token bàn chỉ mở đúng bàn của nó.
+ *
+ * Mã phiên là số chạy nên đoán được: không có chốt này thì khách bàn 12 sửa số
+ * trên thanh địa chỉ là đọc được đơn và tạm tính của bàn 11. Nhân viên và thiết
+ * bị không bị chặn — họ vốn phải nhìn được cả sàn.
+ */
+export function assertOwnTableSession(actor: Actor, sessionId: number): void {
+  if (actor.kind === 'customer' && actor.tableSessionId !== sessionId) {
+    throw new ForbiddenException('Mã QR này không mở được bàn khác')
+  }
 }
 
 /** Ghi vào audit_log.actor_kind / actor_id */

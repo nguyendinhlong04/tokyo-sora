@@ -88,6 +88,18 @@ export interface AvailabilityRow {
   remaining: number | null
 }
 
+/** P12 — một yêu cầu khách bấm từ bàn (T9) */
+export interface TableRequest {
+  id: number
+  sessionId: number
+  kind: string
+  label: string
+  note: string | null
+  createdAt: string
+  tableCode: string
+  urgent: boolean
+}
+
 export const api = {
   staffList: (branchId: string) =>
     apiFetch<StaffOption[]>(`/api/auth/staff?branchId=${encodeURIComponent(branchId)}`),
@@ -119,6 +131,11 @@ export const api = {
     apiFetch<SessionOrder | null>(`/api/table-sessions/${sessionId}/order`),
 
   bill: (sessionId: number) => apiFetch<Bill>(`/api/table-sessions/${sessionId}/bill`),
+
+  tableRequests: (branchId: string) =>
+    apiFetch<{ serverTime: string; requests: TableRequest[] }>(
+      `/api/table-requests?branch=${encodeURIComponent(branchId)}`,
+    ),
 
   // --- Thao tác ghi: đi qua hàng đợi offline, kể cả khi đang online ---
 
@@ -182,6 +199,22 @@ export const api = {
       path: `/api/table-sessions/${sessionId}/pay/cash`,
       payload: { amount, tendered },
       label: `Thu tiền bàn ${tableCode}`,
+    }),
+
+  /**
+   * P12 đánh dấu đã xử lý. KHÔNG qua hàng đợi offline: nhân viên bấm để hàng đợi
+   * ngắn lại ngay trước mắt, một lệnh nằm chờ mạng sẽ làm hai người cùng chạy tới
+   * một bàn.
+   */
+  markRequestDone: (requestId: number) =>
+    apiFetch<{ id: number; done: boolean }>(`/api/table-requests/${requestId}/done`, {
+      method: 'POST',
+    }),
+
+  /** P3 in mã QR dán bàn cho khách quét — token cũ chết ngay khi cấp mã mới */
+  issueQrToken: (sessionId: number) =>
+    apiFetch<{ token: string; url: string }>(`/api/table-sessions/${sessionId}/qr-token`, {
+      method: 'POST',
     }),
 
   closeSession: (sessionId: number, tableCode: string) =>

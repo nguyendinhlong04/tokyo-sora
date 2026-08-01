@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common'
 import { z } from 'zod'
 import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
+import { assertOwnTableSession } from '../identity/actor'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { PaymentsService } from './payments.service'
@@ -61,9 +62,10 @@ export class PaymentsController {
     return this.payments.openShiftOf(branch ?? actor.branchId)
   }
 
-  /** P10 tạm tính */
+  /** P10 tạm tính · T10/T15 trên điện thoại khách */
   @Get('table-sessions/:id/bill')
-  bill(@Param('id', ParseIntPipe) id: number) {
+  bill(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
+    assertOwnTableSession(req.actor!, id)
     return this.payments.bill(id)
   }
 
