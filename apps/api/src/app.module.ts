@@ -4,6 +4,7 @@ import { ConfigBundleModule } from './modules/config-bundle/config-bundle.module
 import { Public } from './modules/identity/auth.guard'
 import { IdentityModule } from './modules/identity/identity.module'
 import { KitchenModule } from './modules/kitchen/kitchen.module'
+import { OnlineModule } from './modules/online/online.module'
 import { OrderingModule } from './modules/ordering/ordering.module'
 import { PaymentsModule } from './modules/payments/payments.module'
 import { RealtimeModule } from './modules/realtime/realtime.module'
@@ -26,6 +27,7 @@ class HealthController {
     OrderingModule,
     KitchenModule,
     PaymentsModule,
+    OnlineModule,
   ],
   controllers: [HealthController],
 })

@@ -128,6 +128,66 @@ export class SplitPaymentService {
   }
 
   /**
+   * O13 tạo VietQR cho đơn ONLINE — đơn không gắn phiên bàn nào.
+   *
+   * Cùng một cơ chế VA với tại bàn (§23.2 "cùng cơ chế tại bàn"): mỗi lượt trả
+   * một VA riêng, và chỉ webhook ngân hàng mới đóng khoản. Khác một điểm: đơn
+   * online trả TRỌN số tiền, không có chuyện chia bill giữa mấy điện thoại.
+   */
+  async createOrderVietQr(orderId: number, actor: Actor) {
+    return this.db.transaction(async (tx) => {
+      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
+      if (!order) throw new NotFoundException('Không có đơn này')
+      if (order.status === 'cancelled') throw new ConflictException('Đơn đã huỷ')
+
+      const { outstanding } = await this.outstandingWithin(tx, order.id, order.moneyTotal)
+      if (outstanding <= 0) throw new ConflictException('Đơn đã trả đủ')
+
+      const [row] = await tx
+        .insert(payments)
+        .values({
+          branchId: order.branchId,
+          orderId: order.id,
+          kind: 'vietqr',
+          amount: outstanding,
+          state: 'pending',
+          createdByKind: actor.kind === 'staff' ? 'staff' : 'customer',
+          createdById: actor.kind === 'staff' ? String(actor.staffId) : null,
+          businessDate: order.businessDate,
+        })
+        .returning({ id: payments.id })
+
+      const va = await this.bank.createVirtualAccount({
+        reference: String(row!.id),
+        amount: outstanding,
+        branchId: order.branchId,
+        expiresInSeconds: VA_TTL_SECONDS,
+      })
+
+      await tx
+        .update(payments)
+        .set({ vaNumber: va.vaNumber, qrString: va.qrString, expiresAt: va.expiresAt })
+        .where(eq(payments.id, row!.id))
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'payment.vietqr.created',
+        entity: 'payment',
+        entityId: String(row!.id),
+        payload: { amount: outstanding, vaNumber: va.vaNumber, orderId },
+      })
+
+      return {
+        id: row!.id,
+        amount: outstanding,
+        vaNumber: va.vaNumber,
+        qrString: va.qrString,
+        expiresAt: va.expiresAt,
+      }
+    })
+  }
+
+  /**
    * Webhook ngân hàng — ĐƯỜNG DUY NHẤT đổi trạng thái sang đã trả.
    *
    * Nút "Đã chuyển xong" của khách chỉ đổi màn hình chờ, không đụng gì tới tiền

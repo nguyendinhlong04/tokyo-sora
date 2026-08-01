@@ -31,6 +31,14 @@ export type Actor =
     }
   /** Khách tại bàn (R0) — token QR của phiên bàn */
   | { kind: 'customer'; tableSessionId: number; branchId: string }
+  /**
+   * Khách web đặt món online — không tài khoản, không thiết bị, không bàn.
+   *
+   * Tách hẳn khỏi `customer` thay vì mượn tạm với `tableSessionId = 0`: mọi chốt
+   * chặn "khách chỉ thao tác trên bàn của mình" đều nhận diện qua `kind`, và một
+   * số 0 giả sẽ lọt qua đúng những chốt đó vào một ngày nào đó.
+   */
+  | { kind: 'guest'; branchId: string }
   /** Tác vụ nền, seeder, dispatcher */
   | { kind: 'system' }
 
@@ -41,6 +49,9 @@ export function actorRoles(actor: Actor): Role[] {
     case 'staff':
       return actor.roles
     case 'customer':
+      return ['R0']
+    // Khách web có đúng quyền của khách tại bàn: xem giá, tự gọi món, tự trả tiền
+    case 'guest':
       return ['R0']
     case 'device':
       /**
@@ -86,6 +97,8 @@ export function actorRef(actor: Actor): { kind: string; id: string | null } {
       return { kind: 'device', id: String(actor.deviceId) }
     case 'customer':
       return { kind: 'customer', id: String(actor.tableSessionId) }
+    case 'guest':
+      return { kind: 'guest', id: null }
     case 'system':
       return { kind: 'system', id: null }
   }

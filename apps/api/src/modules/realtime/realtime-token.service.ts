@@ -85,6 +85,15 @@ function claimsFor(actor: Actor): RealtimeClaims {
       }
     case 'system':
       throw new ServiceUnavailableException('Tác vụ nền không cần token Realtime')
+    case 'guest':
+      /**
+       * Khách web KHÔNG được cấp token Realtime.
+       *
+       * Họ chỉ cần biết đơn của chính mình đi tới đâu, mà đơn đó tra bằng mã theo
+       * dõi — hỏi lại vài giây một lần là đủ. Cấp token Realtime cho người vô danh
+       * là mở một kênh nghe vào chi nhánh cho bất kỳ ai bấm được nút Đặt món.
+       */
+      throw new ServiceUnavailableException('Khách online theo dõi đơn qua mã theo dõi')
   }
 }
 
@@ -101,5 +110,8 @@ function roomsFor(actor: Actor): string[] {
         : [`branch:${b}:expo`, `branch:${b}:config`]
     case 'customer':
       return [`table-session:${actor.tableSessionId}`, `branch:${b}:config`]
+    // Khách web không nghe kênh nào — xem `claimsFor`
+    case 'guest':
+      return []
   }
 }

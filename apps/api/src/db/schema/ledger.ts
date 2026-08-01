@@ -40,8 +40,10 @@ export const auditLog = pgTable(
   },
   (t) => [
     check(
+      // `guest` = khách web đặt món online: không tài khoản, không bàn. Ghi riêng
+      // chứ không gộp vào `customer` để đọc nhật ký còn phân biệt được hai nguồn.
       'audit_log_actor_kind_check',
-      sql`${t.actorKind} IN ('staff','customer','device','system')`,
+      sql`${t.actorKind} IN ('staff','customer','device','system','guest')`,
     ),
     index('audit_log_branch_time_idx').on(t.branchId, t.createdAt),
     index('audit_log_entity_idx').on(t.entity, t.entityId),

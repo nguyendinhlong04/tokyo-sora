@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import {
   bigint,
+  boolean,
   check,
   date,
   index,
@@ -55,6 +56,16 @@ export const orders = pgTable(
 
     paymentState: text('payment_state').notNull().default('unpaid'),
     cancelReason: text('cancel_reason'),
+    /**
+     * Băm của mã theo dõi đơn (O7).
+     *
+     * Khách online không có tài khoản, nhưng vẫn phải xem được đơn của mình mà
+     * không xem được đơn người khác. Cùng cách làm với token bàn: chỉ giữ bản
+     * băm, mã gốc trả về đúng một lần lúc đặt.
+     */
+    trackTokenHash: text('track_token_hash').unique(),
+    /** Người giao đơn — drawer gán ship ở P16 / O9 */
+    shipper: jsonb('shipper'),
     createdByKind: text('created_by_kind').notNull(),
     createdById: text('created_by_id'),
     /** Optimistic concurrency cho PATCH từ nhiều thiết bị POS */
@@ -184,6 +195,42 @@ export const orderLines = pgTable(
     ),
     index('order_lines_order_idx').on(t.orderId, t.batchNo),
     index('order_lines_parent_idx').on(t.parentLineId),
+  ],
+)
+
+/**
+ * Vùng giao hàng của một chi nhánh (màn O10 của Office).
+ *
+ * Khớp theo PHƯỜNG/XÃ khách chọn, không theo toạ độ: quán chưa đấu nối dịch vụ
+ * bản đồ nào, và ở Việt Nam người ta vẫn đọc địa chỉ theo phường.
+ *
+ * Một phường chỉ được thuộc một vùng đang bật; CSDL không cưỡng chế được điều đó
+ * trên cột mảng nên tầng nghiệp vụ báo lỗi cấu hình khi thấy hai vùng cùng khớp,
+ * thay vì lặng lẽ chọn bừa một mức phí.
+ */
+export const deliveryZones = pgTable(
+  'delivery_zones',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    branchId: text('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    name: text('name').notNull(),
+    /** Danh sách phường/xã thuộc vùng, viết thường không dấu để khớp thẳng */
+    wards: text('wards').array().notNull(),
+    feeVnd: bigint('fee_vnd', { mode: 'number' }).notNull(),
+    /** Đơn dưới mức này thì không nhận giao */
+    minOrderVnd: bigint('min_order_vnd', { mode: 'number' }).notNull().default(0),
+    /** Thời gian giao dự kiến, phút — cộng vào giờ hẹn hiện cho khách */
+    etaMinutes: integer('eta_minutes').notNull().default(30),
+    active: boolean('active').notNull().default(true),
+    sort: integer('sort').notNull().default(0),
+  },
+  (t) => [
+    check('delivery_zones_fee_nonneg', sql`${t.feeVnd} >= 0 AND ${t.minOrderVnd} >= 0`),
+    check('delivery_zones_eta_positive', sql`${t.etaMinutes} > 0`),
+    check('delivery_zones_wards_not_empty', sql`array_length(${t.wards}, 1) > 0`),
+    index('delivery_zones_branch_idx').on(t.branchId, t.sort),
   ],
 )
 

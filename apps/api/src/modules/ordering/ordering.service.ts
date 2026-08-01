@@ -31,7 +31,11 @@ import { ApprovalService, type ApprovalInput } from '../identity/approval.servic
 import { AuditService } from '../identity/audit.service'
 import { explodeSet, SetSelectionError, type SetSelection } from '../kitchen/domain/explode'
 import type { ServiceContext } from '../kitchen/domain/routing'
-import { buildTickets, type OrderLineForTicket } from '../kitchen/domain/ticketing'
+import {
+  buildTickets,
+  type OrderChannel,
+  type OrderLineForTicket,
+} from '../kitchen/domain/ticketing'
 
 /** Bản chụp tuỳ chọn lưu trên dòng đơn (cột `modifiers` dạng jsonb) */
 interface LineModifier {
@@ -115,9 +119,7 @@ export class OrderingService {
       const order = await this.ensureOrder(tx, session, actor)
 
       const events: DomainEvent[] = []
-      for (const input of inputs) {
-        await this.addOneLine(tx, { order, session, input, actor })
-      }
+      await this.appendLines(tx, { order, branchId: session.branchId, inputs, actor })
 
       const money = await this.recomputeTotals(tx, order.id, session.branchId)
       events.push({
@@ -132,26 +134,52 @@ export class OrderingService {
     })
   }
 
+  /**
+   * Thêm nhiều dòng vào một đơn ĐÃ CÓ, trong transaction của nơi gọi.
+   *
+   * Kênh online dùng chung đúng đường này với đơn tại bàn: nổ set, đóng băng giá,
+   * trừ trần "còn N phần" — ba việc đó mà viết lại lần thứ hai thì hai đường sẽ
+   * lệch nhau ngay lần sửa sau.
+   */
+  async appendLines(
+    tx: Tx,
+    ctx: {
+      order: typeof orders.$inferSelect
+      branchId: string
+      inputs: AddLineInput[]
+      actor: Actor
+    },
+  ) {
+    for (const input of ctx.inputs) {
+      await this.addOneLine(tx, {
+        order: ctx.order,
+        branchId: ctx.branchId,
+        input,
+        actor: ctx.actor,
+      })
+    }
+  }
+
   private async addOneLine(
     tx: Tx,
     ctx: {
       order: typeof orders.$inferSelect
-      session: typeof tableSessions.$inferSelect
+      branchId: string
       input: AddLineInput
       actor: Actor
     },
   ) {
-    const { order, session, input } = ctx
+    const { order, branchId, input } = ctx
     if (!Number.isSafeInteger(input.qty) || input.qty <= 0) {
       throw new BadRequestException(`Số lượng không hợp lệ: ${input.qty}`)
     }
 
     const batchNo = input.batchNo ?? 1
-    const catalog = await this.catalog.dishesByIds(session.branchId, [input.dishId], tx)
+    const catalog = await this.catalog.dishesByIds(branchId, [input.dishId], tx)
     const dish = catalog.get(input.dishId)
     if (!dish) throw new NotFoundException(`Không có món ${input.dishId}`)
 
-    await this.assertAvailable(tx, session.branchId, input.dishId, input.qty)
+    await this.assertAvailable(tx, branchId, input.dishId, input.qty)
 
     const modifiers = await this.resolveModifiers(tx, input.modifierOptionIds ?? [])
     const unitPrice = dish.price + modifiers.reduce((sum, m) => sum + m.priceDelta, 0)
@@ -198,7 +226,7 @@ export class OrderingService {
       }
 
       const childCatalog = await this.catalog.dishesByIds(
-        session.branchId,
+        branchId,
         children.map((c) => c.dishId),
         tx,
       )
@@ -293,120 +321,13 @@ export class OrderingService {
         ).map((b) => b.batchNo),
       )
 
-      const drafts: OrderLineForTicket[] = draft.map((l) => ({
-        lineId: String(l.id),
-        dishId: l.dishId,
-        kind: l.kind as 'dish' | 'set_parent',
-        qty: l.qty,
-        batchNo: l.batchNo,
-        /**
-         * Tuỳ chọn đi CHUNG một dòng với ghi chú, tuỳ chọn đứng trước.
-         *
-         * Vé bếp chỉ có một dòng chữ vàng dưới tên món (bản thiết kế K2), và bếp
-         * đọc nó trong lúc tay đang bận. Tách thành hai dòng thì vé cao thêm và
-         * số vé nhìn thấy trên màn giảm đi. "Miso cay · Tỏi nướng — cắt dày" nói
-         * đủ mọi thứ bếp cần biết mà vẫn nằm gọn một dòng.
-         */
-        note: ticketNote(l.modifiers, l.note),
-        setLabel: l.setLabel,
-        portionLabel: l.portionLabel,
-      }))
-
-      const catalog = await this.catalog.dishesByIds(
-        session.branchId,
-        drafts.map((d) => d.dishId),
-        tx,
-      )
-      const prefixes = await this.catalog.stationPrefixes(tx)
-      const params = await this.params.bundle(
-        {
-          grillServiceExtraSeconds: 480,
-          packBufferSeconds: 300,
-          deliveryBufferSeconds: 1200,
-        },
-        session.branchId,
-      )
-
-      const context: ServiceContext = {
-        kind: 'dinein',
-        tableCode: table.code,
-        tableHasGrill: table.hasGrill,
-      }
-
-      const drafted = buildTickets({
-        order: {
-          orderNumber: orderNumberOf(order.displayCode),
-          channel: 'pos',
-          context,
-        },
-        lines: drafts,
-        catalog: (id) => {
-          const d = catalog.get(id)
-          return d?.routing ? { name: d.name, routing: d.routing } : undefined
-        },
+      const { count: ticketCount, events } = await this.createTickets(tx, {
+        order,
+        branchId: session.branchId,
+        lines: draft,
+        context: { kind: 'dinein', tableCode: table.code, tableHasGrill: table.hasGrill },
         firedBatches,
-        stationPrefixes: prefixes,
-        now: new Date(),
-        params: {
-          grillServiceExtraSeconds: params.grillServiceExtraSeconds,
-          packBufferSeconds: params.packBufferSeconds,
-          deliveryBufferSeconds: params.deliveryBufferSeconds,
-        },
       })
-
-      const events: DomainEvent[] = []
-      for (const draftTicket of drafted) {
-        const [ticket] = await tx
-          .insert(tickets)
-          .values({
-            displayCode: draftTicket.displayCode,
-            orderId: order.id,
-            branchId: session.branchId,
-            stationId: draftTicket.station,
-            source: draftTicket.source,
-            tableCode: draftTicket.tableCode,
-            batchNo: draftTicket.batchNo,
-            state: draftTicket.state,
-            grillServiceNote: draftTicket.grillServiceNote,
-            prepSeconds: draftTicket.prepSeconds,
-            queuedAt: draftTicket.queuedAt,
-            dueAt: draftTicket.dueAt,
-            startBy: draftTicket.startBy,
-          })
-          .returning({ id: tickets.id })
-
-        await tx.insert(ticketItems).values(
-          draftTicket.items.map((item) => ({
-            ticketId: ticket!.id,
-            orderLineId: Number(item.orderLineId),
-            dishId: item.dishId,
-            nameSnapshot: item.name,
-            qty: item.qty,
-            note: item.note,
-            setLabel: item.setLabel,
-            componentLabel: item.componentLabel,
-            portionLabel: item.portionLabel,
-            linkGroup: item.linkGroup,
-            state: 'queued' as const,
-          })),
-        )
-
-        events.push({
-          branchId: session.branchId,
-          topic: 'ticket.created',
-          rooms: [
-            rooms.station(session.branchId, draftTicket.station),
-            rooms.expo(session.branchId),
-          ],
-          payload: {
-            ticketId: ticket!.id,
-            displayCode: draftTicket.displayCode,
-            station: draftTicket.station,
-            state: draftTicket.state,
-            batchNo: draftTicket.batchNo,
-          },
-        })
-      }
 
       // Cả dòng món lẫn dòng set cha đều thôi là nháp; riêng dòng set cha không
       // sinh vé nào vì món thành phần mới là thứ xuống bếp.
@@ -435,11 +356,190 @@ export class OrderingService {
         action: 'order.sent-to-kitchen',
         entity: 'order',
         entityId: String(order.id),
-        payload: { tickets: drafted.length, lines: draft.length },
+        payload: { tickets: ticketCount, lines: draft.length },
       })
 
-      return { orderId: order.id, tickets: drafted.length }
+      return { orderId: order.id, tickets: ticketCount }
     })
+  }
+
+  /**
+   * Dựng vé bếp cho một loạt dòng đơn và ghi xuống CSDL.
+   *
+   * Dùng chung cho bàn và kênh online. Định tuyến trạm là chỗ tinh vi nhất hệ
+   * thống (§16: bàn có bếp than khác bàn không, mang về khác giao hàng, món đa
+   * trạm tách hai vé nhưng chỉ xong khi cả nhóm xong) — có hai bản chép tay của
+   * đoạn này thì chúng sẽ lệch nhau ở đúng những ca hiếm mà không ai test.
+   */
+  private async createTickets(
+    tx: Tx,
+    ctx: {
+      order: typeof orders.$inferSelect
+      branchId: string
+      lines: (typeof orderLines.$inferSelect)[]
+      context: ServiceContext
+      firedBatches: ReadonlySet<number>
+    },
+  ): Promise<{ count: number; events: DomainEvent[] }> {
+    const { order, branchId, lines, context, firedBatches } = ctx
+
+    const drafts: OrderLineForTicket[] = lines.map((l) => ({
+      lineId: String(l.id),
+      dishId: l.dishId,
+      kind: l.kind as 'dish' | 'set_parent',
+      qty: l.qty,
+      batchNo: l.batchNo,
+      /**
+       * Tuỳ chọn đi CHUNG một dòng với ghi chú, tuỳ chọn đứng trước.
+       *
+       * Vé bếp chỉ có một dòng chữ vàng dưới tên món (bản thiết kế K2), và bếp
+       * đọc nó trong lúc tay đang bận. Tách thành hai dòng thì vé cao thêm và số
+       * vé nhìn thấy trên màn giảm đi. "Miso cay · Tỏi nướng — cắt dày" nói đủ
+       * mọi thứ bếp cần biết mà vẫn nằm gọn một dòng.
+       */
+      note: ticketNote(l.modifiers, l.note),
+      setLabel: l.setLabel,
+      portionLabel: l.portionLabel,
+    }))
+
+    const catalog = await this.catalog.dishesByIds(
+      branchId,
+      drafts.map((d) => d.dishId),
+      tx,
+    )
+    const prefixes = await this.catalog.stationPrefixes(tx)
+    const params = await this.params.bundle(
+      { grillServiceExtraSeconds: 480, packBufferSeconds: 300, deliveryBufferSeconds: 1200 },
+      branchId,
+    )
+
+    const drafted = buildTickets({
+      order: {
+        orderNumber: orderNumberOf(order.displayCode),
+        channel: order.channel as OrderChannel,
+        context,
+        slotAt: order.slotAt,
+      },
+      lines: drafts,
+      catalog: (id) => {
+        const d = catalog.get(id)
+        return d?.routing ? { name: d.name, routing: d.routing } : undefined
+      },
+      firedBatches,
+      stationPrefixes: prefixes,
+      now: new Date(),
+      params: {
+        grillServiceExtraSeconds: params.grillServiceExtraSeconds,
+        packBufferSeconds: params.packBufferSeconds,
+        deliveryBufferSeconds: params.deliveryBufferSeconds,
+      },
+    })
+
+    const events: DomainEvent[] = []
+    for (const draftTicket of drafted) {
+      const [ticket] = await tx
+        .insert(tickets)
+        .values({
+          displayCode: draftTicket.displayCode,
+          orderId: order.id,
+          branchId,
+          stationId: draftTicket.station,
+          source: draftTicket.source,
+          tableCode: draftTicket.tableCode,
+          batchNo: draftTicket.batchNo,
+          state: draftTicket.state,
+          grillServiceNote: draftTicket.grillServiceNote,
+          prepSeconds: draftTicket.prepSeconds,
+          queuedAt: draftTicket.queuedAt,
+          dueAt: draftTicket.dueAt,
+          startBy: draftTicket.startBy,
+        })
+        .returning({ id: tickets.id })
+
+      await tx.insert(ticketItems).values(
+        draftTicket.items.map((item) => ({
+          ticketId: ticket!.id,
+          orderLineId: Number(item.orderLineId),
+          dishId: item.dishId,
+          nameSnapshot: item.name,
+          qty: item.qty,
+          note: item.note,
+          setLabel: item.setLabel,
+          componentLabel: item.componentLabel,
+          portionLabel: item.portionLabel,
+          linkGroup: item.linkGroup,
+          state: 'queued' as const,
+        })),
+      )
+
+      events.push({
+        branchId,
+        topic: 'ticket.created',
+        rooms: [rooms.station(branchId, draftTicket.station), rooms.expo(branchId)],
+        payload: {
+          ticketId: ticket!.id,
+          displayCode: draftTicket.displayCode,
+          station: draftTicket.station,
+          state: draftTicket.state,
+          batchNo: draftTicket.batchNo,
+        },
+      })
+    }
+
+    return { count: drafted.length, events }
+  }
+
+  /**
+   * Đơn online được xác nhận → xuống bếp.
+   *
+   * Đơn hẹn giờ xa KHÔNG nấu sớm: vé mang mốc `startBy` để KDS đếm ngược tới lúc
+   * phải bắt đầu, đúng yêu cầu "đơn online không nấu sớm" ở §2. Trạng thái đơn do
+   * nơi gọi đổi; hàm này chỉ lo phần bếp.
+   */
+  async fireOnlineOrder(tx: Tx, order: typeof orders.$inferSelect, actor: Actor): Promise<number> {
+    const lines = await tx
+      .select()
+      .from(orderLines)
+      .where(and(eq(orderLines.orderId, order.id), eq(orderLines.state, 'draft')))
+      .orderBy(asc(orderLines.id))
+    if (lines.length === 0) return 0
+
+    await tx
+      .insert(orderBatches)
+      .values({
+        orderId: order.id,
+        batchNo: 1,
+        state: 'fired',
+        firedAt: new Date(),
+        firedBy: actor.kind === 'staff' ? actor.staffId : null,
+      })
+      .onConflictDoNothing()
+
+    const { count, events } = await this.createTickets(tx, {
+      order,
+      branchId: order.branchId,
+      lines,
+      // Mang về và giao hàng đều là "bếp làm hết" — không có bếp than tại bàn
+      context: order.type === 'delivery' ? { kind: 'delivery' } : { kind: 'takeaway' },
+      firedBatches: new Set([1]),
+    })
+
+    await tx
+      .update(orderLines)
+      .set({ state: 'queued', sentAt: new Date() })
+      .where(and(eq(orderLines.orderId, order.id), eq(orderLines.state, 'draft')))
+
+    for (const event of events) await emit(tx, event)
+
+    await this.audit.write(tx, {
+      actor,
+      action: 'order.sent-to-kitchen',
+      entity: 'order',
+      entityId: String(order.id),
+      payload: { tickets: count, lines: lines.length, channel: order.channel },
+    })
+
+    return count
   }
 
   /** P7 "Ra đợt tiếp": vé đợt đó vào hàng, đồng hồ bắt đầu chạy TỪ ĐÂY */
@@ -698,7 +798,19 @@ export class OrderingService {
   }
 
   /** Tính lại tổng tiền — SERVER là nguồn duy nhất, client chỉ hiển thị */
-  private async recomputeTotals(tx: Tx, orderId: number, branchId: string) {
+  /**
+   * Tính lại khối tiền của đơn và ghi đè vào bảng orders.
+   *
+   * Hai thứ đọc TỪ CHÍNH ĐƠN chứ không nhận qua tham số:
+   *   · phí giao (`moneyShip`) — đã chốt lúc đặt theo vùng giao; nhận qua tham số
+   *     thì mỗi nơi gọi lại phải nhớ truyền, quên một chỗ là đơn mất phí ship.
+   *   · phí phục vụ — chỉ áp cho đơn tại bàn. Đơn mang về và giao hàng không có
+   *     ai phục vụ tại bàn để mà thu.
+   */
+  async recomputeTotals(tx: Tx, orderId: number, branchId: string) {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
+    if (!order) throw new NotFoundException('Không có đơn này')
+
     const lines = await tx
       .select()
       .from(orderLines)
@@ -710,8 +822,12 @@ export class OrderingService {
       lines: lines
         .filter((l) => l.parentLineId === null)
         .map<OrderLineInput>((l) => ({ qty: l.qty, unitPrice: l.unitPrice })),
-      serviceRate: await this.params.getNumber('sales.serviceFeeRate', 0, branchId),
+      serviceRate:
+        order.type === 'dinein'
+          ? await this.params.getNumber('sales.serviceFeeRate', 0, branchId)
+          : 0,
       vatRate: await this.params.getNumber('sales.vatRate', 0, branchId),
+      ship: order.moneyShip,
       roundingUnit: await this.params.getNumber('sales.roundingUnit', 1000, branchId),
     })
 

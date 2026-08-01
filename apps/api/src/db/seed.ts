@@ -6,6 +6,7 @@
  */
 import 'dotenv/config'
 import { hash } from '@node-rs/argon2'
+import { eq } from 'drizzle-orm'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Pool } from 'pg'
@@ -47,8 +48,47 @@ const PARAMETERS: {
   { key: 'auth.pinLockoutMinutes', value: 5, unit: 'phút', sensitive: true },
   { key: 'auth.pairingCodeTtlMinutes', value: 10, unit: 'phút' },
   { key: 'auth.staffSessionHours', value: 12, unit: 'giờ' },
+  // Kênh online (§23): giờ nhận đơn, thời gian bếp cần, trần đơn mỗi khung 15 phút
+  { key: 'online.openMinute', value: 10 * 60, unit: 'phút từ 00:00' },
+  { key: 'online.lastOrderMinute', value: 21 * 60, unit: 'phút từ 00:00' },
+  { key: 'online.leadMinutes', value: 30, unit: 'phút' },
+  { key: 'online.slotCapacity', value: 6, unit: 'đơn' },
   { key: 'reservation.softHoldMinutes', value: 10, unit: 'phút' },
   { key: 'reservation.tableHoldMinutes', value: 15, unit: 'phút' },
+]
+
+/**
+ * Vùng giao của chi nhánh Cầu Giấy (O10).
+ *
+ * Ba vòng theo khoảng cách: quanh quán, các phường liền kề, rồi vành ngoài với
+ * phí cao hơn và đơn tối thiểu cao hơn — xa hơn thì một chuyến ship phải "cõng"
+ * được nhiều tiền món hơn mới đáng đi.
+ */
+const DELIVERY_ZONES = [
+  {
+    name: 'Vòng 1 · quanh quán',
+    wards: ['Dich Vong', 'Dich Vong Hau', 'Quan Hoa', 'Nghia Do'],
+    feeVnd: 15_000,
+    minOrderVnd: 150_000,
+    etaMinutes: 25,
+    sort: 1,
+  },
+  {
+    name: 'Vòng 2 · Cầu Giấy mở rộng',
+    wards: ['Mai Dich', 'Yen Hoa', 'Trung Hoa', 'Nghia Tan'],
+    feeVnd: 25_000,
+    minOrderVnd: 250_000,
+    etaMinutes: 35,
+    sort: 2,
+  },
+  {
+    name: 'Vòng 3 · lân cận',
+    wards: ['Lang Thuong', 'Lang Ha', 'Thanh Cong', 'Ngoc Khanh'],
+    feeVnd: 40_000,
+    minOrderVnd: 400_000,
+    etaMinutes: 50,
+    sort: 3,
+  },
 ]
 
 /** Vai trò trong prototype → mã vai trò trong ma trận §4.2 */
@@ -218,6 +258,12 @@ async function seed(db: Db) {
       secondaryLabel: routing?.secondaryLabel ?? null,
       prepSeconds: routing?.prepSeconds ?? 300,
       basePrice: d.priceVnd ?? 0,
+      /**
+       * Bán online hay không, theo đúng mẫu O11 của bản thiết kế: set và lẩu tắt,
+       * còn lại bật. Nồi lẩu mang về là nước sánh ra hộp, còn set là mâm dọn theo
+       * nhịp tại bàn — hai thứ đó bán online là bán một trải nghiệm hỏng.
+       */
+      onlineVisible: !isSet && d.group !== 'lau',
       active: d.active,
     }
     await db.insert(s.dishes).values(row).onConflictDoUpdate({ target: s.dishes.id, set: row })
@@ -342,6 +388,19 @@ async function seed(db: Db) {
       .insert(s.tables)
       .values(row)
       .onConflictDoUpdate({ target: [s.tables.branchId, s.tables.code], set: row })
+  }
+
+  // ---- Vùng giao hàng (O10) ----
+  for (const zone of DELIVERY_ZONES) {
+    const existing = await db.query.deliveryZones.findFirst({
+      where: (z, { and, eq }) => and(eq(z.branchId, branchId), eq(z.name, zone.name)),
+    })
+    const row = { branchId, ...zone }
+    if (existing) {
+      await db.update(s.deliveryZones).set(row).where(eq(s.deliveryZones.id, existing.id))
+    } else {
+      await db.insert(s.deliveryZones).values(row)
+    }
   }
 
   // ---- Nhân viên + vai trò ----

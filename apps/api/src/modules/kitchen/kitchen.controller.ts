@@ -41,7 +41,7 @@ export class KitchenController {
     @Query('station') stationQuery?: string,
   ) {
     const actor = req.actor!
-    if (actor.kind === 'system' || actor.kind === 'customer') {
+    if (actor.kind === 'system' || actor.kind === 'customer' || actor.kind === 'guest') {
       throw new BadRequestException('Không đọc được hàng vé')
     }
 

@@ -257,6 +257,12 @@ async function seedFixtures(db: ReturnType<typeof createDb>): Promise<Fixtures> 
     { key: 'sales.vatRate', value: 0 },
     { key: 'sales.serviceFeeRate', value: 0 },
     { key: 'kitchen.grillServiceExtraSeconds', value: 480, unit: 'giây' },
+    // Kênh online mở cả ngày trong test: bộ test chạy bất kể mấy giờ, và "đúng
+    // giờ nhận đơn hay chưa" đã có bộ test miền riêng lo (domain/slots.test.ts).
+    { key: 'online.openMinute', value: 0, unit: 'phút từ 00:00' },
+    { key: 'online.lastOrderMinute', value: 23 * 60 + 45, unit: 'phút từ 00:00' },
+    { key: 'online.leadMinutes', value: 15, unit: 'phút' },
+    { key: 'online.slotCapacity', value: 6, unit: 'đơn' },
   ])
 
   const pins: Record<number, string> = {}
