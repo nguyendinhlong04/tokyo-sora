@@ -10,5 +10,5 @@
     "outDir": "dist",
     "sourceMap": true
   },
-  "include": ["src", "vitest.config.ts"]
+  "include": ["src", "vitest.config.ts", "drizzle.config.ts"]
 }
