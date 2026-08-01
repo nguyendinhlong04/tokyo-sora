@@ -58,6 +58,21 @@ export class OnlineController {
     private readonly payments: SplitPaymentService,
   ) {}
 
+  /** O1: chi nhánh đang bán online */
+  @Public()
+  @Get('branches')
+  branches() {
+    return this.online.branches()
+  }
+
+  /** O2: thực đơn online của chi nhánh */
+  @Public()
+  @Get('menu')
+  menu(@Query('branch') branch: string) {
+    if (!branch) throw new BadRequestException('Thiếu mã chi nhánh')
+    return this.online.menu(branch)
+  }
+
   /** O1: vùng giao đang phục vụ */
   @Public()
   @Get('zones')

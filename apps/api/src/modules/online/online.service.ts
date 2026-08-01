@@ -14,7 +14,16 @@ import { emit } from '../../common/outbox'
 import { ParamsService } from '../../common/params.service'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
-import { branches, deliveryZones, dishes, orderLines, orders } from '../../db/schema'
+import {
+  branches,
+  categories,
+  deliveryZones,
+  dishAvailability,
+  dishBranchOverrides,
+  dishes,
+  orderLines,
+  orders,
+} from '../../db/schema'
 import type { Actor } from '../identity/actor'
 import { hashToken, newToken } from '../identity/tokens'
 import { OrderingService, type AddLineInput } from '../ordering/ordering.service'
@@ -62,6 +71,90 @@ export class OnlineService {
     private readonly params: ParamsService,
     private readonly ordering: OrderingService,
   ) {}
+
+  // ------------------------------------------------------ O1 chọn chi nhánh
+
+  /** Chi nhánh đang bán online — màn O1 đổ ra thẻ chọn chi nhánh */
+  async branches() {
+    const rows = await this.db
+      .select({
+        id: branches.id,
+        name: branches.name,
+        address: branches.address,
+        phone: branches.phone,
+        openHours: branches.openHours,
+      })
+      .from(branches)
+      .where(eq(branches.active, true))
+      .orderBy(asc(branches.id))
+    return rows
+  }
+
+  /**
+   * O2 Thực đơn online của một chi nhánh.
+   *
+   * Công khai và KHÁC thực đơn tại quán: chỉ món bật bán online, kèm danh sách
+   * món đang hết. Không dùng chung `/api/config` vì bundle đó mang cả sơ đồ bàn,
+   * trạm bếp và tham số vận hành — không việc gì phải phát những thứ đó ra web.
+   */
+  async menu(branchId: string) {
+    const branch = await this.branch(branchId)
+
+    const [categoryRows, dishRows, overrideRows, soldOut] = await Promise.all([
+      this.db.select().from(categories).orderBy(asc(categories.sort)),
+      this.db
+        .select()
+        .from(dishes)
+        .where(and(eq(dishes.onlineVisible, true), eq(dishes.active, true)))
+        .orderBy(asc(dishes.sort)),
+      this.db
+        .select()
+        .from(dishBranchOverrides)
+        .where(eq(dishBranchOverrides.branchId, branchId)),
+      this.db
+        .select({ dishId: dishAvailability.dishId, status: dishAvailability.status })
+        .from(dishAvailability)
+        .where(eq(dishAvailability.branchId, branchId)),
+    ])
+
+    const overrideByDish = new Map(overrideRows.map((o) => [o.dishId, o]))
+    const soldOutIds = new Set(
+      soldOut.filter((a) => a.status === 'sold_out').map((a) => a.dishId),
+    )
+
+    const menu = dishRows
+      .filter((d) => overrideByDish.get(d.id)?.active !== false)
+      .map((d) => ({
+        id: d.id,
+        categoryId: d.categoryId,
+        subCategory: d.subCategory,
+        nameVi: d.nameVi,
+        nameJa: d.nameJa,
+        kana: d.kana,
+        shortDesc: d.shortDesc,
+        allergens: d.allergens,
+        tags: d.tags,
+        price: overrideByDish.get(d.id)?.price ?? d.basePrice,
+        soldOut: soldOutIds.has(d.id),
+        /**
+         * Món nướng nguội nhanh — O3 nhắc khách chọn khung giờ gần nhất. Suy từ
+         * trạm nướng chứ không khai tay: món nào ra khỏi vỉ than cũng vậy.
+         */
+        bestWithin30: d.stationGrill === 'ST-06' || d.stationNoGrill === 'ST-06',
+      }))
+
+    return {
+      branch: {
+        id: branch.id,
+        name: branch.name,
+        address: branch.address,
+        phone: branch.phone,
+        openHours: branch.openHours,
+      },
+      categories: categoryRows.map((c) => ({ id: c.id, nameVi: c.nameVi, kanji: c.kanji })),
+      dishes: menu,
+    }
+  }
 
   // --------------------------------------------------------- O1 vùng giao
 

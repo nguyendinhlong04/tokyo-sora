@@ -5,7 +5,8 @@
   "type": "module",
   "description": "44 component dùng chung + UI-lab (playground QA thị giác đối chiếu prototype)",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./QrCode": "./src/QrCode.tsx"
   },
   "scripts": {
     "dev": "vite",
