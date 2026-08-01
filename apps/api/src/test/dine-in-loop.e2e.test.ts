@@ -103,7 +103,7 @@ describe('1. Mở ca và mở bàn (P1 · P2 · P3)', () => {
       headers: auth(cashier),
     })
     const rows = res.json<{ code: string; hasGrill: boolean; session: unknown }[]>()
-    expect(rows).toHaveLength(2)
+    expect(rows.map((r) => r.code).sort()).toEqual(['05', 'A4', 'A9'])
     expect(rows.find((r) => r.code === 'A4')!.hasGrill).toBe(true)
     expect(rows.find((r) => r.code === '05')!.hasGrill).toBe(false)
   })

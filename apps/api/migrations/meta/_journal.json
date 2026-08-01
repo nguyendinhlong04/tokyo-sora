@@ -8,6 +8,13 @@
       "when": 1785575876656,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785586900510,
+      "tag": "0001_bank_events",
+      "breakpoints": true
     }
   ]
 }

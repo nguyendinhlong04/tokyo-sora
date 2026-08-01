@@ -9,6 +9,7 @@ import type { Db } from '../../db/client'
 import { areas, branches, orders, tableSessions, tables } from '../../db/schema'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
+import { hashToken, newToken } from '../identity/tokens'
 
 @Injectable()
 export class FloorplanService {
@@ -118,6 +119,39 @@ export class FloorplanService {
       })
 
       return session!
+    })
+  }
+
+  /**
+   * Cấp token QR cho phiên bàn (A3 in mã dán bàn · P3 khi mở bàn).
+   *
+   * Chỉ lưu bản băm; token trả về đúng MỘT LẦN để in ra mã QR. Muốn cấp lại thì
+   * sinh token mới — token cũ chết ngay, nên khách bàn trước không đọc được đơn
+   * của khách bàn sau.
+   */
+  async issueQrToken(sessionId: number, actor: Actor): Promise<{ token: string; url: string }> {
+    return this.db.transaction(async (tx) => {
+      const [session] = await tx
+        .select()
+        .from(tableSessions)
+        .where(eq(tableSessions.id, sessionId))
+      if (!session) throw new NotFoundException('Không có phiên bàn này')
+      if (session.status === 'closed') throw new ConflictException('Phiên bàn đã đóng')
+
+      const token = newToken()
+      await tx
+        .update(tableSessions)
+        .set({ qrTokenHash: hashToken(token) })
+        .where(eq(tableSessions.id, sessionId))
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'table.qr-token.issued',
+        entity: 'table_session',
+        entityId: String(sessionId),
+      })
+
+      return { token, url: `/t/${token}` }
     })
   }
 

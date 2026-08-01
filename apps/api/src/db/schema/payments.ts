@@ -4,6 +4,7 @@ import {
   check,
   date,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -95,5 +96,38 @@ export const paymentLines = pgTable(
       .on(t.orderLineId)
       .where(sql`live = 'yes'`),
     index('payment_lines_payment_idx').on(t.paymentId),
+  ],
+)
+
+/**
+ * Hộp thư đến từ ngân hàng — APPEND-ONLY.
+ *
+ * Mọi thông báo đều được ghi lại, kể cả thông báo không khớp lượt trả nào. Bỏ im
+ * lặng một khoản tiền đã vào tài khoản là cách chắc chắn nhất để cuối ngày không
+ * đối soát được. `bank_ref` UNIQUE chính là chốt chặn chống xử lý trùng: ngân hàng
+ * gửi lại webhook là chuyện thường, và poller dự phòng cũng đi qua cùng đường này.
+ */
+export const bankEvents = pgTable(
+  'bank_events',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    provider: text('provider').notNull(),
+    bankRef: text('bank_ref').notNull().unique(),
+    vaNumber: text('va_number'),
+    amount: bigint('amount', { mode: 'number' }).notNull(),
+    raw: jsonb('raw').notNull(),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+    matchedPaymentId: bigint('matched_payment_id', { mode: 'number' }),
+    matchState: text('match_state').notNull(),
+  },
+  (t) => [
+    check(
+      'bank_events_match_state_check',
+      sql`${t.matchState} IN ('matched','unmatched','amount_mismatch')`,
+    ),
+    // P15 đối soát: chỉ quét những thông báo cần người xử lý
+    index('bank_events_unmatched_idx')
+      .on(t.receivedAt)
+      .where(sql`match_state <> 'matched'`),
   ],
 )

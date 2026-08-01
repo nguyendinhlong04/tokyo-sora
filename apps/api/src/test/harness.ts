@@ -1,11 +1,10 @@
 import 'reflect-metadata'
-import fastifyCookie from '@fastify/cookie'
 import { Test } from '@nestjs/testing'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
 import { hash } from '@node-rs/argon2'
 import { Pool } from 'pg'
 import { AppModule } from '../app.module'
-import { ZodExceptionFilter } from '../common/zod-exception.filter'
+import { configureApp } from '../bootstrap'
 import { createDb } from '../db/client'
 import { runMigrations } from '../db/migrate'
 import * as s from '../db/schema'
@@ -31,8 +30,9 @@ export async function bootTestApp() {
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()
   const app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter())
-  await app.register(fastifyCookie)
-  app.useGlobalFilters(new ZodExceptionFilter())
+  // Dùng ĐÚNG đường cấu hình của server thật — không dựng lại ở đây, vì bản dựng
+  // lại sẽ trôi lệch và test sẽ kiểm một ứng dụng khác với ứng dụng chạy thật.
+  await configureApp(app)
   await app.init()
   await app.getHttpAdapter().getInstance().ready()
 
@@ -64,6 +64,8 @@ export interface Fixtures {
   grillTableId: number
   /** Bàn KHÔNG có bếp — món sống phải chuyển sang bếp nướng hộ */
   plainTableId: number
+  /** Bàn dự phòng cho các kịch bản cần phiên bàn riêng, không đụng hai bàn trên */
+  spareTableId: number
 }
 
 /** Món đủ để phủ mọi nhánh định tuyến §16 */
@@ -234,6 +236,20 @@ async function seedFixtures(db: ReturnType<typeof createDb>): Promise<Fixtures> 
     })
     .returning({ id: s.tables.id })
 
+  const [spareTable] = await db
+    .insert(s.tables)
+    .values({
+      branchId,
+      areaId: area!.id,
+      code: 'A9',
+      kind: 'grill',
+      hasGrill: true,
+      grillType: 'than',
+      seatMin: 2,
+      seatMax: 6,
+    })
+    .returning({ id: s.tables.id })
+
   await db.insert(s.parameters).values([
     { key: 'sales.roundingUnit', value: 1000, unit: 'đồng' },
     { key: 'sales.vatRate', value: 0 },
@@ -263,5 +279,6 @@ async function seedFixtures(db: ReturnType<typeof createDb>): Promise<Fixtures> 
     pins,
     grillTableId: grillTable!.id,
     plainTableId: plainTable!.id,
+    spareTableId: spareTable!.id,
   }
 }
