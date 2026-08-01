@@ -26,15 +26,57 @@ export interface Ticket {
   prepSeconds: number
   openedAt: string
   queuedAt: string | null
+  /** Đơn hẹn giờ: mốc phải bắt đầu nấu — KDS đếm NGƯỢC tới đây */
   startBy: string | null
   items: TicketItem[]
+}
+
+export interface Station {
+  id: string
+  name: string
+  kanji: string | null
+  columns: number
 }
 
 export interface Queue {
   /** Giờ máy chủ — client hiệu chỉnh đồng hồ theo cái này, không tin đồng hồ TV box */
   serverTime: string
-  station: { id: string; name: string; kanji: string | null; columns: number }
+  station: Station
   tickets: Ticket[]
+}
+
+export interface ExpoOrder {
+  key: string
+  orderId: number
+  tableCode: string | null
+  batchNo: number
+  ready: boolean
+  /** Còn chờ những trạm nào — rỗng nghĩa là ra được */
+  waitingFor: string[]
+  items: {
+    name: string
+    qty: number
+    componentLabel: string | null
+    linkGroup: string | null
+    state: string
+  }[]
+}
+
+export interface AvailabilityRow {
+  dishId: string
+  status: 'sold_out' | 'limited'
+  remaining: number | null
+}
+
+export interface ConfigDish {
+  id: string
+  kind: 'dish' | 'set' | 'drink'
+  nameVi: string
+  routing: {
+    stationGrill: string | null
+    stationNoGrill: string | null
+    secondaryStation: string | null
+  } | null
 }
 
 export const api = {
@@ -49,11 +91,31 @@ export const api = {
 
   queue: () => apiFetch<Queue>('/api/tickets'),
 
+  expo: () => apiFetch<{ serverTime: string; orders: ExpoOrder[] }>('/api/expo'),
+
+  config: (branchId: string) =>
+    apiFetch<{ dishes: ConfigDish[] }>(`/api/config?branch=${branchId}`),
+
+  availability: () => apiFetch<AvailabilityRow[]>('/api/availability'),
+
   setState: (ticketId: number, action: 'start' | 'done' | 'undo', label: string) =>
     enqueue<{ state: string }>({
       method: 'POST',
       path: `/api/tickets/${ticketId}/state`,
       payload: { action },
+      label,
+    }),
+
+  setAvailability: (
+    dishId: string,
+    status: 'sold_out' | 'limited' | 'available',
+    remaining: number | null,
+    label: string,
+  ) =>
+    enqueue<AvailabilityRow>({
+      method: 'POST',
+      path: '/api/availability',
+      payload: { dishId, status, remaining },
       label,
     }),
 }

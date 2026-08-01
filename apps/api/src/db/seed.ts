@@ -109,6 +109,25 @@ interface SeedModifierGroup {
   opts: { id: string; n: string; p: number }[]
 }
 
+interface SeedSetDetail {
+  courses?: {
+    k?: string
+    label: string
+    items?: { id?: string; n?: string; q?: string }[]
+  }[]
+}
+
+/**
+ * Định lượng trong prototype là chuỗi hiển thị: '2 bát' · '100g' · '3 con' · '1 phần'.
+ * Số phần là con số đứng đầu nếu có, còn '100g' thì vẫn là MỘT phần nặng 100g —
+ * chuỗi gốc được giữ nguyên ở `portionLabel` để in lên vé bếp.
+ */
+function parseQty(display: string | undefined): number {
+  if (!display) return 1
+  const match = /^(\d+)\s*(phần|bát|con|xiên|cái|suất)/i.exec(display.trim())
+  return match ? Number(match[1]) : 1
+}
+
 async function seed(db: Db) {
   // ---- Chi nhánh ----
   const branchRows = await readJson<SeedBranch[]>('branches.json')
@@ -181,6 +200,55 @@ async function seed(db: Db) {
     throw new Error(
       `Không suy được trạm cho món: ${unroutable.join(', ')} — bổ sung vào seed-routing.ts`,
     )
+  }
+
+  // ---- Chặng của set ----
+  // Prototype mô tả set theo CHẶNG (Mở bữa · Bò trên than · Chốt bữa…) và "set nấu
+  // theo nhịp, mang từng chặng" — nên mỗi chặng lệch một đợt ra món.
+  const setData = await readJson<{ setDetails: Record<string, SeedSetDetail> | null }>('sets.json')
+  const knownDishIds = new Set(dishes.map((d) => d.id))
+  const skippedSetItems: string[] = []
+
+  for (const [key, detail] of Object.entries(setData.setDetails ?? {})) {
+    // Khoá trong setDetails là 'set' + id (setsora → sora)
+    const setDishId = key.startsWith('set') ? key.slice(3) : key
+    if (!knownDishIds.has(setDishId)) continue
+
+    for (const [index, course] of (detail.courses ?? []).entries()) {
+      const groupId = `${setDishId}-${index}`
+      const group = {
+        id: groupId,
+        setDishId,
+        label: course.label,
+        kanji: course.k ?? null,
+        // Nhóm cố định (lấy hết). Nhóm "chọn N trong M" của Set Kiwami sẽ khai ở
+        // Office M11 khi có dữ liệu thật — prototype chưa mô tả lựa chọn cụ thể.
+        pickCount: null,
+        batchOffset: index,
+        sort: index,
+      }
+      await db.insert(s.setGroups).values(group).onConflictDoUpdate({ target: s.setGroups.id, set: group })
+
+      for (const [itemIndex, item] of (course.items ?? []).entries()) {
+        // Món chỉ có trong set (cơm trắng kèm…) chưa có bản ghi trong danh mục —
+        // ghi nhận để nhập ở Office M1 thay vì bịa ra món mới ở đây.
+        if (!item.id || !knownDishIds.has(item.id)) {
+          skippedSetItems.push(`${setDishId}/${course.label}: ${item.id ?? item.n ?? '?'}`)
+          continue
+        }
+        const row = {
+          groupId,
+          dishId: item.id,
+          qty: parseQty(item.q),
+          portionLabel: item.q ?? null,
+          sort: itemIndex,
+        }
+        await db
+          .insert(s.setGroupItems)
+          .values(row)
+          .onConflictDoUpdate({ target: [s.setGroupItems.groupId, s.setGroupItems.dishId], set: row })
+      }
+    }
   }
 
   // ---- Nhóm tuỳ chọn (modifier) ----
@@ -268,6 +336,8 @@ async function seed(db: Db) {
     tables: tableRows.tables.length,
     staff: staffRows.length,
     parameters: PARAMETERS.length,
+    // Món chỉ xuất hiện trong set mà chưa có trong danh mục — nhập ở Office M1
+    setItemsChuaCoTrongDanhMuc: skippedSetItems,
   }
 }
 

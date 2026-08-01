@@ -1,16 +1,14 @@
-import {
-  calibrate,
-  clearDevice,
-  elapsedSeconds,
-  getDeviceToken,
-  setDeviceInfo,
-  setDeviceToken,
-  watchConnectivity,
-} from '@sora/core'
-import { Button, Card, EmptyState, OrderTicket, ToastProvider, useToast } from '@sora/ui'
-import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { calibrate, clearDevice, getDeviceToken, watchConnectivity } from '@sora/core'
+import { Button, OutboxBanner, ToastProvider } from '@sora/ui'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { api, type Ticket } from './api'
+import { api } from './api'
+import { DishTotals } from './screens/DishTotals'
+import { Expo } from './screens/Expo'
+import { Holding } from './screens/Holding'
+import { Pair } from './screens/Pair'
+import { SoldOut } from './screens/SoldOut'
+import { TicketQueue } from './screens/TicketQueue'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, refetchOnWindowFocus: true } },
@@ -29,123 +27,21 @@ export function App() {
 function Root() {
   const [paired, setPaired] = useState(() => Boolean(getDeviceToken()))
   useEffect(() => watchConnectivity(), [])
-  return paired ? <TicketQueue onUnpair={() => setPaired(false)} /> : <PairScreen onPaired={() => setPaired(true)} />
+  return paired ? <Shell onUnpair={() => setPaired(false)} /> : <Pair onPaired={() => setPaired(true)} />
 }
 
-/**
- * K1 Ghép thiết bị.
- *
- * Màn bếp treo trên tường, không có bàn phím — nhập mã 6 số bằng lưới phím to.
- * Ghép xong thì màn này không hiện lại nữa, kể cả sau khi mất điện bật lại.
- */
-function PairScreen({ onPaired }: { onPaired: () => void }) {
-  const [code, setCode] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+type ScreenId = 'queue' | 'totals' | 'holding' | 'soldout' | 'expo'
 
-  const submit = async (value: string) => {
-    setBusy(true)
-    setError(null)
-    try {
-      const result = await api.pair(value, 'Màn bếp')
-      setDeviceToken(result.token)
-      const me = await api.me()
-      setDeviceInfo({
-        deviceId: result.deviceId,
-        branchId: me.branchId,
-        kind: 'kds',
-        stationId: me.stationId,
-        name: 'Màn bếp',
-      })
-      onPaired()
-    } catch {
-      setError('Mã không đúng hoặc đã hết hạn')
-      setCode('')
-    } finally {
-      setBusy(false)
-    }
-  }
+const SCREENS: { id: ScreenId; label: string; code: string }[] = [
+  { id: 'queue', label: 'Hàng vé', code: 'K2' },
+  { id: 'totals', label: 'Tổng món', code: 'K3' },
+  { id: 'holding', label: 'Chờ ra', code: 'K4' },
+  { id: 'soldout', label: 'Hết món', code: 'K5' },
+  { id: 'expo', label: 'Expo', code: 'K6' },
+]
 
-  const press = (digit: string) => {
-    const next = code + digit
-    setCode(next)
-    if (next.length === 6) void submit(next)
-  }
-
-  return (
-    <main className="flex min-h-dvh items-center justify-center bg-canvas p-10">
-      <Card className="flex flex-col items-center gap-8 p-10">
-        <div className="flex flex-col items-center gap-1">
-          <span className="font-jp text-[length:var(--fs-d3)] text-accent-ink">焼</span>
-          <h1 className="text-[length:var(--fs-t1)] font-semibold text-ink-hi">Ghép màn bếp</h1>
-          <p className="text-[length:var(--fs-b2)] text-ink-mute">
-            Nhập mã 6 số do quản lý cấp
-          </p>
-        </div>
-
-        <div className="flex gap-3">
-          {Array.from({ length: 6 }, (_, i) => (
-            <span
-              key={i}
-              className="flex h-16 w-12 items-center justify-center rounded-md border border-line-3 bg-surface-3 font-mono text-[length:var(--fs-d3)] text-ink-hi"
-            >
-              {code[i] ?? ''}
-            </span>
-          ))}
-        </div>
-
-        {error ? <p className="text-danger">{error}</p> : null}
-
-        <div className="grid grid-cols-3 gap-3">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-            <button
-              key={d}
-              type="button"
-              disabled={busy}
-              onClick={() => press(d)}
-              className="h-24 w-24 rounded-md border border-line-2 bg-surface-3 font-mono text-[length:var(--fs-d3)] text-ink-hi active:bg-surface-4"
-            >
-              {d}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setCode('')}
-            className="h-24 w-24 rounded-md border border-line-2 text-ink-mute"
-          >
-            Xoá
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => press('0')}
-            className="h-24 w-24 rounded-md border border-line-2 bg-surface-3 font-mono text-[length:var(--fs-d3)] text-ink-hi active:bg-surface-4"
-          >
-            0
-          </button>
-          <button
-            type="button"
-            onClick={() => setCode((c) => c.slice(0, -1))}
-            className="h-24 w-24 rounded-md border border-line-2 text-ink-mute"
-          >
-            ←
-          </button>
-        </div>
-      </Card>
-    </main>
-  )
-}
-
-/**
- * K2 Hàng vé.
- *
- * Không cuộn: lưới cố định theo số cột của trạm, quá số ô thì hiện "còn N đơn".
- * Bếp không rảnh tay để cuộn, và vé trôi khỏi màn là vé bị quên.
- */
-function TicketQueue({ onUnpair }: { onUnpair: () => void }) {
-  const toast = useToast()
-  const qc = useQueryClient()
-  const [, setTick] = useState(0)
+function Shell({ onUnpair }: { onUnpair: () => void }) {
+  const [screen, setScreen] = useState<ScreenId>('queue')
 
   const queue = useQuery({
     queryKey: ['queue'],
@@ -155,24 +51,103 @@ function TicketQueue({ onUnpair }: { onUnpair: () => void }) {
     refetchInterval: 5_000,
   })
 
-  // Đồng hồ đếm chạy mỗi giây; hiệu chỉnh theo giờ SERVER mỗi lần có dữ liệu mới
+  // Hiệu chỉnh đồng hồ theo giờ SERVER mỗi lần có dữ liệu mới
   useEffect(() => {
     if (queue.data?.serverTime) calibrate(queue.data.serverTime)
   }, [queue.data?.serverTime])
 
+  // Đồng hồ đếm phải nhích mỗi giây dù dữ liệu chưa đổi
+  const [, setTick] = useState(0)
   useEffect(() => {
     const timer = setInterval(() => setTick((t) => t + 1), 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // Màn bếp không được tắt màn giữa ca
+  useScreenWakeLock()
+
+  const waitingCount = (queue.data?.tickets ?? []).filter((t) => t.state === 'waiting').length
+  const liveCount = (queue.data?.tickets ?? []).filter((t) => t.state !== 'waiting').length
+
+  return (
+    <main className="flex h-dvh flex-col bg-canvas">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-6 border-b border-line-1 px-6">
+        <div className="flex items-baseline gap-3">
+          <span className="font-jp text-[length:var(--fs-t1)] text-accent-ink">
+            {queue.data?.station.kanji ?? '焼'}
+          </span>
+          <span className="text-[length:var(--fs-t1)] font-semibold text-ink-hi">
+            {queue.data?.station.name ?? 'Màn bếp'}
+          </span>
+          <span className="text-[length:var(--fs-b2)] text-ink-mute">
+            {liveCount} vé đang chạy
+            {waitingCount > 0 ? ` · ${waitingCount} chờ ra` : ''}
+          </span>
+        </div>
+
+        <nav className="flex gap-1">
+          {SCREENS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setScreen(item.id)}
+              className={[
+                'flex h-[var(--hit-target)] items-center gap-2 rounded-sm px-4 text-[length:var(--fs-b1)]',
+                screen === item.id
+                  ? 'bg-surface-3 text-ink-hi'
+                  : 'text-ink-mute hover:bg-surface-2',
+              ].join(' ')}
+            >
+              <span className="font-mono text-[length:var(--fs-c2)] text-ink-mute">{item.code}</span>
+              {item.label}
+              {item.id === 'holding' && waitingCount > 0 ? (
+                <span className="rounded-pill bg-warn px-2 font-mono text-[length:var(--fs-c2)] text-canvas">
+                  {waitingCount}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-3">
+          <OutboxBanner />
+          <Button
+            variant="ghost"
+            onClick={() => {
+              clearDevice()
+              onUnpair()
+            }}
+          >
+            Ngắt ghép
+          </Button>
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-hidden p-4">
+        {queue.isError && screen === 'queue' ? (
+          <p className="text-warn">
+            Không nối được máy chủ. Vé đã hiện vẫn giữ nguyên, máy sẽ tự nối lại.
+          </p>
+        ) : null}
+
+        {screen === 'queue' ? <TicketQueue queue={queue.data} loading={queue.isPending} /> : null}
+        {screen === 'totals' ? <DishTotals queue={queue.data} /> : null}
+        {screen === 'holding' ? <Holding queue={queue.data} /> : null}
+        {screen === 'soldout' ? <SoldOut /> : null}
+        {screen === 'expo' ? <Expo /> : null}
+      </div>
+    </main>
+  )
+}
+
+/** Màn bếp không được tắt màn giữa ca */
+function useScreenWakeLock() {
   useEffect(() => {
     let lock: WakeLockSentinel | null = null
     const acquire = async () => {
       try {
         lock = await navigator.wakeLock?.request('screen')
       } catch {
-        // Trình duyệt từ chối (thường vì tab ẩn) — thử lại khi hiện lại
+        // Trình duyệt từ chối (thường vì tab đang ẩn) — thử lại khi hiện lại
       }
     }
     void acquire()
@@ -185,105 +160,4 @@ function TicketQueue({ onUnpair }: { onUnpair: () => void }) {
       void lock?.release()
     }
   }, [])
-
-  const setState = useMutation({
-    mutationFn: ({ ticket, action }: { ticket: Ticket; action: 'start' | 'done' }) =>
-      api.setState(ticket.id, action, `${action === 'start' ? 'Bắt đầu' : 'Xong'} ${ticket.displayCode}`),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['queue'] }),
-    onError: (err: Error) => toast(err.message, 'danger'),
-  })
-
-  const tickets = queue.data?.tickets ?? []
-  const live = tickets.filter((t) => t.state !== 'waiting')
-  const waiting = tickets.filter((t) => t.state === 'waiting')
-
-  // Quá giờ nhảy lên đầu — vé trễ phải đập vào mắt trước
-  const sorted = [...live].sort((a, b) => {
-    const ratioOf = (t: Ticket) =>
-      t.prepSeconds > 0 ? elapsedSeconds(t.queuedAt) / t.prepSeconds : 0
-    return ratioOf(b) - ratioOf(a)
-  })
-
-  // Lưới cố định theo số cột của TRẠM (§22): ST-02 sáu cột vé thấp, ST-06 bốn cột
-  // vé cao. Hai hàng là vừa tầm mắt trên TV treo tường.
-  const columns = queue.data?.station.columns ?? 4
-  const shown = sorted.slice(0, columns * 2)
-  const overflow = sorted.length - shown.length
-
-  return (
-    <main className="flex h-dvh flex-col bg-canvas">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-line-1 px-6">
-        <div className="flex items-baseline gap-3">
-          <span className="font-jp text-[length:var(--fs-t1)] text-accent-ink">
-            {queue.data?.station.kanji ?? '焼'}
-          </span>
-          <span className="text-[length:var(--fs-t1)] font-semibold text-ink-hi">
-            {queue.data?.station.name ?? 'Hàng vé'}
-          </span>
-          <span className="text-[length:var(--fs-b2)] text-ink-mute">
-            {live.length} vé đang chạy
-            {waiting.length > 0 ? ` · ${waiting.length} chờ ra` : ''}
-          </span>
-        </div>
-        <Button
-          variant="ghost"
-          onClick={() => {
-            clearDevice()
-            onUnpair()
-          }}
-        >
-          Ngắt ghép
-        </Button>
-      </header>
-
-      <div className="flex-1 overflow-hidden p-4">
-        {queue.isPending ? (
-          <p className="text-ink-mute">Đang tải hàng vé…</p>
-        ) : queue.isError ? (
-          <EmptyState
-            title="Không nối được máy chủ. Vé đã hiện vẫn giữ nguyên, sẽ tự nối lại."
-          />
-        ) : shown.length === 0 ? (
-          <EmptyState title="Chưa có vé nào. Vé mới sẽ tự hiện ở đây." />
-        ) : (
-          <div
-            className="grid content-start gap-4"
-            style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
-          >
-            {shown.map((ticket) => (
-              <OrderTicket
-                key={ticket.id}
-                displayCode={ticket.displayCode}
-                tableCode={ticket.tableCode}
-                batchNo={ticket.batchNo}
-                state={ticket.state}
-                elapsedSeconds={elapsedSeconds(ticket.queuedAt)}
-                prepSeconds={ticket.prepSeconds}
-                grillServiceNote={ticket.grillServiceNote}
-                showGrams={ticket.stationId === 'ST-02'}
-                items={ticket.items.map((i) => ({
-                  id: i.id,
-                  name: i.nameSnapshot,
-                  qty: i.qty,
-                  note: i.note,
-                  setLabel: i.setLabel,
-                  componentLabel: i.componentLabel,
-                  portionLabel: i.portionLabel,
-                  weightGrams: i.weightGrams,
-                }))}
-                onStart={() => setState.mutate({ ticket, action: 'start' })}
-                onDone={() => setState.mutate({ ticket, action: 'done' })}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {overflow > 0 ? (
-        <footer className="shrink-0 border-t border-line-1 px-6 py-3 text-[length:var(--fs-t2)] text-warn">
-          Còn {overflow} vé nữa
-        </footer>
-      ) : null}
-    </main>
-  )
 }
