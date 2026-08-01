@@ -1,0 +1,242 @@
+/* ============================================================
+   Tokyo Sora — Design tokens
+   Nguồn chuẩn: README.md §5 (bảng token) + kế hoạch thiết kế §8–§11.
+   Hai giá trị chốt theo ground-truth file thiết kế (khác README):
+   - danger #B5382C (README ghi #C34141, file dùng #B5382C)
+   - nhấn nền sáng #8A6C24 (bảng README không phủ chủ đề sáng Office)
+
+   Cấu trúc 3 lớp:
+   1. Palette thô  --sora-*   (bất biến)
+   2. Semantic     --t-*      (đổi theo [data-theme])
+   3. @theme       Tailwind v4 sinh utility từ 2 lớp trên
+   ============================================================ */
+
+:root {
+  /* ---- Nền & bề mặt (chủ đề tối) ---- */
+  --sora-bg-base: #07080a;
+  --sora-surface-1: #0a0c10;
+  --sora-surface-2: #0d0f13;
+  --sora-surface-3: #10131a;
+  --sora-surface-4: #151920;
+  --sora-line-1: #1e232c;
+  --sora-line-2: #242a34;
+  --sora-line-3: #2b313c;
+  --sora-line-4: #3d4552;
+
+  /* ---- Chữ trên nền tối ---- */
+  --sora-ink-hi: #f5f2ea;
+  --sora-ink-cream: #efebe1;
+  --sora-ink-body: #c2bcae;
+  --sora-ink-mute: #8b8577;
+
+  /* ---- Vàng đồng (thương hiệu) ---- */
+  --sora-gold-200: #efe0bc;
+  --sora-gold-300: #dcc58a;
+  --sora-gold-500: #c9a85c;
+  --sora-gold-600: #b08a33;
+  --sora-gold-700: #8a6b22;
+  --sora-gold-900: #5e4917;
+
+  /* ---- Kraft (panel giấy) ---- */
+  --sora-kraft: #d9cdb8;
+  --sora-kraft-ink: #241e17;
+  --sora-kraft-ink-2: #4a3b22;
+
+  /* ---- Washi (nền sáng Office) ---- */
+  --sora-washi-50: #fbf9f4;
+  --sora-washi-100: #ffffff;
+  --sora-washi-200: #efebe1;
+  --sora-gold-light: #8a6c24;
+
+  /* ---- Trạng thái ---- */
+  --sora-ok: #4a8f63;
+  --sora-warn: #d08a1c;
+  --sora-danger: #b5382c;
+  --sora-danger-line: #8c2f2f;
+  --sora-danger-line-2: #6e2a2a;
+  --sora-info: #4e7fa8;
+
+  /* ---- Thang than hồng (ngôn ngữ tiến độ chung) ---- */
+  --sora-ember-0: #5a6270; /* 0–40%  tro   */
+  --sora-ember-1: #c9a85c; /* 40–70% đồng  */
+  --sora-ember-2: #d9721f; /* 70–100% than */
+  --sora-ember-3: #b5382c; /* >100%  lửa   */
+
+  /* ---- Motion (§11.4) ---- */
+  --dur-micro: 120ms;
+  --dur-panel: 200ms;
+  --dur-sheet: 280ms;
+  --dur-reveal: 480ms;
+  --ease-sora: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ---- Vùng chạm: 44 khách · 52 POS · 64 KDS ---- */
+  --hit-target: 44px;
+
+  /* ---- Thang chữ (§9) ---- */
+  --fs-d1: 60px;
+  --fs-d2: 44px;
+  --fs-d3: 30px;
+  --fs-t1: 22px;
+  --fs-t2: 18px;
+  --fs-b1: 16px;
+  --fs-b2: 14px;
+  --fs-c1: 13px;
+  --fs-c2: 11px;
+
+  /* ---- Vai trò chữ trên vé bếp (mặc định; KDS override ×1.25) ---- */
+  --fs-ticket-dish: 19px;
+  --fs-ticket-qty: 24px;
+  --fs-clock: 32px;
+}
+
+/* ---- Semantic — mặc định TỐI ---- */
+:root {
+  --t-bg: var(--sora-bg-base);
+  --t-surface-1: var(--sora-surface-1);
+  --t-surface-2: var(--sora-surface-2);
+  --t-surface-3: var(--sora-surface-3);
+  --t-surface-4: var(--sora-surface-4);
+  --t-line-1: var(--sora-line-1);
+  --t-line-2: var(--sora-line-2);
+  --t-line-3: var(--sora-line-3);
+  --t-line-4: var(--sora-line-4);
+  --t-ink-hi: var(--sora-ink-hi);
+  --t-ink-body: var(--sora-ink-body);
+  --t-ink-mute: var(--sora-ink-mute);
+  --t-accent: var(--sora-gold-500);
+  --t-accent-strong: var(--sora-gold-600);
+  --t-accent-ink: var(--sora-gold-300);
+  /* Nút chính nền vàng chữ sumi — cấm chữ trắng trên vàng (§8.4) */
+  --t-on-accent: var(--sora-bg-base);
+}
+
+/* ---- Semantic — SÁNG (Office). Ramp line sáng chưa được tài liệu hoá chi tiết:
+       tạm map về washi-200 (đúng màu viền/kẻ bảng trong file Office), tinh chỉnh
+       khi dựng màn Office GĐ5 đối chiếu prototype. ---- */
+[data-theme='light'] {
+  --t-bg: var(--sora-washi-50);
+  --t-surface-1: var(--sora-washi-100);
+  --t-surface-2: var(--sora-washi-50);
+  --t-surface-3: var(--sora-washi-200);
+  --t-surface-4: var(--sora-washi-200);
+  --t-line-1: var(--sora-washi-200);
+  --t-line-2: var(--sora-washi-200);
+  --t-line-3: var(--sora-washi-200);
+  --t-line-4: var(--sora-ink-mute);
+  --t-ink-hi: var(--sora-surface-2);
+  --t-ink-body: var(--sora-surface-2);
+  --t-ink-mute: var(--sora-ink-mute);
+  --t-accent: var(--sora-gold-light);
+  --t-accent-strong: var(--sora-gold-700);
+  --t-accent-ink: var(--sora-gold-light);
+  --t-on-accent: var(--sora-washi-100);
+}
+
+/* ---- Thang theo app ---- */
+[data-scale='pos'] {
+  --hit-target: 52px;
+}
+[data-scale='kds'] {
+  --hit-target: 64px;
+  --fs-ticket-dish: 24px;
+  --fs-ticket-qty: 30px;
+  --fs-clock: 40px;
+}
+
+/* ============================================================
+   Tailwind v4 theme — utility sinh từ token, KHÔNG có palette mặc định
+   ============================================================ */
+@theme inline {
+  --color-*: initial;
+
+  /* Semantic (đổi theo chủ đề) */
+  --color-canvas: var(--t-bg);
+  --color-surface-1: var(--t-surface-1);
+  --color-surface-2: var(--t-surface-2);
+  --color-surface-3: var(--t-surface-3);
+  --color-surface-4: var(--t-surface-4);
+  --color-line-1: var(--t-line-1);
+  --color-line-2: var(--t-line-2);
+  --color-line-3: var(--t-line-3);
+  --color-line-4: var(--t-line-4);
+  --color-ink-hi: var(--t-ink-hi);
+  --color-ink-body: var(--t-ink-body);
+  --color-ink-mute: var(--t-ink-mute);
+  --color-accent: var(--t-accent);
+  --color-accent-strong: var(--t-accent-strong);
+  --color-accent-ink: var(--t-accent-ink);
+  --color-on-accent: var(--t-on-accent);
+
+  /* Palette thô (dùng khi cần đúng sắc độ bất kể chủ đề) */
+  --color-ink-cream: var(--sora-ink-cream);
+  --color-gold-200: var(--sora-gold-200);
+  --color-gold-300: var(--sora-gold-300);
+  --color-gold-500: var(--sora-gold-500);
+  --color-gold-600: var(--sora-gold-600);
+  --color-gold-700: var(--sora-gold-700);
+  --color-gold-900: var(--sora-gold-900);
+  --color-kraft: var(--sora-kraft);
+  --color-kraft-ink: var(--sora-kraft-ink);
+  --color-kraft-ink-2: var(--sora-kraft-ink-2);
+  --color-ok: var(--sora-ok);
+  --color-warn: var(--sora-warn);
+  --color-danger: var(--sora-danger);
+  --color-danger-line: var(--sora-danger-line);
+  --color-danger-line-2: var(--sora-danger-line-2);
+  --color-info: var(--sora-info);
+  --color-ember-0: var(--sora-ember-0);
+  --color-ember-1: var(--sora-ember-1);
+  --color-ember-2: var(--sora-ember-2);
+  --color-ember-3: var(--sora-ember-3);
+
+  /* Chữ */
+  --font-sans: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Cormorant Garamond', Lora, 'Noto Serif', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+  --font-jp: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+
+  /* Bo góc (§10): sm nút/ô nhập · md thẻ · lg modal · pill chip */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+}
+
+/* ============================================================
+   Keyframes sora-* (§11.4) — KDS chỉ dùng sora-late
+   ============================================================ */
+@keyframes sora-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sora-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sora-slide {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sora-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@keyframes sora-tick {
+  from { transform: translateY(-2px); opacity: 0.6; }
+  to { transform: none; opacity: 1; }
+}
+/* Nhấp nháy vé quá giờ — CSS thuần cho GPU yếu của TV box */
+@keyframes sora-late {
+  0%, 100% { border-color: var(--sora-danger); }
+  50% { border-color: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

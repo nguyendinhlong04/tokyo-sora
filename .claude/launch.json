@@ -1,0 +1,41 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ui-lab",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@sora/ui", "dev"],
+      "port": 5177
+    },
+    {
+      "name": "table",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@sora/table", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "pos",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@sora/pos", "dev"],
+      "port": 5174
+    },
+    {
+      "name": "kitchen",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@sora/kitchen", "dev"],
+      "port": 5175
+    },
+    {
+      "name": "office",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@sora/office", "dev"],
+      "port": 5176
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@sora/web", "dev"],
+      "port": 3001
+    }
+  ]
+}

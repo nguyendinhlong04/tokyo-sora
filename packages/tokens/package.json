@@ -1,0 +1,10 @@
+{
+  "name": "@sora/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Design tokens Tokyo Sora — palette, semantic 2 chủ đề, thang chữ, motion (nguồn: README.md §5)",
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./fonts.css": "./fonts.css"
+  }
+}

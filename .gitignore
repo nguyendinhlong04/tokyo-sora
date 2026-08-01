@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+*.log
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+
+playwright-report/
+test-results/
+.turbo/
+
+# Dump nguyên trạng từ prototype — chỉ để tra cứu khi debug, sinh lại bằng
+# `pnpm extract-seed`. Bản đã chuẩn hoá (out/*.json) VẪN commit vì là nguồn seed.
+scripts/extract-seed/out/raw/

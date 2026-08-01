@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<template id="__bundler_thumbnail">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" data-bg-color="#07080A">
+<rect width="320" height="320" fill="#07080A"/>
+<rect x="62" y="62" width="196" height="196" rx="12" fill="none" stroke="#B08A33" stroke-width="2" opacity=".5"/>
+<text x="160" y="196" font-family="serif" font-size="96" fill="#DCC58A" text-anchor="middle">卓</text>
+</svg>
+</template>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&amp;family=Be+Vietnam+Pro:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Shippori+Mincho+B1:wght@400;600&amp;display=swap" rel="stylesheet" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#07080A}
+a{color:#DCC58A;text-decoration:none}
+a:hover{color:#EFE0BC}
+button{font-family:inherit}
+input,textarea,select{font-family:inherit}
+@keyframes sora-fade{from{opacity:0}to{opacity:1}}
+@keyframes sora-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sora-sheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes sora-pulse{0%,100%{opacity:.45}50%{opacity:.8}}
+@keyframes sora-tick{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+@keyframes sora-spin{to{transform:rotate(360deg)}}
+[data-rail]{scrollbar-width:none;-ms-overflow-style:none}
+[data-rail]::-webkit-scrollbar{display:none;width:0;height:0}
+@media (prefers-reduced-motion:reduce){*{animation:none !important}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#07080A;font-family:'Be Vietnam Pro',system-ui,sans-serif;color:#F5F2EA">
+
+<div data-rail="1" style="position:sticky;top:0;z-index:200;background:#0D0F13;border-bottom:1px solid #1E232C;padding:0 24px;display:flex;align-items:center;gap:24px;height:60px;overflow-x:auto">
+  <div style="display:flex;align-items:baseline;gap:8px;flex:none">
+    <span style="font-family:'Shippori Mincho B1',serif;font-size:14px;color:#C9A85C">東京空</span>
+    <span style="font-size:11px;font-weight:600;letter-spacing:.14em;color:#8B8577">SORA TABLE · K1</span>
+  </div>
+  <div style="width:1px;height:24px;background:#1E232C;flex:none"></div>
+  <div style="display:flex;align-items:center;gap:10px;flex:none">
+    <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#3D4552">Màn</span>
+    <div style="display:flex;gap:4px">
+      <sc-for list="{{ tabScreens }}" as="o" hint-placeholder-count="16">
+        <button type="button" onClick="{{ o.on }}" style="{{ o.st }}">{{ o.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="width:1px;height:24px;background:#1E232C;flex:none"></div>
+  <div style="display:flex;align-items:center;gap:10px;flex:none">
+    <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#3D4552">Trạng thái</span>
+    <div style="display:flex;gap:4px">
+      <sc-for list="{{ tabState }}" as="o" hint-placeholder-count="4">
+        <button type="button" onClick="{{ o.on }}" style="{{ o.st }}">{{ o.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="width:1px;height:24px;background:#1E232C;flex:none"></div>
+  <div style="display:flex;align-items:center;gap:10px;flex:none">
+    <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#3D4552">Bố cục T2</span>
+    <div style="display:flex;gap:4px">
+      <sc-for list="{{ tabMv }}" as="o" hint-placeholder-count="3">
+        <button type="button" onClick="{{ o.on }}" style="{{ o.st }}">{{ o.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="width:1px;height:24px;background:#1E232C;flex:none"></div>
+  <div style="display:flex;align-items:center;gap:10px;flex:none">
+    <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#3D4552">T17 Mạng</span>
+    <div style="display:flex;gap:4px">
+      <sc-for list="{{ tabNet }}" as="o" hint-placeholder-count="2">
+        <button type="button" onClick="{{ o.on }}" style="{{ o.st }}">{{ o.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+<div style="padding:32px 32px 80px;display:flex;justify-content:center">
+<div style="flex:none">
+  <div style="width:410px;height:864px;background:#151920;border:1px solid #2B313C;border-radius:44px;padding:10px">
+    <div style="position:relative;width:390px;height:844px;border-radius:34px;overflow:hidden;background:#0D0F13">
+
+      <div ref="{{ vpRef }}" data-rail="1" style="position:absolute;inset:0;overflow-y:auto;overflow-x:hidden">
+
+      <div style="position:sticky;top:0;z-index:60">
+        <div style="height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:rgba(13,15,19,.86);backdrop-filter:blur(10px)">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#F5F2EA">19:24</span>
+          <div style="display:flex;gap:5px;align-items:center">
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="#F5F2EA"><rect x="0" y="7" width="3" height="4" rx="1"></rect><rect x="4.3" y="5" width="3" height="6" rx="1"></rect><rect x="8.6" y="2.5" width="3" height="8.5" rx="1"></rect><rect x="12.9" y="0" width="3" height="11" rx="1" opacity=".4"></rect></svg>
+            <svg width="22" height="11" viewBox="0 0 24 12" fill="none"><rect x=".5" y=".5" width="19" height="11" rx="3" stroke="#F5F2EA" opacity=".5"></rect><rect x="2" y="2" width="13" height="8" rx="1.6" fill="#F5F2EA"></rect><path d="M21 4v4c1.2-.4 1.2-3.6 0-4Z" fill="#F5F2EA" opacity=".5"></path></svg>
+          </div>
+        </div>
+        <sc-if value="{{ showTopBar }}" hint-placeholder-val="{{ false }}">
+          <div style="height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:rgba(13,15,19,.94);backdrop-filter:blur(14px);border-bottom:1px solid rgba(201,168,92,.16)">
+            <span style="font-size:13px;font-weight:600;letter-spacing:.2em;color:#F5F2EA">TOKYO SORA</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button type="button" onClick="{{ goSearch }}" style="width:44px;height:44px;border:none;background:transparent;cursor:pointer;display:grid;place-items:center;padding:0">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#C2BCAE" stroke-width="1.7"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 21 21"></path></svg>
+              </button>
+              <button type="button" onClick="{{ goOrders }}" style="position:relative;width:44px;height:44px;border:none;background:transparent;cursor:pointer;display:grid;place-items:center;padding:0">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#C2BCAE" stroke-width="1.7"><path d="M5 8h14l-1.3 11.2a2 2 0 0 1-2 1.8H8.3a2 2 0 0 1-2-1.8L5 8Z"></path><path d="M9 8V6a3 3 0 0 1 6 0v2"></path></svg>
+                <sc-if value="{{ hasOrders }}" hint-placeholder-val="{{ false }}">
+                  <span style="position:absolute;top:5px;right:5px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#B08A33;color:#07080A;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;display:grid;place-items:center">{{ orderCount }}</span>
+                </sc-if>
+              </button>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ offline }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(208,138,28,.14);border-bottom:1px solid #D08A1C">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D08A1C" stroke-width="1.8" style="flex:none"><path d="M2 8.5A15 15 0 0 1 22 8.5"></path><path d="M6 13a9.5 9.5 0 0 1 12 0"></path><circle cx="12" cy="18.5" r="1.3" fill="#D08A1C" stroke="none"></circle><path d="M3 3l18 18" stroke="#D08A1C"></path></svg>
+            <span style="font-size:14px;color:#EFE0BC">Mất kết nối — đơn sẽ tự gửi khi có mạng</span>
+          </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ stLoading }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:20px 16px">
+          <sc-for list="{{ skel6 }}" as="s" hint-placeholder-count="6">
+            <div style="display:flex;gap:16px;align-items:center;height:104px;border-bottom:1px solid #151920">
+              <div style="width:88px;height:88px;border-radius:8px;background:#151920;flex:none;animation:sora-pulse 1.6s ease-in-out infinite"></div>
+              <div style="flex:1">
+                <div style="height:18px;width:62%;border-radius:4px;background:#151920;animation:sora-pulse 1.6s ease-in-out infinite"></div>
+                <div style="height:14px;width:88%;border-radius:4px;background:#151920;margin-top:10px;animation:sora-pulse 1.6s ease-in-out infinite"></div>
+                <div style="height:16px;width:34%;border-radius:4px;background:#151920;margin-top:10px;animation:sora-pulse 1.6s ease-in-out infinite"></div>
+              </div>
+              <div style="width:44px;height:44px;border-radius:4px;background:#151920;flex:none;animation:sora-pulse 1.6s ease-in-out infinite"></div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ stEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:640px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;text-align:center">
+          <span style="font-family:'Shippori Mincho B1',serif;font-size:56px;color:#5E4917;line-height:1">{{ emptyKanji }}</span>
+          <p style="font-size:18px;font-weight:500;color:#F5F2EA;margin:24px 0 0;line-height:1.5;text-wrap:pretty">{{ emptyTitle }}</p>
+          <p style="font-size:15px;color:#C2BCAE;margin:12px 0 0;line-height:1.65">{{ emptySub }}</p>
+          <button type="button" onClick="{{ emptyAct }}" style="height:52px;width:100%;margin-top:32px;border-radius:4px;border:1px solid #C9A85C;background:transparent;color:#DCC58A;font-size:15px;font-weight:500;cursor:pointer">{{ emptyBtn }}</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ stError }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:640px;display:flex;flex-direction:column;justify-content:center;padding:40px 20px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B5382C" stroke-width="1.6"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6"></path><circle cx="12" cy="16.5" r=".8" fill="#B5382C" stroke="none"></circle></svg>
+            <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#B5382C">Không tải được</span>
+          </div>
+          <p style="font-size:22px;font-weight:600;color:#F5F2EA;margin:18px 0 0;line-height:1.35;text-wrap:pretty">{{ errTitle }}</p>
+          <p style="font-size:15px;color:#C2BCAE;margin:14px 0 0;line-height:1.7">{{ errSub }}</p>
+          <button type="button" onClick="{{ retry }}" style="height:52px;margin-top:32px;border-radius:4px;border:none;background:#B08A33;color:#07080A;font-size:15px;font-weight:600;cursor:pointer">Thử lại</button>
+          <button type="button" onClick="{{ goCall }}" style="height:52px;margin-top:12px;border-radius:4px;border:1px solid #2B313C;background:transparent;color:#C2BCAE;font-size:15px;cursor:pointer">Gọi nhân viên</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ stOk }}" hint-placeholder-val="{{ true }}">
+      <div>
+
+      <sc-if value="{{ isT1 }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="T1 Chào và xác nhận bàn" style="position:relative;min-height:800px;display:flex;flex-direction:column;padding:0 20px 24px">
+        <span style="position:absolute;right:8px;top:104px;font-family:'Shippori Mincho B1',serif;font-size:180px;line-height:1;color:#F5F2EA;opacity:.06;pointer-events:none">空</span>
+        <div style="position:relative;flex:none;display:flex;justify-content:flex-end;padding-top:12px">
+          <div style="display:flex;gap:4px">
+            <sc-for list="{{ langsSm }}" as="l" hint-placeholder-count="3">
+              <button type="button" onClick="{{ l.on }}" style="{{ l.st }}">{{ l.code }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:8px">
+          <div style="text-align:center">
+            <p style="font-family:'Shippori Mincho B1',serif;font-size:20px;color:#C9A85C;margin:0;letter-spacing:.3em">東京空</p>
+            <p style="font-family:'Cormorant Garamond',serif;font-weight:300;font-size:30px;color:#F5F2EA;margin:10px 0 0;letter-spacing:.06em">TOKYO SORA</p>
+          </div>
+          <div style="margin-top:44px;padding:24px;border:1px solid rgba(201,168,92,.16);border-radius:8px;background:#151920">
+            <p style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:30px;color:#F5F2EA;margin:0;line-height:1">Bàn 12</p>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="1.6" style="flex:none"><path d="M12 3c1.6 3.2.4 4.6-.8 6-1 1.2-1.6 2.3-1.6 3.7a2.4 2.4 0 0 0 4.8 0c0-.9-.3-1.6-.7-2.2 1.9 1 3.3 2.7 3.3 5A5 5 0 0 1 7 15.5C7 10 12 9 12 3Z"></path></svg>
+              <span style="font-size:14px;color:#C2BCAE">{{ tableZone }}</span>
+            </div>
+          </div>
+          <div style="margin-top:32px">
+            <p style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8B8577;margin:0 0 14px">Mấy người ăn?</p>
+            <div style="display:flex;align-items:center;border:1px solid #2B313C;border-radius:4px;height:64px">
+              <button type="button" onClick="{{ minusGuest }}" style="width:64px;height:62px;border:none;background:transparent;color:#DCC58A;font-size:24px;cursor:pointer">−</button>
+              <span style="flex:1;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:24px;color:#F5F2EA">{{ guests }}</span>
+              <button type="button" onClick="{{ plusGuest }}" style="width:64px;height:62px;border:none;background:transparent;color:#DCC58A;font-size:24px;cursor:pointer">+</button>
+            </div>
+          </div>
+        </div>
+        <div style="flex:none;display:grid;gap:10px">
+          <button type="button" onClick="{{ startOrder }}" style="height:56px;border-radius:4px;border:none;background:#B08A33;color:#07080A;font-size:16px;font-weight:600;cursor:pointer">Bắt đầu gọi món</button>
+          <button type="button" onClick="{{ goCall }}" style="height:52px;border-radius:4px;border:1px solid #2B313C;background:transparent;color:#C2BCAE;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h1.8a1 1 0 0 1 1 .8l.7 3a1 1 0 0 1-.5 1.1l-1.6.9a11 11 0 0 0 5.3 5.3l.9-1.6a1 1 0 0 1 1.1-.5l3 .7a1 1 0 0 1 .8 1v1.8a2.5 2.5 0 0 1-2.5 2.5A14.5 14.5 0 0 1 4 6.5Z"></path></svg>
+            Gọi nhân viên
+          </button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT2 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T2 Thực đơn">
+        <div data-rail="1" style="position:sticky;top:92px;z-index:40;height:48px;display:flex;align-items:center;gap:6px;padding:0 16px;background:rgba(13,15,19,.96);backdrop-filter:blur(14px);border-bottom:1px solid rgba(201,168,92,.16);overflow-x:auto">
+          <sc-for list="{{ cats }}" as="c" hint-placeholder-count="10">
+            <button type="button" onClick="{{ c.on }}" style="{{ c.st }}">
+              <span style="font-family:'Shippori Mincho B1',serif;font-size:14px">{{ c.kanji }}</span>
+              <span style="font-size:14px">{{ c.name }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 16px 0">
+          <button type="button" onClick="{{ goFilter }}" style="height:44px;padding:0 16px;border-radius:999px;border:1px solid #2B313C;background:transparent;color:#C2BCAE;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M6 12h12M10 18h4"></path></svg>{{ filterLabel }}
+          </button>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8B8577">{{ shownCount }} món</span>
+        </div>
+
+        <sc-if value="{{ menuEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:64px 28px 96px;text-align:center">
+            <span style="font-family:'Shippori Mincho B1',serif;font-size:56px;color:#5E4917;line-height:1">無</span>
+            <p style="font-size:18px;font-weight:500;color:#F5F2EA;margin:24px 0 0;line-height:1.5">Không món nào phù hợp bộ lọc.</p>
+            <p style="font-size:15px;color:#C2BCAE;margin:12px 0 0;line-height:1.65">Bỏ một vài điều kiện là thấy lại thực đơn.</p>
+            <button type="button" onClick="{{ goFilter }}" style="height:52px;width:100%;margin-top:28px;border-radius:4px;border:1px solid #C9A85C;background:transparent;color:#DCC58A;font-size:15px;font-weight:500;cursor:pointer">Sửa bộ lọc</button>
+          </div>
+        </sc-if>
+
+        <div style="padding:0 0 96px">
+        <sc-for list="{{ menuGroups }}" as="g" hint-placeholder-count="10">
+        <div ref="{{ g.ref }}">
+          <div style="padding:32px 16px 20px;text-align:center">
+            <h2 style="font-family:'Cormorant Garamond',serif;font-weight:300;font-size:30px;color:#F5F2EA;margin:0">{{ g.name }}</h2>
+            <p style="font-family:'Shippori Mincho B1',serif;font-size:14px;color:#8B8577;margin:8px 0 0;letter-spacing:.2em">{{ g.div }}</p>
+          </div>
+          <sc-for list="{{ g.subs }}" as="sub" hint-placeholder-count="1">
+            <div>
+              <sc-if value="{{ sub.show }}" hint-placeholder-val="{{ false }}">
+                <div style="position:sticky;top:140px;z-index:30;display:flex;align-items:center;gap:10px;padding:10px 16px;background:#0D0F13;border-top:1px solid rgba(201,168,92,.16);border-bottom:1px solid rgba(201,168,92,.16)">
+                  <span style="font-family:'Shippori Mincho B1',serif;font-size:20px;color:#C9A85C;line-height:1">{{ sub.kanji }}</span>
+                  <span style="font-size:13px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8B8577">{{ sub.name }}</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ mvA }}" hint-placeholder-val="{{ true }}">
+              <div>
+                <sc-for list="{{ sub.dishes }}" as="d" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:center;gap:14px;height:104px;padding:0 16px;border-bottom:1px solid #151920">
+                    <div onClick="{{ d.open }}" style="{{ d.plate88 }}">
+                      <span style="font-family:'Shippori Mincho B1',serif;font-size:40px;color:#5E4917;line-height:1;filter:drop-shadow(0 12px 24px rgba(0,0,0,.45))">{{ d.k }}</span>
+                    </div>
+                    <div onClick="{{ d.open }}" style="flex:1;min-width:0;cursor:pointer">
+                      <p style="font-size:18px;font-weight:600;color:#F5F2EA;margin:0;line-height:1.3">{{ d.vi }}</p>
+                      <p style="font-size:14px;color:#C2BCAE;margin:5px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.d }}</p>
+                      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#DCC58A">{{ d.p }}</span>
+                        <sc-if value="{{ d.hasPromo }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:inline-flex;align-items:center;gap:8px">
+                            <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8B8577;text-decoration:line-through">{{ d.pOld }}</span>
+                            <span style="height:22px;padding:0 8px;border-radius:999px;border:1px solid #B5382C;color:#B5382C;font-size:11px;font-weight:600;letter-spacing:.04em;display:inline-flex;align-items:center">{{ d.promoTag }}</span>
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{ d.so }}" hint-placeholder-val="{{ false }}">
+                          <span style="height:22px;padding:0 9px;border-radius:999px;border:1px solid #B5382C;color:#B5382C;font-size:11px;font-weight:600;display:inline-flex;align-items:center">Tạm hết</span>
+                        </sc-if>
+                        <sc-if value="{{ d.pre }}" hint-placeholder-val="{{ false }}">
+                          <span style="height:22px;padding:0 9px;border-radius:999px;border:1px solid #4E7FA8;color:#4E7FA8;font-size:11px;font-weight:600;display:inline-flex;align-items:center">Bếp nướng sẵn</span>
+                        </sc-if>
+                      </div>
+                    </div>
+                    <button type="button" onClick="{{ d.add }}" disabled="{{ d.so }}" style="{{ d.addSt }}">
+                      <sc-if value="{{ d.needMods }}" hint-placeholder-val="{{ false }}">
+                        <span style="position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:#C9A85C"></span>
+                      </sc-if>+
+                    </button>
+                  </div>
+                </sc-for>
+              </div>
+              </sc-if>
+
+              <sc-if value="{{ mvB }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px">
+                <sc-for list="{{ sub.dishes }}" as="d" hint-placeholder-count="4">
+                  <div>
+                    <div onClick="{{ d.open }}" style="{{ d.plate43 }}">
+                      <span style="font-family:'Shippori Mincho B1',serif;font-size:46px;color:#5E4917;line-height:1;filter:drop-shadow(0 12px 24px rgba(0,0,0,.45))">{{ d.k }}</span>
+                      <sc-if value="{{ d.so }}" hint-placeholder-val="{{ false }}">
+                        <span style="position:absolute;top:8px;left:8px;height:22px;padding:0 9px;border-radius:999px;border:1px solid #B5382C;background:#0D0F13;color:#B5382C;font-size:11px;font-weight:600;display:inline-flex;align-items:center">Tạm hết</span>
+                      </sc-if>
+                      <sc-if value="{{ d.hasPromo }}" hint-placeholder-val="{{ false }}">
+                        <span style="position:absolute;top:8px;right:8px;height:22px;padding:0 8px;border-radius:999px;background:#B5382C;color:#F5F2EA;font-size:11px;font-weight:600;letter-spacing:.04em;display:inline-flex;align-items:center">{{ d.promoTag }}</span>
+                      </sc-if>
+                    </div>
+                    <p onClick="{{ d.open }}" style="font-size:16px;font-weight:600;color:#F5F2EA;margin:12px 0 0;line-height:1.35;cursor:pointer">{{ d.vi }}</p>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px">
+                      <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#DCC58A">{{ d.p }}</span>
+                        <sc-if value="{{ d.hasPromo }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8B8577;text-decoration:line-through">{{ d.pOld }}</span>
+                        </sc-if>
+                      </span>
+                      <button type="button" onClick="{{ d.add }}" disabled="{{ d.so }}" style="{{ d.addSt }}">+</button>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              </sc-if>
+
+              <sc-if value="{{ mvC }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <sc-for list="{{ sub.dishes }}" as="d" hint-placeholder-count="6">
+                  <div style="display:flex;align-items:center;gap:12px;height:72px;padding:0 16px;border-bottom:1px solid #151920">
+                    <div onClick="{{ d.open }}" style="{{ d.plate56 }}">
+                      <span style="font-family:'Shippori Mincho B1',serif;font-size:26px;color:#5E4917;line-height:1">{{ d.k }}</span>
+                      <sc-if value="{{ d.hasPromo }}" hint-placeholder-val="{{ false }}">
+                        <span style="position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;background:#B5382C;color:#F5F2EA;font-size:11px;font-weight:700;line-height:1;display:grid;place-items:center">%</span>
+                      </sc-if>
+                    </div>
+                    <div onClick="{{ d.open }}" style="flex:1;min-width:0;cursor:pointer;display:flex;align-items:baseline;gap:10px">
+                      <p style="font-size:16px;font-weight:600;color:#F5F2EA;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.vi }}</p>
+                      <sc-if value="{{ d.so }}" hint-placeholder-val="{{ false }}">
+                        <span style="height:20px;padding:0 8px;border-radius:999px;border:1px solid #B5382C;color:#B5382C;font-size:11px;font-weight:600;display:inline-flex;align-items:center;flex:none">Hết</span>
+                      </sc-if>
+                      <sc-if value="{{ d.hasPromo }}" hint-placeholder-val="{{ false }}">
+                        <span style="height:20px;padding:0 8px;border-radius:999px;border:1px solid #B5382C;color:#B5382C;font-size:11px;font-weight:600;display:inline-flex;align-items:center;flex:none">{{ d.promoTag }}</span>
+                      </sc-if>
+                    </div>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#DCC58A;flex:none">{{ d.p }}</span>
+                    <button type="button" onClick="{{ d.add }}" disabled="{{ d.so }}" style="{{ d.addSt }}">+</button>
+                  </div>
+                </sc-for>
+              </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT4 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T4 Tìm kiếm">
+        <div style="padding:16px">
+          <div style="display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;border:1px solid #C9A85C;border-radius:4px;background:#151920">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B8577" stroke-width="1.7" style="flex:none"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 21 21"></path></svg>
+            <input type="text" value="{{ query }}" onChange="{{ onQuery }}" placeholder="Gõ không dấu cũng được — bo ba chi" style="flex:1;height:50px;border:none;background:transparent;color:#F5F2EA;font-size:16px;outline:none" />
+            <button type="button" onClick="{{ clearQuery }}" style="width:32px;height:32px;border:none;background:transparent;color:#8B8577;font-size:18px;cursor:pointer;padding:0;flex:none">×</button>
+          </div>
+        </div>
+        <sc-if value="{{ noQuery }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:8px 16px 0">
+            <p style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8B8577;margin:0 0 14px">Tìm gần đây</p>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <sc-for list="{{ recent }}" as="r" hint-placeholder-count="4">
+                <button type="button" onClick="{{ r.on }}" style="height:44px;padding:0 16px;border-radius:999px;border:1px solid #2B313C;background:transparent;color:#C2BCAE;font-size:14px;cursor:pointer">{{ r.q }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ hasResults }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:8px 0 96px">
+            <sc-for list="{{ results }}" as="d" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:14px;height:104px;padding:0 16px;border-bottom:1px solid #151920">
+                <div onClick="{{ d.open }}" style="{{ d.plate88 }}">
+                  <span style="font-family:'Shippori Mincho B1',serif;font-size:40px;color:#5E4917;line-height:1;filter:drop-shadow(0 12px 24px rgba(0,0,0,.45))">{{ d.k }}</span>
+                </div>
+                <div onClick="{{ d.open }}" style="flex:1;min-width:0;cursor:pointer">
+                  <p style="font-size:18px;font-weight:600;color:#F5F2EA;margin:0;line-height:1.3">{{ d.vi }}</p>
+                  <p style="font-size:14px;color:#C2BCAE;margin:5px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.d }}</p>
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#DCC58A">{{ d.p }}</span>
+                    <sc-if value="{{ d.hasPromo }}" hint-placeholder-val="{{ false }}">
+                      <span style="display:inline-flex;align-items:center;gap:8px">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8B8577;text-decoration:line-through">{{ d.pOld }}</span>
+                        <span style="height:22px;padding:0 8px;border-radius:999px;border:1px solid #B5382C;color:#B5382C;font-size:11px;font-weight:600;display:inline-flex;align-items:center">{{ d.promoTag }}</span>
+                      </span>
+                    </sc-if>
+                  </div>
+                </div>
+                <button type="button" onClick="{{ d.add }}" disabled="{{ d.so }}" style="{{ d.addSt }}">+</button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:32px 16px 96px">
+            <p style="font-size:18px;font-weight:500;color:#F5F2EA;margin:0;line-height:1.5">Không thấy món nào khớp. Thử từ khoá khác nhé.</p>
+            <p style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8B8577;margin:36px 0 14px">Ba món bán chạy</p>
+            <sc-for list="{{ topDishes }}" as="d" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:14px;height:104px;border-bottom:1px solid #151920">
+                <div onClick="{{ d.open }}" style="{{ d.plate88 }}">
+                  <span style="font-family:'Shippori Mincho B1',serif;font-size:40px;color:#5E4917;line-height:1;filter:drop-shadow(0 12px 24px rgba(0,0,0,.45))">{{ d.k }}</span>
+                </div>
+                <div onClick="{{ d.open }}" style="flex:1;min-width:0;cursor:pointer">
+                  <p style="font-size:18px;font-weight:600;color:#F5F2EA;margin:0">{{ d.vi }}</p>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#DCC58A;display:inline-block;margin-top:6px">{{ d.p }}</span>
+                </div>
+                <button type="button" onClick="{{ d.add }}" style="{{ d.addSt }}">+</button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT6 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T6 Giỏ hàng">
+        <sc-if value="{{ cartEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height:600px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;text-align:center">
+            <span style="font-family:'Shippori Mincho B1',serif;font-size:56px;color:#5E4917;line-height:1">空</span>
+            <p style="font-size:18px;font-weight:500;color:#F5F2EA;margin:24px 0 0;line-height:1.5">Chưa có món nào. Chọn từ thực đơn để bắt đầu.</p>
+            <button type="button" onClick="{{ goMenu }}" style="height:52px;width:100%;margin-top:32px;border-radius:4px;border:1px solid #C9A85C;background:transparent;color:#DCC58A;font-size:15px;font-weight:500;cursor:pointer">Xem thực đơn</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ cartHas }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <div style="padding:20px 16px 8px">
+            <h1 style="font-family:'Cormorant Garamond',serif;font-weight:300;font-size:30px;color:#F5F2EA;margin:0">Giỏ của bàn 12</h1>
+            <p style="font-size:14px;color:#8B8577;margin:8px 0 0">Bấm Gửi bếp là bếp bắt đầu làm ngay.</p>
+          </div>
+          <div style="padding:8px 0">
+            <sc-for list="{{ cart }}" as="l" hint-placeholder-count="3">
+              <div style="padding:14px 16px;border-bottom:1px solid #151920">
+                <div style="display:flex;align-items:flex-start;gap:12px">
+                  <div style="flex:1;min-width:0">
+                    <p style="font-size:16px;font-weight:600;color:#F5F2EA;margin:0;line-height:1.35">{{ l.vi }}</p>
+                    <sc-if value="{{ l.hasMods }}" hint-placeholder-val="{{ false }}">
+                      <p style="font-size:13px;color:#D08A1C;margin:6px 0 0;padding-left:12px;line-height:1.5">{{ l.modText }}</p>
+                    </sc-if>
+                    <sc-if value="{{ l.hasNote }}" hint-placeholder-val="{{ false }}">
+                      <p style="font-size:13px;color:#D08A1C;margin:4px 0 0;padding-left:12px;line-height:1.5">▸ {{ l.note }}</p>
+                    </sc-if>
+                  </div>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#DCC58A;flex:none">{{ l.amount }}</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px">
+                  <div style="display:flex;align-items:center;border:1px solid #2B313C;border-radius:4px;height:44px">
+                    <button type="button" onClick="{{ l.minus }}" style="width:44px;height:42px;border:none;background:transparent;color:#DCC58A;font-size:19px;cursor:pointer">−</button>
+                    <span style="min-width:34px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:16px;color:#F5F2EA">{{ l.qty }}</span>
+                    <button type="button" onClick="{{ l.plus }}" style="width:44px;height:42px;border:none;background:transparent;color:#DCC58A;font-size:19px;cursor:pointer">+</button>
+                  </div>
+                  <button type="button" onClick="{{ l.del }}" style="height:44px;padding:0 14px;border-radius:4px;border:1px solid #B5382C;background:transparent;color:#B5382C;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"></path></svg>Xoá
+                  </button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:16px">
+            <label style="display:block;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#8B8577;margin-bottom:10px">Ghi chú chung cho bếp</label>
+            <textarea rows="2" onChange="{{ onCartNote }}" placeholder="Ví dụ: cắt dày, ít muối, ra món chậm thôi" style="width:100%;border-radius:4px;border:1px solid #2B313C;background:#151920;color:#F5F2EA;font-size:16px;padding:12px 14px;resize:vertical;line-height:1.6"></textarea>
+          </div>
+          <div style="padding:8px 16px 96px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;padding-top:16px;border-top:1px solid rgba(201,168,92,.16)">
+              <span style="font-size:15px;color:#C2BCAE">Tạm tính đợt này</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#F5F2EA">{{ cartTotal }}</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT7 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T7 Xác nhận gửi" style="min-height:756px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;animation:sora-fade .3s ease-out both">
+        <div style="width:96px;height:96px;border-radius:50%;border:1px solid #C9A85C;display:grid;place-items:center;animation:sora-tick .5s ease-out both">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#DCC58A" stroke-width="1.5" stroke-linecap="round"><path d="M4 12.5 9.5 18 20 7"></path></svg>
+        </div>
+        <p style="font-size:22px;font-weight:600;color:#F5F2EA;margin:32px 0 0;text-align:center">{{ sentLine }}</p>
+        <p style="font-size:15px;color:#8B8577;margin:12px 0 0">Đang về thực đơn…</p>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT8 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T8 Đơn của bàn">
+        <div style="padding:20px 16px 8px">
+          <h1 style="font-family:'Cormorant Garamond',serif;font-weight:300;font-size:30px;color:#F5F2EA;margin:0">Đơn của bàn 12</h1>
+          <p style="font-size:14px;color:#8B8577;margin:8px 0 0">{{ batchSummary }}</p>
+        </div>
+        <div style="padding:8px 0 96px">
+          <sc-for list="{{ batches }}" as="b" hint-placeholder-count="2">
+            <div style="padding-bottom:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#151920;border-top:1px solid rgba(201,168,92,.16);border-bottom:1px solid rgba(201,168,92,.16)">
+                <span style="font-size:14px;font-weight:600;color:#F5F2EA">{{ b.title }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8B8577">{{ b.time }}</span>
+              </div>
+              <sc-for list="{{ b.items }}" as="it" hint-placeholder-count="3">
+                <div style="padding:16px;border-bottom:1px solid #151920">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                    <p style="{{ it.nameSt }}">{{ it.qty }} × {{ it.vi }}</p>
+                    <sc-if value="{{ it.cancelled }}" hint-placeholder-val="{{ false }}">
+                      <span style="height:22px;padding:0 9px;border-radius:999px;border:1px solid #B5382C;color:#B5382C;font-size:11px;font-weight:600;display:inline-flex;align-items:center;flex:none">Đã huỷ</span>
+                    </sc-if>
+                    <sc-if value="{{ it.live }}" hint-placeholder-val="{{ true }}">
+                      <span style="{{ it.stChip }}">{{ it.stLabel }}</span>
+                    </sc-if>
+                  </div>
+                  <sc-if value="{{ it.live }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;gap:4px;margin-top:12px">
+                      <sc-for list="{{ it.steps }}" as="s" hint-placeholder-count="4">
+                        <div style="{{ s.st }}"></div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+<sc-if value="{{ isT10 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T10 Tạm tính">
+        <div style="padding:20px 16px 8px">
+          <h1 style="font-family:'Cormorant Garamond',serif;font-weight:300;font-size:30px;color:#F5F2EA;margin:0">Tạm tính</h1>
+          <p style="font-size:14px;color:#8B8577;margin:8px 0 0">Bàn 12 · {{ guests }} khách · chưa phải hoá đơn</p>
+        </div>
+        <div style="padding:16px 0 0">
+          <sc-for list="{{ billLines }}" as="l" hint-placeholder-count="4">
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid #151920">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8B8577;flex:none;width:26px">{{ l.qty }}×</span>
+              <div style="flex:1;min-width:0">
+                <p style="font-size:15px;color:#F5F2EA;margin:0;line-height:1.4">{{ l.vi }}</p>
+                <sc-if value="{{ l.hasMods }}" hint-placeholder-val="{{ false }}">
+                  <p style="font-size:13px;color:#8B8577;margin:4px 0 0">{{ l.mods }}</p>
+                </sc-if>
+              </div>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#C2BCAE;flex:none">{{ l.amount }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="padding:20px 16px 0">
+          <div style="display:flex;justify-content:space-between;padding:8px 0">
+            <span style="font-size:15px;color:#C2BCAE">Tạm tính</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#F5F2EA">{{ billSubtotalFmt }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0">
+            <span style="font-size:15px;color:#C2BCAE">Phí phục vụ {{ svcPct }}%</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#F5F2EA">{{ billServiceFmt }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(201,168,92,.16)">
+            <span style="font-size:15px;color:#C2BCAE">Thuế VAT {{ vatPct }}%</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#F5F2EA">{{ billTaxFmt }}</span>
+          </div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;padding:18px 0 0">
+            <span style="font-size:16px;font-weight:600;color:#F5F2EA">Tổng</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:500;color:#DCC58A">{{ billTotalFmt }}</span>
+          </div>
+          <sc-if value="{{ hasPaid }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:20px;padding:14px 16px;border:1px solid #4A8F63;border-radius:8px;background:rgba(74,143,99,.08)">
+              <p style="font-size:15px;color:#F5F2EA;margin:0">Đã trả {{ paidFmt }} · còn {{ remainFmt }}</p>
+            </div>
+          </sc-if>
+        </div>
+        <div style="padding:32px 16px 40px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <button type="button" onClick="{{ goSplit }}" style="height:56px;border-radius:4px;border:1px solid #C9A85C;background:transparent;color:#DCC58A;font-size:15px;font-weight:500;cursor:pointer">Tự thanh toán</button>
+          <button type="button" onClick="{{ goCall }}" style="height:56px;border-radius:4px;border:1px solid #C2BCAE;background:transparent;color:#F5F2EA;font-size:15px;font-weight:500;cursor:pointer">Gọi thu ngân</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT11 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T11 Chia tiền">
+        <div style="padding:20px 16px 8px">
+          <h1 style="font-family:'Cormorant Garamond',serif;font-weight:300;font-size:30px;color:#F5F2EA;margin:0">Trả thế nào?</h1>
+          <p style="font-size:14px;color:#8B8577;margin:8px 0 0">Còn phải trả {{ remainFmt }}</p>
+        </div>
+        <sc-if value="{{ hasPaid }}" hint-placeholder-val="{{ false }}">
+          <div style="margin:12px 16px 0;padding:14px 16px;border:1px solid #4A8F63;border-radius:8px;background:rgba(74,143,99,.08);display:flex;gap:12px;align-items:flex-start">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4A8F63" stroke-width="2" stroke-linecap="round" style="flex:none;margin-top:2px"><path d="M4 12.5 9.5 18 20 7"></path></svg>
+            <p style="font-size:15px;color:#F5F2EA;margin:0;line-height:1.5">Đã trả {{ paidFmt }} · còn {{ remainFmt }}</p>
+          </div>
+        </sc-if>
+        <div style="padding:20px 16px 0;display:grid;gap:12px">
+          <sc-for list="{{ payModes }}" as="o" hint-placeholder-count="3">
+            <button type="button" onClick="{{ o.on }}" style="{{ o.st }}">
+              <p style="font-size:17px;font-weight:600;color:#F5F2EA;margin:0">{{ o.n }}</p>
+              <p style="font-size:14px;color:#C2BCAE;margin:6px 0 0;line-height:1.5">{{ o.d }}</p>
+            </button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ isEven }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:24px 16px 0">
+            <p style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8B8577;margin:0 0 12px">Chia cho mấy người</p>
+            <div style="display:flex;align-items:center;border:1px solid #2B313C;border-radius:4px;height:64px">
+              <button type="button" onClick="{{ minusSplit }}" style="width:64px;height:62px;border:none;background:transparent;color:#DCC58A;font-size:24px;cursor:pointer">−</button>
+              <span style="flex:1;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:24px;color:#F5F2EA">{{ splitN }}</span>
+              <button type="button" onClick="{{ plusSplit }}" style="width:64px;height:62px;border:none;background:transparent;color:#DCC58A;font-size:24px;cursor:pointer">+</button>
+            </div>
+            <p style="font-size:16px;color:#F5F2EA;margin:16px 0 0">Mỗi người <strong style="font-family:'IBM Plex Mono',monospace;font-weight:500;color:#DCC58A">{{ perHeadFmt }}</strong></p>
+          </div>
+        </sc-if>
+        <div style="padding:32px 16px 40px">
+          <button type="button" onClick="{{ goPay }}" disabled="{{ noPayMode }}" style="{{ payNextSt }}">{{ payNextLabel }}</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT12 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T12 Chọn món mình trả">
+        <div style="padding:20px 16px 8px">
+          <h1 style="font-family:'Cormorant Garamond',serif;font-weight:300;font-size:30px;color:#F5F2EA;margin:0">Bạn ăn món nào?</h1>
+          <p style="font-size:14px;color:#8B8577;margin:8px 0 0">Chọn món bạn trả. Món người khác nhận sẽ bị khoá.</p>
+        </div>
+        <div style="padding:16px 0 0">
+          <sc-for list="{{ pickLines }}" as="l" hint-placeholder-count="4">
+            <button type="button" onClick="{{ l.on }}" style="{{ l.st }}">
+              <span style="{{ l.mark }}">
+                <sc-if value="{{ l.on2 }}" hint-placeholder-val="{{ false }}">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#07080A" stroke-width="3.4" stroke-linecap="round"><path d="M4 12.5 9.5 18 20 7"></path></svg>
+                </sc-if>
+              </span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8B8577;flex:none;width:26px">{{ l.qty }}×</span>
+              <span style="flex:1;min-width:0">
+                <span style="display:block;font-size:15px;color:#F5F2EA;line-height:1.4">{{ l.vi }}</span>
+                <sc-if value="{{ l.locked }}" hint-placeholder-val="{{ false }}">
+                  <span style="display:block;font-size:13px;color:#8B8577;margin-top:4px">{{ l.lockLabel }}</span>
+                </sc-if>
+              </span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#C2BCAE;flex:none">{{ l.amount }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="padding:28px 16px 40px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(201,168,92,.16)">
+            <span style="font-size:16px;font-weight:600;color:#F5F2EA">Phần của bạn</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:500;color:#DCC58A">{{ pickedTotalFmt }}</span>
+          </div>
+          <button type="button" onClick="{{ goQR }}" disabled="{{ noPicked }}" style="{{ pickNextSt }}">Tiếp tục</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT13 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T13 VietQR">
+        <div style="padding:20px 16px 0;text-align:center">
+          <h1 style="font-family:'Cormorant Garamond',serif;font-weight:300;font-size:30px;color:#F5F2EA;margin:0">Quét để trả</h1>
+          <p style="font-size:14px;color:#8B8577;margin:8px 0 0">Quét bằng app ngân hàng bất kỳ</p>
+        </div>
+        <div style="display:flex;justify-content:center;padding:24px 16px 0">
+          <div style="width:280px;height:280px;border-radius:12px;background:#FFFFFF;padding:18px" dangerouslySetInnerHTML="{{ qrPay }}"></div>
+        </div>
+        <div style="padding:28px 16px 0;display:grid;gap:12px">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid #2B313C;border-radius:4px;background:#151920">
+            <div style="flex:1;min-width:0">
+              <p style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#8B8577;margin:0">Số tài khoản</p>
+              <p style="font-family:'IBM Plex Mono',monospace;font-size:17px;color:#F5F2EA;margin:6px 0 0">{{ account }}</p>
+            </div>
+            <button type="button" onClick="{{ copyAccount }}" style="width:44px;height:44px;flex:none;border-radius:4px;border:1px solid #2B313C;background:transparent;color:#DCC58A;cursor:pointer;display:grid;place-items:center;padding:0">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 5H6a2 2 0 0 0-2 2v9"></path></svg>
+            </button>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid #C9A85C;border-radius:4px;background:#151920">
+            <div style="flex:1;min-width:0">
+              <p style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#8B8577;margin:0">Số tiền</p>
+              <p style="font-family:'IBM Plex Mono',monospace;font-size:24px;color:#DCC58A;margin:6px 0 0">{{ payAmountFmt }}</p>
+            </div>
+            <button type="button" onClick="{{ copyAmount }}" style="width:44px;height:44px;flex:none;border-radius:4px;border:1px solid #2B313C;background:transparent;color:#DCC58A;cursor:pointer;display:grid;place-items:center;padding:0">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 5H6a2 2 0 0 0-2 2v9"></path></svg>
+            </button>
+          </div>
+        </div>
+        <div style="padding:28px 16px 40px">
+          <button type="button" onClick="{{ startWait }}" style="height:56px;width:100%;border-radius:4px;border:1px solid #C9A85C;background:transparent;color:#DCC58A;font-size:16px;font-weight:500;cursor:pointer">Đã chuyển xong</button>
+          <button type="button" onClick="{{ goSplit }}" style="height:44px;width:100%;margin-top:8px;border:none;background:transparent;color:#8B8577;font-size:14px;cursor:pointer">Đổi cách trả</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT14 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T14 Chờ xác nhận">
+        <sc-if value="{{ t14Waiting }}" hint-placeholder-val="{{ true }}">
+        <div style="min-height:620px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center">
+          <div style="position:relative;width:132px;height:132px">
+            <svg width="132" height="132" viewBox="0 0 132 132" style="transform:rotate(-90deg)">
+              <circle cx="66" cy="66" r="54" fill="none" stroke="#1E232C" stroke-width="3"></circle>
+              <circle cx="66" cy="66" r="54" fill="none" stroke="{{ t14Color }}" stroke-width="3" stroke-linecap="round" stroke-dasharray="339.29" stroke-dashoffset="{{ t14Off }}"></circle>
+            </svg>
+            <span style="position:absolute;inset:0;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-size:24px;color:#F5F2EA">{{ t14Pct }}%</span>
+          </div>
+          <p style="font-size:18px;font-weight:500;color:#F5F2EA;margin:32px 0 0;line-height:1.5">{{ t14Msg }}</p>
+          <p style="font-family:'IBM Plex Mono',monospace;font-size:20px;color:#DCC58A;margin:14px 0 0">{{ payAmountFmt }}</p>
+          <sc-if value="{{ t14Late }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:24px;padding:14px 16px;border:1px solid #D08A1C;border-radius:8px;background:rgba(208,138,28,.08)">
+              <p style="font-size:15px;color:#EFE0BC;margin:0;line-height:1.55">Nhân viên sẽ tới xác nhận giúp bạn.</p>
+            </div>
+          </sc-if>
+          <p style="font-size:14px;color:#8B8577;margin:28px 0 0;line-height:1.6">Bạn có thể đóng màn này, kết quả sẽ báo lại.</p>
+        </div>
+        </sc-if>
+        <sc-if value="{{ t14Done }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:620px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;animation:sora-fade .3s ease-out both">
+          <div style="width:96px;height:96px;border-radius:50%;border:1px solid #4A8F63;display:grid;place-items:center;animation:sora-tick .5s ease-out both">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4A8F63" stroke-width="1.5" stroke-linecap="round"><path d="M4 12.5 9.5 18 20 7"></path></svg>
+          </div>
+          <p style="font-size:22px;font-weight:600;color:#F5F2EA;margin:32px 0 0;line-height:1.4">Đã nhận {{ payAmountFmt }}<br />Cảm ơn bạn!</p>
+          <button type="button" onClick="{{ finishPay }}" style="height:56px;width:100%;margin-top:36px;border-radius:4px;border:none;background:#B08A33;color:#07080A;font-size:16px;font-weight:600;cursor:pointer">{{ finishLabel }}</button>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ blocked }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T17 Thanh toán bị chặn" style="min-height:620px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center">
+        <span style="font-family:'Shippori Mincho B1',serif;font-size:56px;color:#5E4917;line-height:1">断</span>
+        <p style="font-size:20px;font-weight:600;color:#F5F2EA;margin:24px 0 0;line-height:1.45">Thanh toán cần mạng ổn định.<br />Vui lòng gọi thu ngân.</p>
+        <p style="font-size:15px;color:#C2BCAE;margin:14px 0 0;line-height:1.65">Giỏ hàng của bạn vẫn thao tác được và sẽ tự gửi khi có mạng.</p>
+        <button type="button" onClick="{{ goCall }}" style="height:56px;width:100%;margin-top:32px;border-radius:4px;border:1px solid #C9A85C;background:transparent;color:#DCC58A;font-size:16px;font-weight:500;cursor:pointer">Gọi thu ngân</button>
+        <button type="button" onClick="{{ goCart }}" style="height:52px;width:100%;margin-top:10px;border-radius:4px;border:1px solid #2B313C;background:transparent;color:#C2BCAE;font-size:15px;cursor:pointer">Về giỏ hàng</button>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT15 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="T15 Hoá đơn">
+        <div style="padding:20px 16px 0">
+          <div style="border:1px solid rgba(201,168,92,.16);border-radius:8px;background:#151920;padding:24px">
+            <div style="text-align:center;padding-bottom:20px;border-bottom:1px solid #1E232C">
+              <p style="font-family:'Shippori Mincho B1',serif;font-size:16px;color:#C9A85C;margin:0;letter-spacing:.3em">東京空</p>
+              <p style="font-size:13px;font-weight:600;letter-spacing:.2em;color:#F5F2EA;margin:8px 0 0">TOKYO SORA</p>
+              <p style="font-size:13px;color:#8B8577;margin:10px 0 0;line-height:1.6">24 Trần Duy Hưng, Cầu Giấy, Hà Nội<br />MST 0106482119</p>
+            </div>
+            <div style="padding:16px 0">
+              <sc-for list="{{ billLines }}" as="l" hint-placeholder-count="4">
+                <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8B8577;flex:none;width:24px">{{ l.qty }}×</span>
+                  <span style="flex:1;min-width:0;font-size:14px;color:#C2BCAE;line-height:1.4">{{ l.vi }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#F5F2EA;flex:none">{{ l.amount }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="padding-top:14px;border-top:1px solid #1E232C">
+              <div style="display:flex;justify-content:space-between;padding:5px 0">
+                <span style="font-size:14px;color:#8B8577">Phí phục vụ {{ svcPct }}%</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#C2BCAE">{{ billServiceFmt }}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0">
+                <span style="font-size:14px;color:#8B8577">Thuế VAT {{ vatPct }}%</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#C2BCAE">{{ billTaxFmt }}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;padding:16px 0 0;margin-top:10px;border-top:1px solid #1E232C">
+                <span style="font-size:16px;font-weight:600;color:#F5F2EA">Tổng đã trả</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:500;color:#DCC58A">{{ billTotalFmt }}</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:16px;margin-top:24px;padding-top:20px;border-top:1px solid #1E232C">
+              <div style="width:88px;height:88px;flex:none;border-radius:4px;background:#FFFFFF;padding:6px" dangerouslySetInnerHTML="{{ qrInvoice }}"></div>
+              <div>
+                <p style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#8B8577;margin:0">Hoá đơn điện tử</p>
+                <p style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#F5F2EA;margin:6px 0 0">1C26TSR · 0004127</p>
+                <p style="font-size:13px;color:#8B8577;margin:8px 0 0;line-height:1.5">Quét để tra cứu trên hệ thống thuế</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:16px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <button type="button" style="height:52px;border-radius:4px;border:1px solid #2B313C;background:transparent;color:#C2BCAE;font-size:15px;cursor:pointer">Lưu ảnh</button>
+          <button type="button" style="height:52px;border-radius:4px;border:1px solid #2B313C;background:transparent;color:#C2BCAE;font-size:15px;cursor:pointer">Gửi email / Zalo</button>
+        </div>
+        <sc-if value="{{ showLoyalty }}" hint-placeholder-val="{{ true }}">
+          <div style="margin:24px 16px 0;padding:14px 16px;border:1px solid #4A8F63;border-radius:8px;background:rgba(74,143,99,.08)">
+            <p style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#4A8F63;margin:0">+42 điểm · hạng Bạc · tổng 362</p>
+          </div>
+        </sc-if>
+        <div style="padding:24px 16px 0">
+          <div style="padding:20px;border:1px solid rgba(201,168,92,.16);border-radius:8px;background:#151920">
+            <p style="font-size:16px;font-weight:500;color:#F5F2EA;margin:0">Bữa nay thế nào?</p>
+            <div style="display:flex;gap:4px;margin-top:12px">
+              <sc-for list="{{ stars }}" as="s" hint-placeholder-count="5">
+                <button type="button" onClick="{{ s.on }}" style="{{ s.st }}">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="{{ s.fill }}" stroke="currentColor" stroke-width="1.4"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.2 1 5.9L12 17l-5.2 2.8 1-5.9-4.3-4.2 5.9-.8L12 3.5Z"></path></svg>
+                </button>
+              </sc-for>
+            </div>
+            <sc-if value="{{ hasStars }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:16px">
+                <textarea rows="2" placeholder="Món nào bạn sẽ gọi lại?" style="width:100%;border-radius:4px;border:1px solid #2B313C;background:#0D0F13;color:#F5F2EA;font-size:16px;padding:12px 14px;resize:vertical;line-height:1.6"></textarea>
+                <button type="button" style="height:48px;width:100%;margin-top:10px;border-radius:4px;border:1px solid #C9A85C;background:transparent;color:#DCC58A;font-size:15px;cursor:pointer">Gửi nhận xét</button>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+        <p style="font-size:15px;color:#8B8577;margin:32px 16px 40px;text-align:center">Cảm ơn bạn đã đến Tokyo Sora.</p>
+      </div>
+      </sc-if>
+
+      </div>
+      </sc-if>
+
+      </div>
+
+      <sc-if value="{{ showBottom }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute;left:0;right:0;bottom:0;z-index:70;background:#151920;border-top:1px solid rgba(201,168,92,.16);padding:12px 16px 20px">
+          <sc-if value="{{ barMenu }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px">
+              <div>
+                <p style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#F5F2EA;margin:0">{{ cartCountLine }}</p>
+                <p style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8B8577;margin:2px 0 0">{{ cartTotal }}</p>
+              </div>
+              <button type="button" onClick="{{ goCart }}" disabled="{{ cartEmpty }}" style="{{ viewCartSt }}">Xem giỏ</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ barCart }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ sendKitchen }}" style="height:56px;width:100%;border-radius:4px;border:none;background:#B08A33;color:#07080A;font-size:16px;font-weight:600;cursor:pointer">Gửi bếp · {{ cartTotal }}</button>
+          </sc-if>
+          <sc-if value="{{ barOrders }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div>
+                <p style="font-size:13px;color:#8B8577;margin:0">Tạm tính</p>
+                <p style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#F5F2EA;margin:2px 0 0">{{ billSubtotalFmt }}</p>
+              </div>
+              <button type="button" onClick="{{ goBill }}" style="height:52px;padding:0 22px;border-radius:4px;border:1px solid #C9A85C;background:transparent;color:#DCC58A;font-size:15px;font-weight:500;cursor:pointer;flex:none">Xem tạm tính</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ barCall }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ goCall }}" style="height:56px;width:100%;border-radius:4px;border:1px solid #C9A85C;background:transparent;color:#DCC58A;font-size:16px;font-weight:500;cursor:pointer">Gọi nhân viên</button>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:16px;right:16px;bottom:108px;z-index:90;padding:14px 16px;border-radius:8px;background:#1E232C;border:1px solid rgba(201,168,92,.16);display:flex;align-items:center;gap:12px;animation:sora-rise .25s ease-out both">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4A8F63" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M4 12.5 9.5 18 20 7"></path></svg>
+          <span style="font-size:14px;color:#F5F2EA">{{ toast }}</span>
+        </div>
+      </sc-if>
+
+<sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:100">
+        <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(7,8,10,.72);animation:sora-fade .2s ease-out both"></div>
+
+        <sc-if value="{{ sheetT3 }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:0;right:0;bottom:0;height:90%;background:#0D0F13;border-radius:12px 12px 0 0;border-top:1px solid rgba(201,168,92,.16);display:flex;flex-direction:column;animation:sora-sheet .28s cubic-bezier(.2,.8,.2,1) both">
+          <div style="flex:none;padding:10px 0 0;display:flex;justify-content:center">
+            <div style="width:44px;height:4px;border-radius:2px;background:#2B313C"></div>
+          </div>
+          <div data-rail="1" style="flex:1;overflow-y:auto;padding:16px 16px 0">
+            <div style="width:100%;aspect-ratio:3/2;border-radius:8px;background:radial-gradient(120% 100% at 50% 18%,#1E232C 0%,#151920 76%);display:grid;place-items:center;border:1px solid rgba(201,168,92,.16)">
+              <span style="font-family:'Shippori Mincho B1',serif;font-size:104px;color:#5E4917;line-height:1;filter:drop-shadow(0 12px 24px rgba(0,0,0,.45))">{{ sheetD.k }}</span>
+            </div>
+            <p style="font-size:22px;font-weight:600;color:#F5F2EA;margin:20px 0 0;line-height:1.3">{{ sheetD.vi }}</p>
+            <p style="font-family:'Shippori Mincho B1',serif;font-size:14px;color:#DCC58A;margin:6px 0 0;letter-spacing:.12em">{{ sheetD.ja }}</p>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#DCC58A">{{ sheetD.p }}</span>
+              <sc-if value="{{ sheetD.hasPromo }}" hint-placeholder-val="{{ false }}">
+                <span style="display:inline-flex;align-items:center;gap:10px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8B8577;text-decoration:line-through">{{ sheetD.pOld }}</span>
+                  <span style="height:26px;padding:0 10px;border-radius:999px;background:#B5382C;color:#F5F2EA;font-size:12px;font-weight:600;letter-spacing:.04em;display:inline-flex;align-items:center">{{ sheetD.promoTag }}</span>
+                </span>
+              </sc-if>
+            </div>
+            <p style="font-size:15px;color:#C2BCAE;margin:12px 0 0;line-height:1.65">{{ sheetD.d }}</p>
+
+            <sc-if value="{{ sheetD.hasAl }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:18px">
+                <sc-for list="{{ sheetD.alList }}" as="a" hint-placeholder-count="2">
+                  <span style="height:30px;padding:0 12px;border-radius:999px;border:1px solid #2B313C;color:#C2BCAE;font-size:13px;display:inline-flex;align-items:center;gap:7px">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#D08A1C" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path></svg>{{ a }}
+                  </span>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ sheetD.preAlert }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:18px;padding:14px 16px;border:1px solid #4E7FA8;border-radius:8px;background:rgba(78,127,168,.08);display:flex;gap:12px;align-items:flex-start">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4E7FA8" stroke-width="1.8" style="flex:none;margin-top:2px"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><circle cx="12" cy="7.6" r=".9" fill="#4E7FA8" stroke="none"></circle></svg>
+                <p style="font-size:15px;color:#C2BCAE;margin:0;line-height:1.6">Bàn bạn không có bếp — bếp sẽ nướng sẵn, thêm khoảng 8 phút.</p>
+              </div>
+            </sc-if>
+
+            <sc-for list="{{ sheetD.groups }}" as="g" hint-placeholder-count="2">
+              <div style="margin-top:28px">
+                <p style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8B8577;margin:0 0 12px">{{ g.title }}</p>
+                <div style="display:grid;gap:8px">
+                  <sc-for list="{{ g.opts }}" as="o" hint-placeholder-count="3">
+                    <button type="button" onClick="{{ o.on }}" style="{{ o.st }}">
+                      <span style="{{ o.mark }}">
+                        <sc-if value="{{ o.on2 }}" hint-placeholder-val="{{ false }}">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#07080A" stroke-width="3.6" stroke-linecap="round"><path d="M4 12.5 9.5 18 20 7"></path></svg>
+                        </sc-if>
+                      </span>
+                      <span style="flex:1">{{ o.n }}</span>
+                      <sc-if value="{{ o.hasDelta }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#DCC58A;flex:none">{{ o.delta }}</span>
+                      </sc-if>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+
+            <div style="margin-top:28px">
+              <p style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8B8577;margin:0 0 12px">Ghi chú cho bếp</p>
+              <textarea rows="2" onChange="{{ onDnote }}" placeholder="Ví dụ: cắt dày, không hành" style="width:100%;border-radius:4px;border:1px solid #2B313C;background:#151920;color:#F5F2EA;font-size:16px;padding:12px 14px;resize:vertical;line-height:1.6"></textarea>
+            </div>
+
+            <div style="margin-top:32px;padding-bottom:24px">
+              <p style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8B8577;margin:0 0 14px">Ngon hơn khi đi cùng</p>
+              <div data-rail="1" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:4px">
+                <sc-for list="{{ sheetD.pairs }}" as="d" hint-placeholder-count="3">
+                  <div onClick="{{ d.open }}" style="width:120px;flex:none;cursor:pointer">
+                    <div style="width:120px;height:90px;border-radius:8px;background:radial-gradient(120% 100% at 50% 20%,#1E232C 0%,#151920 74%);display:grid;place-items:center;border:1px solid rgba(201,168,92,.16)">
+                      <span style="font-family:'Shippori Mincho B1',serif;font-size:34px;color:#5E4917;line-height:1">{{ d.k }}</span>
+                    </div>
+                    <p style="font-size:14px;font-weight:500;color:#F5F2EA;margin:8px 0 0;line-height:1.35">{{ d.vi }}</p>
+                    <p style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#DCC58A;margin:4px 0 0">{{ d.p }}</p>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="flex:none;display:flex;gap:12px;padding:12px 16px 20px;background:#151920;border-top:1px solid rgba(201,168,92,.16)">
+            <div style="display:flex;align-items:center;border:1px solid #2B313C;border-radius:4px;height:56px;flex:none">
+              <button type="button" onClick="{{ minusQty }}" style="width:44px;height:54px;border:none;background:transparent;color:#DCC58A;font-size:20px;cursor:pointer">−</button>
+              <span style="min-width:30px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:17px;color:#F5F2EA">{{ sheetQty }}</span>
+              <button type="button" onClick="{{ plusQty }}" style="width:44px;height:54px;border:none;background:transparent;color:#DCC58A;font-size:20px;cursor:pointer">+</button>
+            </div>
+            <button type="button" onClick="{{ confirmAdd }}" style="flex:1;height:56px;border-radius:4px;border:none;background:#B08A33;color:#07080A;font-size:15px;font-weight:600;cursor:pointer;padding:0 10px;line-height:1.3">{{ addLabel }}</button>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ sheetT5 }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:0;right:0;bottom:0;background:#0D0F13;border-radius:12px 12px 0 0;border-top:1px solid rgba(201,168,92,.16);animation:sora-sheet .28s cubic-bezier(.2,.8,.2,1) both">
+          <div style="padding:10px 0 0;display:flex;justify-content:center">
+            <div style="width:44px;height:4px;border-radius:2px;background:#2B313C"></div>
+          </div>
+          <div style="padding:20px 16px 0">
+            <p style="font-size:22px;font-weight:600;color:#F5F2EA;margin:0">Bộ lọc</p>
+          </div>
+          <div style="padding:16px 16px 0">
+            <sc-for list="{{ filterRows }}" as="f" hint-placeholder-count="5">
+              <button type="button" onClick="{{ f.on }}" style="display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;height:52px;padding:0;background:transparent;border:none;border-bottom:1px solid #151920;cursor:pointer;text-align:left">
+                <span style="font-size:16px;color:#F5F2EA">{{ f.n }}</span>
+                <span style="{{ f.track }}"><span style="{{ f.knob }}"></span></span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="padding:24px 16px 20px">
+            <button type="button" onClick="{{ closeSheet }}" style="height:56px;width:100%;border-radius:4px;border:none;background:#B08A33;color:#07080A;font-size:16px;font-weight:600;cursor:pointer">{{ filterApplyLabel }}</button>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ sheetT9 }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:0;right:0;bottom:0;background:#0D0F13;border-radius:12px 12px 0 0;border-top:1px solid rgba(201,168,92,.16);animation:sora-sheet .28s cubic-bezier(.2,.8,.2,1) both">
+          <div style="padding:10px 0 0;display:flex;justify-content:center">
+            <div style="width:44px;height:4px;border-radius:2px;background:#2B313C"></div>
+          </div>
+          <sc-if value="{{ callSent }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:32px 20px 28px;text-align:center">
+              <div style="width:64px;height:64px;margin:0 auto;border-radius:50%;border:1px solid #4A8F63;display:grid;place-items:center;animation:sora-tick .4s ease-out both">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4A8F63" stroke-width="1.8" stroke-linecap="round"><path d="M4 12.5 9.5 18 20 7"></path></svg>
+              </div>
+              <p style="font-size:20px;font-weight:600;color:#F5F2EA;margin:24px 0 0">Nhân viên đang tới</p>
+              <p style="font-size:15px;color:#C2BCAE;margin:10px 0 0">{{ callName }} · {{ callWait }}</p>
+              <button type="button" onClick="{{ resetCall }}" style="height:52px;width:100%;margin-top:28px;border-radius:4px;border:1px solid #2B313C;background:transparent;color:#C2BCAE;font-size:15px;cursor:pointer">Gọi việc khác</button>
+              <button type="button" onClick="{{ closeSheet }}" style="height:44px;width:100%;margin-top:8px;border:none;background:transparent;color:#8B8577;font-size:14px;cursor:pointer">Đóng</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ callIdle }}" hint-placeholder-val="{{ true }}">
+            <div>
+              <div style="padding:20px 16px 0">
+                <p style="font-size:22px;font-weight:600;color:#F5F2EA;margin:0">Cần gì ạ?</p>
+              </div>
+              <div style="padding:16px 16px 20px;display:grid;gap:10px">
+                <sc-for list="{{ calls }}" as="c" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ c.on }}" style="{{ c.st }}">
+                    <span style="flex:1">{{ c.n }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8B8577;flex:none">{{ c.wait }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isT16 }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:110;display:grid;place-items:center;padding:24px;background:rgba(7,8,10,.78);animation:sora-fade .2s ease-out both">
+        <div style="width:100%;border-radius:12px;background:#151920;border:1px solid rgba(201,168,92,.16);padding:24px;animation:sora-rise .3s ease-out both">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#D08A1C" stroke-width="1.6"><path d="M12 3 2.5 20h19L12 3Z"></path><path d="M12 9.5v5"></path><circle cx="12" cy="17.2" r=".9" fill="#D08A1C" stroke="none"></circle></svg>
+          <p style="font-size:18px;font-weight:600;color:#F5F2EA;margin:18px 0 0;line-height:1.45">{{ soldOutName }} vừa hết — đã bỏ khỏi đơn của bạn.</p>
+          <p style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8B8577;margin:24px 0 12px">Thay bằng món này?</p>
+          <div style="display:grid;gap:10px">
+            <sc-for list="{{ alts }}" as="d" hint-placeholder-count="2">
+              <div onClick="{{ d.open }}" style="display:flex;align-items:center;gap:14px;padding:12px;border:1px solid #2B313C;border-radius:8px;cursor:pointer">
+                <div style="width:56px;height:56px;flex:none;border-radius:8px;background:radial-gradient(120% 100% at 50% 20%,#1E232C 0%,#151920 74%);display:grid;place-items:center">
+                  <span style="font-family:'Shippori Mincho B1',serif;font-size:26px;color:#5E4917;line-height:1">{{ d.k }}</span>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <p style="font-size:16px;font-weight:600;color:#F5F2EA;margin:0">{{ d.vi }}</p>
+                  <p style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#DCC58A;margin:5px 0 0">{{ d.p }}</p>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <button type="button" onClick="{{ ackSoldOut }}" style="height:56px;width:100%;margin-top:20px;border-radius:4px;border:none;background:#B08A33;color:#07080A;font-size:16px;font-weight:600;cursor:pointer">Đã hiểu</button>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;tableHasGrill&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Bàn&quot;},&quot;serviceFeePct&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:5,&quot;min&quot;:0,&quot;max&quot;:10,&quot;unit&quot;:&quot;%&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Tính tiền&quot;},&quot;vatPct&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:8,&quot;min&quot;:0,&quot;max&quot;:10,&quot;unit&quot;:&quot;%&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Tính tiền&quot;},&quot;paymentDelaySec&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:12,&quot;min&quot;:3,&quot;max&quot;:60,&quot;unit&quot;:&quot;giây&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Tính tiền&quot;},&quot;showLoyalty&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Hoá đơn&quot;}}">
+const M = n => n.toLocaleString('de-DE') + '₫';
+const nod = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+
+class Component extends DCLogic {
+  state = {
+    screen: 'T1', st: 'ok', mv: 'A', offline: false, guests: 4, lang: 'VI', cat: 'yaki',
+    query: '', sheet: null, dishOpen: 'bachi', mods: { vi: ['muoi'], them: [] }, qty: 1, dnote: '',
+    cart: [], cartNote: '', staffCall: null, toast: '', callFrom: 'T2',
+    payMode: null, splitN: 2, picked: [], paid: 0, stars: 0, t14: 0,
+    filters: { veg: false, noSpicy: false, noSea: false, under200: false, avail: false },
+    batches: [
+      { n: 1, time: '19:24', items: [
+        { id: 'bachi', qty: 2, mods: 'Tương Sora · Tỏi nướng', unit: 300000, status: 3 },
+        { id: 'sodiep', qty: 1, mods: 'Chanh muối', unit: 245000, status: 3 },
+        { id: 'asahi', qty: 2, mods: '', unit: 75000, status: 3 },
+        { id: 'duamuoi', qty: 1, mods: '', unit: 65000, status: 3 },
+        { id: 'sagari', qty: 1, mods: '', unit: 275000, status: 3, cancelled: true }
+      ] },
+      { n: 2, time: '19:52', items: [
+        { id: 'nambo', qty: 2, mods: 'Muối tiêu chanh', unit: 265000, status: 1 },
+        { id: 'namdui', qty: 1, mods: '', unit: 85000, status: 2 },
+        { id: 'miso', qty: 2, mods: '', unit: 45000, status: 0 }
+      ] }
+    ]
+  };
+
+  D = {
+    cats: [['set', 'Set', '膳'], ['yaki', 'Nướng', '焼'], ['tuoi', 'Khai vị lạnh', '鮮'], ['chien', 'Chiên xào hấp', '揚'], ['lau', 'Lẩu · cơm · mì', '鍋'], ['sup', 'Súp', '汁'], ['ngot', 'Ngọt', '甘'], ['bia', 'Bia', '麦'], ['ruou', 'Rượu', '酒'], ['tra', 'Trà', '茶']],
+    subs: [['beef', 'Bò', '牛'], ['pork', 'Heo', '豚'], ['sea', 'Hải sản', '海'], ['veg', 'Rau · nấm', '野']],
+    soldOut: ['sagari'],
+    dishes: [
+      { id: 'setsora', vi: 'Set Sora', ja: '空膳', k: '空', pr: 1280000, pm: 1150000, pmTag: 'Giờ vàng', g: 'set', s: '', d: '8 món cho 2 người · 3 loại bò', al: 'Đậu nành, Lúa mì, Trứng' },
+      { id: 'setsumi', vi: 'Set Sumi', ja: '炭膳', k: '炭', pr: 1980000, g: 'set', s: '', d: '12 món cho 3–4 người · có thăn bò', al: 'Đậu nành, Lúa mì, Trứng' },
+      { id: 'setkiwami', vi: 'Set Kiwami', ja: '極膳', k: '極', pr: 3200000, g: 'set', s: '', d: '16 món cho 4–6 người · bếp trưởng chọn', al: 'Đậu nành, Lúa mì, Hải sản' },
+      { id: 'bachi', vi: 'Ba chỉ bò', ja: '牛バラ', k: 'バ', pr: 285000, g: 'yaki', s: 'beef', raw: 1, d: 'Vân mỡ đan dày, nướng 40 giây mỗi mặt', al: 'Đậu nành, Lúa mì' },
+      { id: 'nambo', vi: 'Nầm bò', ja: 'ハラミ', k: 'ハ', pr: 265000, g: 'yaki', s: 'beef', raw: 1, d: 'Thớ dày, ngọt hậu. Ăn nóng ngay khi rời vỉ', al: 'Đậu nành, Tỏi' },
+      { id: 'thanbo', vi: 'Thăn bò', ja: 'ヒレ', k: 'ヒ', pr: 420000, g: 'yaki', s: 'beef', raw: 1, d: 'Mềm nhất trong con bò. Chỉ nướng tới hồng đào', al: '' },
+      { id: 'carbi', vi: 'Sườn non bò', ja: 'カルビ', k: 'カ', pr: 310000, pm: 263500, g: 'yaki', s: 'beef', raw: 1, d: 'Sườn non tách xương, ướp tương Sora', al: 'Đậu nành, Lúa mì' },
+      { id: 'misuji', vi: 'Lõi vai bò', ja: 'ミスジ', k: 'ミ', pr: 380000, g: 'yaki', s: 'beef', raw: 1, d: 'Miếng hiếm, mỗi con bò chỉ được 2kg', al: '' },
+      { id: 'sagari', vi: 'Dẻ sườn bò', ja: 'サガリ', k: 'サ', pr: 275000, g: 'yaki', s: 'beef', raw: 1, d: 'Thớ ngắn, giòn nhẹ ở rìa', al: 'Đậu nành' },
+      { id: 'bachiheo', vi: 'Ba chỉ heo', ja: '豚バラ', k: '豚', pr: 165000, g: 'yaki', s: 'pork', raw: 1, d: 'Lát mỏng, nướng giòn cạnh', al: '' },
+      { id: 'suonheo', vi: 'Sườn heo ướp miso', ja: '味噌漬け', k: '味', pr: 185000, pm: 148000, g: 'yaki', s: 'pork', raw: 1, d: 'Ướp miso đỏ hai ngày', al: 'Đậu nành, Lúa mì' },
+      { id: 'sodiep', vi: 'Sò điệp Hokkaido', ja: 'ホタテ', k: 'ホ', pr: 245000, g: 'yaki', s: 'sea', raw: 1, sea: 1, d: 'Cồi dày, nướng vừa se mặt là ngọt nhất', al: 'Hải sản' },
+      { id: 'tomsu', vi: 'Tôm sú nướng muối', ja: '海老', k: '海', pr: 195000, g: 'yaki', s: 'sea', raw: 1, sea: 1, d: 'Nướng nguyên vỏ với muối biển', al: 'Hải sản' },
+      { id: 'muctrung', vi: 'Mực trứng', ja: 'イカ', k: 'イ', pr: 175000, g: 'yaki', s: 'sea', raw: 1, sea: 1, d: 'Mực trứng nguyên con, chấm tương gừng', al: 'Hải sản, Đậu nành' },
+      { id: 'namdui', vi: 'Nấm đùi gà nướng', ja: 'エリンギ', k: 'エ', pr: 85000, g: 'yaki', s: 'veg', raw: 1, veg: 1, d: 'Xé sợi, quét bơ tỏi', al: 'Sữa' },
+      { id: 'bingoi', vi: 'Bí ngòi & hành tây', ja: '焼き野菜', k: '焼', pr: 75000, g: 'yaki', s: 'veg', raw: 1, veg: 1, d: 'Rau theo mùa, nướng cùng thịt', al: '' },
+      { id: 'botai', vi: 'Bò tái chanh', ja: '牛たたき', k: '牛', pr: 195000, g: 'tuoi', s: '', d: 'Áp lửa ngoài, hồng trong, chanh muối', al: 'Đậu nành' },
+      { id: 'sashimi', vi: 'Sashimi cá hồi', ja: 'サーモン', k: 'サ', pr: 265000, g: 'tuoi', s: '', sea: 1, d: 'Cá hồi Na Uy, 5 lát dày', al: 'Hải sản' },
+      { id: 'duamuoi', vi: 'Dưa muối ba vị', ja: '三種漬物', k: '三', pr: 65000, g: 'tuoi', s: '', veg: 1, d: 'Cải, dưa chuột, củ cải vàng', al: '' },
+      { id: 'karaage', vi: 'Gà chiên karaage', ja: '唐揚げ', k: '唐', pr: 145000, g: 'chien', s: '', d: 'Chiên hai lần, chấm mayo yuzu', al: 'Lúa mì, Trứng' },
+      { id: 'dauphu', vi: 'Đậu phụ chiên giòn', ja: '揚げ出し豆腐', k: '揚', pr: 95000, g: 'chien', s: '', d: 'Nước dùng dashi, hành hoa', al: 'Đậu nành, Hải sản' },
+      { id: 'sukiyaki', vi: 'Lẩu Sukiyaki bò', ja: 'すき焼き', k: 'す', pr: 480000, g: 'lau', s: '', d: 'Nước dùng tương ngọt, ăn cùng trứng', al: 'Đậu nành, Trứng' },
+      { id: 'bibimbap', vi: 'Cơm trộn bò kim chi', ja: 'ビビンバ', k: 'ビ', pr: 155000, g: 'lau', s: '', spicy: 1, d: 'Nồi đá nóng, cơm cháy đáy', al: 'Đậu nành, Trứng' },
+      { id: 'milanh', vi: 'Mì lạnh', ja: '冷麺', k: '冷', pr: 125000, g: 'lau', s: '', d: 'Sợi dai, nước dùng lạnh chua nhẹ', al: 'Lúa mì, Trứng' },
+      { id: 'miso', vi: 'Canh miso rong biển', ja: '味噌汁', k: '味', pr: 45000, g: 'sup', s: '', d: 'Miso trắng, đậu phụ non', al: 'Đậu nành, Hải sản' },
+      { id: 'duoibo', vi: 'Canh đuôi bò', ja: 'テールスープ', k: 'テ', pr: 115000, g: 'sup', s: '', d: 'Hầm 6 giờ, chỉ muối và hành', al: '' },
+      { id: 'kemtra', vi: 'Kem trà xanh', ja: '抹茶アイス', k: '抹', pr: 65000, g: 'ngot', s: '', veg: 1, d: 'Matcha Uji, đắng nhẹ', al: 'Sữa' },
+      { id: 'phomai', vi: 'Bánh phô mai Hokkaido', ja: 'チーズケーキ', k: 'チ', pr: 85000, g: 'ngot', s: '', d: 'Nướng chảy, ăn ấm', al: 'Sữa, Trứng, Lúa mì' },
+      { id: 'asahi', vi: 'Bia tươi Asahi', ja: '生ビール', k: '生', pr: 75000, g: 'bia', s: '', d: 'Vại 400ml, rót tại quầy', al: 'Lúa mì' },
+      { id: 'sapporo', vi: 'Bia Sapporo lon', ja: 'サッポロ', k: 'サ', pr: 85000, pm: 68000, g: 'bia', s: '', d: 'Lon 330ml', al: 'Lúa mì' },
+      { id: 'milanhpromo', vi: 'Mì lạnh cỡ lớn', ja: '大冷麺', k: '大', pr: 165000, pm: 132000, pmTag: 'Cuối bữa', g: 'lau', s: '', d: 'Suất đôi, gọi sau khi ăn thịt', al: 'Lúa mì, Trứng' },
+      { id: 'junmai', vi: 'Sake Junmai Ginjo', ja: '純米吟醸', k: '純', pr: 380000, g: 'ruou', s: '', d: 'Chai 300ml, uống lạnh', al: '' },
+      { id: 'sochu', vi: 'Sochu khoai', ja: '芋焼酎', k: '芋', pr: 145000, g: 'ruou', s: '', d: 'Ly 60ml, pha đá hoặc nước nóng', al: '' },
+      { id: 'muchacha', vi: 'Trà lúa mạch lạnh', ja: '麦茶', k: '麦', pr: 35000, g: 'tra', s: '', veg: 1, d: 'Rót thêm không tính phí', al: 'Lúa mì' },
+      { id: 'hojicha', vi: 'Trà hoji nóng', ja: 'ほうじ茶', k: 'ほ', pr: 45000, g: 'tra', s: '', veg: 1, d: 'Rang đậm, ít chát', al: '' }
+    ],
+    modYaki: [
+      { gid: 'vi', title: 'Chọn vị', req: true, opts: [{ id: 'muoi', n: 'Muối tiêu chanh', p: 0 }, { id: 'tuong', n: 'Tương Sora', p: 0 }, { id: 'miso', n: 'Miso cay', p: 0 }] },
+      { gid: 'them', title: 'Thêm', req: false, opts: [{ id: 'toi', n: 'Tỏi nướng', p: 15000 }, { id: 'mo', n: 'Mỡ bò', p: 10000 }, { id: 'rau', n: 'Rau ăn kèm', p: 25000 }] }
+    ],
+    modLau: [{ gid: 'nguoi', title: 'Số người ăn', req: true, opts: [{ id: '2', n: '2 người', p: 0 }, { id: '3', n: '3 người', p: 180000 }, { id: '4', n: '4 người', p: 360000 }] }],
+    modDrink: [{ gid: 'da', title: 'Đá', req: false, opts: [{ id: 'nhieu', n: 'Nhiều đá', p: 0 }, { id: 'khong', n: 'Không đá', p: 0 }] }],
+    statuses: ['Đã nhận', 'Đang làm', 'Đang mang ra', 'Đã phục vụ'],
+    recent: ['bo ba chi', 'so diep', 'bia tuoi', 'lau'],
+    calls: [
+      { id: 'phucvu', n: 'Gọi phục vụ', wait: '≈ 1 phút' },
+      { id: 'than', n: 'Thêm than', wait: '≈ 3 phút' },
+      { id: 'da', n: 'Đá / nước', wait: '≈ 2 phút' },
+      { id: 'tinh', n: 'Xin tính tiền', wait: '≈ 2 phút' },
+      { id: 'khac', n: 'Việc khác', wait: '≈ 1 phút' }
+    ]
+  };
+
+  componentDidMount() {
+    this._t = setInterval(() => {
+      if (this.state.screen === 'T14' && this.state.t14 < 99) this.setState(s => ({ t14: s.t14 + 1 }));
+    }, 1000);
+  }
+  componentWillUnmount() { clearInterval(this._t); clearTimeout(this._tt); clearTimeout(this._st); }
+
+  vpRef = el => {
+    if (this._vp === el) return;
+    if (this._vp) this._vp.removeEventListener('scroll', this.onScroll);
+    this._vp = el;
+    if (el) el.addEventListener('scroll', this.onScroll, { passive: true });
+  };
+  gRef = gid => el => {
+    this._g = this._g || {};
+    if (el) this._g[gid] = el; else delete this._g[gid];
+  };
+  jumpTo = gid => () => {
+    this.setState({ cat: gid });
+    const el = this._g && this._g[gid];
+    if (el && this._vp) this._vp.scrollTop = Math.max(0, el.offsetTop - 146);
+  };
+  onScroll = () => {
+    if (this.state.screen !== 'T2' || !this._vp || !this._g) return;
+    const y = this._vp.scrollTop + 168;
+    let cur = null;
+    this.D.cats.forEach(c => { const el = this._g[c[0]]; if (el && el.offsetTop <= y) cur = c[0]; });
+    if (cur && cur !== this.state.cat) this.setState({ cat: cur });
+  };
+  top = () => { if (this._vp) this._vp.scrollTop = 0; };
+  go = sc => e => { if (e && e.preventDefault) e.preventDefault(); this.setState({ screen: sc, sheet: null }); this.top(); };
+  set = k => v => () => this.setState({ [k]: v });
+  say = m => { clearTimeout(this._tt); this.setState({ toast: m }); this._tt = setTimeout(() => this.setState({ toast: '' }), 2200); };
+
+  dish(id) { return this.D.dishes.find(d => d.id === id) || this.D.dishes[3]; }
+  eff(d) { return d.pm || d.pr; }
+  promoTag(d) { return d.pm ? (d.pmTag || '−' + Math.round((1 - d.pm / d.pr) * 100) + '%') : ''; }
+  isSold(id) { return this.D.soldOut.indexOf(id) >= 0; }
+  modsFor(d) {
+    if (d.g === 'yaki') return this.D.modYaki;
+    if (d.g === 'lau') return this.D.modLau;
+    if (d.g === 'bia' || d.g === 'tra') return this.D.modDrink;
+    return [];
+  }
+  needMods(d) { return this.modsFor(d).some(g => g.req); }
+
+  openDish = id => () => {
+    const d = this.dish(id), gs = this.modsFor(d), m = {};
+    gs.forEach(g => { if (g.req) m[g.gid] = [g.opts[0].id]; else m[g.gid] = []; });
+    this.setState({ screen: 'T3', dishOpen: id, mods: m, qty: 1, dnote: '' });
+  };
+  quickAdd = id => () => {
+    const d = this.dish(id);
+    if (this.isSold(id)) return;
+    if (this.needMods(d)) { this.openDish(id)(); return; }
+    this.pushCart(d, 1, {}, '');
+    this.say('Đã thêm ' + d.vi);
+  };
+  pushCart(d, qty, mods, note) {
+    const flat = [];
+    this.modsFor(d).forEach(g => {
+      let cur = mods[g.gid] || [];
+      if (g.req && cur.length === 0) cur = [g.opts[0].id];
+      cur.forEach(oid => { const o = g.opts.find(x => x.id === oid); if (o) flat.push({ n: o.n, p: o.p }); });
+    });
+    const extra = flat.reduce((a, b) => a + b.p, 0);
+    this.setState(s => ({
+      cart: s.cart.concat([{ uid: 'u' + Date.now() + Math.random().toString(36).slice(2, 6), id: d.id, qty: qty, mods: flat, note: note, unit: this.eff(d) + extra }])
+    }));
+  }
+  selOf(g) {
+    const cur = this.state.mods[g.gid] || [];
+    if (g.req && cur.length === 0) return [g.opts[0].id];
+    return cur;
+  }
+  sheetPrice() {
+    const d = this.dish(this.state.dishOpen);
+    let extra = 0;
+    this.modsFor(d).forEach(g => this.selOf(g).forEach(oid => {
+      const o = g.opts.find(x => x.id === oid); if (o) extra += o.p;
+    }));
+    return (this.eff(d) + extra) * this.state.qty;
+  }
+  toggleMod = (gid, oid, req) => () => {
+    this.setState(s => {
+      const cur = (s.mods[gid] || []).slice();
+      let next;
+      if (req) next = [oid];
+      else next = cur.indexOf(oid) >= 0 ? cur.filter(x => x !== oid) : cur.concat([oid]);
+      return { mods: Object.assign({}, s.mods, { [gid]: next }) };
+    });
+  };
+
+  qr(n, seed) {
+    const cell = 100 / n; let r = '';
+    const inFinder = (i, j) => (i < 7 && j < 7) || (i < 7 && j >= n - 7) || (i >= n - 7 && j < 7);
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (inFinder(i, j)) continue;
+        const h = Math.abs((i * 73856093) ^ (j * 19349663) ^ (seed * 83492791)) % 100;
+        if (h < 47) r += '<rect x="' + (j * cell).toFixed(3) + '" y="' + (i * cell).toFixed(3) + '" width="' + cell.toFixed(3) + '" height="' + cell.toFixed(3) + '"/>';
+      }
+    }
+    const f = (x, y) => '<rect x="' + (x * cell).toFixed(3) + '" y="' + (y * cell).toFixed(3) + '" width="' + (cell * 7).toFixed(3) + '" height="' + (cell * 7).toFixed(3) + '"/>'
+      + '<rect x="' + ((x + 1) * cell).toFixed(3) + '" y="' + ((y + 1) * cell).toFixed(3) + '" width="' + (cell * 5).toFixed(3) + '" height="' + (cell * 5).toFixed(3) + '" fill="#FFFFFF"/>'
+      + '<rect x="' + ((x + 2) * cell).toFixed(3) + '" y="' + ((y + 2) * cell).toFixed(3) + '" width="' + (cell * 3).toFixed(3) + '" height="' + (cell * 3).toFixed(3) + '"/>';
+    return '<svg viewBox="0 0 100 100" width="100%" height="100%" fill="#07080A" shape-rendering="crispEdges">' + r + f(0, 0) + f(n - 7, 0) + f(0, n - 7) + '</svg>';
+  }
+
+  billLines() {
+    const out = [];
+    this.state.batches.forEach(b => b.items.forEach(it => {
+      if (it.cancelled) return;
+      const d = this.dish(it.id);
+      out.push({ uid: b.n + '-' + it.id, vi: d.vi, qty: it.qty, unit: it.unit, amount: it.unit * it.qty, mods: it.mods });
+    }));
+    return out;
+  }
+  money() {
+    const svc = this.props.serviceFeePct ?? 5, vat = this.props.vatPct ?? 8;
+    const sub = this.billLines().reduce((a, l) => a + l.amount, 0);
+    const service = Math.round(sub * svc / 100);
+    const tax = Math.round((sub + service) * vat / 100);
+    return { sub: sub, service: service, tax: tax, total: sub + service + tax, svc: svc, vat: vat };
+  }
+  pickedSum() {
+    return this.billLines().filter(l => this.state.picked.indexOf(l.uid) >= 0).reduce((a, l) => a + l.amount, 0);
+  }
+  payAmount() {
+    const m = this.money(), remain = m.total - this.state.paid;
+    if (this.state.payMode === 'even') return Math.ceil(remain / this.state.splitN / 1000) * 1000;
+    if (this.state.payMode === 'pick' || this.state.screen === 'T12') return this.pickedSum();
+    return remain;
+  }
+
+  applyFilters(list) {
+    const f = this.state.filters;
+    let out = list;
+    if (f.veg) out = out.filter(d => d.veg);
+    if (f.noSpicy) out = out.filter(d => !d.spicy);
+    if (f.noSea) out = out.filter(d => !d.sea);
+    if (f.under200) out = out.filter(d => this.eff(d) < 200000);
+    if (f.avail) out = out.filter(d => !this.isSold(d.id));
+    return out;
+  }
+  filtered() { return this.applyFilters(this.D.dishes); }
+  matchAll() {
+    const raw = this.state.query.trim();
+    if (!raw) return [];
+    const toks = nod(raw).split(/\s+/).filter(Boolean);
+    return this.D.dishes.filter(d => {
+      const hay = nod(d.vi) + ' ' + nod(d.d) + ' ' + nod(d.ja);
+      return toks.every(t => hay.indexOf(t) >= 0) || d.ja.indexOf(raw) >= 0;
+    });
+  }
+
+  dv(d) {
+    const so = this.isSold(d.id);
+    const pre = !!d.raw && !(this.props.tableHasGrill ?? true);
+    const plate = 'position:relative;border-radius:8px;background:radial-gradient(120% 100% at 50% 20%,#1E232C 0%,#151920 74%);display:grid;place-items:center;cursor:pointer;flex:none;border:1px solid rgba(201,168,92,.16);' + (so ? 'opacity:.4;' : '');
+    return {
+      id: d.id, vi: d.vi, ja: d.ja, k: d.k, p: M(this.eff(d)), d: d.d, so: so, pre: pre,
+      hasPromo: !!d.pm, pOld: M(d.pr), promoTag: this.promoTag(d),
+      needMods: this.needMods(d),
+      plate88: plate + 'width:88px;height:88px',
+      plate56: plate + 'width:56px;height:56px',
+      plate43: plate + 'width:100%;aspect-ratio:4/3',
+      addSt: 'position:relative;width:44px;height:44px;flex:none;border-radius:4px;font-size:22px;line-height:1;display:grid;place-items:center;padding:0;' + (so ? 'border:1px solid #1E232C;background:transparent;color:#3D4552;cursor:not-allowed' : 'border:1px solid #C9A85C;background:transparent;color:#DCC58A;cursor:pointer'),
+      open: this.openDish(d.id), add: this.quickAdd(d.id)
+    };
+  }
+
+  tab(list, active, key) {
+    const base = 'height:30px;padding:0 12px;border-radius:4px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;border:1px solid ';
+    return list.map(o => ({
+      label: o.label, on: this.set(key)(o.v),
+      st: base + (o.v === active ? '#C9A85C;background:#5E4917;color:#EFE0BC' : '#1E232C;background:transparent;color:#8B8577')
+    }));
+  }
+
+  renderVals() {
+    const S = this.state, D = this.D, sc = S.screen;
+    const m = this.money(), remain = m.total - S.paid, pay = this.payAmount();
+    const cartTotal = S.cart.reduce((a, l) => a + l.unit * l.qty, 0);
+    const cartCount = S.cart.reduce((a, l) => a + l.qty, 0);
+    const openD = this.dish(S.dishOpen);
+    const fCount = Object.keys(S.filters).filter(k => S.filters[k]).length;
+    const list = this.filtered();
+    const menuGroups = D.cats.map(c => {
+      const gid = c[0], all = this.applyFilters(D.dishes.filter(d => d.g === gid));
+      const subs = gid === 'yaki'
+        ? D.subs.map(s => ({ show: true, kanji: s[2], name: s[1], dishes: all.filter(d => d.s === s[0]).map(d => this.dv(d)) })).filter(s => s.dishes.length > 0)
+        : [{ show: false, kanji: '', name: '', dishes: all.map(d => this.dv(d)) }];
+      return { id: gid, name: c[1], kanji: c[2], div: '— ' + c[2] + ' —', count: all.length, subs: subs, ref: this.gRef(gid) };
+    }).filter(g => g.count > 0);
+
+    const emptyMap = {
+      T2: { k: '無', t: 'Nhóm này chưa có món nào phù hợp bộ lọc.', s: 'Bỏ một vài điều kiện, hoặc xem nhóm khác.', b: 'Xoá bộ lọc', a: () => this.setState({ filters: { veg: false, noSpicy: false, noSea: false, under200: false, avail: false }, st: 'ok' }) },
+      T6: { k: '空', t: 'Chưa có món nào. Chọn từ thực đơn để bắt đầu.', s: 'Bấm dấu cộng ở mỗi món là thêm được ngay.', b: 'Xem thực đơn', a: this.go('T2') },
+      T8: { k: '未', t: 'Bàn chưa gọi món nào.', s: 'Sau khi gửi bếp, tiến độ từng món sẽ hiện ở đây.', b: 'Xem thực đơn', a: this.go('T2') },
+      T4: { k: '探', t: 'Không thấy món nào khớp.', s: 'Gõ không dấu cũng được — thử "bo ba chi".', b: 'Về thực đơn', a: this.go('T2') },
+      T10: { k: '無', t: 'Chưa có gì để tính tiền.', s: 'Bàn chưa có món nào được phục vụ.', b: 'Xem thực đơn', a: this.go('T2') }
+    };
+    const em = emptyMap[sc] || emptyMap.T2;
+    const errMap = {
+      T2: { t: 'Thực đơn chưa tải về được.', s: 'Máy chủ nhà hàng chưa trả lời. Thử lại, hoặc nhờ nhân viên đưa thực đơn giấy.' },
+      T6: { t: 'Giỏ hàng chưa đồng bộ được.', s: 'Món bạn chọn vẫn còn trên máy này. Thử lại trước khi gửi bếp.' },
+      T13: { t: 'Chưa tạo được mã QR.', s: 'Cổng thanh toán không phản hồi. Gọi thu ngân sẽ nhanh hơn chờ.' },
+      T1: { t: 'Mã bàn không hợp lệ.', s: 'Nhờ nhân viên hỗ trợ bạn nhé — họ quét lại mã trên bàn là xong.' }
+    };
+    const er = errMap[sc] || errMap.T2;
+
+    const sheetD = {
+      vi: openD.vi, ja: openD.ja, k: openD.k, p: M(this.eff(openD)), d: openD.d,
+      hasPromo: !!openD.pm, pOld: M(openD.pr), promoTag: this.promoTag(openD),
+      alList: openD.al ? openD.al.split(', ') : [],
+      hasAl: !!openD.al,
+      preAlert: !!openD.raw && !(this.props.tableHasGrill ?? true),
+      groups: this.modsFor(openD).map(g => ({
+        title: g.req ? g.title + ' *' : g.title,
+        req: g.req,
+        opts: g.opts.map(o => {
+          const on = this.selOf(g).indexOf(o.id) >= 0;
+          return {
+            n: o.n, delta: o.p > 0 ? '+' + M(o.p) : '', hasDelta: o.p > 0,
+            on: this.toggleMod(g.gid, o.id, g.req),
+            st: 'display:flex;align-items:center;gap:12px;width:100%;height:52px;padding:0 14px;border-radius:4px;background:transparent;cursor:pointer;text-align:left;font-size:15px;border:1px solid ' + (on ? '#C9A85C;color:#EFE0BC' : '#2B313C;color:#C2BCAE'),
+            mark: g.req
+              ? 'width:18px;height:18px;flex:none;border-radius:50%;border:1px solid ' + (on ? '#C9A85C' : '#3D4552') + ';display:grid;place-items:center;background:' + (on ? '#C9A85C' : 'transparent')
+              : 'width:18px;height:18px;flex:none;border-radius:3px;border:1px solid ' + (on ? '#C9A85C' : '#3D4552') + ';display:grid;place-items:center;background:' + (on ? '#C9A85C' : 'transparent'),
+            on2: on
+          };
+        })
+      })),
+      pairs: D.dishes.filter(x => x.g !== openD.g && !this.isSold(x.id)).slice(0, 3).map(x => this.dv(x))
+    };
+
+    const batches = S.batches.map(b => ({
+      title: 'Đợt ' + b.n, time: b.time,
+      items: b.items.map(it => {
+        const d = this.dish(it.id), cancelled = !!it.cancelled;
+        const stColors = ['#5A6270', '#C9A85C', '#D9721F', '#4A8F63'];
+        return {
+          vi: d.vi, qty: String(it.qty), cancelled: cancelled, live: !cancelled,
+          nameSt: 'font-size:16px;font-weight:600;margin:0;line-height:1.35;' + (cancelled ? 'color:#8B8577;text-decoration:line-through' : 'color:#F5F2EA'),
+          stLabel: D.statuses[it.status],
+          stChip: 'height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;flex:none;white-space:nowrap;border:1px solid ' + stColors[it.status] + ';color:' + stColors[it.status],
+          steps: [0, 1, 2, 3].map(i => ({ st: 'flex:1;height:4px;border-radius:2px;background:' + (i <= it.status ? stColors[it.status] : '#1E232C') }))
+        };
+      })
+    }));
+
+    const served = S.batches.reduce((a, b) => a + b.items.filter(i => !i.cancelled).length, 0);
+    const doneCount = S.batches.reduce((a, b) => a + b.items.filter(i => !i.cancelled && i.status === 3).length, 0);
+
+    const payModes = [
+      { id: 'full', n: 'Trả toàn bộ', d: 'Bạn trả hết ' + M(remain) },
+      { id: 'even', n: 'Chia đều', d: 'Mỗi người một phần bằng nhau' },
+      { id: 'pick', n: 'Chọn món mình trả', d: 'Chỉ trả những món bạn ăn' }
+    ].map(o => ({
+      n: o.n, d: o.d, on: () => this.setState({ payMode: o.id, picked: [] }),
+      st: 'display:block;width:100%;text-align:left;padding:18px;border-radius:8px;background:#151920;cursor:pointer;border:1px solid ' + (S.payMode === o.id ? '#C9A85C' : 'rgba(201,168,92,.16)')
+    }));
+
+    const pickedSum = this.pickedSum();
+    const pickLines = this.billLines().map((l, ix) => {
+      const locked = ix === 1;
+      const on = S.picked.indexOf(l.uid) >= 0;
+      return {
+        vi: l.vi, qty: String(l.qty), amount: M(l.amount), locked: locked, free: !locked,
+        lockLabel: 'Bạn A đang trả',
+        on: locked ? () => {} : () => this.setState(s => ({ picked: s.picked.indexOf(l.uid) >= 0 ? s.picked.filter(x => x !== l.uid) : s.picked.concat([l.uid]) })),
+        st: 'display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;background:transparent;cursor:' + (locked ? 'not-allowed' : 'pointer') + ';text-align:left;border:none;border-bottom:1px solid #151920',
+        mark: 'width:20px;height:20px;flex:none;border-radius:3px;border:1px solid ' + (on ? '#C9A85C' : locked ? '#1E232C' : '#3D4552') + ';background:' + (on ? '#C9A85C' : 'transparent') + ';display:grid;place-items:center',
+        on2: on
+      };
+    });
+
+    const t14Msg = S.t14 < 20 ? 'Đang chờ ngân hàng báo về…' : S.t14 < 60 ? 'Thường mất dưới 1 phút' : 'Nhân viên sẽ tới xác nhận giúp bạn';
+    const delay = this.props.paymentDelaySec ?? 12;
+    const t14Done = S.t14 >= delay;
+
+    const isSheet = sc === 'T3' || sc === 'T5' || sc === 'T9';
+    const baseT1 = sc === 'T1' || (sc === 'T9' && S.callFrom === 'T1');
+    const blocked = S.offline && (sc === 'T13' || sc === 'T14');
+
+    return {
+      tabScreens: this.tab([
+        { label: 'T1 Chào bàn', v: 'T1' }, { label: 'T2 Thực đơn', v: 'T2' }, { label: 'T3 Chi tiết món', v: 'T3' },
+        { label: 'T4 Tìm', v: 'T4' }, { label: 'T5 Lọc', v: 'T5' }, { label: 'T6 Giỏ', v: 'T6' },
+        { label: 'T7 Đã gửi', v: 'T7' }, { label: 'T8 Đơn của bàn', v: 'T8' }, { label: 'T9 Gọi NV', v: 'T9' },
+        { label: 'T10 Tạm tính', v: 'T10' }, { label: 'T11 Chia tiền', v: 'T11' }, { label: 'T12 Chọn món trả', v: 'T12' },
+        { label: 'T13 VietQR', v: 'T13' }, { label: 'T14 Chờ xác nhận', v: 'T14' }, { label: 'T15 Hoá đơn', v: 'T15' }, { label: 'T16 Hết món', v: 'T16' }
+      ], sc, 'screen'),
+      tabState: this.tab([{ label: 'Bình thường', v: 'ok' }, { label: 'Đang tải', v: 'loading' }, { label: 'Rỗng', v: 'empty' }, { label: 'Lỗi', v: 'error' }], S.st, 'st'),
+      tabMv: this.tab([{ label: 'A · ListRow 104', v: 'A' }, { label: 'B · Thẻ 2 cột', v: 'B' }, { label: 'C · Gọn 72', v: 'C' }], S.mv, 'mv'),
+      tabNet: this.tab([{ label: 'Có mạng', v: false }, { label: 'Mất kết nối', v: true }], S.offline, 'offline'),
+
+      vpRef: this.vpRef, offline: S.offline,
+      stOk: S.st === 'ok', stLoading: S.st === 'loading', stEmpty: S.st === 'empty', stError: S.st === 'error',
+      skel6: [1, 2, 3, 4, 5, 6],
+      isT1: baseT1, isT2: sc === 'T2' || sc === 'T3' || sc === 'T5' || sc === 'T16' || (sc === 'T9' && S.callFrom !== 'T1'),
+      isT4: sc === 'T4', isT6: sc === 'T6', isT7: sc === 'T7', isT8: sc === 'T8',
+      isT10: sc === 'T10', isT11: sc === 'T11', isT12: sc === 'T12',
+      isT13: sc === 'T13' && !blocked, isT14: sc === 'T14' && !blocked, isT15: sc === 'T15',
+      blocked: blocked,
+      mvA: S.mv === 'A', mvB: S.mv === 'B', mvC: S.mv === 'C',
+      showTopBar: !baseT1 && sc !== 'T7',
+      emptyKanji: em.k, emptyTitle: em.t, emptySub: em.s, emptyBtn: em.b, emptyAct: em.a,
+      errTitle: er.t, errSub: er.s, retry: () => this.setState({ st: 'loading' }),
+
+      guests: String(S.guests),
+      tableZone: 'Khu Sakura · ' + ((this.props.tableHasGrill ?? true) ? 'bàn có bếp nướng' : 'bàn không có bếp'),
+      minusGuest: () => this.setState(s => ({ guests: Math.max(1, s.guests - 1) })),
+      plusGuest: () => this.setState(s => ({ guests: Math.min(12, s.guests + 1) })),
+      langsSm: ['VI', 'EN', 'JA'].map(c => ({
+        code: c, on: this.set('lang')(c),
+        st: 'min-width:44px;height:44px;padding:0 12px;border-radius:999px;font-size:14px;font-weight:500;cursor:pointer;border:1px solid ' + (S.lang === c ? '#C9A85C;background:#5E4917;color:#EFE0BC' : '#1E232C;background:transparent;color:#8B8577')
+      })),
+      langs: ['VI', 'EN', 'JA'].map(c => ({
+        code: c, on: this.set('lang')(c),
+        st: 'flex:1;height:44px;border-radius:999px;font-size:14px;font-weight:500;cursor:pointer;border:1px solid ' + (S.lang === c ? '#C9A85C;background:#5E4917;color:#EFE0BC' : '#2B313C;background:transparent;color:#C2BCAE')
+      })),
+      startOrder: this.go('T2'),
+
+      cats: D.cats.map(c => ({
+        kanji: c[2], name: c[1], on: this.jumpTo(c[0]),
+        st: 'height:36px;padding:0 14px;border-radius:999px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap;flex:none;border:1px solid ' + (S.cat === c[0] ? '#C9A85C;background:#5E4917;color:#EFE0BC' : '#1E232C;background:transparent;color:#C2BCAE')
+      })),
+      menuGroups: menuGroups, menuEmpty: menuGroups.length === 0, shownCount: String(list.length),
+      filterLabel: fCount ? 'Bộ lọc · ' + fCount : 'Bộ lọc',
+      goFilter: () => this.setState({ screen: 'T5' }),
+      goSearch: this.go('T4'), goOrders: this.go('T8'), goMenu: this.go('T2'), goCart: this.go('T6'),
+      goBill: this.go('T10'), goSplit: this.go('T11'),
+      goCall: () => this.setState({ screen: 'T9', staffCall: null, callFrom: sc === 'T1' ? 'T1' : 'T2' }),
+      hasOrders: served > 0, orderCount: String(served),
+
+      query: S.query, onQuery: e => this.setState({ query: e.target.value }),
+      clearQuery: () => this.setState({ query: '' }),
+      noQuery: !S.query.trim(), hasResults: !!S.query.trim() && this.matchAll().length > 0,
+      noResults: !!S.query.trim() && this.matchAll().length === 0,
+      results: this.matchAll().map(d => this.dv(d)),
+      recent: D.recent.map(q => ({ q: q, on: () => this.setState({ query: q }) })),
+      topDishes: ['bachi', 'sodiep', 'asahi'].map(id => this.dv(this.dish(id))),
+
+      cart: S.cart.map(l => {
+        const d = this.dish(l.id);
+        return {
+          vi: d.vi, qty: String(l.qty), amount: M(l.unit * l.qty),
+          hasMods: l.mods.length > 0, modText: l.mods.map(x => x.n).join(' · '),
+          hasNote: !!l.note, note: l.note,
+          minus: () => this.setState(s => ({ cart: l.qty <= 1 ? s.cart.filter(x => x.uid !== l.uid) : s.cart.map(x => x.uid === l.uid ? Object.assign({}, x, { qty: x.qty - 1 }) : x) })),
+          plus: () => this.setState(s => ({ cart: s.cart.map(x => x.uid === l.uid ? Object.assign({}, x, { qty: x.qty + 1 }) : x) })),
+          del: () => { this.setState(s => ({ cart: s.cart.filter(x => x.uid !== l.uid) })); this.say('Đã xoá ' + d.vi); }
+        };
+      }),
+      cartEmpty: S.cart.length === 0, cartHas: S.cart.length > 0,
+      cartTotal: M(cartTotal), cartCountLine: cartCount + ' món',
+      onCartNote: e => this.setState({ cartNote: e.target.value }),
+      viewCartSt: 'height:52px;padding:0 24px;border-radius:4px;border:none;font-size:15px;font-weight:600;flex:none;' + (cartCount ? 'background:#B08A33;color:#07080A;cursor:pointer' : 'background:#1E232C;color:#3D4552;cursor:not-allowed'),
+      sendKitchen: () => {
+        const n = S.batches.length + 1;
+        const items = S.cart.map(l => ({ id: l.id, qty: l.qty, mods: l.mods.map(x => x.n).join(' · '), unit: l.unit, status: 0 }));
+        this.setState({ batches: S.batches.concat([{ n: n, time: '20:0' + Math.min(9, n), items: items }]), cart: [], cartNote: '', screen: 'T7' });
+        this.top();
+        clearTimeout(this._st);
+        this._st = setTimeout(() => this.setState({ screen: 'T2' }), 2200);
+      },
+      sentLine: 'Đã gửi bếp · ' + cartCount + ' món',
+
+      batches: batches, batchSummary: doneCount + '/' + served + ' món đã phục vụ · ' + S.batches.length + ' đợt',
+
+      billLines: this.billLines().map(l => ({ vi: l.vi, qty: String(l.qty), unit: M(l.unit), amount: M(l.amount), hasMods: !!l.mods, mods: l.mods })),
+      billSubtotalFmt: M(m.sub), billServiceFmt: M(m.service), billTaxFmt: M(m.tax), billTotalFmt: M(m.total),
+      svcPct: String(m.svc), vatPct: String(m.vat),
+      paidFmt: M(S.paid), remainFmt: M(remain), hasPaid: S.paid > 0,
+      payAmountFmt: M(pay), perHeadFmt: M(Math.ceil(remain / S.splitN / 1000) * 1000),
+      payModes: payModes, isEven: S.payMode === 'even', isPick: S.payMode === 'pick',
+      splitN: String(S.splitN),
+      minusSplit: () => this.setState(s => ({ splitN: Math.max(2, s.splitN - 1) })),
+      plusSplit: () => this.setState(s => ({ splitN: Math.min(12, s.splitN + 1) })),
+      pickLines: pickLines, pickedTotalFmt: M(pickedSum), hasPicked: pickedSum > 0,
+      goPay: () => { this.setState({ screen: S.payMode === 'pick' ? 'T12' : 'T13', t14: 0 }); this.top(); },
+      goQR: () => { this.setState({ screen: 'T13', payMode: 'pick', t14: 0 }); this.top(); },
+      startWait: () => { this.setState({ screen: 'T14', t14: 0 }); this.top(); },
+      t14Msg: t14Msg, t14Done: t14Done, t14Waiting: !t14Done,
+      t14Pct: String(Math.min(100, Math.round(S.t14 / delay * 100))),
+      t14Off: (339.29 * (1 - Math.min(1, S.t14 / delay))).toFixed(1),
+      t14Color: S.t14 < delay * 0.4 ? '#5A6270' : S.t14 < delay * 0.7 ? '#C9A85C' : '#D9721F',
+      qrPay: { __html: this.qr(25, 42) }, qrInvoice: { __html: this.qr(21, 7) },
+      copyAccount: () => { if (navigator.clipboard) navigator.clipboard.writeText('9704128842102'); this.say('Đã sao chép số tài khoản'); },
+      copyAmount: () => { if (navigator.clipboard) navigator.clipboard.writeText(String(pay)); this.say('Đã sao chép số tiền'); },
+      finishPay: () => {
+        const np = S.paid + pay;
+        const done = np >= m.total;
+        this.setState({ paid: np, screen: done ? 'T15' : 'T11', payMode: done ? S.payMode : null, picked: [], t14: 0 });
+        this.top();
+      },
+      account: '9704 12 8842 1102',
+      stars: [1, 2, 3, 4, 5].map(n => ({
+        on: () => this.setState({ stars: n }),
+        st: 'width:44px;height:44px;border:none;background:transparent;cursor:pointer;padding:0;display:grid;place-items:center;color:' + (n <= S.stars ? '#C9A85C' : '#3D4552'),
+        fill: n <= S.stars ? '#C9A85C' : 'none'
+      })),
+      hasStars: S.stars > 0, showLoyalty: this.props.showLoyalty ?? true,
+
+      sheetOpen: isSheet, sheetT3: sc === 'T3', sheetT5: sc === 'T5', sheetT9: sc === 'T9',
+      closeSheet: () => { this.setState({ screen: sc === 'T9' ? S.callFrom : 'T2' }); this.top(); },
+      callIdle: !S.staffCall,
+      noPayMode: !S.payMode,
+      payNextLabel: S.payMode ? 'Trả ' + M(pay) : 'Chọn cách trả',
+      payNextSt: 'height:56px;width:100%;border-radius:4px;border:none;font-size:16px;font-weight:600;' + (S.payMode ? 'background:#B08A33;color:#07080A;cursor:pointer' : 'background:#1E232C;color:#3D4552;cursor:not-allowed'),
+      noPicked: pickedSum <= 0,
+      pickNextSt: 'height:56px;width:100%;margin-top:20px;border-radius:4px;border:none;font-size:16px;font-weight:600;' + (pickedSum > 0 ? 'background:#B08A33;color:#07080A;cursor:pointer' : 'background:#1E232C;color:#3D4552;cursor:not-allowed'),
+      t14Late: S.t14 >= 60,
+      finishLabel: (S.paid + pay) >= m.total ? 'Xem hoá đơn' : 'Về chia tiền',
+      sheetD: sheetD, sheetQty: String(S.qty),
+      minusQty: () => this.setState(s => ({ qty: Math.max(1, s.qty - 1) })),
+      plusQty: () => this.setState(s => ({ qty: Math.min(20, s.qty + 1) })),
+      onDnote: e => this.setState({ dnote: e.target.value }),
+      addLabel: 'Thêm vào giỏ · ' + M(this.sheetPrice()),
+      confirmAdd: () => {
+        const d = this.dish(S.dishOpen);
+        this.pushCart(d, S.qty, S.mods, S.dnote);
+        this.setState({ screen: 'T2' });
+        this.say('Đã thêm ' + S.qty + ' × ' + d.vi);
+      },
+      filterRows: [
+        { k: 'veg', n: 'Chay' }, { k: 'noSpicy', n: 'Không cay' }, { k: 'noSea', n: 'Không hải sản' },
+        { k: 'under200', n: 'Dưới 200k' }, { k: 'avail', n: 'Đang có sẵn' }
+      ].map(f => {
+        const on = S.filters[f.k];
+        return {
+          n: f.n, on: () => this.setState(s => ({ filters: Object.assign({}, s.filters, { [f.k]: !s.filters[f.k] }) })),
+          track: 'width:52px;height:30px;flex:none;border-radius:999px;position:relative;transition:background .15s;background:' + (on ? '#B08A33' : '#2B313C'),
+          knob: 'position:absolute;top:3px;width:24px;height:24px;border-radius:50%;background:' + (on ? '#07080A' : '#8B8577') + ';transition:left .15s;left:' + (on ? '25px' : '3px')
+        };
+      }),
+      filterApplyLabel: 'Xem ' + list.length + ' món phù hợp',
+      calls: D.calls.map(c => ({
+        n: c.n, wait: c.wait,
+        on: () => { this.setState({ staffCall: c.id }); },
+        st: 'display:flex;align-items:center;gap:14px;width:100%;height:64px;padding:0 16px;border-radius:4px;background:transparent;cursor:pointer;text-align:left;font-size:16px;font-weight:500;border:1px solid ' + (S.staffCall === c.id ? '#C9A85C;color:#EFE0BC' : '#2B313C;color:#F5F2EA')
+      })),
+      callSent: !!S.staffCall,
+      callWait: S.staffCall ? (D.calls.find(c => c.id === S.staffCall) || D.calls[0]).wait : '',
+      callName: S.staffCall ? (D.calls.find(c => c.id === S.staffCall) || D.calls[0]).n : '',
+      resetCall: () => this.setState({ staffCall: null }),
+
+      isT16: sc === 'T16',
+      soldOutName: 'Nầm bò',
+      alts: ['carbi', 'misuji'].map(id => this.dv(this.dish(id))),
+      ackSoldOut: () => this.setState({ screen: 'T2' }),
+
+      toastOn: !!S.toast, toast: S.toast,
+      showBottom: (sc === 'T2' || sc === 'T4' || sc === 'T6' || sc === 'T8' || sc === 'T16') && S.st === 'ok' && !isSheet,
+      barMenu: sc === 'T2' || sc === 'T4' || sc === 'T16', barCart: sc === 'T6' && S.cart.length > 0,
+      barOrders: sc === 'T8', barCall: false
+    };
+  }
+}
+</script>
+</body>
+</html>

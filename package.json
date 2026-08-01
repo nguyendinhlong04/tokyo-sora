@@ -1,0 +1,30 @@
+{
+  "name": "tokyo-sora",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "test": "pnpm -r test",
+    "dev:api": "pnpm --filter @sora/api dev",
+    "dev:web": "pnpm --filter @sora/web dev",
+    "dev:table": "pnpm --filter @sora/table dev",
+    "dev:pos": "pnpm --filter @sora/pos dev",
+    "dev:kitchen": "pnpm --filter @sora/kitchen dev",
+    "dev:office": "pnpm --filter @sora/office dev",
+    "dev:lab": "pnpm --filter @sora/ui dev",
+    "extract-seed": "pnpm --filter @sora/extract-seed start"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.0",
+    "eslint": "^9.30.0",
+    "globals": "^17.8.0",
+    "prettier": "^3.6.0",
+    "typescript": "catalog:",
+    "typescript-eslint": "^8.40.0"
+  }
+}

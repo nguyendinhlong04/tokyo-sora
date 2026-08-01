@@ -1,0 +1,6 @@
+{
+  "name": "@sora/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared tsconfig/eslint/prettier presets for the Tokyo Sora monorepo"
+}

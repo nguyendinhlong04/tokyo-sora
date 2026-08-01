@@ -1,0 +1,75 @@
+# Tokyo Sora — Caddy: TLS tự động + same-origin /api trên từng origin + security headers.
+# Đổi domain thật tại biến bên dưới khi deploy. Bản này là khung GĐ0 — Web (Next SSR)
+# và Table sẽ được thêm service/route khi tới GĐ2–3.
+
+(security) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+}
+
+# CSP strict cho SPA (Vite không sinh inline script)
+(spa_csp) {
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' wss:; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+}
+
+(api_proxy) {
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /socket.io/* {
+		reverse_proxy api:3000
+	}
+}
+
+pos.tokyosora.vn {
+	import security
+	import spa_csp
+	import api_proxy
+	handle {
+		root * /srv/pos
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+kds.tokyosora.vn {
+	import security
+	import spa_csp
+	import api_proxy
+	handle {
+		root * /srv/kitchen
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+admin.tokyosora.vn {
+	import security
+	import spa_csp
+	import api_proxy
+	handle {
+		root * /srv/office
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# GĐ2–3: tokyosora.vn → Next SSR (service web) + /t/* → SPA table + /api proxy
+# tokyosora.vn {
+# 	import security
+# 	import api_proxy
+# 	handle /t/* {
+# 		root * /srv/table
+# 		try_files {path} /index.html
+# 		file_server
+# 	}
+# 	handle {
+# 		reverse_proxy web:3001
+# 	}
+# }

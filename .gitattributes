@@ -1,0 +1,7 @@
+# Chuẩn hoá LF trong repo (CI chạy Linux, dev chạy Windows) — tránh diff CRLF giả.
+* text=auto eol=lf
+
+*.woff2 binary
+*.png binary
+*.jpg binary
+*.ico binary

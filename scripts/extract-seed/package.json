@@ -1,0 +1,10 @@
+{
+  "name": "@sora/extract-seed",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Trích dữ liệu mẫu (món, bàn, trạm, chi nhánh, tham số) từ designs/*.dc.html thành seed JSON",
+  "scripts": {
+    "start": "node extract.mjs"
+  }
+}

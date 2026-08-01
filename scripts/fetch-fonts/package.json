@@ -1,0 +1,13 @@
+{
+  "name": "@sora/fetch-fonts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tải + subset 4 họ font tự host vào packages/tokens/fonts, sinh fonts.css",
+  "scripts": {
+    "start": "node fetch.mjs"
+  },
+  "dependencies": {
+    "subset-font": "^2.4.0"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@sora/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hợp đồng dữ liệu Tokyo Sora: zod schemas, sự kiện WS, tiền VND — API và 5 app cùng import",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

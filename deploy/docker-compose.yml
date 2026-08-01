@@ -1,0 +1,73 @@
+# Tokyo Sora — Docker Compose
+# Dev:  docker compose up -d            → chỉ postgres + redis (API/web chạy pnpm dev ngoài)
+# Prod: docker compose --profile prod up -d --build
+#
+# LƯU Ý: máy dev hiện tại chưa cài Docker Desktop — file này soạn sẵn cho GĐ1;
+# API cần Postgres thật từ GĐ1 nên hãy cài Docker trước khi bắt đầu GĐ1.
+name: tokyo-sora
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sora
+      POSTGRES_USER: sora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Đặt POSTGRES_PASSWORD trong deploy/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Chỉ mạng nội bộ compose. Dev cần nối từ máy host thì mở comment 2 dòng dưới:
+    ports:
+      - '127.0.0.1:5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sora -d sora']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    ports:
+      - '127.0.0.1:6379:6379'
+
+  api:
+    profiles: [prod]
+    build:
+      context: ..
+      dockerfile: deploy/api.Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://sora:${POSTGRES_PASSWORD}@postgres:5432/sora
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  caddy:
+    profiles: [prod]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      # Build tĩnh của 4 SPA copy vào đây ở bước deploy (GĐ1+):
+      - ./srv:/srv:ro
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:

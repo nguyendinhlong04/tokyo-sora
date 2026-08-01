@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<template id="__bundler_thumbnail">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" data-bg-color="#07080A">
+<rect width="320" height="320" fill="#07080A"/>
+<rect x="62" y="62" width="196" height="196" rx="12" fill="none" stroke="#B08A33" stroke-width="2" opacity=".5"/>
+<text x="160" y="196" font-family="serif" font-size="96" fill="#DCC58A" text-anchor="middle">厨</text>
+</svg>
+</template>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Shippori+Mincho+B1:wght@400;600&amp;display=swap" rel="stylesheet" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#07080A}
+a{color:#DCC58A;text-decoration:none}
+a:hover{color:#EFE0BC}
+button{font-family:inherit}
+input,textarea,select{font-family:inherit}
+@keyframes sora-late{0%,100%{border-color:#B5382C}50%{border-color:rgba(181,56,44,.25)}}
+@keyframes sora-fade{from{opacity:0}to{opacity:1}}
+@keyframes sora-pulse{0%,100%{opacity:.45}50%{opacity:.8}}
+[data-rail]{scrollbar-width:none;-ms-overflow-style:none}
+[data-rail]::-webkit-scrollbar{display:none;width:0;height:0}
+@media (prefers-reduced-motion:reduce){*{animation:none !important}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#07080A;font-family:'Be Vietnam Pro',system-ui,sans-serif;color:#F5F2EA">
+
+<div data-rail="1" style="position:sticky;top:0;z-index:200;background:#0D0F13;border-bottom:1px solid #1E232C;padding:0 24px;display:flex;align-items:center;gap:24px;height:60px;overflow-x:auto">
+  <div style="display:flex;align-items:baseline;gap:8px;flex:none">
+    <span style="font-family:'Shippori Mincho B1',serif;font-size:14px;color:#C9A85C">東京空</span>
+    <span style="font-size:11px;font-weight:600;letter-spacing:.14em;color:#8B8577">SORA KITCHEN · K3</span>
+  </div>
+  <div style="width:1px;height:24px;background:#1E232C;flex:none"></div>
+  <div style="display:flex;align-items:center;gap:10px;flex:none">
+    <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#3D4552">Màn</span>
+    <div style="display:flex;gap:4px">
+      <sc-for list="{{ tabScreens }}" as="o" hint-placeholder-count="6">
+        <button type="button" onClick="{{ o.on }}" style="{{ o.st }}">{{ o.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="width:1px;height:24px;background:#1E232C;flex:none"></div>
+  <div style="display:flex;align-items:center;gap:10px;flex:none">
+    <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#3D4552">Trạm</span>
+    <div style="display:flex;gap:4px">
+      <sc-for list="{{ tabStation }}" as="o" hint-placeholder-count="6">
+        <button type="button" onClick="{{ o.on }}" style="{{ o.st }}">{{ o.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="width:1px;height:24px;background:#1E232C;flex:none"></div>
+  <div style="display:flex;align-items:center;gap:10px;flex:none">
+    <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#3D4552">Trạng thái</span>
+    <div style="display:flex;gap:4px">
+      <sc-for list="{{ tabState }}" as="o" hint-placeholder-count="4">
+        <button type="button" onClick="{{ o.on }}" style="{{ o.st }}">{{ o.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+  <span style="flex:none;font-size:12px;color:#3D4552;margin-left:auto;white-space:nowrap">ST-02 → 6 cột vé thấp · ST-06 → 4 cột vé cao</span>
+</div>
+
+<div style="padding:32px 32px 80px;display:flex;justify-content:flex-start">
+<div style="flex:none">
+  <div style="width:1944px;height:1104px;background:#151920;border:1px solid #2B313C;border-radius:14px;padding:12px">
+    <div style="position:relative;width:1920px;height:1080px;border-radius:6px;overflow:hidden;background:#07080A">
+
+    <sc-if value="{{ isD1 }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="K1 Ghép thiết bị" style="height:1080px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px">
+      <span style="font-family:'Shippori Mincho B1',serif;font-size:24px;color:#C9A85C;letter-spacing:.4em">東京空</span>
+      <p style="font-size:30px;font-weight:600;color:#F5F2EA;margin:28px 0 0">Ghép màn hình bếp</p>
+      <p style="font-size:18px;color:#8B8577;margin:14px 0 0">Nhập mã 6 số hiện trên Quản trị · Thiết bị</p>
+      <div style="display:flex;gap:20px;margin-top:56px">
+        <sc-for list="{{ codeCells }}" as="c" hint-placeholder-count="6">
+          <span style="{{ c.st }}">{{ c.v }}</span>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:56px;width:760px">
+        <sc-for list="{{ codeKeys }}" as="k" hint-placeholder-count="10">
+          <button type="button" onClick="{{ k.on }}" style="{{ k.st }}">{{ k.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;gap:28px;margin-top:56px;padding:28px 40px;border-radius:8px;border:1px solid rgba(201,168,92,.16);background:#0D0F13">
+        <span style="font-family:'Shippori Mincho B1',serif;font-size:64px;color:#5E4917;line-height:1">{{ stKanji }}</span>
+        <div>
+          <p style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8B8577;margin:0">Trạm sẽ gán</p>
+          <p style="font-size:24px;font-weight:600;color:#F5F2EA;margin:10px 0 0">{{ stName }}</p>
+          <p style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#DCC58A;margin:8px 0 0">{{ station }}</p>
+        </div>
+      </div>
+      <button type="button" onClick="{{ pairDevice }}" disabled="{{ cantPair }}" style="{{ pairSt }}">{{ pairLabel }}</button>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ showKds }}" hint-placeholder-val="{{ true }}">
+    <div style="height:1080px;display:flex;flex-direction:column">
+
+      <div style="flex:none;height:64px;display:flex;align-items:center;padding:0 24px;background:#0D0F13;border-bottom:1px solid rgba(201,168,92,.16)">
+        <div style="display:flex;align-items:center;gap:16px;flex:none">
+          <span style="font-family:'Shippori Mincho B1',serif;font-size:40px;color:#5E4917;line-height:1">{{ stKanji }}</span>
+          <div>
+            <p style="font-size:24px;font-weight:600;color:#F5F2EA;margin:0;line-height:1.1">{{ stName }}</p>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#8B8577">{{ station }}</span>
+          <span style="width:1px;height:28px;background:#1E232C"></span>
+          <span style="font-size:18px;color:#8B8577">{{ screenName }}</span>
+        </div>
+        <span style="position:absolute;left:50%;transform:translateX(-50%);font-family:'IBM Plex Mono',monospace;font-size:32px;color:#F5F2EA">{{ clock }}</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:20px;flex:none">
+          <span style="font-size:20px;color:#C2BCAE">{{ counter }}</span>
+          <sc-if value="{{ hasLate }}" hint-placeholder-val="{{ false }}">
+            <span style="height:36px;padding:0 14px;border-radius:999px;border:1px solid #B5382C;color:#B5382C;font-size:16px;font-weight:600;display:inline-flex;align-items:center">{{ lateLabel }}</span>
+          </sc-if>
+        </div>
+      </div>
+
+      <sc-if value="{{ stLoading }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;padding:24px;display:grid;grid-template-columns:repeat(5,1fr);gap:16px">
+          <sc-for list="{{ skel5 }}" as="s" hint-placeholder-count="5">
+            <div style="border-radius:8px;background:#151920;animation:sora-pulse 1.6s ease-in-out infinite"></div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ stEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:64px">
+          <span style="font-family:'Shippori Mincho B1',serif;font-size:120px;color:#5E4917;line-height:1">{{ emptyKanji }}</span>
+          <p style="font-size:44px;font-weight:600;color:#F5F2EA;margin:40px 0 0">{{ emptyTitle }}</p>
+          <p style="font-size:22px;color:#8B8577;margin:20px 0 0;max-width:720px;line-height:1.6">{{ emptySub }}</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ stError }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:64px 96px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#B5382C" stroke-width="1.6"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6"></path><circle cx="12" cy="16.5" r=".8" fill="#B5382C" stroke="none"></circle></svg>
+            <span style="font-size:18px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#B5382C">Mất kết nối máy chủ</span>
+          </div>
+          <p style="font-size:44px;font-weight:600;color:#F5F2EA;margin:28px 0 0;line-height:1.25;max-width:1100px">Vé mới không về được màn này.</p>
+          <p style="font-size:22px;color:#C2BCAE;margin:24px 0 0;max-width:900px;line-height:1.65">Vé đang hiện vẫn làm được bình thường. Nhờ thu ngân đọc đơn qua bộ đàm cho tới khi mạng trở lại.</p>
+          <p style="font-family:'IBM Plex Mono',monospace;font-size:20px;color:#8B8577;margin:32px 0 0">Lần nhận vé cuối · 20:14 · 6 phút trước</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ stOk }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1;min-height:0;display:flex">
+
+      <sc-if value="{{ isD2 }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="K2 Hàng vé" style="flex:1;min-width:0;display:flex;gap:16px;padding:24px">
+        <sc-for list="{{ columns }}" as="col" hint-placeholder-count="5">
+          <div style="{{ col.st }}">
+            <sc-for list="{{ col.tickets }}" as="t" hint-placeholder-count="2">
+              <div style="{{ t.card }}">
+                <div style="{{ t.head }}">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                    <span style="font-size:22px;font-weight:600;color:#C2BCAE;letter-spacing:.04em">{{ t.tableLabel }}</span>
+                    <span style="{{ t.batchChip }}">{{ t.batchLabel }}</span>
+                  </div>
+                  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:8px">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#8B8577">#{{ t.code }}</span>
+                    <span style="{{ t.clockSt }}">{{ t.clock }}</span>
+                  </div>
+                </div>
+                <div style="flex:1;min-height:0;padding:14px 16px">
+                  <sc-for list="{{ t.items }}" as="it" hint-placeholder-count="3">
+                    <div style="padding:10px 0;border-bottom:1px solid #151920">
+                      <div style="display:flex;align-items:baseline;gap:12px">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:700;color:#DCC58A;line-height:1;flex:none">{{ it.qty }}</span>
+                        <span style="font-size:24px;font-weight:600;color:#F5F2EA;line-height:1.2;flex:1">{{ it.vi }}</span>
+                        <sc-if value="{{ it.isSet }}" hint-placeholder-val="{{ false }}">
+                          <span style="height:26px;padding:0 10px;border-radius:999px;background:#5E4917;color:#EFE0BC;font-size:14px;font-weight:700;letter-spacing:.06em;display:inline-flex;align-items:center;flex:none">SET</span>
+                        </sc-if>
+                      </div>
+                      <sc-if value="{{ it.hasNote }}" hint-placeholder-val="{{ false }}">
+                        <p style="font-size:18px;color:#D08A1C;margin:8px 0 0;line-height:1.35">▸ {{ it.note }}</p>
+                      </sc-if>
+                      <sc-if value="{{ it.hasWait }}" hint-placeholder-val="{{ false }}">
+                        <span style="height:26px;padding:0 10px;margin-top:8px;border-radius:999px;border:1px solid #2B313C;color:#8B8577;font-size:14px;display:inline-flex;align-items:center">{{ it.waitLabel }}</span>
+                      </sc-if>
+                      <sc-if value="{{ it.gram }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+                          <span style="font-size:14px;color:#8B8577">Cân</span>
+                          <span style="min-width:96px;height:40px;padding:0 12px;border-radius:4px;border:1px solid #2B313C;background:#0D0F13;font-family:'IBM Plex Mono',monospace;font-size:24px;color:#F5F2EA;display:inline-flex;align-items:center;justify-content:flex-end">{{ it.gramV }}</span>
+                          <span style="font-size:16px;color:#8B8577">g</span>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ t.noGrill }}" hint-placeholder-val="{{ false }}">
+                    <p style="font-size:16px;color:#8B8577;margin:12px 0 0">{{ t.noGrillText }}</p>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ t.online }}" hint-placeholder-val="{{ false }}">
+                  <div style="flex:none;padding:10px 16px;border-top:1px solid #1E232C;display:flex;align-items:center;justify-content:space-between;gap:12px">
+                    <span style="height:30px;padding:0 12px;border-radius:4px;background:#4E7FA8;color:#07080A;font-size:15px;font-weight:700;letter-spacing:.06em;display:inline-flex;align-items:center">{{ t.onlineLabel }}</span>
+                    <span style="font-size:15px;color:#8B8577">{{ t.onlineNote }}</span>
+                  </div>
+                </sc-if>
+                <div style="{{ t.footSt }}">
+                  <sc-if value="{{ t.showUndo }}" hint-placeholder-val="{{ false }}">
+                    <button type="button" onClick="{{ t.undo }}" style="flex:1;height:72px;border-radius:4px;border:1px solid #2B313C;background:transparent;color:#C2BCAE;font-size:20px;font-weight:600;cursor:pointer">Hoàn tác · {{ t.undoLeft }}s</button>
+                  </sc-if>
+                  <sc-if value="{{ t.showActions }}" hint-placeholder-val="{{ true }}">
+                    <span style="display:flex;gap:10px;flex:1">
+                      <button type="button" onClick="{{ t.doing }}" style="{{ t.doingSt }}">ĐANG LÀM</button>
+                      <sc-if value="{{ t.showGrid }}" hint-placeholder-val="{{ false }}">
+                        <button type="button" onClick="{{ t.onGrid }}" style="{{ t.gridSt }}">TRÊN VỈ</button>
+                      </sc-if>
+                      <button type="button" onClick="{{ t.done }}" style="flex:1;height:72px;border-radius:4px;border:none;background:#4A8F63;color:#07080A;font-size:20px;font-weight:700;letter-spacing:.04em;cursor:pointer">XONG</button>
+                    </span>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+        <sc-if value="{{ hasOverflow }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:none;width:88px;border-radius:8px;border:1px solid #1E232C;background:#0D0F13;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:44px;color:#DCC58A;line-height:1">{{ overflowN }}</span>
+            <span style="font-size:16px;color:#8B8577;writing-mode:vertical-rl;letter-spacing:.1em">đơn nữa</span>
+          </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+<sc-if value="{{ isD4 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="K4 Chờ ra" style="flex:1;min-width:0;display:flex;gap:16px;padding:24px">
+        <sc-for list="{{ columns }}" as="col" hint-placeholder-count="4">
+          <div style="{{ col.st }}">
+            <sc-for list="{{ col.tickets }}" as="t" hint-placeholder-count="2">
+              <div style="{{ t.card }}">
+                <div style="{{ t.head }}">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                    <span style="font-size:22px;font-weight:600;color:#8B8577;letter-spacing:.04em">{{ t.tableLabel }}</span>
+                  </div>
+                  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:8px">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#3D4552">#{{ t.code }}</span>
+                  </div>
+                  <p style="font-size:15px;font-weight:600;color:#8B8577;margin:10px 0 0;line-height:1.35">{{ t.batchLabel }}</p>
+                </div>
+                <div style="flex:1;min-height:0;padding:14px 16px">
+                  <sc-for list="{{ t.items }}" as="it" hint-placeholder-count="3">
+                    <div style="padding:10px 0;border-bottom:1px solid #151920">
+                      <div style="display:flex;align-items:baseline;gap:12px">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:700;color:#8B8577;line-height:1;flex:none">{{ it.qty }}</span>
+                        <span style="font-size:24px;font-weight:600;color:#C2BCAE;line-height:1.2;flex:1">{{ it.vi }}</span>
+                      </div>
+                      <sc-if value="{{ it.hasNote }}" hint-placeholder-val="{{ false }}">
+                        <p style="font-size:18px;color:#8B8577;margin:8px 0 0;line-height:1.35">▸ {{ it.note }}</p>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isD3 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="K3 Bảng tổng món" style="flex:1;min-width:0;padding:24px">
+        <p style="font-size:18px;color:#8B8577;margin:0 0 20px">{{ totalCount }} món đang chờ ở trạm này · sắp theo số lượng giảm dần</p>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px">
+          <sc-for list="{{ totalCards }}" as="c" hint-placeholder-count="10">
+            <div style="border-radius:8px;background:#0D0F13;border:1px solid rgba(201,168,92,.16);padding:20px;display:flex;flex-direction:column">
+              <p style="font-size:24px;font-weight:600;color:#F5F2EA;margin:0;line-height:1.25;min-height:60px">{{ c.vi }}</p>
+              <p style="font-family:'IBM Plex Mono',monospace;font-size:40px;font-weight:500;color:#DCC58A;margin:16px 0 0;line-height:1">{{ c.n }}</p>
+              <p style="font-size:16px;color:#8B8577;margin:12px 0 0">{{ c.parts }}</p>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isD5 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="K5 Báo hết món" style="flex:1;min-width:0;display:flex;flex-direction:column;padding:24px">
+        <p style="font-size:18px;color:#8B8577;margin:0 0 20px">Gạt tắt để báo hết. Món hết sẽ khoá ngay trên thực đơn khách và POS.</p>
+        <div style="flex:1;min-height:0;border-radius:8px;border:1px solid rgba(201,168,92,.16);background:#0D0F13;overflow:hidden">
+          <sc-for list="{{ menu }}" as="m" hint-placeholder-count="12">
+            <div style="{{ m.rowSt }}">
+              <span style="font-size:24px;font-weight:600;color:#F5F2EA;flex:1">{{ m.vi }}</span>
+              <span style="{{ m.labelSt }}">{{ m.label }}</span>
+              <button type="button" onClick="{{ m.on }}" style="{{ m.track }}"><span style="{{ m.knob }}"></span></button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isD6 }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="K6 Expo" style="flex:1;min-width:0;padding:24px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+          <sc-for list="{{ expo }}" as="e" hint-placeholder-count="5">
+            <div style="{{ e.card }}">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                <span style="font-size:24px;font-weight:600;color:#F5F2EA">{{ e.head }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#8B8577">#{{ e.code }}</span>
+              </div>
+              <p style="font-size:20px;color:#C2BCAE;margin:10px 0 0">{{ e.progress }}</p>
+              <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1E232C">
+                <sc-for list="{{ e.items }}" as="i" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:12px;padding:9px 0">
+                    <span style="{{ i.dot }}"></span>
+                    <span style="{{ i.viSt }}">{{ i.vi }}</span>
+                    <sc-if value="{{ i.ok }}" hint-placeholder-val="{{ false }}">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4A8F63" stroke-width="2.4" stroke-linecap="round" style="flex:none"><path d="M4 12.5 9.5 18 20 7"></path></svg>
+                    </sc-if>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#3D4552;flex:none">{{ i.code }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <sc-if value="{{ e.warn }}" hint-placeholder-val="{{ false }}">
+                <p style="font-size:18px;color:#D08A1C;margin:16px 0 0">{{ e.warnText }}</p>
+              </sc-if>
+              <sc-if value="{{ e.full }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ e.on }}" style="height:72px;margin-top:18px;border-radius:4px;border:none;background:#4A8F63;color:#07080A;font-size:20px;font-weight:700;letter-spacing:.04em;cursor:pointer">ĐÃ RA MÓN</button>
+              </sc-if>
+              <sc-if value="{{ e.marked }}" hint-placeholder-val="{{ false }}">
+                <p style="font-size:18px;color:#4A8F63;margin:18px 0 0">Đã ra món</p>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+<sc-if value="{{ outSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:120;display:grid;place-items:center;background:rgba(7,8,10,.82);animation:sora-fade .18s ease-out both">
+      <div style="width:720px;border-radius:12px;background:#151920;border:1px solid rgba(201,168,92,.16);padding:36px">
+        <p style="font-size:18px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#8B8577;margin:0">Báo hết món</p>
+        <p style="font-size:30px;font-weight:600;color:#F5F2EA;margin:14px 0 0">{{ outName }}</p>
+        <div style="display:grid;gap:12px;margin-top:32px">
+          <sc-for list="{{ outModes }}" as="o" hint-placeholder-count="2">
+            <button type="button" onClick="{{ o.on }}" style="{{ o.st }}">{{ o.n }}</button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ showPortions }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:28px">
+            <div style="display:flex;align-items:center;gap:16px">
+              <span style="font-size:20px;color:#C2BCAE">Còn</span>
+              <span style="flex:1;height:80px;border-radius:4px;border:1px solid #C9A85C;background:#0D0F13;font-family:'IBM Plex Mono',monospace;font-size:40px;color:#F5F2EA;display:flex;align-items:center;justify-content:flex-end;padding:0 20px">{{ outPortions }}</span>
+              <span style="font-size:20px;color:#C2BCAE">phần</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px">
+              <sc-for list="{{ numKeys }}" as="k" hint-placeholder-count="12">
+                <button type="button" onClick="{{ k.on }}" style="{{ k.st }}">{{ k.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <div style="display:flex;gap:12px;margin-top:32px">
+          <button type="button" onClick="{{ closeOut }}" style="flex:none;width:200px;height:80px;border-radius:4px;border:1px solid #2B313C;background:transparent;color:#C2BCAE;font-size:20px;cursor:pointer">Bỏ qua</button>
+          <button type="button" onClick="{{ confirmOut }}" disabled="{{ cantConfirmOut }}" style="{{ confirmOutSt }}">Báo hết</button>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    </div>
+  </div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;slaSeconds&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:720,&quot;min&quot;:180,&quot;max&quot;:1800,&quot;unit&quot;:&quot;giây&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Vé&quot;},&quot;undoSeconds&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:30,&quot;min&quot;:5,&quot;max&quot;:120,&quot;unit&quot;:&quot;giây&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Vé&quot;},&quot;showOnlineOrders&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Vé&quot;},&quot;expoWarnMin&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:5,&quot;min&quot;:1,&quot;max&quot;:20,&quot;unit&quot;:&quot;phút&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Expo&quot;}}">
+const mmss = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60); };
+
+class Component extends DCLogic {
+  state = {
+    screen: 'D2', st: 'ok', station: 'ST-06', code: '', tick: 0,
+    doing: [], done: [], gridOn: [], undoAt: {},
+    outSheet: null, outMode: null, outPortions: '', out: ['DẺ SƯỜN BÒ', 'MỰC TRỨNG'],
+    expoDone: []
+  };
+
+  D = {
+    stations: [
+      { id: 'ST-01', k: '鮮', n: 'Khai vị lạnh', c: '#4E7FA8', cols: 5 },
+      { id: 'ST-02', k: '生', n: 'Quầy sống', c: '#C2BCAE', cols: 6 },
+      { id: 'ST-03', k: '揚', n: 'Chiên xào hấp', c: '#D08A1C', cols: 5 },
+      { id: 'ST-04', k: '鍋', n: 'Lẩu cơm mì', c: '#4A8F63', cols: 5 },
+      { id: 'ST-05', k: '酒', n: 'Quầy đồ uống', c: '#C9A85C', cols: 5 },
+      { id: 'ST-06', k: '焼', n: 'Bếp nướng', c: '#D9721F', cols: 4 }
+    ],
+    tickets: [
+      { code: 'A-0412', table: '12', batch: 2, ago: 742, st: 'ST-06', items: [{ q: 2, vi: 'BA CHỈ BÒ', note: 'cắt dày' }, { q: 1, vi: 'NẦM BÒ' }, { q: 2, vi: 'SÒ ĐIỆP HOKKAIDO' }] },
+      { code: 'A-0415', table: '03', batch: 1, ago: 486, st: 'ST-06', items: [{ q: 4, vi: 'SƯỜN NON BÒ' }, { q: 1, vi: 'BÍ NGÒI & HÀNH TÂY' }], wait: 'ST-04' },
+      { code: 'A-0418', table: '06', batch: 3, ago: 322, st: 'ST-06', items: [{ q: 1, vi: 'SET SUMI', set: 1 }, { q: 2, vi: 'THĂN BÒ', note: 'hồng đào' }] },
+      { code: 'A-0421', table: 'P1', batch: 2, ago: 214, st: 'ST-06', items: [{ q: 6, vi: 'BA CHỈ HEO' }, { q: 3, vi: 'NẤM ĐÙI GÀ' }, { q: 2, vi: 'TÔM SÚ NƯỚNG MUỐI' }] },
+      { code: 'O-2841', table: '', batch: 0, ago: 96, st: 'ST-06', online: 'take', items: [{ q: 2, vi: 'BA CHỈ BÒ' }, { q: 1, vi: 'SƯỜN HEO MISO' }], noGrill: '05' },
+      { code: 'A-0424', table: '11', batch: 1, ago: 64, st: 'ST-06', items: [{ q: 2, vi: 'LÕI VAI BÒ' }] },
+      { code: 'O-2843', table: '', batch: 0, ago: 30, st: 'ST-06', online: 'ship', shipAt: '19:30', cd: 452, items: [{ q: 3, vi: 'SƯỜN NON BÒ' }, { q: 2, vi: 'MỰC TRỨNG' }] },
+      { code: 'A-0427', table: '16', batch: 1, ago: 18, st: 'ST-06', items: [{ q: 1, vi: 'MISUJI' }, { q: 2, vi: 'BÍ NGÒI & HÀNH TÂY' }] },
+      { code: 'A-0429', table: '15', batch: 1, ago: 8, st: 'ST-06', items: [{ q: 2, vi: 'BA CHỈ BÒ' }] },
+      { code: 'A-0430', table: '09', batch: 1, ago: 4, st: 'ST-06', items: [{ q: 1, vi: 'THĂN BÒ' }] },
+      { code: 'A-0431', table: '02', batch: 1, ago: 2, st: 'ST-06', items: [{ q: 4, vi: 'NẦM BÒ' }] },
+      { code: 'B-0412', table: '12', batch: 2, ago: 620, st: 'ST-02', items: [{ q: 2, vi: 'BA CHỈ BÒ', g: 320 }, { q: 1, vi: 'NẦM BÒ', g: 180 }] },
+      { code: 'B-0415', table: '03', batch: 1, ago: 402, st: 'ST-02', items: [{ q: 4, vi: 'SƯỜN NON BÒ', g: 640 }] },
+      { code: 'B-0418', table: '06', batch: 3, ago: 288, st: 'ST-02', items: [{ q: 2, vi: 'THĂN BÒ', g: 300 }] },
+      { code: 'B-0421', table: 'P1', batch: 2, ago: 176, st: 'ST-02', items: [{ q: 6, vi: 'BA CHỈ HEO', g: 720 }] },
+      { code: 'B-0424', table: '11', batch: 1, ago: 88, st: 'ST-02', items: [{ q: 2, vi: 'LÕI VAI BÒ', g: 240 }] },
+      { code: 'B-0427', table: '16', batch: 1, ago: 26, st: 'ST-02', items: [{ q: 1, vi: 'MISUJI', g: 130 }] },
+      { code: 'B-0429', table: '15', batch: 1, ago: 12, st: 'ST-02', items: [{ q: 2, vi: 'BA CHỈ BÒ', g: 320 }] },
+      { code: 'C-0412', table: '12', batch: 2, ago: 540, st: 'ST-04', items: [{ q: 2, vi: 'CANH MISO RONG BIỂN' }] },
+      { code: 'C-0415', table: '03', batch: 1, ago: 366, st: 'ST-04', items: [{ q: 1, vi: 'LẨU SUKIYAKI BÒ', note: '2 người' }, { q: 1, vi: 'CƠM TRỘN BÒ KIM CHI' }] },
+      { code: 'C-0421', table: 'P1', batch: 2, ago: 142, st: 'ST-04', items: [{ q: 2, vi: 'MÌ LẠNH' }, { q: 1, vi: 'CANH ĐUÔI BÒ' }] },
+      { code: 'D-0412', table: '12', batch: 1, ago: 210, st: 'ST-01', items: [{ q: 1, vi: 'DƯA MUỐI BA VỊ' }, { q: 1, vi: 'BÒ TÁI CHANH' }] },
+      { code: 'D-0418', table: '06', batch: 1, ago: 78, st: 'ST-01', items: [{ q: 2, vi: 'SASHIMI CÁ HỒI' }] },
+      { code: 'E-0415', table: '03', batch: 1, ago: 120, st: 'ST-03', items: [{ q: 2, vi: 'GÀ CHIÊN KARAAGE' }, { q: 1, vi: 'ĐẬU PHỤ CHIÊN GIÒN' }] },
+      { code: 'F-0412', table: '12', batch: 2, ago: 44, st: 'ST-05', items: [{ q: 2, vi: 'BIA TƯƠI ASAHI' }] },
+      { code: 'F-0421', table: 'P1', batch: 2, ago: 20, st: 'ST-05', items: [{ q: 4, vi: 'BIA TƯƠI ASAHI' }, { q: 1, vi: 'SAKE JUNMAI GINJO' }] }
+    ],
+    menu: {
+      'ST-06': ['BA CHỈ BÒ', 'NẦM BÒ', 'THĂN BÒ', 'SƯỜN NON BÒ', 'LÕI VAI BÒ', 'DẺ SƯỜN BÒ', 'BA CHỈ HEO', 'SƯỜN HEO MISO', 'SÒ ĐIỆP HOKKAIDO', 'TÔM SÚ NƯỚNG MUỐI', 'MỰC TRỨNG', 'NẤM ĐÙI GÀ', 'BÍ NGÒI & HÀNH TÂY'],
+      'ST-02': ['BA CHỈ BÒ', 'NẦM BÒ', 'THĂN BÒ', 'SƯỜN NON BÒ', 'LÕI VAI BÒ', 'DẺ SƯỜN BÒ', 'BA CHỈ HEO'],
+      'ST-01': ['BÒ TÁI CHANH', 'SASHIMI CÁ HỒI', 'DƯA MUỐI BA VỊ', 'KEM TRÀ XANH', 'BÁNH PHÔ MAI'],
+      'ST-03': ['GÀ CHIÊN KARAAGE', 'ĐẬU PHỤ CHIÊN GIÒN'],
+      'ST-04': ['LẨU SUKIYAKI BÒ', 'CƠM TRỘN BÒ KIM CHI', 'MÌ LẠNH', 'CANH MISO RONG BIỂN', 'CANH ĐUÔI BÒ'],
+      'ST-05': ['BIA TƯƠI ASAHI', 'BIA SAPPORO LON', 'SAKE JUNMAI GINJO', 'SOCHU KHOAI', 'TRÀ LÚA MẠCH LẠNH', 'TRÀ HOJI NÓNG']
+    },
+    expo: [
+      { table: '12', batch: 2, code: 'A-0412', items: [{ vi: 'BA CHỈ BÒ', st: 'ST-06', ok: 1 }, { vi: 'NẦM BÒ', st: 'ST-06', ok: 1 }, { vi: 'SÒ ĐIỆP HOKKAIDO', st: 'ST-06', ok: 1 }, { vi: 'CANH MISO RONG BIỂN', st: 'ST-04', ok: 0 }, { vi: 'BIA TƯƠI ASAHI', st: 'ST-05', ok: 1 }], waitFor: 'ST-04', waitSec: 372 },
+      { table: '03', batch: 1, code: 'A-0415', items: [{ vi: 'SƯỜN NON BÒ', st: 'ST-06', ok: 1 }, { vi: 'BÍ NGÒI & HÀNH TÂY', st: 'ST-06', ok: 1 }, { vi: 'GÀ CHIÊN KARAAGE', st: 'ST-03', ok: 1 }, { vi: 'LẨU SUKIYAKI BÒ', st: 'ST-04', ok: 1 } ] },
+      { table: '06', batch: 3, code: 'A-0418', items: [{ vi: 'SET SUMI', st: 'ST-06', ok: 0 }, { vi: 'THĂN BÒ', st: 'ST-06', ok: 1 }, { vi: 'SASHIMI CÁ HỒI', st: 'ST-01', ok: 1 }] },
+      { table: 'P1', batch: 2, code: 'A-0421', items: [{ vi: 'BA CHỈ HEO', st: 'ST-06', ok: 0 }, { vi: 'NẤM ĐÙI GÀ', st: 'ST-06', ok: 0 }, { vi: 'MÌ LẠNH', st: 'ST-04', ok: 1 }, { vi: 'BIA TƯƠI ASAHI', st: 'ST-05', ok: 1 }] },
+      { table: '11', batch: 1, code: 'A-0424', items: [{ vi: 'LÕI VAI BÒ', st: 'ST-06', ok: 1 }] }
+    ]
+  };
+
+  _t0 = Date.now();
+  componentDidMount() { this._t = setInterval(() => this.setState(s => ({ tick: s.tick + 1 })), 1000); }
+  componentWillUnmount() { clearInterval(this._t); }
+
+  go = sc => () => this.setState({ screen: sc });
+  set = k => v => () => this.setState({ [k]: v });
+  sta() { return this.D.stations.find(s => s.id === this.state.station) || this.D.stations[5]; }
+  sla() { return this.props.slaSeconds ?? 720; }
+  elapsed(t) { return t.ago + (Date.now() - this._t0) / 1000; }
+  heat(p) { return p < 0.4 ? '#5A6270' : p < 0.7 ? '#C9A85C' : p <= 1 ? '#D9721F' : '#B5382C'; }
+
+  live() {
+    const showOnline = this.props.showOnlineOrders ?? true;
+    return this.D.tickets
+      .filter(t => t.st === this.state.station)
+      .filter(t => this.state.done.indexOf(t.code) < 0)
+      .filter(t => showOnline || !t.online)
+      .map(t => ({ t: t, el: this.elapsed(t), late: this.elapsed(t) > this.sla() }))
+      .sort((a, b) => (b.late - a.late) || (b.el - a.el));
+  }
+
+  tab(list, active, key) {
+    const base = 'height:30px;padding:0 12px;border-radius:4px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;border:1px solid ';
+    return list.map(o => ({
+      label: o.label, on: this.set(key)(o.v),
+      st: base + (o.v === active ? '#C9A85C;background:#5E4917;color:#EFE0BC' : '#1E232C;background:transparent;color:#8B8577')
+    }));
+  }
+
+  ticketView(row, waiting) {
+    const S = this.state, t = row.t, sta = this.sta();
+    const pct = row.el / this.sla();
+    const c = waiting ? '#8B8577' : this.heat(pct);
+    const isDoing = S.doing.indexOf(t.code) >= 0;
+    const isGrid = S.gridOn.indexOf(t.code) >= 0;
+    const undoTs = S.undoAt[t.code];
+    const undoLeft = undoTs ? Math.max(0, Math.ceil((this.props.undoSeconds ?? 30) - (Date.now() - undoTs) / 1000)) : 0;
+    const online = !!t.online;
+    let border = 'border:1px solid rgba(201,168,92,.16)';
+    if (online) border = 'border:2px solid #4E7FA8';
+    else if (row.late && !waiting) border = 'border:2px solid #B5382C;animation:sora-late 1.2s steps(1,end) infinite';
+    else if (isDoing) border = 'border:1px solid #C9A85C';
+    return {
+      code: t.code,
+      tableLabel: t.table ? 'BÀN ' + t.table : (t.online === 'take' ? 'MANG VỀ' : 'GIAO HÀNG'),
+      batchLabel: waiting ? (t.online === 'ship' ? 'GIAO ' + t.shipAt + ' — bắt đầu 18:52' : 'ĐỢT ' + t.batch + ' — chờ lệnh') : (t.batch ? 'ĐỢT ' + t.batch : 'ONLINE'),
+      batchChip: 'height:28px;padding:0 10px;border-radius:999px;font-size:15px;font-weight:600;display:inline-flex;align-items:center;flex:none;white-space:nowrap;border:1px solid ' + (waiting ? '#2B313C;color:#8B8577' : 'rgba(201,168,92,.4);color:#DCC58A'),
+      clock: t.online === 'ship' && !waiting ? '−' + mmss(Math.max(0, t.cd - (Date.now() - this._t0) / 1000)) : mmss(row.el),
+      clockSt: 'font-family:\'IBM Plex Mono\',monospace;font-size:40px;line-height:1;font-weight:500;color:' + c,
+      head: 'flex:none;padding:14px 16px;background:' + (waiting ? '#0D0F13' : '#151920') + ';border-bottom:1px solid #1E232C',
+      card: 'display:flex;flex-direction:column;border-radius:8px;background:#0D0F13;overflow:hidden;' + border + ';' + (waiting ? 'opacity:.7;' : ''),
+      items: t.items.map((it, ix) => ({
+        qty: it.q + ' ×', vi: it.vi, isSet: !!it.set,
+        hasNote: !!it.note, note: it.note,
+        hasWait: !!t.wait && ix === 0, waitLabel: t.wait ? 'cùng ' + (this.D.stations.find(x => x.id === t.wait) || {}).k + ' ' + t.wait : '',
+        gram: sta.id === 'ST-02' && !waiting, gramV: it.g ? String(it.g) : '—'
+      })),
+      noGrill: !!t.noGrill, noGrillText: 'Bàn ' + t.noGrill + ' không có bếp',
+      online: online, onlineLabel: t.online === 'take' ? 'MANG VỀ' : 'GIAO ' + t.shipAt,
+      onlineNote: t.online === 'ship' ? 'còn ' + mmss(Math.max(0, t.cd - (Date.now() - this._t0) / 1000)) + ' mới phải bắt đầu' : 'khách tự đến lấy',
+      footSt: 'flex:none;padding:12px 16px 16px;display:' + (waiting ? 'none' : 'flex') + ';gap:10px',
+      showActions: !undoTs, showUndo: !!undoTs && undoLeft > 0, undoLeft: String(undoLeft),
+      doingSt: 'flex:1;height:72px;border-radius:4px;font-size:20px;font-weight:600;letter-spacing:.04em;cursor:pointer;border:1px solid ' + (isDoing ? '#C9A85C;background:#5E4917;color:#EFE0BC' : '#2B313C;background:transparent;color:#C2BCAE'),
+      showGrid: sta.id === 'ST-06',
+      gridSt: 'flex:1;height:72px;border-radius:4px;font-size:20px;font-weight:600;letter-spacing:.04em;cursor:pointer;border:1px solid ' + (isGrid ? '#D9721F;background:rgba(217,114,31,.18);color:#EFE0BC' : '#2B313C;background:transparent;color:#C2BCAE'),
+      doing: () => this.setState(s => ({ doing: s.doing.indexOf(t.code) >= 0 ? s.doing.filter(x => x !== t.code) : s.doing.concat([t.code]) })),
+      onGrid: () => this.setState(s => ({ gridOn: s.gridOn.indexOf(t.code) >= 0 ? s.gridOn.filter(x => x !== t.code) : s.gridOn.concat([t.code]) })),
+      done: () => this.setState(s => ({ undoAt: Object.assign({}, s.undoAt, { [t.code]: Date.now() }) })),
+      undo: () => this.setState(s => { const u = Object.assign({}, s.undoAt); delete u[t.code]; return { undoAt: u }; })
+    };
+  }
+
+  renderVals() {
+    const S = this.state, D = this.D, sc = S.screen, sta = this.sta();
+    const now = new Date();
+    const rows = this.live();
+    const cols = sta.cols;
+    const perCol = cols === 6 ? 3 : cols === 4 ? 2 : 2;
+    const cap = cols * perCol;
+    const shown = rows.slice(0, cap), overflow = rows.length - shown.length;
+    const columns = [];
+    for (let i = 0; i < cols; i++) columns.push({ tickets: [], st: 'flex:1;min-width:0;display:flex;flex-direction:column;gap:16px' });
+    shown.forEach((r, i) => columns[i % cols].tickets.push(this.ticketView(r, false)));
+
+    const lateN = rows.filter(r => r.late).length;
+    const soonN = rows.filter(r => !r.late && r.el / this.sla() > 0.7).length;
+
+    const totals = {};
+    rows.forEach(r => r.t.items.forEach(it => {
+      if (!totals[it.vi]) totals[it.vi] = { n: 0, tables: {}, online: 0 };
+      totals[it.vi].n += it.q;
+      if (r.t.online) totals[it.vi].online += 1; else totals[it.vi].tables[r.t.table] = 1;
+    }));
+    const totalCards = Object.keys(totals).map(k => {
+      const v = totals[k], tn = Object.keys(v.tables).length;
+      return { vi: k, n: String(v.n), parts: tn + ' bàn' + (v.online ? ' · ' + v.online + ' online' : '') };
+    }).sort((a, b) => Number(b.n) - Number(a.n));
+
+    const waitRows = D.tickets.filter(t => t.st === S.station).slice(0, cols * 2).map((t, i) => ({
+      t: Object.assign({}, t, { batch: t.batch + 1 }), el: 0, late: false
+    }));
+    const waitCols = [];
+    for (let i = 0; i < cols; i++) waitCols.push({ tickets: [], st: 'flex:1;min-width:0;display:flex;flex-direction:column;gap:16px' });
+    waitRows.forEach((r, i) => waitCols[i % cols].tickets.push(this.ticketView(r, true)));
+
+    const menu = (D.menu[S.station] || []).map(n => {
+      const off = S.out.indexOf(n) >= 0 || S.out.indexOf(n.toLowerCase()) >= 0;
+      return {
+        vi: n, off: off,
+        rowSt: 'display:flex;align-items:center;justify-content:space-between;gap:24px;padding:18px 24px;border-bottom:1px solid #151920;' + (off ? 'background:rgba(181,56,44,.08)' : ''),
+        track: 'width:64px;height:36px;flex:none;border-radius:999px;position:relative;cursor:pointer;border:none;background:' + (off ? '#2B313C' : '#4A8F63'),
+        knob: 'position:absolute;top:4px;width:28px;height:28px;border-radius:50%;background:' + (off ? '#8B8577' : '#07080A') + ';left:' + (off ? '4px' : '32px'),
+        label: off ? 'Đang hết' : 'Còn bán',
+        labelSt: 'font-size:18px;flex:none;width:120px;text-align:right;color:' + (off ? '#B5382C' : '#8B8577'),
+        on: () => off ? this.setState(s => ({ out: s.out.filter(x => x !== n) })) : this.setState({ outSheet: n, outMode: null, outPortions: '' })
+      };
+    });
+
+    const expo = D.expo.map(e => {
+      const total = e.items.length, ok = e.items.filter(i => i.ok).length;
+      const full = ok === total, marked = S.expoDone.indexOf(e.code) >= 0;
+      const warn = !!e.waitFor && e.waitSec > (this.props.expoWarnMin ?? 5) * 60;
+      let border = 'border:1px solid rgba(201,168,92,.16)';
+      if (marked) border = 'border:1px solid #1E232C';
+      else if (full) border = 'border:2px solid #4A8F63';
+      else if (warn) border = 'border:2px solid #D08A1C';
+      return {
+        head: 'BÀN ' + e.table + ' · đợt ' + e.batch, code: e.code,
+        progress: ok + '/' + total + ' món xong',
+        card: 'display:flex;flex-direction:column;border-radius:8px;background:#0D0F13;padding:20px;' + border + ';' + (marked ? 'opacity:.5;' : ''),
+        items: e.items.map(i => {
+          const st = D.stations.find(x => x.id === i.st) || D.stations[0];
+          return {
+            vi: i.vi, dot: 'width:12px;height:12px;border-radius:50%;flex:none;background:' + st.c,
+            code: i.st, ok: !!i.ok,
+            viSt: 'font-size:22px;flex:1;line-height:1.25;color:' + (i.ok ? '#F5F2EA' : '#8B8577')
+          };
+        }),
+        warn: warn, warnText: 'Chờ ' + (D.stations.find(x => x.id === e.waitFor) || {}).k + ' ' + e.waitFor + ' · ' + mmss(e.waitSec),
+        full: full && !marked, marked: marked,
+        on: () => this.setState(s => ({ expoDone: s.expoDone.concat([e.code]) }))
+      };
+    });
+
+    const names = { D1: 'Ghép thiết bị', D2: 'Hàng vé', D3: 'Bảng tổng món', D4: 'Chờ ra', D5: 'Báo hết món', D6: 'Expo' };
+    const emptyMap = {
+      D2: { k: '静', t: 'Không có vé nào.', s: 'Vé mới sẽ hiện ngay khi thu ngân gửi bếp. Màn này không cuộn — vé luôn nằm trong tầm mắt.' },
+      D3: { k: '無', t: 'Chưa có món nào đang chờ.', s: 'Bảng tổng chỉ hiện khi có vé đang mở ở trạm này.' },
+      D4: { k: '待', t: 'Không có đợt nào chờ lệnh.', s: 'Đợt sau và đơn giao giờ sau sẽ xếp ở đây trước khi tới giờ làm.' },
+      D5: { k: '全', t: 'Trạm này chưa gán món nào.', s: 'Gán món cho trạm trong Quản trị · Bếp & định tuyến.' },
+      D6: { k: '空', t: 'Chưa có bàn nào chờ ra món.', s: 'Khi các trạm bắt đầu báo xong, thẻ bàn sẽ hiện ở đây.' }
+    };
+    const em = emptyMap[sc] || emptyMap.D2;
+
+    return {
+      tabScreens: this.tab([
+        { label: 'K1 Ghép thiết bị', v: 'D1' }, { label: 'K2 Hàng vé', v: 'D2' }, { label: 'K3 Bảng tổng món', v: 'D3' },
+        { label: 'K4 Chờ ra', v: 'D4' }, { label: 'K5 Báo hết món', v: 'D5' }, { label: 'K6 Expo', v: 'D6' }
+      ], sc, 'screen'),
+      tabStation: this.tab(D.stations.map(s => ({ label: s.k + ' ' + s.id, v: s.id })), S.station, 'station'),
+      tabState: this.tab([{ label: 'Bình thường', v: 'ok' }, { label: 'Đang tải', v: 'loading' }, { label: 'Rỗng', v: 'empty' }, { label: 'Lỗi', v: 'error' }], S.st, 'st'),
+
+      isD1: sc === 'D1', showKds: sc !== 'D1',
+      isD2: sc === 'D2', isD3: sc === 'D3', isD4: sc === 'D4', isD5: sc === 'D5', isD6: sc === 'D6',
+      stOk: S.st === 'ok', stLoading: S.st === 'loading', stEmpty: S.st === 'empty', stError: S.st === 'error',
+      skel5: [1, 2, 3, 4, 5],
+      emptyKanji: em.k, emptyTitle: em.t, emptySub: em.s,
+
+      station: sta.id, stKanji: sta.k, stName: sta.n, screenName: names[sc] || '',
+      clock: (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes() + ':' + (now.getSeconds() < 10 ? '0' : '') + now.getSeconds(),
+      counter: rows.length + ' vé · ' + soonN + ' sắp trễ',
+      hasLate: lateN > 0, lateLabel: lateN + ' vé quá hạn',
+
+      columns: sc === 'D4' ? waitCols : columns,
+      hasOverflow: sc !== 'D4' && overflow > 0, overflowN: '+' + overflow,
+
+      totalCards: totalCards,
+      menu: menu,
+      expo: expo,
+
+      codeCells: [0, 1, 2, 3, 4, 5].map(i => ({
+        v: S.code[i] || '',
+        st: 'width:96px;height:120px;border-radius:8px;display:grid;place-items:center;font-family:\'IBM Plex Mono\',monospace;font-size:56px;background:#0D0F13;border:1px solid ' + (S.code.length === i ? '#C9A85C' : '#2B313C') + ';color:#F5F2EA'
+      })),
+      codeKeys: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map(k => ({
+        label: k,
+        st: 'height:72px;border-radius:4px;border:1px solid #2B313C;background:#151920;color:#F5F2EA;font-family:\'IBM Plex Mono\',monospace;font-size:28px;cursor:pointer',
+        on: () => this.setState(s => ({ code: (s.code + k).slice(0, 6) }))
+      })),
+      cantPair: S.code.length < 6,
+      pairLabel: S.code.length < 6 ? 'Nhập đủ 6 số' : 'Ghép màn hình',
+      pairSt: 'height:80px;width:520px;margin-top:48px;border-radius:4px;border:none;font-size:24px;font-weight:600;' + (S.code.length === 6 ? 'background:#B08A33;color:#07080A;cursor:pointer' : 'background:#1E232C;color:#3D4552;cursor:not-allowed'),
+      pairDevice: () => this.setState({ screen: 'D2' }),
+
+      outSheet: !!S.outSheet, outName: S.outSheet || '',
+      closeOut: () => this.setState({ outSheet: null }),
+      outModes: [{ id: 'shift', n: 'Hết đến cuối ca' }, { id: 'left', n: 'Còn một số phần' }].map(o => ({
+        n: o.n, on: () => this.setState({ outMode: o.id }),
+        st: 'height:72px;padding:0 24px;border-radius:4px;font-size:22px;font-weight:600;cursor:pointer;text-align:left;width:100%;border:1px solid ' + (S.outMode === o.id ? '#C9A85C;background:#5E4917;color:#EFE0BC' : '#2B313C;background:transparent;color:#C2BCAE')
+      })),
+      showPortions: S.outMode === 'left', outPortions: S.outPortions || '0',
+      numKeys: ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '←'].map(k => ({
+        label: k,
+        st: 'height:72px;border-radius:4px;border:1px solid #2B313C;background:#151920;color:#F5F2EA;font-family:\'IBM Plex Mono\',monospace;font-size:26px;cursor:pointer',
+        on: () => this.setState(s => {
+          const v = String(s.outPortions || '');
+          if (k === 'C') return { outPortions: '' };
+          if (k === '←') return { outPortions: v.slice(0, -1) };
+          return { outPortions: (v + k).slice(0, 3) };
+        })
+      })),
+      cantConfirmOut: !(S.outMode && (S.outMode === 'shift' || (S.outPortions && Number(S.outPortions) > 0))),
+      confirmOutSt: 'flex:1;height:80px;border-radius:4px;border:none;font-size:22px;font-weight:600;' + (S.outMode && (S.outMode === 'shift' || (S.outPortions && Number(S.outPortions) > 0)) ? 'background:#B5382C;color:#F5F2EA;cursor:pointer' : 'background:#1E232C;color:#3D4552;cursor:not-allowed'),
+      confirmOut: () => this.setState(s => ({ out: s.out.concat([s.outSheet]), outSheet: null })),
+      totalCount: String(totalCards.length)
+    };
+  }
+}
+</script>
+</body>
+</html>
