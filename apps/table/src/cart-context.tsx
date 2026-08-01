@@ -12,9 +12,11 @@ import type { NewLine } from './api'
 export interface CartItem {
   dishId: string
   name: string
+  /** Giá một phần ĐÃ cộng chênh giá tuỳ chọn — máy chủ tính lại y hệt khi gửi */
   price: number
   qty: number
   note: string
+  options: { id: string; name: string; priceDelta: number }[]
 }
 
 interface CartValue {
@@ -27,7 +29,13 @@ interface CartValue {
   clear: () => void
   /** Món vừa bị bếp báo hết thì bỏ khỏi giỏ và nói cho khách biết (T16) */
   dropSoldOut: (soldOutIds: Set<string>) => string[]
-  toLines: () => NewLine[]
+  toLines: (sharedNote?: string) => NewLine[]
+}
+
+function sameOptions(a: CartItem['options'], b: CartItem['options']): boolean {
+  if (a.length !== b.length) return false
+  const ids = new Set(a.map((o) => o.id))
+  return b.every((o) => ids.has(o.id))
 }
 
 const Ctx = createContext<CartValue | null>(null)
@@ -89,7 +97,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       add: (item) =>
         update((current) => {
           const qty = item.qty ?? 1
-          const at = current.findIndex((l) => l.dishId === item.dishId && l.note === item.note)
+          // Gộp dòng chỉ khi TRÙNG CẢ ghi chú lẫn tuỳ chọn: hai phần thăn bò một
+          // chấm muối một chấm miso là hai dòng khác nhau, bếp làm khác nhau.
+          const at = current.findIndex(
+            (l) =>
+              l.dishId === item.dishId && l.note === item.note && sameOptions(l.options, item.options),
+          )
           if (at >= 0) {
             return current.map((l, i) => (i === at ? { ...l, qty: l.qty + qty } : l))
           }
@@ -111,8 +124,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return hit.map((l) => l.name)
       },
 
-      toLines: () =>
-        items.map((l) => ({ dishId: l.dishId, qty: l.qty, note: l.note.trim() || null })),
+      toLines: (sharedNote = '') =>
+        items.map((l) => ({
+          dishId: l.dishId,
+          qty: l.qty,
+          // Ghi chú chung của giỏ chỉ gắn vào món CHƯA có ghi chú riêng — món đã
+          // dặn "cắt dày" không bị ghi đè bởi câu dặn chung.
+          note: l.note.trim() || sharedNote.trim() || null,
+          modifierOptionIds: l.options.map((o) => o.id),
+        })),
     }),
     [items, update],
   )

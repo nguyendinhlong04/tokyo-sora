@@ -53,6 +53,12 @@ export const dishes = pgTable(
     code: text('code').notNull().unique(),
     kind: text('kind').notNull().default('dish'),
     categoryId: text('category_id').references(() => categories.id),
+    /**
+     * Chặng nhỏ trong nhóm — nhóm Nướng dài tới mức phải chia Bò / Heo / Hải sản
+     * / Rau thì khách mới lướt được. Chuỗi tự do vì đây là cách sắp xếp thực đơn,
+     * không phải thứ nghiệp vụ nào tra cứu.
+     */
+    subCategory: text('sub_category'),
     nameVi: text('name_vi').notNull(),
     nameEn: text('name_en'),
     nameJa: text('name_ja'),

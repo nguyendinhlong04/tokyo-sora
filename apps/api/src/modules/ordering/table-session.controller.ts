@@ -19,6 +19,7 @@ import { assertOwnTableSession } from '../identity/actor'
 import { Public, TABLE_COOKIE, type RequestWithActor } from '../identity/auth.guard'
 import { IdentityService } from '../identity/identity.service'
 import { RequirePermission } from '../identity/permission.guard'
+import { FeedbackService } from './feedback.service'
 import { FloorplanService } from './floorplan.service'
 import { TableRequestService } from './table-request.service'
 
@@ -29,6 +30,13 @@ const RequestBody = z.object({
   note: z.string().max(300).nullish(),
 })
 
+const GuestsBody = z.object({ guestCount: z.number().int().min(1).max(50) })
+
+const FeedbackBody = z.object({
+  stars: z.number().int().min(1).max(5),
+  comment: z.string().max(1000).nullish(),
+})
+
 @Controller('api')
 @UseInterceptors(IdempotencyInterceptor)
 export class TableSessionController {
@@ -36,6 +44,7 @@ export class TableSessionController {
     private readonly floorplan: FloorplanService,
     private readonly identity: IdentityService,
     private readonly requests: TableRequestService,
+    private readonly feedbackService: FeedbackService,
   ) {}
 
   /** P3: in mã QR dán bàn cho khách quét */
@@ -79,6 +88,35 @@ export class TableSessionController {
   session(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
     assertOwnTableSession(req.actor!, id)
     return this.floorplan.sessionSummary(id)
+  }
+
+  /** T1: khách chốt lại bàn mình mấy người */
+  @Post('table-sessions/:id/guests')
+  @RequirePermission('order.create')
+  setGuests(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    assertOwnTableSession(req.actor!, id)
+    return this.floorplan.setGuestCount(id, GuestsBody.parse(body).guestCount, req.actor!)
+  }
+
+  /** T15: khách chấm sao và nhận xét */
+  @Post('table-sessions/:id/feedback')
+  feedback(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    assertOwnTableSession(req.actor!, id)
+    return this.feedbackService.submit(id, FeedbackBody.parse(body))
+  }
+
+  @Get('table-sessions/:id/feedback')
+  getFeedback(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
+    assertOwnTableSession(req.actor!, id)
+    return this.feedbackService.of(id)
   }
 
   /** T9: khách gọi nhân viên */

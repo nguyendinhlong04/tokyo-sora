@@ -5,8 +5,17 @@ import type { Dish } from '../api'
 import { BottomBar, BottomBarSpacer } from '../components/BottomBar'
 import { DishRow } from '../components/DishRow'
 import { DishSheet } from '../components/DishSheet'
+import { FilterSheet } from '../components/FilterSheet'
 import { useCart } from '../cart-context'
-import { useMenu } from '../menu'
+import {
+  applyFilters,
+  countActive,
+  needsChoice,
+  NO_FILTERS,
+  SUB_LABELS,
+  useMenu,
+  type Filters,
+} from '../menu'
 import { useTableSession } from '../table-context'
 
 /** T2 Thực đơn — dải nhóm món dính trên, danh sách theo nhóm, giỏ ghim dưới */
@@ -16,6 +25,8 @@ export function Menu() {
   const cart = useCart()
   const menu = useMenu(session.branchId)
   const [open, setOpen] = useState<Dish | null>(null)
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS)
+  const [filterOpen, setFilterOpen] = useState(false)
   const [soldOutNotice, setSoldOutNotice] = useState<string[]>([])
 
   /**
@@ -28,15 +39,51 @@ export function Menu() {
     if (dropped.length > 0) setSoldOutNotice(dropped)
   }, [menu.soldOut, cart])
 
+  const shown = useMemo(
+    () => applyFilters(menu.dishes, filters, menu.soldOut),
+    [menu.dishes, filters, menu.soldOut],
+  )
+
+  /** Nhóm → chặng (Nướng dài nên chia bò · heo · hải sản · rau) */
   const groups = useMemo(() => {
     const byCategory = new Map<string | null, Dish[]>()
-    for (const dish of menu.dishes) {
+    for (const dish of shown) {
       byCategory.set(dish.categoryId, [...(byCategory.get(dish.categoryId) ?? []), dish])
     }
     return menu.categories
-      .map((c) => ({ ...c, dishes: byCategory.get(c.id) ?? [] }))
+      .map((c) => {
+        const dishes = byCategory.get(c.id) ?? []
+        const subKeys = [...new Set(dishes.map((d) => d.subCategory))].filter(
+          (s): s is string => s !== null && s in SUB_LABELS,
+        )
+        return {
+          ...c,
+          dishes,
+          subs:
+            subKeys.length > 1
+              ? subKeys.map((key) => ({
+                  key,
+                  ...SUB_LABELS[key]!,
+                  dishes: dishes.filter((d) => d.subCategory === key),
+                }))
+              : [],
+        }
+      })
       .filter((c) => c.dishes.length > 0)
-  }, [menu.categories, menu.dishes])
+  }, [menu.categories, shown])
+
+  const activeFilters = countActive(filters)
+
+  const addOrOpen = (dish: Dish) => {
+    const dishGroups = menu.groupsOf(dish)
+    // Món phải chọn vị / số người ăn thì bấm + là MỞ chi tiết: gửi xuống bếp một
+    // phần thăn bò không có vị chấm thì bếp phải chạy ra hỏi lại.
+    if (needsChoice(dishGroups)) {
+      setOpen(dish)
+      return
+    }
+    cart.add({ dishId: dish.id, name: dish.nameVi, price: dish.price, note: '', options: [] })
+  }
 
   if (menu.isError) {
     return (
@@ -81,8 +128,34 @@ export function Menu() {
         ))}
       </nav>
 
+      <div className="flex items-center justify-between gap-3 px-4 pt-4">
+        <Button
+          className={activeFilters > 0 ? 'rounded-pill border-accent text-accent-ink' : 'rounded-pill'}
+          onClick={() => setFilterOpen(true)}
+        >
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7">
+            <path d="M3 6h18M6 12h12M10 18h4" />
+          </svg>
+          {activeFilters > 0 ? `Bộ lọc · ${activeFilters}` : 'Bộ lọc'}
+        </Button>
+        <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">{shown.length} món</span>
+      </div>
+
       {groups.length === 0 ? (
-        <EmptyState title="Chi nhánh chưa phát hành thực đơn. Nhờ nhân viên giúp bạn gọi món nhé." />
+        <EmptyState
+          title={
+            activeFilters > 0
+              ? 'Không món nào phù hợp bộ lọc. Bỏ một vài điều kiện là thấy lại thực đơn.'
+              : 'Chi nhánh chưa phát hành thực đơn. Nhờ nhân viên giúp bạn gọi món nhé.'
+          }
+          action={
+            activeFilters > 0 ? (
+              <Button size="lg" onClick={() => setFilters(NO_FILTERS)}>
+                Xoá bộ lọc
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         groups.map((group) => (
           <section key={group.id} id={`nhom-${group.id}`} className="scroll-mt-24">
@@ -96,17 +169,40 @@ export function Menu() {
                 </p>
               ) : null}
             </header>
-            {group.dishes.map((dish) => (
-              <DishRow
-                key={dish.id}
-                dish={dish}
-                soldOut={menu.soldOut.has(dish.id)}
-                onOpen={() => setOpen(dish)}
-                onAdd={() =>
-                  cart.add({ dishId: dish.id, name: dish.nameVi, price: dish.price, note: '' })
-                }
-              />
-            ))}
+
+            {group.subs.length > 0
+              ? group.subs.map((sub) => (
+                  <div key={sub.key}>
+                    <div className="sticky top-23 z-30 flex items-center gap-2.5 border-y border-accent/16 bg-surface-2 px-4 py-2.5">
+                      <span className="font-jp text-[length:var(--fs-t2)] leading-none text-accent">
+                        {sub.kanji}
+                      </span>
+                      <span className="text-[length:var(--fs-c1)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
+                        {sub.name}
+                      </span>
+                    </div>
+                    {sub.dishes.map((dish) => (
+                      <DishRow
+                        key={dish.id}
+                        dish={dish}
+                        soldOut={menu.soldOut.has(dish.id)}
+                        needsChoice={needsChoice(menu.groupsOf(dish))}
+                        onOpen={() => setOpen(dish)}
+                        onAdd={() => addOrOpen(dish)}
+                      />
+                    ))}
+                  </div>
+                ))
+              : group.dishes.map((dish) => (
+                  <DishRow
+                    key={dish.id}
+                    dish={dish}
+                    soldOut={menu.soldOut.has(dish.id)}
+                    needsChoice={needsChoice(menu.groupsOf(dish))}
+                    onOpen={() => setOpen(dish)}
+                    onAdd={() => addOrOpen(dish)}
+                  />
+                ))}
           </section>
         ))
       )}
@@ -131,11 +227,23 @@ export function Menu() {
         </div>
       </BottomBar>
 
-      <DishSheet
-        dish={open}
-        soldOut={open ? menu.soldOut.has(open.id) : false}
-        hasGrill={session.table.hasGrill}
-        onClose={() => setOpen(null)}
+      {open ? (
+        <DishSheet
+          key={open.id}
+          dish={open}
+          groups={menu.groupsOf(open)}
+          soldOut={menu.soldOut.has(open.id)}
+          hasGrill={session.table.hasGrill}
+          onClose={() => setOpen(null)}
+        />
+      ) : null}
+
+      <FilterSheet
+        open={filterOpen}
+        filters={filters}
+        matchCount={shown.length}
+        onChange={setFilters}
+        onClose={() => setFilterOpen(false)}
       />
 
       <SoldOutNotice names={soldOutNotice} onClose={() => setSoldOutNotice([])} />

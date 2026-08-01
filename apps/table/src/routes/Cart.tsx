@@ -1,4 +1,4 @@
-import { Button, EmptyState, Money, useToast } from '@sora/ui'
+import { Button, EmptyState, Money, SectionLabel, useToast } from '@sora/ui'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -15,10 +15,11 @@ export function Cart() {
   const toast = useToast()
   const queryClient = useQueryClient()
   const [sent, setSent] = useState<{ count: number; queued: boolean } | null>(null)
+  const [sharedNote, setSharedNote] = useState('')
 
   const send = useMutation({
     mutationFn: async () => {
-      const lines = cart.toLines()
+      const lines = cart.toLines(sharedNote)
       // Hai lượt gọi, đúng thứ tự: thêm món vào đơn rồi mới gửi bếp. Hàng đợi
       // offline gửi tuần tự nên thứ tự này giữ nguyên cả khi đang mất mạng.
       const added = await api.addLines(session.id, lines)
@@ -92,8 +93,13 @@ export function Cart() {
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-[length:var(--fs-b1)] font-semibold text-ink-hi">{line.name}</p>
+                {line.options.length > 0 ? (
+                  <p className="mt-1.5 pl-3 text-[length:var(--fs-c1)] leading-normal text-accent-ink">
+                    {line.options.map((o) => o.name).join(' · ')}
+                  </p>
+                ) : null}
                 {line.note ? (
-                  <p className="mt-1.5 pl-3 text-[length:var(--fs-c1)] leading-normal text-warn">
+                  <p className="mt-1 pl-3 text-[length:var(--fs-c1)] leading-normal text-warn">
                     ▸ {line.note}
                   </p>
                 ) : null}
@@ -131,6 +137,21 @@ export function Cart() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="px-4 pt-2">
+        <SectionLabel>Ghi chú chung cho bếp</SectionLabel>
+        <textarea
+          rows={2}
+          value={sharedNote}
+          onChange={(e) => setSharedNote(e.target.value)}
+          maxLength={300}
+          placeholder="Ví dụ: ra món chậm thôi, nhà có trẻ nhỏ"
+          className="mt-2.5 w-full resize-y rounded-sm border border-line-3 bg-surface-4 px-3.5 py-3 text-[length:var(--fs-b1)] leading-relaxed text-ink-hi"
+        />
+        <p className="mt-2 text-[length:var(--fs-c1)] text-ink-mute">
+          Gắn vào những món chưa có ghi chú riêng.
+        </p>
       </div>
 
       <BottomBarSpacer />

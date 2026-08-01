@@ -10,7 +10,8 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { IDEMPOTENCY_HEADER } from '@sora/contracts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
-import { bankEvents, devices, journalEntries, payments } from '../db/schema'
+import { bankEvents, devices, journalEntries, payments, tableFeedback } from '../db/schema'
+import { ConfigBundleService } from '../modules/config-bundle/config-bundle.service'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
 import { bootTestApp, type Fixtures } from './harness'
@@ -141,6 +142,35 @@ describe('1. Quét QR vào bàn (T1)', () => {
     expect(res.statusCode).toBe(401)
   })
 
+  it('khách chốt lại số khách của bàn mình', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/guests`,
+      headers: { cookie: phoneA },
+      payload: { guestCount: 3 },
+    })
+    expect(res.statusCode).toBe(201)
+    expect(res.json<{ guestCount: number }>().guestCount).toBe(3)
+
+    // Trả lại 4 để các mục sau đọc đúng con số ban đầu
+    await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/guests`,
+      headers: { cookie: phoneA },
+      payload: { guestCount: 4 },
+    })
+  })
+
+  it('số khách vượt sức chứa bàn bị chặn — y như lúc nhân viên mở bàn', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/guests`,
+      headers: { cookie: phoneA },
+      payload: { guestCount: 40 },
+    })
+    expect(res.statusCode).toBe(409)
+  })
+
   it('điện thoại đọc được mình đang ngồi bàn nào — T1 mới chào bàn được', async () => {
     const res = await inject({
       method: 'GET',
@@ -250,6 +280,52 @@ describe('2. Khách tự gọi món (T2 · T6 · T7)', () => {
     expect(replay.json<{ money: { sub: number } }>().money.sub).toBe(
       first.json<{ money: { sub: number } }>().money.sub,
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('2b. Thực đơn trên điện thoại (T2 · T3 · T5)', () => {
+  beforeAll(async () => {
+    // Ngoài đời Office bấm "Lưu & phát hành"; ở đây gọi thẳng service vì thu ngân
+    // không có quyền sửa giá — và quyền đó không phải thứ mục này đang kiểm.
+    await app.get(ConfigBundleService).publish(fx.branchId, { kind: 'system' })
+  })
+
+  it('bundle mang theo nhóm tuỳ chọn và món nào dùng nhóm nào', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/config?branch=${fx.branchId}`,
+      headers: { cookie: phoneA },
+    })
+    expect(res.statusCode).toBe(200)
+    const bundle = res.json<{
+      modifiers: { id: string; options: { id: string; priceDelta: number }[] }[]
+      dishes: { id: string; modifierGroupIds: string[] }[]
+    }>()
+
+    const group = bundle.modifiers.find((g) => g.id === 'yaki-them')
+    expect(group?.options.find((o) => o.id === 'yaki-them-toi')?.priceDelta).toBe(15_000)
+    expect(bundle.dishes.find((d) => d.id === 'thanbo')?.modifierGroupIds).toContain('yaki-them')
+  })
+
+  it('khách chọn tuỳ chọn thì chênh giá vào thẳng dòng đơn', async () => {
+    const before = await inject({
+      method: 'GET',
+      url: `/api/table-sessions/${sessionId}/order`,
+      headers: { cookie: phoneA },
+    })
+    const subBefore = before.json<{ order: { moneySub: number } }>().order.moneySub
+
+    const res = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/lines`,
+      headers: { cookie: phoneA },
+      payload: { lines: [{ dishId: 'thanbo', qty: 1, modifierOptionIds: ['yaki-them-toi'] }] },
+    })
+    expect(res.statusCode).toBe(201)
+    // 420.000 + 15.000 tỏi nướng
+    expect(res.json<{ money: { sub: number } }>().money.sub).toBe(subBefore + 435_000)
   })
 })
 
@@ -591,6 +667,63 @@ describe('6. Món hết khoá ngay trên điện thoại khách (K5 → T2)', ()
     })
     expect(res.statusCode).toBe(200)
     expect(res.json<{ dishId: string }[]>().some((a) => a.dishId === 'kemtra')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('6b. Chấm sao sau bữa ăn (T15 → B13)', () => {
+  it('khách chấm sao kèm nhận xét', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/feedback`,
+      headers: { cookie: phoneA },
+      payload: { stars: 4, comment: 'Thăn bò ngon, chờ hơi lâu' },
+    })
+    expect(res.statusCode).toBe(201)
+    expect(res.json<{ stars: number }>().stars).toBe(4)
+  })
+
+  it('chấm lại thì SỬA phiếu cũ, không đẻ ra hai ý kiến của một bữa', async () => {
+    await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/feedback`,
+      headers: { cookie: phoneA },
+      payload: { stars: 5, comment: 'Nghĩ lại thì rất đáng' },
+    })
+
+    const res = await inject({
+      method: 'GET',
+      url: `/api/table-sessions/${sessionId}/feedback`,
+      headers: { cookie: phoneA },
+    })
+    expect(res.json<{ stars: number; comment: string }>()).toEqual({
+      stars: 5,
+      comment: 'Nghĩ lại thì rất đáng',
+    })
+
+    const rows = await db.select().from(tableFeedback)
+    expect(rows.filter((r) => r.tableSessionId === sessionId)).toHaveLength(1)
+  })
+
+  it('số sao ngoài thang 1–5 bị từ chối', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/feedback`,
+      headers: { cookie: phoneA },
+      payload: { stars: 9 },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('khách không chấm hộ bàn khác được', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${otherSession}/feedback`,
+      headers: { cookie: phoneA },
+      payload: { stars: 1 },
+    })
+    expect(res.statusCode).toBe(403)
   })
 })
 

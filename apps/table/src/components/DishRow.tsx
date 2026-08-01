@@ -11,11 +11,14 @@ import { Plate } from './Plate'
 export function DishRow({
   dish,
   soldOut,
+  needsChoice = false,
   onOpen,
   onAdd,
 }: {
   dish: Dish
   soldOut: boolean
+  /** Món phải chọn vị / số người ăn — chấm vàng báo trước rằng nút + sẽ mở chi tiết */
+  needsChoice?: boolean
   onOpen: () => void
   onAdd: () => void
 }) {
@@ -40,11 +43,14 @@ export function DishRow({
       </button>
       <button
         type="button"
-        aria-label={`Thêm ${dish.nameVi}`}
+        aria-label={needsChoice ? `Chọn kiểu cho ${dish.nameVi}` : `Thêm ${dish.nameVi}`}
         disabled={soldOut}
         onClick={onAdd}
-        className="h-[var(--hit-target)] w-[var(--hit-target)] flex-none rounded-sm border border-accent text-[length:var(--fs-t1)] text-accent-ink disabled:border-line-4 disabled:text-ink-mute"
+        className="relative h-[var(--hit-target)] w-[var(--hit-target)] flex-none rounded-sm border border-accent text-[length:var(--fs-t1)] text-accent-ink disabled:border-line-4 disabled:text-ink-mute"
       >
+        {needsChoice && !soldOut ? (
+          <span className="absolute -top-1 -right-1 h-2 w-2 rounded-pill bg-accent" />
+        ) : null}
         +
       </button>
     </div>

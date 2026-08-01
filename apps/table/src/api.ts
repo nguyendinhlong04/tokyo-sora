@@ -13,14 +13,34 @@ export interface Dish {
   id: string
   kind: 'dish' | 'set' | 'drink'
   categoryId: string | null
+  /** Chặng trong nhóm: nhóm Nướng chia bò · heo · hải sản · rau */
+  subCategory: string | null
   nameVi: string
   nameJa: string | null
   kana: string | null
   shortDesc: string | null
   allergens: string[] | null
+  /** `chay` · `cay` · `hai-san` — nguồn của bộ lọc T5 */
+  tags: string[] | null
   price: number
   tableOrderable: boolean
+  modifierGroupIds: string[]
   routing: { stationGrill: string | null; stationNoGrill: string | null } | null
+}
+
+export interface ModifierOption {
+  id: string
+  name: string
+  priceDelta: number
+}
+
+export interface ModifierGroup {
+  id: string
+  name: string
+  /** Bắt buộc chọn: món nướng phải có vị, lẩu phải có số người ăn */
+  required: boolean
+  multi: boolean
+  options: ModifierOption[]
 }
 
 export interface ConfigBundle {
@@ -28,6 +48,7 @@ export interface ConfigBundle {
   branch: { id: string; name: string; address: string | null; phone: string | null }
   categories: { id: string; nameVi: string; kanji: string | null }[]
   dishes: Dish[]
+  modifiers: ModifierGroup[]
 }
 
 export interface AvailabilityRow {
@@ -102,6 +123,7 @@ export interface NewLine {
   dishId: string
   qty: number
   note?: string | null
+  modifierOptionIds?: string[]
 }
 
 export const api = {
@@ -149,6 +171,25 @@ export const api = {
       path: `/api/table-sessions/${sessionId}/send`,
       payload: {},
       label: 'Gửi bếp',
+    }),
+
+  /** T1 khách chốt lại bàn mình mấy người */
+  setGuestCount: (sessionId: number, guestCount: number) =>
+    apiFetch<{ sessionId: number; guestCount: number }>(
+      `/api/table-sessions/${sessionId}/guests`,
+      { method: 'POST', body: { guestCount } },
+    ),
+
+  /** T15 chấm sao và nhận xét */
+  feedback: (sessionId: number) =>
+    apiFetch<{ stars: number; comment: string | null } | null>(
+      `/api/table-sessions/${sessionId}/feedback`,
+    ),
+
+  sendFeedback: (sessionId: number, stars: number, comment: string) =>
+    apiFetch<{ id: number; stars: number }>(`/api/table-sessions/${sessionId}/feedback`, {
+      method: 'POST',
+      body: { stars, comment: comment.trim() || null },
     }),
 
   /** T9 gọi nhân viên — không qua hàng đợi: gọi người mà chờ có mạng thì vô nghĩa */

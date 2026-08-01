@@ -98,6 +98,37 @@ export const tableSessions = pgTable(
   ],
 )
 
+/**
+ * Khách chấm sao và nhận xét ngay trên hoá đơn (T15) — nguồn cho màn B13 của
+ * Office ở GĐ5.
+ *
+ * Một phiên bàn một phiếu: khách đổi ý chấm lại thì SỬA phiếu cũ chứ không đẻ ra
+ * hai ý kiến của cùng một bữa ăn. Không lưu danh tính vì không có: khách tại bàn
+ * chỉ có token của bàn, và hỏi thêm tên chỉ làm người ta bỏ dở.
+ */
+export const tableFeedback = pgTable(
+  'table_feedback',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    branchId: text('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    tableSessionId: bigint('table_session_id', { mode: 'number' })
+      .notNull()
+      .unique()
+      .references(() => tableSessions.id),
+    stars: integer('stars').notNull(),
+    comment: text('comment'),
+    businessDate: date('business_date').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('table_feedback_stars_check', sql`${t.stars} BETWEEN 1 AND 5`),
+    index('table_feedback_branch_date_idx').on(t.branchId, t.businessDate),
+  ],
+)
+
 /** Yêu cầu từ bàn (T9) → hàng đợi P12 */
 export const tableRequests = pgTable(
   'table_requests',

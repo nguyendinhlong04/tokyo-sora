@@ -83,11 +83,15 @@ interface SeedDishRow {
   nameJa: string | null
   kana: string | null
   group: string | null
+  subGroup: string | null
   priceVnd: number | null
   costVnd: number | null
   allergens: string | null
   descShort: string | null
   descLong: string | null
+  isVegetarian: boolean
+  isSpicy: boolean
+  hasSeafood: boolean
   active: boolean
   stationsFromKitchen: string[]
 }
@@ -96,6 +100,26 @@ interface SeedTable {
   z: string
   grill: number
   cap: number
+}
+
+/**
+ * Nhóm tuỳ chọn áp cho nhóm món nào (luật `modsFor` của prototype Table).
+ * Rượu KHÔNG hỏi đá — rượu Nhật uống theo cách của nó, hỏi đá là hỏi sai.
+ */
+const MODIFIER_SCOPE_CATEGORIES: Record<string, string[]> = {
+  modYaki: ['yaki'],
+  modLau: ['lau'],
+  modDrink: ['bia', 'tra'],
+}
+
+/** Cờ ăn kiêng đưa vào `tags` — nguồn cho bộ lọc T5 */
+function dietTags(d: SeedDishRow): string[] | null {
+  const tags = [
+    d.isVegetarian ? 'chay' : null,
+    d.isSpicy ? 'cay' : null,
+    d.hasSeafood ? 'hai-san' : null,
+  ].filter((t): t is string => t !== null)
+  return tags.length > 0 ? tags : null
 }
 interface SeedStaff {
   id: string
@@ -176,12 +200,14 @@ async function seed(db: Db) {
       code: d.code ?? `SORA-${d.id.toUpperCase()}`,
       kind: isSet ? 'set' : d.group && ['bia', 'ruou', 'tra'].includes(d.group) ? 'drink' : 'dish',
       categoryId: d.group,
+      subCategory: d.subGroup || null,
       nameVi: d.nameVi,
       nameJa: d.nameJa,
       kana: d.kana,
       shortDesc: d.descShort,
       longDesc: d.descLong,
       allergens: d.allergens ? d.allergens.split(',').map((a) => a.trim()) : null,
+      tags: dietTags(d),
       routingMethod: routing?.method ?? null,
       stationGrill: routing?.stationGrill ?? null,
       stationNoGrill: routing?.stationNoGrill ?? null,
@@ -254,13 +280,28 @@ async function seed(db: Db) {
   // ---- Nhóm tuỳ chọn (modifier) ----
   const mods = await readJson<Record<string, SeedModifierGroup[]>>('modifiers.json')
   for (const [scope, groups] of Object.entries(mods)) {
-    for (const g of groups) {
+    for (const [gi, g] of groups.entries()) {
       const gid = `${scope}-${g.gid}`
       const grow = { id: gid, name: g.title, required: g.req, multi: !g.req, pickMin: g.req ? 1 : 0, pickMax: g.req ? 1 : null }
       await db.insert(s.modifierGroups).values(grow).onConflictDoUpdate({ target: s.modifierGroups.id, set: grow })
       for (const [i, o] of g.opts.entries()) {
         const orow = { id: `${gid}-${o.id}`, groupId: gid, name: o.n, priceDelta: o.p, sort: i }
         await db.insert(s.modifierOptions).values(orow).onConflictDoUpdate({ target: s.modifierOptions.id, set: orow })
+      }
+
+      // Gắn nhóm vào món theo NHÓM MÓN, đúng luật của prototype: món nướng phải
+      // chọn vị, lẩu phải chọn số người, đồ uống thì hỏi đá. Gắn tay từng món sẽ
+      // sai ngay lần thêm món mới — quy tắc mới là thứ cần giữ, không phải bảng.
+      const categories = MODIFIER_SCOPE_CATEGORIES[scope] ?? []
+      for (const dish of dishes.filter((d) => d.group && categories.includes(d.group))) {
+        const link = { dishId: dish.id, groupId: gid, sort: gi }
+        await db
+          .insert(s.dishModifierGroups)
+          .values(link)
+          .onConflictDoUpdate({
+            target: [s.dishModifierGroups.dishId, s.dishModifierGroups.groupId],
+            set: link,
+          })
       }
     }
   }

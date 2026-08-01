@@ -203,6 +203,8 @@ async function seedFixtures(db: ReturnType<typeof createDb>): Promise<Fixtures> 
     { id: 'yaki-them-toi', groupId: 'yaki-them', name: 'Tỏi nướng', priceDelta: 15_000 },
     { id: 'yaki-them-rau', groupId: 'yaki-them', name: 'Rau ăn kèm', priceDelta: 25_000 },
   ])
+  // Gắn nhóm vào món để bundle cấu hình biết món nào hỏi thêm gì (T3)
+  await db.insert(s.dishModifierGroups).values({ dishId: 'thanbo', groupId: 'yaki-them' })
 
   const [area] = await db
     .insert(s.areas)

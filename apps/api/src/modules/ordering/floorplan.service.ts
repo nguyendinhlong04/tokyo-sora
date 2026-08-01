@@ -92,6 +92,44 @@ export class FloorplanService {
     }
   }
 
+  /**
+   * T1 khách sửa số khách của bàn.
+   *
+   * Nhân viên đã nhập số này lúc mở bàn, nhưng người ngồi xuống mới biết chắc bàn
+   * có mấy người — và con số này đi thẳng vào báo cáo doanh thu trên đầu khách.
+   * Vẫn chặn theo sức chứa bàn y như P3: bàn bốn ghế không ngồi được mười người.
+   */
+  async setGuestCount(sessionId: number, guestCount: number, actor: Actor) {
+    return this.db.transaction(async (tx) => {
+      const [session] = await tx
+        .select()
+        .from(tableSessions)
+        .where(eq(tableSessions.id, sessionId))
+      if (!session) throw new NotFoundException('Không có phiên bàn này')
+      if (session.status !== 'open') throw new ConflictException('Bàn đã đóng hoặc đang chờ dọn')
+
+      const [table] = await tx.select().from(tables).where(eq(tables.id, session.tableId))
+      if (guestCount < 1 || guestCount > table!.seatMax) {
+        throw new ConflictException(`Bàn ${table!.code} chỉ ngồi tối đa ${table!.seatMax} khách`)
+      }
+
+      await tx
+        .update(tableSessions)
+        .set({ guestCount })
+        .where(eq(tableSessions.id, sessionId))
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'table.guest-count.changed',
+        entity: 'table_session',
+        entityId: String(sessionId),
+        payload: { from: session.guestCount, to: guestCount },
+      })
+
+      return { sessionId, guestCount }
+    })
+  }
+
   /** P3 mở bàn */
   async openTable(
     tableId: number,

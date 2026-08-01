@@ -27,6 +27,9 @@ pnpm --filter @sora/api db:migrate
 pnpm --filter @sora/api db:seed
 ```
 
+Sửa dữ liệu thực đơn (giá, nhóm tuỳ chọn, cờ chay/cay/hải sản) thì phải **phát
+hành lại bundle** thì app mới thấy — `db:dev-bootstrap` ở cuối trang làm việc đó.
+
 `apps/api/.env` (đã gitignore) cần ba biến — xem `apps/api/.env.example`:
 - `DATABASE_URL` — role `sora_app`, quyền hẹp, KHÔNG sửa/xoá được các bảng sổ
 - `DATABASE_MIGRATION_URL` — superuser, vì `CREATE EVENT TRIGGER` cần quyền cao

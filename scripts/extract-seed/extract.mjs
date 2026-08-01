@@ -172,6 +172,12 @@ async function main() {
       costVnd: toVnd(office?.cost),
       station: office?.st ?? null,
       isRaw: d.raw === 1 || d.raw === true,
+      // Ba cờ ăn kiêng — nguồn của bộ lọc T5. Chỉ bản thiết kế Table có, và chỉ
+      // đánh cho món ĐÚNG là như vậy: không suy từ tên món, "bí ngòi nướng" là
+      // chay còn "cơm trộn bò" thì không, đoán sai một món là khách ăn nhầm.
+      isVegetarian: d.veg === 1 || d.veg === true,
+      isSpicy: d.spicy === 1 || d.spicy === true,
+      hasSeafood: d.sea === 1 || d.sea === true,
       isSignature: web?.sig === 1 || web?.sig === true,
       allergens: d.al ?? web?.al ?? null,
       descShort: d.d ?? null,

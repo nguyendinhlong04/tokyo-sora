@@ -2,15 +2,18 @@ import { Button, Card, Money } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { api } from '../api'
+import { RatingCard } from '../components/RatingCard'
 import { useMenu } from '../menu'
 import { useTableSession } from '../table-context'
 
 /**
  * T15 Hoá đơn.
  *
- * Bản thiết kế còn có mã tra cứu hoá đơn điện tử, điểm tích luỹ và ô chấm sao.
- * Ba thứ đó chưa có ở đây vì HĐĐT, loyalty và phản hồi khách là module của GĐ5 —
- * dựng vỏ trước sẽ hiện ra một mã tra cứu không tra được gì.
+ * Bản thiết kế còn có mã tra cứu hoá đơn điện tử và dòng điểm tích luỹ. Hai thứ
+ * đó chưa hiện ở đây vì chưa có nguồn: HĐĐT phải do nhà cung cấp cấp mã mới tra
+ * cứu được trên hệ thống thuế, còn điểm tích luỹ cần danh tính khách mà khách
+ * tại bàn thì chỉ có token của bàn. In ra một mã không tra được gì thì tệ hơn là
+ * không in.
  */
 export function Invoice() {
   const session = useTableSession()
@@ -120,6 +123,8 @@ export function Invoice() {
           </div>
         ) : null}
       </Card>
+
+      <RatingCard sessionId={session.id} />
 
       <p className="mt-8 text-center text-[length:var(--fs-b1)] text-ink-mute">
         Cảm ơn bạn đã đến Tokyo Sora.
