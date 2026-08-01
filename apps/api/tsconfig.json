@@ -7,10 +7,8 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "verbatimModuleSyntax": false,
-    "noEmit": false,
     "outDir": "dist",
     "sourceMap": true
   },
-  "include": ["src"],
-  "exclude": ["**/*.spec.ts", "**/*.test.ts"]
+  "include": ["src", "vitest.config.ts"]
 }
