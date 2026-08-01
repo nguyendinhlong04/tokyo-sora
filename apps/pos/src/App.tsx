@@ -3,6 +3,7 @@ import { Button, OutboxBanner, ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router'
+import { usePwaUpdate } from './pwa'
 import { Floorplan } from './routes/Floorplan'
 import { Pay } from './routes/Pay'
 import { ShiftLogin } from './routes/ShiftLogin'
@@ -48,6 +49,7 @@ export function App() {
 /** Khung chung: chưa đăng nhập ca thì mọi màn vận hành đều đẩy về P1 */
 function Shell() {
   const { staff, ready, signOut } = useSession()
+  const { needRefresh, applyUpdate } = usePwaUpdate()
   const navigate = useNavigate()
 
   if (!ready) {
@@ -68,6 +70,15 @@ function Shell() {
           <span className="text-[length:var(--fs-b2)] text-ink-hi">{staff.fullName}</span>
         </div>
         <div className="flex items-center gap-3">
+          {needRefresh ? (
+            <button
+              type="button"
+              onClick={applyUpdate}
+              className="rounded-sm border border-accent px-3 py-1.5 text-[length:var(--fs-b2)] text-accent-ink"
+            >
+              Có bản mới — bấm để cập nhật
+            </button>
+          ) : null}
           <OutboxBanner />
           <Button
             variant="ghost"

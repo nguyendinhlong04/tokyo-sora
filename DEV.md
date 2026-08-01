@@ -50,6 +50,19 @@ pnpm dev:web      # Web   :3001
 pnpm dev:lab      # UI-lab:5177 — trang đối chiếu design token
 ```
 
+## Kiểm tra PWA (service worker chỉ chạy ở bản build, không chạy ở dev)
+
+```bash
+pnpm --filter @sora/pos build && pnpm --filter @sora/pos preview       # :4174
+pnpm --filter @sora/kitchen build && pnpm --filter @sora/kitchen preview  # :4175
+```
+
+Trên Windows phải **tắt server preview trước khi build lại**, nếu không Vite không
+xoá được thư mục `dist` đang bị khoá file (`EPERM`).
+
+Service worker chỉ nắm quyền từ lần điều hướng SAU khi cài, nên muốn thử offline
+thì: mở trang → tải lại một lần → tắt server → tải lại lần nữa.
+
 ## Kiểm tra
 
 ```bash

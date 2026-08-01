@@ -1,0 +1,13 @@
+{
+  "name": "@sora/make-icons",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sinh icon PWA cho POS và màn bếp từ dấu hiệu thương hiệu",
+  "scripts": {
+    "start": "node make-icons.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.3"
+  }
+}

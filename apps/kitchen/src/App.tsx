@@ -3,6 +3,7 @@ import { Button, OutboxBanner, ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { api } from './api'
+import { usePwaUpdate } from './pwa'
 import { DishTotals } from './screens/DishTotals'
 import { Expo } from './screens/Expo'
 import { Holding } from './screens/Holding'
@@ -68,6 +69,9 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
   const waitingCount = (queue.data?.tickets ?? []).filter((t) => t.state === 'waiting').length
   const liveCount = (queue.data?.tickets ?? []).filter((t) => t.state !== 'waiting').length
 
+  // Bản mới chỉ được áp dụng khi màn không còn vé nào đang chạy
+  const { needRefresh } = usePwaUpdate(liveCount === 0)
+
   return (
     <main className="flex h-dvh flex-col bg-canvas">
       <header className="flex h-16 shrink-0 items-center justify-between gap-6 border-b border-line-1 px-6">
@@ -109,6 +113,11 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
         </nav>
 
         <div className="flex items-center gap-3">
+          {needRefresh ? (
+            <span className="rounded-sm border border-line-3 px-3 py-1.5 text-[length:var(--fs-b2)] text-ink-mute">
+              Có bản mới — cập nhật khi hết vé
+            </span>
+          ) : null}
           <OutboxBanner />
           <Button
             variant="ghost"

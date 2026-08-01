@@ -36,6 +36,18 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@sora/web", "dev"],
       "port": 3001
+    },
+    {
+      "name": "pos-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@sora/pos", "preview"],
+      "port": 4174
+    },
+    {
+      "name": "kitchen-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@sora/kitchen", "preview"],
+      "port": 4175
     }
   ]
 }
