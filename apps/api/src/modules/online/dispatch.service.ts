@@ -57,10 +57,29 @@ export class DispatchService {
       )
       .orderBy(asc(sql`coalesce(${orders.slotAt}, ${orders.createdAt})`))
 
+    const itemCounts = await this.itemCountsOf(rows.map((o) => o.id))
+
     return {
       serverTime: new Date(),
-      orders: rows.map((o) => this.card(o)),
+      orders: rows.map((o) => this.card(o, itemCounts.get(o.id) ?? 0)),
     }
+  }
+
+  /** Số món của từng đơn — thẻ trên bảng chỉ cần con số, không cần cả danh sách */
+  private async itemCountsOf(orderIds: number[]) {
+    if (orderIds.length === 0) return new Map<number, number>()
+    const rows = await this.db
+      .select({ orderId: orderLines.orderId, count: sql<number>`sum(${orderLines.qty})::int` })
+      .from(orderLines)
+      .where(
+        and(
+          inArray(orderLines.orderId, orderIds),
+          sql`${orderLines.parentLineId} IS NULL`,
+          sql`${orderLines.state} <> 'voided'`,
+        ),
+      )
+      .groupBy(orderLines.orderId)
+    return new Map(rows.map((r) => [r.orderId, Number(r.count)]))
   }
 
   /** O9 Chi tiết đơn */
@@ -298,7 +317,7 @@ export class DispatchService {
     return rows.map((o) => this.card(o))
   }
 
-  private card(order: typeof orders.$inferSelect) {
+  private card(order: typeof orders.$inferSelect, itemCount = 0) {
     const customer = (order.customer ?? {}) as Record<string, unknown>
     return {
       id: order.id,
@@ -314,6 +333,8 @@ export class DispatchService {
       customerName: typeof customer.name === 'string' ? customer.name : null,
       customerPhone: typeof customer.phone === 'string' ? customer.phone : null,
       address: typeof customer.address === 'string' ? customer.address : null,
+      externalCode: typeof customer.externalCode === 'string' ? customer.externalCode : null,
+      itemCount,
     }
   }
 

@@ -5,6 +5,8 @@ import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router'
 import { api } from './api'
 import { usePwaUpdate } from './pwa'
+import { Dispatch } from './routes/Dispatch'
+import { ExternalChannels } from './routes/ExternalChannels'
 import { Floorplan } from './routes/Floorplan'
 import { Pay } from './routes/Pay'
 import { ShiftLogin } from './routes/ShiftLogin'
@@ -37,6 +39,8 @@ export function App() {
               <Route element={<Shell />}>
                 <Route path="/floor" element={<Floorplan />} />
                 <Route path="/yeu-cau" element={<TableRequests />} />
+                <Route path="/dieu-phoi" element={<Dispatch />} />
+                <Route path="/kenh-ngoai" element={<ExternalChannels />} />
                 <Route path="/table/:sessionId" element={<TableOrder />} />
                 <Route path="/table/:sessionId/pay" element={<Pay />} />
               </Route>
@@ -64,6 +68,13 @@ function Shell() {
     refetchInterval: 15_000,
   })
 
+  const dispatch = useQuery({
+    queryKey: ['dispatch', branchId],
+    queryFn: () => api.dispatchBoard(branchId!),
+    enabled: Boolean(branchId) && Boolean(staff),
+    refetchInterval: 15_000,
+  })
+
   if (!ready) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-canvas text-ink-mute">
@@ -75,6 +86,8 @@ function Shell() {
   if (!staff) return <Navigate to="/shift" replace />
 
   const pendingRequests = requests.data?.requests.length ?? 0
+  // Đơn online đang chạy — con số để thu ngân biết có việc mà không phải mở màn
+  const liveOnline = dispatch.data?.orders.length ?? 0
 
   return (
     <div className="min-h-dvh bg-canvas text-ink-body">
@@ -84,6 +97,9 @@ function Shell() {
           <span className="text-[length:var(--fs-b2)] text-ink-hi">{staff.fullName}</span>
         </div>
         <div className="flex items-center gap-3">
+          <Button variant="ghost" onClick={() => void navigate('/dieu-phoi')}>
+            Đơn online{liveOnline > 0 ? ` · ${liveOnline}` : ''}
+          </Button>
           <Button
             variant={pendingRequests > 0 ? 'primary' : 'ghost'}
             onClick={() => void navigate('/yeu-cau')}

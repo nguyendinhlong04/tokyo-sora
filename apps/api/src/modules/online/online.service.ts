@@ -38,6 +38,8 @@ export interface OnlineCustomer {
   address?: string | null
   ward?: string | null
   note?: string | null
+  /** Mã đơn bên GrabFood/ShopeeFood/Be — thứ nhân viên đối chiếu khi shipper tới */
+  externalCode?: string | null
 }
 
 export interface CreateOnlineOrderInput {
@@ -341,6 +343,7 @@ export class OnlineService {
             address: input.customer.address ?? null,
             ward: input.customer.ward ?? null,
             note: input.customer.note ?? null,
+            externalCode: input.customer.externalCode ?? null,
             zone: zoneName,
             etaMinutes,
           },
@@ -405,6 +408,18 @@ export class OnlineService {
     options: SlotOptions
   }): Date {
     const { input, now, dayStart, taken, options } = ctx
+
+    /**
+     * Đơn kênh ngoài KHÔNG bị chặn bởi giờ nhận đơn hay trần khung.
+     *
+     * Hai chốt đó sinh ra để che bếp khỏi lượng đơn từ web. Còn đơn Grab thì
+     * shipper của họ đang đứng ở cửa và nhân viên đã quyết định nhận — từ chối ở
+     * đây chỉ tạo ra một đơn nằm ngoài hệ thống, ghi tay lên giấy. Đơn vẫn rơi
+     * vào khung hiện tại nên vẫn được đếm vào tải của bếp.
+     */
+    if ((input.channel ?? 'web') !== 'web') {
+      return slotStart(now, dayStart)
+    }
 
     if (input.slotMode === 'asap') {
       const slots = buildSlots({ now, dayStart, takenBySlot: taken, options })

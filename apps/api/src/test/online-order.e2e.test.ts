@@ -12,6 +12,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
 import { deliveryZones, devices, dishes, tickets } from '../db/schema'
+import { ParamsService } from '../common/params.service'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
 import { bootTestApp, type Fixtures } from './harness'
@@ -495,7 +496,8 @@ describe('6. Kênh ngoài nhập tay (O12)', () => {
         branchId: fx.branchId,
         channel: 'grab',
         type: 'delivery',
-        customer: { name: 'Grab #8842', phone: '0987654321' },
+        externalCode: 'GR-8842',
+        customer: { phone: '0987654321' },
         lines: [{ dishId: 'thanbo', qty: 1 }],
       },
     })
@@ -520,6 +522,39 @@ describe('6. Kênh ngoài nhập tay (O12)', () => {
     expect(confirmed.json<{ tickets: number }>().tickets).toBeGreaterThan(0)
   })
 
+  /**
+   * Shipper của Grab đang đứng ở cửa: từ chối vì "hết giờ nhận đơn online" chỉ
+   * đẩy đơn đó ra ngoài hệ thống, ghi tay lên giấy.
+   */
+  it('đơn kênh ngoài nhận được cả khi đã quá giờ nhận đơn online', async () => {
+    const params = app.get(ParamsService)
+    await params.set('online.lastOrderMinute', 1)
+
+    try {
+      const res = await inject({
+        method: 'POST',
+        url: '/api/orders/external',
+        headers: staffAuth(),
+        payload: {
+          branchId: fx.branchId,
+          channel: 'be',
+          type: 'delivery',
+          externalCode: 'BE-0007',
+          customer: {},
+          lines: [{ dishId: 'thanbo', qty: 1 }],
+        },
+      })
+      expect(res.statusCode, res.payload).toBe(201)
+
+      // Cùng lúc đó khách web thì bị từ chối, đúng như ý đồ của giờ nhận đơn
+      const web = await placeTakeaway()
+      expect(web.statusCode).toBe(409)
+      expect(web.json<{ code: string }>().code).toBe('no_slot')
+    } finally {
+      await params.set('online.lastOrderMinute', 23 * 60 + 45)
+    }
+  })
+
   it('đơn kênh ngoài không tính phí giao — bên họ thu của khách', async () => {
     const created = await inject({
       method: 'POST',
@@ -529,7 +564,8 @@ describe('6. Kênh ngoài nhập tay (O12)', () => {
         branchId: fx.branchId,
         channel: 'shopee',
         type: 'delivery',
-        customer: { name: 'Shopee #1201' },
+        externalCode: 'SP-1201',
+        customer: {},
         lines: [{ dishId: 'thanbo', qty: 1 }],
       },
     })

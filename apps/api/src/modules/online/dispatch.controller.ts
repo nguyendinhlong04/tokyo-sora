@@ -30,8 +30,10 @@ const ManualOrderBody = z.object({
   branchId: z.string().min(1),
   channel: z.enum(['grab', 'shopee', 'be']),
   type: z.enum(['takeaway', 'delivery']),
+  /** Mã đơn bên kênh — thứ nhân viên đọc để đối chiếu khi shipper của họ tới */
+  externalCode: z.string().min(1).max(40),
   customer: z.object({
-    name: z.string().min(1).max(120),
+    name: z.string().max(120).nullish(),
     phone: z.string().max(20).nullish(),
     address: z.string().max(300).nullish(),
     note: z.string().max(300).nullish(),
@@ -142,10 +144,12 @@ export class DispatchController {
         type: input.type,
         channel: input.channel,
         customer: {
-          name: input.customer.name,
+          // Kênh ngoài che tên khách; thứ nhân viên đọc là mã đơn của kênh
+          name: input.customer.name?.trim() || input.externalCode,
           phone: input.customer.phone ?? '',
           address: input.customer.address ?? null,
           note: input.customer.note ?? null,
+          externalCode: input.externalCode,
         },
         lines: input.lines,
         // Kênh ngoài luôn là "làm ngay": shipper của họ đang đứng chờ ở cửa

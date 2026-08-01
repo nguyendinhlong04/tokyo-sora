@@ -101,6 +101,46 @@ export interface AvailabilityRow {
   remaining: number | null
 }
 
+/** O8 — thẻ đơn trên bảng điều phối */
+export interface DispatchCard {
+  id: number
+  displayCode: string
+  channel: 'web' | 'grab' | 'shopee' | 'be' | 'pos' | 'table'
+  type: 'takeaway' | 'delivery' | 'dinein'
+  status: 'new' | 'confirmed' | 'cooking' | 'ready' | 'delivering' | 'done' | 'cancelled'
+  paymentState: 'unpaid' | 'partial' | 'paid' | 'refunded'
+  slotMode: 'asap' | 'scheduled' | null
+  slotAt: string | null
+  createdAt: string
+  total: number
+  customerName: string | null
+  customerPhone: string | null
+  address: string | null
+  externalCode: string | null
+  itemCount: number
+}
+
+/** O9 — chi tiết đơn trong ngăn kéo bên phải */
+export interface DispatchDetail extends DispatchCard {
+  customer: Record<string, unknown> | null
+  shipper: { name: string; phone: string | null; provider: string | null } | null
+  cancelReason: string | null
+  money: { sub: number; service: number; vat: number; ship: number; round: number; total: number }
+  lines: {
+    id: number
+    parentLineId: number | null
+    nameSnapshot: string
+    qty: number
+    unitPrice: number
+    priceTotal: number
+    note: string | null
+    modifiers: { name: string }[] | null
+    state: string
+  }[]
+  /** Bước bấm được với vai trò đang đăng nhập — POS không tự đoán */
+  nextStatuses: DispatchCard['status'][]
+}
+
 /** P12 — một yêu cầu khách bấm từ bàn (T9) */
 export interface TableRequest {
   id: number
@@ -144,6 +184,45 @@ export const api = {
     apiFetch<SessionOrder | null>(`/api/table-sessions/${sessionId}/order`),
 
   bill: (sessionId: number) => apiFetch<Bill>(`/api/table-sessions/${sessionId}/bill`),
+
+  // --- O8 · O9 · O12 điều phối đơn online ---
+
+  dispatchBoard: (branchId: string) =>
+    apiFetch<{ serverTime: string; orders: DispatchCard[] }>(
+      `/api/orders?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  orderDetail: (orderId: number) => apiFetch<DispatchDetail>(`/api/orders/${orderId}`),
+
+  setOrderStatus: (orderId: number, to: DispatchCard['status']) =>
+    apiFetch<{ status: string; changed: boolean; tickets?: number }>(
+      `/api/orders/${orderId}/status`,
+      { method: 'POST', body: { to } },
+    ),
+
+  cancelOrder: (orderId: number, reason: string) =>
+    apiFetch<{ changed: boolean }>(`/api/orders/${orderId}/cancel`, {
+      method: 'POST',
+      body: { reason },
+    }),
+
+  assignShipper: (orderId: number, name: string, phone: string | null) =>
+    apiFetch<{ shipper: string }>(`/api/orders/${orderId}/assign-shipper`, {
+      method: 'POST',
+      body: { name, phone },
+    }),
+
+  createExternalOrder: (input: {
+    branchId: string
+    channel: 'grab' | 'shopee' | 'be'
+    type: 'takeaway' | 'delivery'
+    externalCode: string
+    customer: { name?: string | null; phone?: string | null; note?: string | null }
+    lines: { dishId: string; qty: number }[]
+  }) => apiFetch<{ id: number; displayCode: string }>('/api/orders/external', {
+    method: 'POST',
+    body: input,
+  }),
 
   tableRequests: (branchId: string) =>
     apiFetch<{ serverTime: string; requests: TableRequest[] }>(
