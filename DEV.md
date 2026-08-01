@@ -67,6 +67,30 @@ pnpm extract-seed
 
 Đọc `designs/*.dc.html`, xuất JSON đã chuẩn hoá vào `scripts/extract-seed/out/`.
 
+## Mở POS và màn bếp lên dùng ngay
+
+```bash
+pnpm --filter @sora/api db:dev-bootstrap
+```
+
+Lệnh này làm hai việc mà ngoài đời người vận hành làm tay lúc mở quán: tạo thiết bị
+đầu tiên của chi nhánh và phát hành bundle cấu hình. Nó in ra token của từng máy.
+
+Mở app rồi dán vào Console của trình duyệt:
+
+```js
+localStorage.setItem('sora.device.token', 'dev-device-token')   // POS
+localStorage.setItem('sora.device.token', 'dev-kds-st-02')      // Màn quầy sống
+localStorage.setItem('sora.device.token', 'dev-kds-st-06')      // Màn bếp nướng
+location.reload()
+```
+
+> **Lưu ý khi chạy dev:** cookie của trình duyệt KHÔNG phân biệt cổng, nên phiên
+> đăng nhập ở POS (`localhost:5174`) cũng được gửi sang màn bếp (`localhost:5175`).
+> Ở môi trường thật hai app nằm trên hai tên miền khác nhau nên không có chuyện đó.
+> Hệ thống xử lý đúng trong cả hai trường hợp: quyền là hợp của vai trò người đăng
+> nhập và vai trò của thiết bị họ đang đứng.
+
 ## Tài khoản dev
 
 PIN 4 số, chỉ dùng ở môi trường phát triển (xem `apps/api/src/db/seed.ts`):

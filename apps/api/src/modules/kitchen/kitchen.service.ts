@@ -6,7 +6,7 @@ import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
-import { branches, dishAvailability, orders, ticketItems, tickets } from '../../db/schema'
+import { branches, dishAvailability, orders, stations, ticketItems, tickets } from '../../db/schema'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 import { deriveStatusFromTickets, type TicketRollupState } from '../ordering/domain/order-state'
@@ -26,6 +26,9 @@ export class KitchenService {
    * để màn K4 "Chờ ra" dùng.
    */
   async queue(branchId: string, stationId: string) {
+    const [station] = await this.db.select().from(stations).where(eq(stations.id, stationId))
+    if (!station) throw new NotFoundException(`Không có trạm ${stationId}`)
+
     const rows = await this.db
       .select()
       .from(tickets)
@@ -38,7 +41,19 @@ export class KitchenService {
       )
       .orderBy(asc(tickets.openedAt))
 
-    if (rows.length === 0) return { tickets: [], serverTime: new Date() }
+    // Số cột do TRẠM quyết định (§22): ST-02 sáu cột vé thấp vì mỗi vé chỉ vài
+    // dòng thịt cân sẵn; ST-06 bốn cột vé cao vì vé nướng nhiều dòng hơn.
+    const meta = {
+      station: {
+        id: station.id,
+        name: station.name,
+        kanji: station.kanji,
+        columns: station.columns,
+      },
+      serverTime: new Date(),
+    }
+
+    if (rows.length === 0) return { ...meta, tickets: [] }
 
     const items = await this.db
       .select()
@@ -51,9 +66,9 @@ export class KitchenService {
       )
 
     return {
-      // Client tính thang than hồng theo giờ SERVER, không theo đồng hồ thiết bị —
-      // TV box giá rẻ hay sai giờ và sẽ làm mọi vé đỏ ngay khi hiện.
-      serverTime: new Date(),
+      // `serverTime` để client tính thang than hồng theo giờ SERVER, không theo
+      // đồng hồ thiết bị — TV box giá rẻ hay sai giờ và sẽ làm mọi vé đỏ ngay khi hiện.
+      ...meta,
       tickets: rows.map((t) => ({
         ...t,
         items: items.filter((i) => i.ticketId === t.id && i.state !== 'voided'),

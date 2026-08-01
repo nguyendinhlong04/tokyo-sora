@@ -41,13 +41,20 @@ export class KitchenController {
     @Query('station') stationQuery?: string,
   ) {
     const actor = req.actor!
-    if (actor.kind === 'device') {
-      if (!actor.stationId) throw new BadRequestException('Thiết bị chưa ghép vào trạm nào')
-      return this.kitchen.queue(actor.branchId, actor.stationId)
+    if (actor.kind === 'system' || actor.kind === 'customer') {
+      throw new BadRequestException('Không đọc được hàng vé')
     }
-    if (actor.kind !== 'staff') throw new BadRequestException('Không đọc được hàng vé')
-    if (!stationQuery) throw new BadRequestException('Thiếu tham số station')
-    return this.kitchen.queue(branchQuery ?? actor.branchId, stationQuery)
+
+    // Trạm lấy từ THIẾT BỊ trước: màn bếp ghim cứng một trạm nên không thể xem
+    // nhầm vé trạm khác, kể cả khi có người đăng nhập lên nó. Tham số `station`
+    // chỉ dùng cho máy không gắn trạm (máy thu ngân xem hộ, màn Expo).
+    const station = actor.stationId ?? stationQuery
+    if (!station) {
+      throw new BadRequestException(
+        'Thiết bị chưa ghép vào trạm nào — truyền tham số station nếu xem từ máy khác',
+      )
+    }
+    return this.kitchen.queue(branchQuery ?? actor.branchId, station)
   }
 
   /** K6 Expo — gom theo đơn, biết còn chờ trạm nào */

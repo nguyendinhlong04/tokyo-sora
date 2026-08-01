@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import type { FastifyRequest } from 'fastify'
-import type { Actor } from './actor'
+import { actorRoles, type Actor } from './actor'
 import { IdentityService } from './identity.service'
 
 export const IS_PUBLIC = 'sora:public'
@@ -57,10 +57,34 @@ export class AuthGuard implements CanActivate {
   }
 
   private async resolve(req: RequestWithActor): Promise<Actor | null> {
+    const deviceToken = req.headers[DEVICE_HEADER]
+    const device =
+      typeof deviceToken === 'string' ? await this.identity.resolveDevice(deviceToken) : null
+
     const staffToken = readCredential(req, STAFF_COOKIE)
     if (staffToken) {
       const actor = await this.identity.resolveStaffSession(staffToken)
-      if (actor) return actor
+      if (actor) {
+        // Người đăng nhập MANG THEO cả trạm lẫn quyền của thiết bị họ đang đứng.
+        // Quyền là HỢP của hai nguồn: bếp trưởng đứng ở màn ST-06 vẫn giữ quyền
+        // của mình, còn thu ngân đứng ở đó thì mượn được quyền bếp của cái màn.
+        // Thiếu bước này thì màn bếp mất cả trạm lẫn quyền ngay khi có ai đó
+        // đăng nhập lên nó.
+        const deviceActor: Actor | null = device
+          ? {
+              kind: 'device',
+              deviceId: device.id,
+              branchId: device.branchId,
+              stationId: device.stationId,
+              deviceKind: device.kind,
+            }
+          : null
+        return {
+          ...actor,
+          stationId: device?.stationId ?? null,
+          roles: [...new Set([...actor.roles, ...(deviceActor ? actorRoles(deviceActor) : [])])],
+        }
+      }
     }
 
     const tableToken = readCredential(req, TABLE_COOKIE)
@@ -69,16 +93,13 @@ export class AuthGuard implements CanActivate {
       if (actor) return actor
     }
 
-    const deviceToken = req.headers[DEVICE_HEADER]
-    if (typeof deviceToken === 'string') {
-      const device = await this.identity.resolveDevice(deviceToken)
-      if (device) {
-        return {
-          kind: 'device',
-          deviceId: device.id,
-          branchId: device.branchId,
-          stationId: device.stationId,
-        }
+    if (device) {
+      return {
+        kind: 'device',
+        deviceId: device.id,
+        branchId: device.branchId,
+        stationId: device.stationId,
+        deviceKind: device.kind,
       }
     }
 

@@ -1,0 +1,22 @@
+{
+  "name": "@sora/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Runtime phía client: API client, hàng đợi offline, realtime, lưu phiên",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@sora/contracts": "workspace:*",
+    "dexie": "^4.2.0"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

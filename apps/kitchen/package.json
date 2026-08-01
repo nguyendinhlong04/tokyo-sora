@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "@sora/contracts": "workspace:*",
+    "@sora/core": "workspace:*",
     "@sora/tokens": "workspace:*",
+    "@sora/ui": "workspace:*",
+    "@tanstack/react-query": "^5.101.4",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

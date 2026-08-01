@@ -12,7 +12,7 @@ import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
 import type { Db } from '../../db/client'
 import { devices, pairingCodes, staff, staffRoles, staffSessions, tableSessions } from '../../db/schema'
-import type { Actor } from './actor'
+import type { Actor, StaffActor } from './actor'
 import { hashToken, newPairingCode, newToken } from './tokens'
 
 export type DeviceKind = 'pos' | 'cashier' | 'kds' | 'kiosk' | 'bridge'
@@ -220,6 +220,8 @@ export class IdentityService {
         deviceId: input.deviceId,
         sessionId: session!.id,
         fullName: person.fullName,
+        // Trạm do AuthGuard gắn theo thiết bị của từng request, không lưu vào phiên
+        stationId: null,
       },
     }
   }
@@ -269,7 +271,7 @@ export class IdentityService {
   }
 
   /** Token phiên nhân viên → actor nhân viên */
-  async resolveStaffSession(token: string): Promise<Actor | null> {
+  async resolveStaffSession(token: string): Promise<StaffActor | null> {
     const [row] = await this.db
       .select({
         sessionId: staffSessions.id,
@@ -296,6 +298,9 @@ export class IdentityService {
       deviceId: row.deviceId,
       sessionId: row.sessionId,
       fullName: row.fullName,
+      // AuthGuard gắn trạm theo thiết bị đang gọi — cùng một người đứng ở màn ST-02
+      // hay ST-06 phải thấy hàng vé khác nhau.
+      stationId: null,
     }
   }
 
