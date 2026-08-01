@@ -1,7 +1,7 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../../db/client'
-import { devices, staffRoles } from '../../db/schema'
+import { devices } from '../../db/schema'
 import { bootTestApp, type Fixtures } from '../../test/harness'
 import { DEVICE_HEADER } from './auth.guard'
 import { IdentityService } from './identity.service'
@@ -35,12 +35,8 @@ beforeAll(async () => {
     name: 'Máy thu ngân gốc',
     tokenHash: hashToken(SEED_DEVICE_TOKEN),
   })
-  // Quản lý ca kiêm luôn vai trò chủ để test được nhánh quản trị
-  await db.insert(staffRoles).values({
-    staffId: fx.managerId,
-    roleCode: 'R10',
-    branchId: fx.branchId,
-  })
+  // Quản lý ca trong harness đã kiêm vai trò chủ (R7 + R10) nên test được cả
+  // nhánh quản trị mà không phải cấp thêm quyền ở đây.
 
   const res = await app.inject({
     method: 'POST',
