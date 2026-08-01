@@ -14,8 +14,11 @@ async function main() {
 
   const pool = new Pool({ connectionString: url })
   try {
-    const files = await runMigrations({ exec: (sql) => pool.query(sql) })
-    console.log(`Đã áp ${files.length} migration: ${files.join(', ')}`)
+    const ran = await runMigrations({
+      exec: (sql) => pool.query(sql),
+      query: async <T,>(sql: string) => ({ rows: (await pool.query(sql)).rows as T[] }),
+    })
+    console.log(ran.length ? `Đã áp ${ran.length} migration: ${ran.join(', ')}` : 'Không có migration mới')
   } finally {
     await pool.end()
   }

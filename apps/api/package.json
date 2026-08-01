@@ -13,25 +13,35 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.2",
     "@nestjs/common": "^11.1.0",
+    "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.0",
     "@nestjs/platform-fastify": "^11.1.0",
+    "@nestjs/platform-socket.io": "^11.1.28",
+    "@nestjs/websockets": "^11.1.28",
     "@node-rs/argon2": "^2.0.2",
     "@sora/contracts": "workspace:*",
     "drizzle-orm": "^0.45.2",
+    "fastify": "^5.11.0",
     "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.8.3",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",
     "@nestjs/cli": "^11.0.0",
+    "@nestjs/testing": "^11.1.28",
+    "@swc/core": "^1.15.47",
     "@types/node": "catalog:",
     "@types/pg": "^8.20.3",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.1",
     "typescript": "catalog:",
+    "unplugin-swc": "^1.5.9",
     "vitest": "catalog:"
   }
 }

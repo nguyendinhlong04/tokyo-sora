@@ -112,6 +112,37 @@ export const pairingCodes = pgTable(
   (t) => [check('pairing_codes_code_check', sql`${t.code} ~ '^[0-9]{6}$'`)],
 )
 
+/**
+ * Phiên đăng nhập nhân viên.
+ *
+ * Dùng token đục (opaque) lưu bản băm thay vì JWT: mọi request đã phải tra CSDL để
+ * kiểm thiết bị có bị thu hồi chưa (A4 "ngắt từ xa"), nên JWT không tiết kiệm được
+ * lượt truy vấn nào mà lại thêm bí mật phải quản lý/xoay vòng và không thu hồi
+ * được giữa chừng. Postgres chạy cùng máy nên chi phí tra cứu không đáng kể.
+ *
+ * Phiên GẮN với thiết bị đã ghép: PIN đứng một mình vô dụng nếu ở ngoài quán.
+ */
+export const staffSessions = pgTable(
+  'staff_sessions',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    staffId: bigint('staff_id', { mode: 'number' })
+      .notNull()
+      .references(() => staff.id),
+    deviceId: bigint('device_id', { mode: 'number' })
+      .notNull()
+      .references(() => devices.id),
+    branchId: text('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => [index('staff_sessions_staff_idx').on(t.staffId, t.expiresAt)],
+)
+
 /** Ca làm việc của thu ngân — mốc đối soát tiền mặt (P1 mở · P14 đóng) */
 export const shifts = pgTable(
   'shifts',

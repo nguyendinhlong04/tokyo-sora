@@ -3,11 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Hợp đồng dữ liệu Tokyo Sora: zod schemas, sự kiện WS, tiền VND — API và 5 app cùng import",
+  "description": "Hợp đồng dữ liệu Tokyo Sora: zod schemas, sự kiện WS, ma trận quyền, tiền VND — API và 5 app cùng import",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
