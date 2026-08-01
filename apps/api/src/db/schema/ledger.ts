@@ -117,6 +117,13 @@ export const outboxEvents = pgTable(
     id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
     branchId: text('branch_id'),
     topic: text('topic').notNull(),
+    /**
+     * Kênh nhận sự kiện — tên phòng theo TRIEN-KHAI §6
+     * ('branch:cg:orders', 'branch:cg:station:ST-06'…). Một sự kiện có thể vào
+     * nhiều kênh (VD ticket.ready đi cả trạm lẫn expo). Code nghiệp vụ quyết định
+     * danh sách này, SQL chỉ việc phát — không suy diễn trong trigger.
+     */
+    rooms: text('rooms').array().notNull(),
     payload: jsonb('payload').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     dispatchedAt: timestamp('dispatched_at', { withTimezone: true }),

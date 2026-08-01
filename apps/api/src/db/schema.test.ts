@@ -136,9 +136,29 @@ describe('Sổ bất biến — chỉ INSERT, sửa sai bằng bút toán ngư�
 describe('Outbox — nội dung sự kiện bất biến, vé bếp không thể mất', () => {
   beforeAll(async () => {
     await db.exec(
-      `INSERT INTO outbox_events (branch_id, topic, payload)
-         VALUES ('cg', 'ticket.created', '{"ticketId":1}'::jsonb)`,
+      `INSERT INTO outbox_events (branch_id, topic, rooms, payload)
+         VALUES ('cg', 'ticket.created', ARRAY['branch:cg:station:ST-06'], '{"ticketId":1}'::jsonb)`,
     )
+  })
+
+  it('sự kiện mang danh sách kênh nhận — code nghiệp vụ quyết định, SQL chỉ phát', async () => {
+    const res = await db.query<{ rooms: string[] }>(
+      `SELECT rooms FROM outbox_events WHERE topic = 'ticket.created'`,
+    )
+    expect(res.rows[0]!.rooms).toEqual(['branch:cg:station:ST-06'])
+  })
+
+  it('trigger phát Realtime tự bỏ qua trên Postgres không có Supabase', async () => {
+    // Trên Postgres tự dựng không có schema `realtime`; ghi outbox vẫn phải chạy
+    // bình thường thay vì làm hỏng giao dịch nghiệp vụ.
+    await db.exec(
+      `INSERT INTO outbox_events (branch_id, topic, rooms, payload)
+         VALUES ('cg', 'order.updated', ARRAY['branch:cg:orders'], '{}'::jsonb)`,
+    )
+    const res = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM outbox_events WHERE topic = 'order.updated'`,
+    )
+    expect(res.rows[0]!.n).toBe(1)
   })
 
   it('đánh dấu đã phát thì được', async () => {
@@ -157,7 +177,8 @@ describe('Outbox — nội dung sự kiện bất biến, vé bếp không thể
 
   it('không xoá được sự kiện CHƯA phát', async () => {
     await db.exec(
-      `INSERT INTO outbox_events (branch_id, topic, payload) VALUES ('cg','order.created','{}'::jsonb)`,
+      `INSERT INTO outbox_events (branch_id, topic, rooms, payload)
+         VALUES ('cg','order.created', ARRAY['branch:cg:orders'], '{}'::jsonb)`,
     )
     await expect(
       db.exec(`DELETE FROM outbox_events WHERE topic = 'order.created'`),

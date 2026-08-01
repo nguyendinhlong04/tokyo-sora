@@ -33,12 +33,21 @@ export const WsEnvelopeSchema = z.object({
 })
 export type WsEnvelope = z.infer<typeof WsEnvelopeSchema>
 
-/** Tên room — server GÁN từ credential lúc handshake, client không tự join */
+/**
+ * Tên kênh Realtime (TRIEN-KHAI §6).
+ *
+ * Client nối thẳng tới Supabase Realtime nên KHÔNG thể trông vào việc server gán
+ * kênh lúc handshake. Quyền nghe do RLS trên `realtime.messages` cưỡng chế, đối
+ * chiếu tên kênh với claim trong JWT do API cấp (xem migration 9003).
+ */
 export const rooms = {
   orders: (branchId: string) => `branch:${branchId}:orders`,
   station: (branchId: string, stationId: string) => `branch:${branchId}:station:${stationId}`,
   expo: (branchId: string) => `branch:${branchId}:expo`,
   tables: (branchId: string) => `branch:${branchId}:tables`,
+  /** Kênh riêng của một lượt khách ngồi bàn — T8 theo dõi đơn của bàn mình */
+  tableSession: (sessionId: number) => `table-session:${sessionId}`,
+  /** Kênh theo dõi đơn online của khách (O7) */
   order: (orderId: string) => `order:${orderId}`,
   config: (branchId: string) => `branch:${branchId}:config`,
   print: (branchId: string) => `branch:${branchId}:print`,

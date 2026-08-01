@@ -74,6 +74,18 @@ CREATE TABLE "staff_roles" (
 	CONSTRAINT "staff_roles_role_code_check" CHECK ("staff_roles"."role_code" IN ('R0','R1','R2','R3','R4','R5','R6','R7','R8','R9','R10','R11','R12','R13'))
 );
 --> statement-breakpoint
+CREATE TABLE "staff_sessions" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "staff_sessions_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"staff_id" bigint NOT NULL,
+	"device_id" bigint NOT NULL,
+	"branch_id" text NOT NULL,
+	"token_hash" text NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"revoked_at" timestamp with time zone,
+	CONSTRAINT "staff_sessions_token_hash_unique" UNIQUE("token_hash")
+);
+--> statement-breakpoint
 CREATE TABLE "categories" (
 	"id" text PRIMARY KEY NOT NULL,
 	"parent_id" text,
@@ -513,6 +525,7 @@ CREATE TABLE "outbox_events" (
 	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "outbox_events_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
 	"branch_id" text,
 	"topic" text NOT NULL,
+	"rooms" text[] NOT NULL,
 	"payload" jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"dispatched_at" timestamp with time zone
@@ -527,6 +540,9 @@ ALTER TABLE "shifts" ADD CONSTRAINT "shifts_device_id_devices_id_fk" FOREIGN KEY
 ALTER TABLE "shifts" ADD CONSTRAINT "shifts_cashier_id_staff_id_fk" FOREIGN KEY ("cashier_id") REFERENCES "public"."staff"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "staff_roles" ADD CONSTRAINT "staff_roles_staff_id_staff_id_fk" FOREIGN KEY ("staff_id") REFERENCES "public"."staff"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "staff_roles" ADD CONSTRAINT "staff_roles_branch_id_branches_id_fk" FOREIGN KEY ("branch_id") REFERENCES "public"."branches"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "staff_sessions" ADD CONSTRAINT "staff_sessions_staff_id_staff_id_fk" FOREIGN KEY ("staff_id") REFERENCES "public"."staff"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "staff_sessions" ADD CONSTRAINT "staff_sessions_device_id_devices_id_fk" FOREIGN KEY ("device_id") REFERENCES "public"."devices"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "staff_sessions" ADD CONSTRAINT "staff_sessions_branch_id_branches_id_fk" FOREIGN KEY ("branch_id") REFERENCES "public"."branches"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dish_availability" ADD CONSTRAINT "dish_availability_branch_id_branches_id_fk" FOREIGN KEY ("branch_id") REFERENCES "public"."branches"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dish_availability" ADD CONSTRAINT "dish_availability_dish_id_dishes_id_fk" FOREIGN KEY ("dish_id") REFERENCES "public"."dishes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dish_availability" ADD CONSTRAINT "dish_availability_updated_by_staff_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."staff"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -591,6 +607,7 @@ ALTER TABLE "journal_entries" ADD CONSTRAINT "journal_entries_approval_id_approv
 CREATE INDEX "devices_branch_idx" ON "devices" USING btree ("branch_id","kind");--> statement-breakpoint
 CREATE INDEX "shifts_branch_idx" ON "shifts" USING btree ("branch_id","business_date");--> statement-breakpoint
 CREATE UNIQUE INDEX "staff_roles_unique" ON "staff_roles" USING btree ("staff_id","role_code",coalesce("branch_id", '*'));--> statement-breakpoint
+CREATE INDEX "staff_sessions_staff_idx" ON "staff_sessions" USING btree ("staff_id","expires_at");--> statement-breakpoint
 CREATE INDEX "dishes_category_idx" ON "dishes" USING btree ("category_id","sort");--> statement-breakpoint
 CREATE INDEX "table_requests_queue_idx" ON "table_requests" USING btree ("branch_id","created_at") WHERE state = 'open';--> statement-breakpoint
 CREATE UNIQUE INDEX "table_sessions_one_live_per_table" ON "table_sessions" USING btree ("table_id") WHERE status <> 'closed';--> statement-breakpoint

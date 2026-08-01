@@ -6,39 +6,12 @@ settings:
 
 catalogs:
   default:
-    '@tailwindcss/postcss':
-      specifier: ^4.1.0
-      version: 4.3.3
-    '@tailwindcss/vite':
-      specifier: ^4.1.0
-      version: 4.3.3
     '@types/node':
       specifier: ^20.19.0
       version: 20.19.43
-    '@types/react':
-      specifier: ^19.2.0
-      version: 19.2.18
-    '@types/react-dom':
-      specifier: ^19.2.0
-      version: 19.2.4
-    '@vitejs/plugin-react':
-      specifier: ^5.0.0
-      version: 5.2.0
-    react:
-      specifier: ^19.2.0
-      version: 19.2.8
-    react-dom:
-      specifier: ^19.2.0
-      version: 19.2.8
-    tailwindcss:
-      specifier: ^4.1.0
-      version: 4.3.3
     typescript:
       specifier: ^5.9.3
       version: 5.9.3
-    vite:
-      specifier: ^7.1.0
-      version: 7.3.6
     vitest:
       specifier: ^3.2.0
       version: 3.2.7
@@ -89,12 +62,6 @@ importers:
       '@nestjs/platform-fastify':
         specifier: ^11.1.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)
-      '@nestjs/platform-socket.io':
-        specifier: ^11.1.28
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/websockets@11.1.28)(rxjs@7.8.2)
-      '@nestjs/websockets':
-        specifier: ^11.1.28
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/platform-socket.io@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@node-rs/argon2':
         specifier: ^2.0.2
         version: 2.0.2
@@ -107,6 +74,9 @@ importers:
       fastify:
         specifier: 5.11.0
         version: 5.11.0
+      jose:
+        specifier: ^6.2.6
+        version: 6.2.6
       pg:
         specifier: ^8.22.0
         version: 8.22.0
@@ -116,9 +86,6 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
-      socket.io:
-        specifier: ^4.8.3
-        version: 4.8.3
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -2926,6 +2893,9 @@ packages:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
 
+  jose@6.2.6:
+    resolution: {integrity: sha512-HwMtbJjMw8rC8dUTwCNilHJD+fxTeKM3JV1eprSmTjS41qwXSSt6exJXgyPK1QOu0jB9eDYLESRDkB3qaT3jnw==}
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -4810,6 +4780,7 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+    optional: true
 
   '@nestjs/schematics@11.1.0(chokidar@4.0.3)(prettier@3.9.6)(typescript@5.9.3)':
     dependencies:
@@ -4841,6 +4812,7 @@ snapshots:
       tslib: 2.8.1
     optionalDependencies:
       '@nestjs/platform-socket.io': 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/websockets@11.1.28)(rxjs@7.8.2)
+    optional: true
 
   '@next/env@15.5.22': {}
 
@@ -5016,7 +4988,8 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.62.4':
     optional: true
 
-  '@socket.io/component-emitter@3.1.2': {}
+  '@socket.io/component-emitter@3.1.2':
+    optional: true
 
   '@swc/core-darwin-arm64@1.15.47':
     optional: true
@@ -5201,6 +5174,7 @@ snapshots:
   '@types/cors@2.8.19':
     dependencies:
       '@types/node': 20.19.43
+    optional: true
 
   '@types/deep-eql@4.0.2': {}
 
@@ -5239,6 +5213,7 @@ snapshots:
   '@types/ws@8.18.1':
     dependencies:
       '@types/node': 20.19.43
+    optional: true
 
   '@typescript-eslint/eslint-plugin@8.65.0(@typescript-eslint/parser@8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)':
     dependencies:
@@ -5471,6 +5446,7 @@ snapshots:
     dependencies:
       mime-types: 2.1.35
       negotiator: 0.6.3
+    optional: true
 
   acorn-import-phases@1.0.4(acorn@8.18.0):
     dependencies:
@@ -5553,7 +5529,8 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  base64id@2.0.0: {}
+  base64id@2.0.0:
+    optional: true
 
   baseline-browser-mapping@2.11.9: {}
 
@@ -5653,7 +5630,8 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  cookie@0.7.2: {}
+  cookie@0.7.2:
+    optional: true
 
   cookie@1.1.1: {}
 
@@ -5663,6 +5641,7 @@ snapshots:
     dependencies:
       object-assign: 4.1.1
       vary: 1.1.2
+    optional: true
 
   cosmiconfig@8.3.6(typescript@5.9.3):
     dependencies:
@@ -5726,7 +5705,8 @@ snapshots:
 
   emoji-regex@8.0.0: {}
 
-  engine.io-parser@5.2.3: {}
+  engine.io-parser@5.2.3:
+    optional: true
 
   engine.io@6.6.9:
     dependencies:
@@ -5744,6 +5724,7 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+    optional: true
 
   enhanced-resolve@5.24.5:
     dependencies:
@@ -6130,6 +6111,8 @@ snapshots:
 
   jiti@2.7.0: {}
 
+  jose@6.2.6: {}
+
   js-tokens@4.0.0: {}
 
   js-tokens@9.0.1: {}
@@ -6271,13 +6254,15 @@ snapshots:
 
   merge-stream@2.0.0: {}
 
-  mime-db@1.52.0: {}
+  mime-db@1.52.0:
+    optional: true
 
   mime-db@1.54.0: {}
 
   mime-types@2.1.35:
     dependencies:
       mime-db: 1.52.0
+    optional: true
 
   mimic-fn@2.1.0: {}
 
@@ -6301,7 +6286,8 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  negotiator@0.6.3: {}
+  negotiator@0.6.3:
+    optional: true
 
   neo-async@2.6.2: {}
 
@@ -6336,9 +6322,11 @@ snapshots:
 
   node-releases@2.0.51: {}
 
-  object-assign@4.1.1: {}
+  object-assign@4.1.1:
+    optional: true
 
-  object-hash@3.0.0: {}
+  object-hash@3.0.0:
+    optional: true
 
   on-exit-leak-free@2.1.2: {}
 
@@ -6667,6 +6655,7 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+    optional: true
 
   socket.io-parser@4.2.7:
     dependencies:
@@ -6674,6 +6663,7 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   socket.io@4.8.3:
     dependencies:
@@ -6688,6 +6678,7 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+    optional: true
 
   sonic-boom@4.2.1:
     dependencies:
@@ -6887,7 +6878,8 @@ snapshots:
 
   util-deprecate@1.0.2: {}
 
-  vary@1.1.2: {}
+  vary@1.1.2:
+    optional: true
 
   vite-node@3.2.4(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.1):
     dependencies:
@@ -7046,7 +7038,8 @@ snapshots:
       string-width: 4.2.3
       strip-ansi: 6.0.1
 
-  ws@8.21.1: {}
+  ws@8.21.1:
+    optional: true
 
   xtend@4.0.2: {}
 

@@ -82,33 +82,3 @@ $$;
 CREATE TRIGGER payments_sync_claims
   AFTER UPDATE ON payments
   FOR EACH ROW EXECUTE FUNCTION sora_sync_payment_line_claims();
-
---------------------------------------------------------------------------------
--- 4. Vé bếp không bao giờ biết giá. Chặn ở tầng schema thay vì trông vào kỷ luật
---    code: thêm cột có tên gợi ý tiền vào tickets/ticket_items sẽ bị từ chối.
---------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION sora_no_money_in_kitchen() RETURNS event_trigger
-LANGUAGE plpgsql AS $$
-DECLARE
-  offending text;
-BEGIN
-  SELECT string_agg(format('%I.%I', c.relname, a.attname), ', ')
-    INTO offending
-    FROM pg_attribute a
-    JOIN pg_class c ON c.oid = a.attrelid
-   WHERE c.relname IN ('tickets', 'ticket_items')
-     AND a.attnum > 0
-     AND NOT a.attisdropped
-     AND (a.attname ~ '(price|amount|money|total|cost|discount|vat)');
-
-  IF offending IS NOT NULL THEN
-    RAISE EXCEPTION 'Vé bếp không được mang thông tin tiền: %', offending
-      USING ERRCODE = 'restrict_violation';
-  END IF;
-END;
-$$;
-
-CREATE EVENT TRIGGER sora_kitchen_money_guard
-  ON ddl_command_end
-  WHEN TAG IN ('ALTER TABLE', 'CREATE TABLE')
-  EXECUTE FUNCTION sora_no_money_in_kitchen();

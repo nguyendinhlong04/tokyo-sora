@@ -2,6 +2,7 @@ import { Controller, Get, Module } from '@nestjs/common'
 import { CommonModule } from './common/common.module'
 import { Public } from './modules/identity/auth.guard'
 import { IdentityModule } from './modules/identity/identity.module'
+import { RealtimeModule } from './modules/realtime/realtime.module'
 
 @Controller()
 class HealthController {
@@ -13,7 +14,7 @@ class HealthController {
 }
 
 @Module({
-  imports: [CommonModule, IdentityModule],
+  imports: [CommonModule, IdentityModule, RealtimeModule],
   controllers: [HealthController],
 })
 export class AppModule {}
