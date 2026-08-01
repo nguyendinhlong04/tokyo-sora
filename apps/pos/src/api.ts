@@ -67,19 +67,32 @@ export interface Bill {
   paymentState?: string
 }
 
+export interface ModifierGroup {
+  id: string
+  name: string
+  /** Bắt buộc chọn: món nướng phải có vị, lẩu phải có số người ăn */
+  required: boolean
+  multi: boolean
+  options: { id: string; name: string; priceDelta: number }[]
+}
+
+export interface ConfigDish {
+  id: string
+  kind: 'dish' | 'set' | 'drink'
+  categoryId: string | null
+  nameVi: string
+  price: number
+  modifierGroupIds: string[]
+  routing: { stationGrill: string | null; stationNoGrill: string | null } | null
+}
+
 export interface ConfigBundle {
   version: string
   branch: { id: string; name: string; timezone: string }
   stations: { id: string; name: string; ticketPrefix: string }[]
   categories: { id: string; nameVi: string; kanji: string | null }[]
-  dishes: {
-    id: string
-    kind: 'dish' | 'set' | 'drink'
-    categoryId: string | null
-    nameVi: string
-    price: number
-    routing: { stationGrill: string | null; stationNoGrill: string | null } | null
-  }[]
+  dishes: ConfigDish[]
+  modifiers: ModifierGroup[]
 }
 
 export interface AvailabilityRow {
@@ -149,7 +162,7 @@ export const api = {
 
   addLines: (
     sessionId: number,
-    lines: { dishId: string; qty: number; note?: string | null }[],
+    lines: { dishId: string; qty: number; note?: string | null; modifierOptionIds?: string[] }[],
     label: string,
   ) =>
     enqueue<{ money: { sub: number; total: number } }>({

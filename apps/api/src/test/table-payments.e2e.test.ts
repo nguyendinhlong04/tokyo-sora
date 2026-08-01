@@ -10,7 +10,14 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { IDEMPOTENCY_HEADER } from '@sora/contracts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
-import { bankEvents, devices, journalEntries, payments, tableFeedback } from '../db/schema'
+import {
+  bankEvents,
+  devices,
+  journalEntries,
+  payments,
+  tableFeedback,
+  ticketItems,
+} from '../db/schema'
 import { ConfigBundleService } from '../modules/config-bundle/config-bundle.service'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
@@ -326,6 +333,28 @@ describe('2b. Thực đơn trên điện thoại (T2 · T3 · T5)', () => {
     expect(res.statusCode).toBe(201)
     // 420.000 + 15.000 tỏi nướng
     expect(res.json<{ money: { sub: number } }>().money.sub).toBe(subBefore + 435_000)
+  })
+
+  it('tuỳ chọn xuống tới VÉ BẾP, không dừng ở dòng đơn', async () => {
+    await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/lines`,
+      headers: { cookie: phoneA },
+      payload: {
+        lines: [
+          { dishId: 'thanbo', qty: 1, modifierOptionIds: ['yaki-them-rau'], note: 'cắt dày' },
+        ],
+      },
+    })
+    await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/send`,
+      headers: staffAuth(),
+    })
+
+    const rows = await db.select().from(ticketItems)
+    const item = rows.filter((r) => r.dishId === 'thanbo').at(-1)
+    expect(item?.note).toBe('Rau ăn kèm — cắt dày')
   })
 })
 

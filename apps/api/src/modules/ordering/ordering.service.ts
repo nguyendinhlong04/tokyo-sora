@@ -33,6 +33,24 @@ import { explodeSet, SetSelectionError, type SetSelection } from '../kitchen/dom
 import type { ServiceContext } from '../kitchen/domain/routing'
 import { buildTickets, type OrderLineForTicket } from '../kitchen/domain/ticketing'
 
+/** Bản chụp tuỳ chọn lưu trên dòng đơn (cột `modifiers` dạng jsonb) */
+interface LineModifier {
+  optionId: string
+  name: string
+  priceDelta: number
+}
+
+/**
+ * Dòng chữ vàng dưới tên món trên vé bếp: tuỳ chọn trước, ghi chú của khách sau.
+ * Không có gì để nói thì trả `null` để vé không mọc thêm dòng trống.
+ */
+function ticketNote(modifiers: unknown, note: string | null): string | null {
+  const chosen = Array.isArray(modifiers) ? (modifiers as LineModifier[]) : []
+  const names = chosen.map((m) => m.name).filter(Boolean).join(' · ')
+  if (names && note) return `${names} — ${note}`
+  return names || note || null
+}
+
 export interface AddLineInput {
   dishId: string
   qty: number
@@ -281,7 +299,15 @@ export class OrderingService {
         kind: l.kind as 'dish' | 'set_parent',
         qty: l.qty,
         batchNo: l.batchNo,
-        note: l.note,
+        /**
+         * Tuỳ chọn đi CHUNG một dòng với ghi chú, tuỳ chọn đứng trước.
+         *
+         * Vé bếp chỉ có một dòng chữ vàng dưới tên món (bản thiết kế K2), và bếp
+         * đọc nó trong lúc tay đang bận. Tách thành hai dòng thì vé cao thêm và
+         * số vé nhìn thấy trên màn giảm đi. "Miso cay · Tỏi nướng — cắt dày" nói
+         * đủ mọi thứ bếp cần biết mà vẫn nằm gọn một dòng.
+         */
+        note: ticketNote(l.modifiers, l.note),
         setLabel: l.setLabel,
         portionLabel: l.portionLabel,
       }))

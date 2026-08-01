@@ -12,14 +12,18 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
-import { api, type OrderLineRow } from '../api'
+import { api, type ConfigDish, type ModifierGroup, type OrderLineRow } from '../api'
 import { useSession } from '../session-context'
 
 interface PadLine {
+  /** Món + đúng bộ tuỳ chọn — hai phần thăn bò khác vị là hai dòng khác nhau */
+  key: string
   dishId: string
   name: string
+  /** Giá một phần ĐÃ cộng chênh giá tuỳ chọn */
   price: number
   qty: number
+  options: { id: string; name: string; priceDelta: number }[]
 }
 
 /**
@@ -41,6 +45,7 @@ export function TableOrder() {
   const [pad, setPad] = useState<PadLine[]>([])
   const [voiding, setVoiding] = useState<OrderLineRow | null>(null)
   const [showQr, setShowQr] = useState(false)
+  const [modifierFor, setModifierFor] = useState<ConfigDish | null>(null)
 
   const id = Number(sessionId)
 
@@ -74,13 +79,22 @@ export function TableOrder() {
     (d) => !category || d.categoryId === category,
   )
 
+  const groupsOf = (dish: ConfigDish): ModifierGroup[] =>
+    dish.modifierGroupIds
+      .map((gid) => (config.data?.modifiers ?? []).find((g) => g.id === gid))
+      .filter((g): g is ModifierGroup => g !== undefined)
+
   const padTotal = pad.reduce((sum, l) => sum + l.price * l.qty, 0)
 
   const addLines = useMutation({
     mutationFn: () =>
       api.addLines(
         id,
-        pad.map((l) => ({ dishId: l.dishId, qty: l.qty })),
+        pad.map((l) => ({
+          dishId: l.dishId,
+          qty: l.qty,
+          modifierOptionIds: l.options.map((o) => o.id),
+        })),
         `Thêm ${pad.length} món bàn ${tableCode}`,
       ),
     onSuccess: () => {
@@ -108,14 +122,29 @@ export function TableOrder() {
     onError: (err: Error) => toast(err.message, 'danger'),
   })
 
-  const push = (dishId: string, name: string, price: number) => {
+  /**
+   * Thêm một phần vào phiếu order.
+   *
+   * Gộp dòng theo món KÈM tuỳ chọn: hai phần thăn bò một chấm muối một chấm miso
+   * là hai dòng, vì bếp làm khác nhau và vé xuống bếp cũng phải khác nhau.
+   */
+  const push = (dish: ConfigDish, options: PadLine['options']) => {
+    const key = [dish.id, ...options.map((o) => o.id).sort()].join('|')
+    const price = dish.price + options.reduce((sum, o) => sum + o.priceDelta, 0)
     setPad((current) => {
-      const existing = current.find((l) => l.dishId === dishId)
-      if (existing) {
-        return current.map((l) => (l.dishId === dishId ? { ...l, qty: l.qty + 1 } : l))
-      }
-      return [...current, { dishId, name, price, qty: 1 }]
+      const existing = current.find((l) => l.key === key)
+      if (existing) return current.map((l) => (l.key === key ? { ...l, qty: l.qty + 1 } : l))
+      return [...current, { key, dishId: dish.id, name: dish.nameVi, price, qty: 1, options }]
     })
+  }
+
+  /** Món có nhóm tuỳ chọn thì chạm vào là mở P6, không thả thẳng vào phiếu */
+  const tapDish = (dish: ConfigDish) => {
+    if (groupsOf(dish).length > 0) {
+      setModifierFor(dish)
+      return
+    }
+    push(dish, [])
   }
 
   const sentLines = (order.data?.lines ?? []).filter(
@@ -174,7 +203,8 @@ export function TableOrder() {
                   station={d.routing?.stationGrill ?? null}
                   soldOut={avail?.status === 'sold_out'}
                   remaining={avail?.status === 'limited' ? avail.remaining : null}
-                  onClick={() => push(d.id, d.nameVi, d.price)}
+                  hasRequiredModifier={groupsOf(d).some((g) => g.required)}
+                  onClick={() => tapDish(d)}
                 />
               )
             })}
@@ -208,23 +238,30 @@ export function TableOrder() {
             <section className="mb-5 flex flex-col gap-2">
               <SectionLabel>Chưa gửi bếp</SectionLabel>
               {pad.map((line) => (
-                <div key={line.dishId} className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPad((c) =>
-                        c
-                          .map((l) => (l.dishId === line.dishId ? { ...l, qty: l.qty - 1 } : l))
-                          .filter((l) => l.qty > 0),
-                      )
-                    }
-                    className="h-9 w-9 rounded-sm border border-line-3 text-ink-body"
-                  >
-                    −
-                  </button>
-                  <span className="w-8 text-center font-mono text-ink-hi">{line.qty}</span>
-                  <span className="flex-1 text-[length:var(--fs-b2)] text-ink-body">{line.name}</span>
-                  <Money amount={line.price * line.qty} className="text-[length:var(--fs-b2)] text-ink-body" />
+                <div key={line.key} className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPad((c) =>
+                          c
+                            .map((l) => (l.key === line.key ? { ...l, qty: l.qty - 1 } : l))
+                            .filter((l) => l.qty > 0),
+                        )
+                      }
+                      className="h-9 w-9 rounded-sm border border-line-3 text-ink-body"
+                    >
+                      −
+                    </button>
+                    <span className="w-8 text-center font-mono text-ink-hi">{line.qty}</span>
+                    <span className="flex-1 text-[length:var(--fs-b2)] text-ink-body">{line.name}</span>
+                    <Money amount={line.price * line.qty} className="text-[length:var(--fs-b2)] text-ink-body" />
+                  </div>
+                  {line.options.length > 0 ? (
+                    <p className="pl-[76px] text-[length:var(--fs-c2)] text-warn">
+                      {line.options.map((o) => o.name).join(' · ')}
+                    </p>
+                  ) : null}
                 </div>
               ))}
               <Button
@@ -291,6 +328,19 @@ export function TableOrder() {
         </footer>
       </aside>
 
+      {modifierFor ? (
+        <ModifierDialog
+          key={modifierFor.id}
+          dish={modifierFor}
+          groups={groupsOf(modifierFor)}
+          onClose={() => setModifierFor(null)}
+          onDone={(options) => {
+            push(modifierFor, options)
+            setModifierFor(null)
+          }}
+        />
+      ) : null}
+
       <TableQrDialog
         sessionId={id}
         tableCode={tableCode}
@@ -329,6 +379,105 @@ function LineRow({ line, onVoid }: { line: OrderLineRow; onVoid: () => void }) {
         Huỷ
       </button>
     </div>
+  )
+}
+
+/**
+ * P6 Popup modifier.
+ *
+ * Nhóm bắt buộc mở sẵn lựa chọn đầu tiên: nhân viên bấm rất nhanh, và phần lớn
+ * khách lấy vị mặc định. Ai đổi ý thì chạm một cái. "Bỏ qua" là HUỶ chứ không
+ * phải "thêm không tuỳ chọn" — món nướng không có vị chấm thì bếp phải chạy ra
+ * hỏi lại, tức là chậm hơn hẳn việc bấm thêm một nút ở đây.
+ */
+function ModifierDialog({
+  dish,
+  groups,
+  onClose,
+  onDone,
+}: {
+  dish: ConfigDish
+  groups: ModifierGroup[]
+  onClose: () => void
+  onDone: (options: { id: string; name: string; priceDelta: number }[]) => void
+}) {
+  const [picked, setPicked] = useState<Record<string, string[]>>(() =>
+    Object.fromEntries(
+      groups.map((g) => [g.id, g.required && g.options[0] ? [g.options[0].id] : []]),
+    ),
+  )
+
+  const chosen = groups.flatMap((g) =>
+    g.options.filter((o) => (picked[g.id] ?? []).includes(o.id)),
+  )
+  const unitPrice = dish.price + chosen.reduce((sum, o) => sum + o.priceDelta, 0)
+  const missing = groups.filter((g) => g.required && (picked[g.id] ?? []).length === 0)
+
+  const toggle = (group: ModifierGroup, optionId: string) =>
+    setPicked((current) => {
+      const on = current[group.id] ?? []
+      if (!group.multi) return { ...current, [group.id]: [optionId] }
+      return {
+        ...current,
+        [group.id]: on.includes(optionId) ? on.filter((id) => id !== optionId) : [...on, optionId],
+      }
+    })
+
+  return (
+    <Modal
+      open
+      title={dish.nameVi}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>Bỏ qua</Button>
+          <Button
+            variant="primary"
+            disabled={missing.length > 0}
+            onClick={() =>
+              onDone(chosen.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta })))
+            }
+          >
+            Xong · <Money amount={unitPrice} />
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        {groups.map((group) => (
+          <div key={group.id} className="flex flex-col gap-3">
+            <SectionLabel>
+              {group.name}
+              {group.required ? ' *' : ''}
+            </SectionLabel>
+            <div className="grid gap-2">
+              {group.options.map((option) => {
+                const on = (picked[group.id] ?? []).includes(option.id)
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => toggle(group, option.id)}
+                    className={[
+                      'flex h-[var(--hit-target)] items-center justify-between gap-3 rounded-sm border px-4 text-left text-[length:var(--fs-b1)]',
+                      on ? 'border-accent text-gold-200' : 'border-line-3 text-ink-body',
+                    ].join(' ')}
+                  >
+                    <span>{option.name}</span>
+                    {option.priceDelta > 0 ? (
+                      <Money
+                        amount={option.priceDelta}
+                        className="flex-none text-[length:var(--fs-b2)] text-accent-ink"
+                      />
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Modal>
   )
 }
 
