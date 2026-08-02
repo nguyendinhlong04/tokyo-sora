@@ -22,23 +22,35 @@ const IngredientBody = z.object({
   basePerPurchase: z.number().int().positive(),
   minLevelBase: z.number().int().min(0).default(0),
   lotRequired: z.boolean().default(false),
+  isSemiFinished: z.boolean().default(false),
   active: z.boolean().default(true),
   sort: z.number().int().min(0).default(0),
   approval: Approval,
 })
 
+const RecipeLines = z
+  .array(
+    z.object({
+      ingredientId: z.string().min(1),
+      qtyBase: z.number().int().positive(),
+      wasteBp: z.number().int().min(0).max(10_000).default(0),
+    }),
+  )
+  .max(60)
+
 const RecipeBody = z.object({
-  lines: z
-    .array(
-      z.object({
-        ingredientId: z.string().min(1),
-        qtyBase: z.number().int().positive(),
-        wasteBp: z.number().int().min(0).max(10_000).default(0),
-      }),
-    )
-    .max(60),
+  lines: RecipeLines,
   approval: Approval,
 })
+
+const PrepRecipeBody = z.object({
+  /** Một mẻ ra bao nhiêu ĐVT cơ sở; 0 chỉ hợp lệ khi xoá hết dòng công thức */
+  yieldBase: z.number().int().min(0),
+  lines: RecipeLines,
+  approval: Approval,
+})
+
+const SubjectKind = z.enum(['dish', 'prep'])
 
 const ReceiveBody = z.object({
   branchId: z.string().min(1),
@@ -120,6 +132,59 @@ export class InventoryController {
   setRecipe(@Param('dishId') dishId: string, @Body() body: unknown, @Req() req: RequestWithActor) {
     const { lines, approval } = RecipeBody.parse(body)
     return this.inventory.setRecipe(dishId, lines, req.actor!, approval)
+  }
+
+  // ------------------------------------------------------------- M8
+
+  @Get('preps')
+  @RequirePermission('cost.view-recipe')
+  preps() {
+    return this.inventory.prepList()
+  }
+
+  @Get('preps/:id')
+  @RequirePermission('cost.view-recipe')
+  prep(@Param('id') id: string) {
+    return this.inventory.prepRecipe(id)
+  }
+
+  @Put('preps/:id')
+  @RequirePermission('recipe.edit')
+  setPrep(@Param('id') id: string, @Body() body: unknown, @Req() req: RequestWithActor) {
+    const { approval, ...input } = PrepRecipeBody.parse(body)
+    return this.inventory.setPrepRecipe(id, input, req.actor!, approval)
+  }
+
+  // ------------------------------------------------------------- M9
+
+  /** Dòng thời gian mọi lần sửa công thức — bảng chính của M9 */
+  @Get('recipe-changes')
+  @RequirePermission('cost.view-recipe')
+  recipeChanges() {
+    return this.inventory.recentRecipeChanges()
+  }
+
+  @Get('recipe-versions/:kind/:id')
+  @RequirePermission('cost.view-recipe')
+  recipeVersions(@Param('kind') kind: string, @Param('id') id: string) {
+    return this.inventory.versionsOf(SubjectKind.parse(kind), id)
+  }
+
+  @Get('recipe-versions/:kind/:id/compare')
+  @RequirePermission('cost.view-recipe')
+  compareVersions(
+    @Param('kind') kind: string,
+    @Param('id') id: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    const version = z.coerce.number().int().positive()
+    return this.inventory.compareVersions(
+      SubjectKind.parse(kind),
+      id,
+      version.parse(from),
+      version.parse(to),
+    )
   }
 
   /** Giá vốn + food cost của mọi món — cột giá vốn của M1 */

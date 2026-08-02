@@ -21,6 +21,7 @@ import {
   shifts,
   tableSessions,
 } from '../../db/schema'
+import { CustomersService } from '../crm/customers.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 
@@ -29,6 +30,7 @@ export class PaymentsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly customers: CustomersService,
   ) {}
 
   // ------------------------------------------------------------ Ca (P1/P14)
@@ -263,6 +265,17 @@ export class PaymentsService {
           .update(tableSessions)
           .set({ status: 'paid_wait_clear' })
           .where(eq(tableSessions.id, sessionId))
+
+        // §25 B14: điểm chỉ sinh từ sự kiện thanh toán, và sinh trong CÙNG
+        // transaction — thu tiền rollback thì điểm cũng không tồn tại. Đơn không
+        // có số điện thoại khách thì hàm này im lặng bỏ qua, đó là phần lớn bill
+        // tại bàn và là chuyện bình thường.
+        await this.customers.accrueForPaidOrder(tx, {
+          orderId: order.id,
+          branchId: session.branchId,
+          paidVnd: order.moneyTotal,
+          businessDate: shift.businessDate,
+        })
       }
 
       await emit(tx, {

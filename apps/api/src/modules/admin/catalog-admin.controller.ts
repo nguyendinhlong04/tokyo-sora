@@ -43,7 +43,30 @@ const DishSchema = z.object({
   tableOrderable: z.boolean(),
   signature: z.boolean(),
   active: z.boolean(),
+  // Lịch bán M11; mặc định = bán cả tuần, cả ngày, không giới hạn mùa
+  saleFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+  saleTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+  saleDays: z.number().int().min(1).max(127).default(127),
+  saleStartMinute: z.number().int().min(0).max(1439).nullable().default(null),
+  saleEndMinute: z.number().int().min(1).max(1440).nullable().default(null),
   sort: z.number().int().min(0).max(9999),
+})
+
+const CategorySchema = z.object({
+  id: z.string().min(2).max(40),
+  parentId: z.string().max(40).nullable().default(null),
+  nameVi: z.string().min(1).max(120),
+  nameEn: z.string().max(120).nullable().default(null),
+  nameJa: z.string().max(120).nullable().default(null),
+  kanji: z.string().max(8).nullable().default(null),
+  imageUrl: z.string().max(500).nullable().default(null),
+  onlineVisible: z.boolean().default(true),
+  tableVisible: z.boolean().default(true),
+})
+
+const MoveSchema = z.object({
+  parentId: z.string().max(40).nullable(),
+  position: z.number().int().min(0).max(999),
 })
 
 const UpdateSchema = DishSchema.partial().extend({ approval: ApprovalSchema })
@@ -148,5 +171,68 @@ export class CatalogAdminController {
     @Req() req: RequestWithActor,
   ) {
     return this.catalog.clearBranchOverride(id, branchId, req.actor!)
+  }
+}
+
+/**
+ * M10 — Cây danh mục.
+ *
+ * Mượn lại đúng cặp khoá của thực đơn (`menu.view-price` đọc · `menu.edit-price`
+ * ghi) chứ không sinh khoá mới: ma trận §4.2 là hằng typed ở `@sora/contracts`,
+ * thêm dòng vào đó là việc của bản thiết kế chứ không phải của lớp cài đặt.
+ */
+@Controller('api/admin/categories')
+export class CategoryAdminController {
+  constructor(private readonly catalog: CatalogAdminService) {}
+
+  @Get()
+  @RequirePermission('menu.view-price')
+  tree() {
+    return this.catalog.categoryTree()
+  }
+
+  @Post()
+  @RequirePermission('menu.edit-price')
+  create(@Body() body: unknown, @Req() req: RequestWithActor) {
+    return this.catalog.createCategory(CategorySchema.parse(body), req.actor!)
+  }
+
+  @Patch(':id')
+  @RequirePermission('menu.edit-price')
+  update(@Param('id') id: string, @Body() body: unknown, @Req() req: RequestWithActor) {
+    return this.catalog.updateCategory(id, CategorySchema.partial().parse(body), req.actor!)
+  }
+
+  /** Kéo thả: cha mới + vị trí trong danh sách anh em mới */
+  @Put(':id/move')
+  @RequirePermission('menu.edit-price')
+  move(@Param('id') id: string, @Body() body: unknown, @Req() req: RequestWithActor) {
+    const { parentId, position } = MoveSchema.parse(body)
+    return this.catalog.moveCategory(id, parentId, position, req.actor!)
+  }
+
+  @Delete(':id')
+  @RequirePermission('menu.edit-price')
+  remove(@Param('id') id: string, @Req() req: RequestWithActor) {
+    return this.catalog.deleteCategory(id, req.actor!)
+  }
+}
+
+/**
+ * M11 — Set & Combo. Chỉ ĐỌC: chặng của set sửa ở trình sửa món
+ * (`PUT /api/admin/dishes/:id/courses`), giá và lịch bán sửa bằng `PATCH` cùng
+ * chỗ với mọi thuộc tính khác của món. Dựng thêm một cửa ghi ở đây là tạo nguồn
+ * thứ hai cho dữ liệu đã có nguồn.
+ *
+ * Cái M11 thêm vào là con số không nằm trong bảng nào: dải giá vốn min–max.
+ */
+@Controller('api/admin/sets')
+export class SetAdminController {
+  constructor(private readonly catalog: CatalogAdminService) {}
+
+  @Get()
+  @RequirePermission('cost.view-recipe')
+  list(@Query('branch') branch?: string) {
+    return this.catalog.setsOverview(branch ?? null)
   }
 }

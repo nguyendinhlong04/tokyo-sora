@@ -5,11 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { and, asc, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, lte, sql, type SQLWrapper } from 'drizzle-orm'
 import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
 import { PeriodLockService } from '../../common/period-lock.service'
+import { isUniqueViolation } from '../../common/pg-error'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
@@ -20,6 +21,7 @@ import {
   expenseCategories,
   expenseEntries,
   expenseVouchers,
+  inputInvoices,
   recurringExpenses,
   staff,
 } from '../../db/schema'
@@ -58,6 +60,24 @@ export interface AssetInput {
   costVnd: number
   inServiceFrom: string
   depreciationMonths: number
+  note: string | null
+}
+
+/** Cùng lý do với `reports.service.ts`: tổng tiền cả kỳ vượt tầm int4 */
+const money = (expr: SQLWrapper) => sql<number>`coalesce(sum(${expr}), 0)::float8`
+
+export interface InputInvoiceInput {
+  branchId: string
+  /** Gắn phiếu chi là tuỳ chọn — hoá đơn và tiền ra đến theo hai nhịp khác nhau */
+  voucherId: number | null
+  sellerName: string
+  sellerTaxCode: string
+  invoiceNo: string
+  serial: string | null
+  issuedOn: string
+  netVnd: number
+  vatVnd: number
+  deductible: boolean
   note: string | null
 }
 
@@ -158,6 +178,242 @@ export class ExpensesService {
       createdByName,
       tier: approvalTierOf(voucher.amountVnd, thresholds, Boolean(voucher.assetId)),
     }))
+  }
+
+  // ================================================ C5 · Hoá đơn đầu vào
+
+  /**
+   * Sổ hoá đơn VAT đầu vào, kèm danh sách phiếu chi CHƯA có hoá đơn.
+   *
+   * Phần thứ hai mới là lý do màn này tồn tại. Một phiếu chi lớn không có hoá đơn
+   * đầu vào là một khoản VAT không đòi lại được — mất tiền thật, mà chỗ mất thì
+   * không hiện ra ở bất kỳ báo cáo nào khác. Ngưỡng lấy từ hạn mức chi vặt A6:
+   * dưới mức đó là chi chợ, chi vặt, không ai đòi hoá đơn.
+   */
+  async inputInvoices(branchId: string, from: string, to: string) {
+    const [rows, thresholds] = await Promise.all([
+      this.db
+        .select({
+          invoice: inputInvoices,
+          voucherMemo: expenseVouchers.memo,
+          voucherAmount: expenseVouchers.amountVnd,
+          categoryName: expenseCategories.name,
+          createdByName: staff.fullName,
+        })
+        .from(inputInvoices)
+        .leftJoin(expenseVouchers, eq(expenseVouchers.id, inputInvoices.voucherId))
+        .leftJoin(expenseCategories, eq(expenseCategories.id, expenseVouchers.categoryId))
+        .leftJoin(staff, eq(staff.id, inputInvoices.createdBy))
+        .where(
+          and(
+            eq(inputInvoices.branchId, branchId),
+            gte(inputInvoices.issuedOn, from),
+            lte(inputInvoices.issuedOn, to),
+          ),
+        )
+        .orderBy(sql`${inputInvoices.issuedOn} desc`, sql`${inputInvoices.id} desc`),
+      this.thresholds(branchId),
+    ])
+
+    const missing = await this.db
+      .select({
+        id: expenseVouchers.id,
+        paidOn: expenseVouchers.paidOn,
+        supplier: expenseVouchers.supplier,
+        memo: expenseVouchers.memo,
+        amountVnd: expenseVouchers.amountVnd,
+        vatVnd: expenseVouchers.vatVnd,
+        categoryName: expenseCategories.name,
+      })
+      .from(expenseVouchers)
+      .innerJoin(expenseCategories, eq(expenseCategories.id, expenseVouchers.categoryId))
+      .where(
+        and(
+          eq(expenseVouchers.branchId, branchId),
+          eq(expenseVouchers.state, 'approved'),
+          // Tạm ứng không phải chi phí nên không kèm hoá đơn VAT
+          eq(expenseVouchers.kind, 'expense'),
+          gte(expenseVouchers.paidOn, from),
+          lte(expenseVouchers.paidOn, to),
+          /**
+           * Hai loại phiếu đáng nêu tên, và loại thứ hai mới là loại gắt:
+           *   · Phiếu LỚN (từ hạn mức chi vặt trở lên) — mức đó thì phải có hoá đơn.
+           *   · Phiếu ĐÃ GÕ SỐ VAT mà không có tờ nào đứng sau, dù nhỏ. Người ghi
+           *     đang tưởng khoản đó được khấu trừ; không có chứng từ thì không.
+           */
+          sql`(${expenseVouchers.amountVnd} >= ${thresholds.pettyCashVnd}
+            OR ${expenseVouchers.vatVnd} > 0)`,
+          sql`not exists (
+            select 1 from ${inputInvoices} i where i.voucher_id = ${expenseVouchers.id}
+          )`,
+        ),
+      )
+      .orderBy(sql`${expenseVouchers.amountVnd} desc`)
+
+    const deductibleVnd = rows
+      .filter(({ invoice }) => invoice.deductible)
+      .reduce((sum, { invoice }) => sum + invoice.vatVnd, 0)
+
+    return {
+      branchId,
+      from,
+      to,
+      thresholdVnd: thresholds.pettyCashVnd,
+      rows: rows.map(({ invoice, voucherMemo, voucherAmount, categoryName, createdByName }) => ({
+        ...invoice,
+        voucherMemo,
+        voucherAmount,
+        categoryName,
+        createdByName,
+      })),
+      /** Con số F4 cộng vào thuế đầu vào */
+      deductibleVnd,
+      declaredButUndocumentedVnd: missing.reduce((sum, v) => sum + v.vatVnd, 0),
+      missingVouchers: missing,
+    }
+  }
+
+  /**
+   * Ghi một tờ hoá đơn đầu vào.
+   *
+   * Gắn phiếu chi là TUỲ CHỌN vì hai thứ đến theo hai nhịp khác nhau: hoá đơn nhà
+   * cung cấp có thể về trước lúc trả tiền, hoặc về sau cả tháng. Bắt buộc gắn sẽ
+   * làm kế toán để dồn một xấp hoá đơn chờ phiếu — và xấp đó là chỗ hoá đơn thất
+   * lạc.
+   */
+  async createInputInvoice(input: InputInvoiceInput, actor: Actor) {
+    await this.requireBranch(input.branchId)
+    await this.locks.assertOpen(input.branchId, [input.issuedOn], 'ghi hoá đơn đầu vào')
+    if (input.vatVnd > input.netVnd) {
+      throw new BadRequestException('VAT không lớn hơn tiền trước thuế — có thể đang gõ nhầm cột')
+    }
+
+    if (input.voucherId !== null) {
+      const [voucher] = await this.db
+        .select()
+        .from(expenseVouchers)
+        .where(eq(expenseVouchers.id, input.voucherId))
+      if (!voucher || voucher.branchId !== input.branchId) {
+        throw new NotFoundException('Không có phiếu chi này ở chi nhánh đang xem')
+      }
+      if (voucher.kind === 'advance') {
+        throw new BadRequestException(
+          'Tạm ứng không phải chi phí nên không gắn hoá đơn VAT — hoá đơn sẽ về cùng khoản chi thật',
+        )
+      }
+      /**
+       * Tổng tiền trên các tờ hoá đơn không vượt số tiền đã chi. Vượt nghĩa là
+       * gắn nhầm tờ của phiếu khác, và hậu quả là khấu trừ VAT nhiều hơn số thật
+       * đã trả — đúng thứ mà thanh tra thuế tìm.
+       */
+      const [sum] = await this.db
+        .select({ total: money(sql`${inputInvoices.netVnd} + ${inputInvoices.vatVnd}`) })
+        .from(inputInvoices)
+        .where(eq(inputInvoices.voucherId, input.voucherId))
+      const already = Number(sum?.total ?? 0)
+      if (already + input.netVnd + input.vatVnd > voucher.amountVnd) {
+        throw new ConflictException(
+          `Tổng hoá đơn gắn vào phiếu này (${already + input.netVnd + input.vatVnd}₫) vượt số đã chi (${voucher.amountVnd}₫)`,
+        )
+      }
+    }
+
+    try {
+      const [row] = await this.db
+        .insert(inputInvoices)
+        .values({
+          ...input,
+          sellerName: input.sellerName.trim(),
+          sellerTaxCode: input.sellerTaxCode.trim(),
+          invoiceNo: input.invoiceNo.trim(),
+          serial: input.serial?.trim() || null,
+          createdBy: actor.kind === 'staff' ? actor.staffId : null,
+        })
+        .returning({ id: inputInvoices.id })
+
+      await this.writeInvoiceLog(actor, 'input-invoice.created', String(row!.id), {
+        sellerTaxCode: input.sellerTaxCode,
+        invoiceNo: input.invoiceNo,
+        vatVnd: input.vatVnd,
+        voucherId: input.voucherId,
+      })
+      return { id: row!.id }
+    } catch (err) {
+      if (isUniqueViolation(err, 'input_invoices_seller_no_unique')) {
+        throw new ConflictException(
+          `Hoá đơn số ${input.invoiceNo} của mã số thuế ${input.sellerTaxCode} đã ghi rồi`,
+        )
+      }
+      throw err
+    }
+  }
+
+  /** Sửa cờ khấu trừ hoặc gắn phiếu chi về sau — hai việc kế toán làm nhiều nhất */
+  async updateInputInvoice(
+    id: number,
+    patch: { voucherId?: number | null; deductible?: boolean; note?: string | null },
+    actor: Actor,
+  ) {
+    const [row] = await this.db.select().from(inputInvoices).where(eq(inputInvoices.id, id))
+    if (!row) throw new NotFoundException('Không có hoá đơn này')
+    await this.locks.assertOpen(row.branchId, [row.issuedOn], 'sửa hoá đơn đầu vào')
+
+    if (patch.voucherId != null) {
+      const [voucher] = await this.db
+        .select()
+        .from(expenseVouchers)
+        .where(eq(expenseVouchers.id, patch.voucherId))
+      if (!voucher || voucher.branchId !== row.branchId) {
+        throw new NotFoundException('Không có phiếu chi này ở chi nhánh đang xem')
+      }
+    }
+
+    await this.db.update(inputInvoices).set(patch).where(eq(inputInvoices.id, id))
+    await this.writeInvoiceLog(actor, 'input-invoice.updated', String(id), { ...patch })
+    return { id }
+  }
+
+  async deleteInputInvoice(id: number, actor: Actor) {
+    const [row] = await this.db.select().from(inputInvoices).where(eq(inputInvoices.id, id))
+    if (!row) throw new NotFoundException('Không có hoá đơn này')
+    await this.locks.assertOpen(row.branchId, [row.issuedOn], 'xoá hoá đơn đầu vào')
+
+    await this.db.delete(inputInvoices).where(eq(inputInvoices.id, id))
+    await this.writeInvoiceLog(actor, 'input-invoice.deleted', String(id), {
+      invoiceNo: row.invoiceNo,
+      vatVnd: row.vatVnd,
+    })
+    return { id, deleted: true }
+  }
+
+  private async writeInvoiceLog(
+    actor: Actor,
+    action: string,
+    entityId: string,
+    payload: Record<string, unknown>,
+  ) {
+    await this.audit.writeStandalone({ actor, action, entity: 'input_invoice', entityId, payload })
+  }
+
+  /**
+   * VAT đầu vào ĐƯỢC KHẤU TRỪ của một kỳ — nguồn cho F4.
+   *
+   * Lấy từ tờ hoá đơn chứ không từ con số gõ trên phiếu chi: số trên phiếu là ý
+   * định, tờ hoá đơn mới là bằng chứng, và cơ quan thuế hỏi bằng chứng.
+   */
+  async deductibleVatIn(branchId: string, from: string, to: string) {
+    const [row] = await this.db
+      .select({ vat: money(inputInvoices.vatVnd), count: sql<number>`count(*)::int` })
+      .from(inputInvoices)
+      .where(
+        and(
+          eq(inputInvoices.branchId, branchId),
+          eq(inputInvoices.deductible, true),
+          gte(inputInvoices.issuedOn, from),
+          lte(inputInvoices.issuedOn, to),
+        ),
+      )
+    return { vatVnd: Number(row?.vat ?? 0), invoices: Number(row?.count ?? 0) }
   }
 
   /**

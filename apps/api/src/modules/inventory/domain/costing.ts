@@ -82,6 +82,38 @@ export function dishCost(lines: readonly RecipeLineInput[]): DishCostBreakdown {
   }
 }
 
+export interface PrepCostBreakdown extends DishCostBreakdown {
+  /** Sản lượng một mẻ, ĐVT cơ sở của bán thành phẩm */
+  yieldBase: number
+  /**
+   * Giá vốn CHUẨN mỗi ĐVT cơ sở, phần nghìn đồng — con số "giá vốn/ml" của M8.
+   * null khi chưa khai sản lượng: chia cho 0 không phải là 0₫, mà là chưa biết.
+   */
+  costPerBaseMilli: number | null
+}
+
+/**
+ * M8 — giá vốn một mẻ bán thành phẩm và giá chuẩn mỗi ĐVT cơ sở.
+ *
+ * Chia ở đơn vị PHẦN NGHÌN ĐỒNG chứ không chia rồi mới đổi đơn vị: nồi nước dùng
+ * 240.000₫ ra 8.000ml là 30₫/ml — chia được tròn. Nhưng mẻ 240.000₫ ra 400.000ml
+ * (siro pha loãng) là 0,6₫/ml, và làm tròn về đồng ở bước này biến nó thành 1₫/ml,
+ * tức là đội giá vốn thêm hai phần ba. Đúng lý do `ingredients.costPerBaseMilli`
+ * tồn tại ở đơn vị phần nghìn đồng.
+ *
+ * `costVnd` của cả mẻ vẫn cộng từ các dòng ĐÃ làm tròn, y hệt món: bảng trên màn
+ * hình hiện từng dòng, và cột dọc phải cộng đúng thành dòng tổng.
+ */
+export function prepCost(lines: readonly RecipeLineInput[], yieldBase: number): PrepCostBreakdown {
+  const batch = dishCost(lines)
+  return {
+    ...batch,
+    yieldBase,
+    costPerBaseMilli:
+      yieldBase > 0 ? Math.round((batch.costVnd * 1_000) / yieldBase) : null,
+  }
+}
+
 export interface FoodCost {
   costVnd: number
   priceVnd: number

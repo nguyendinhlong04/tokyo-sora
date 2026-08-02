@@ -22,6 +22,7 @@ import {
   payments,
   tableSessions,
 } from '../../db/schema'
+import { CustomersService } from '../crm/customers.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 import { MockBankProvider, PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider'
@@ -35,6 +36,7 @@ export class SplitPaymentService {
     @Inject(DB) private readonly db: Db,
     @Inject(PAYMENT_PROVIDER) private readonly bank: PaymentProvider,
     private readonly audit: AuditService,
+    private readonly customers: CustomersService,
   ) {}
 
   /**
@@ -418,6 +420,18 @@ export class SplitPaymentService {
         .update(tableSessions)
         .set({ status: 'paid_wait_clear' })
         .where(eq(tableSessions.id, order.tableSessionId))
+    }
+
+    // §25 B14: tích điểm ngay tại sự kiện thanh toán. Hàm này chạy lại được —
+    // webhook ngân hàng gửi lặp là chuyện thường, và chỉ số duy nhất
+    // `loyalty_entries_one_earn_per_order` chặn tích hai lần cho một bill.
+    if (state === 'paid') {
+      await this.customers.accrueForPaidOrder(tx, {
+        orderId,
+        branchId: order.branchId,
+        paidVnd: order.moneyTotal,
+        businessDate: order.businessDate,
+      })
     }
     return state
   }

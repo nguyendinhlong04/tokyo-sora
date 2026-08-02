@@ -19,6 +19,25 @@ export function businessDateOf(at: Date, timezone: string): string {
 }
 
 /**
+ * Giờ treo tường của chi nhánh, tính bằng phút kể từ 00:00.
+ *
+ * Lịch bán (M11) khai bằng phút trong ngày, nên nó cần đúng con số này chứ không
+ * phải giờ máy chủ: quán Hà Nội bán suất trưa 11:00–14:00, còn máy chủ chạy UTC
+ * thì lúc đó mới 4 giờ sáng và sẽ từ chối mọi suất trưa.
+ */
+export function minuteOfDayIn(at: Date, timezone: string): number {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(at)
+  const get = (type: string) => Number(parts.find((p) => p.type === type)!.value)
+  // Giờ 24 của Intl là 00 của ngày hôm sau
+  return (get('hour') % 24) * 60 + get('minute')
+}
+
+/**
  * Mốc tuyệt đối của 00:00 ngày làm việc, theo múi giờ chi nhánh.
  *
  * Khung giờ nhận đơn online đếm bằng phút kể từ mốc này, nên nó phải đúng dù máy

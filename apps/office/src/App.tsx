@@ -4,23 +4,49 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
 import { Debts, InvoiceBook, PeriodClose, RevenueJournal, TaxReport } from './routes/Accounting'
 import { Accounts } from './routes/Accounts'
+import { Attendance } from './routes/Attendance'
 import { AuditLog } from './routes/AuditLog'
 import { Branches } from './routes/Branches'
 import { CashBook } from './routes/CashBook'
+import { Categories } from './routes/Categories'
 import { Cms } from './routes/Cms'
+import { Corporate } from './routes/Corporate'
 import { Assets, ExpenseOverview, RecurringExpenses } from './routes/CostCenter'
+import { Customers } from './routes/Customers'
 import { DeliveryZones } from './routes/DeliveryZones'
 import { Devices } from './routes/Devices'
 import { Dishes } from './routes/Dishes'
 import { EInvoice } from './routes/EInvoice'
 import { Employees } from './routes/Employees'
 import { Expenses } from './routes/Expenses'
+import { Feedback } from './routes/Feedback'
 import { Floorplan } from './routes/Floorplan'
 import { Ingredients } from './routes/Ingredients'
+import { InputInvoices } from './routes/InputInvoices'
+import { Leaves } from './routes/Leaves'
 import { Login } from './routes/Login'
+import { LoyaltyRules } from './routes/LoyaltyRules'
+import { PayrollRules } from './routes/PayrollRules'
+import { Promotions } from './routes/Promotions'
+import { PrepEditor, PrepList } from './routes/Prep'
 import { Printers } from './routes/Printers'
+import { PurchaseOrders, Receiving } from './routes/Purchasing'
+import { RecipeHistory } from './routes/RecipeHistory'
+import { ReportCenter } from './routes/ReportCenter'
+import { CostMargin, Revenue, SetsReport } from './routes/RevenueReports'
 import { Roles } from './routes/Roles'
+import { Sets } from './routes/Sets'
+import { Lots, StockCardScreen, WasteReport } from './routes/StockBooks'
+import { Production, StockCount, StockIssues, Transfers } from './routes/StockOps'
+import { Suppliers } from './routes/Suppliers'
+import { Timesheet } from './routes/Timesheet'
 import { MenuMatrix } from './routes/MenuMatrix'
+import {
+  KitchenReport,
+  OnlineReport,
+  StaffReport,
+  TableTurnover,
+} from './routes/OperationsReports'
 import { OnlineMenu } from './routes/OnlineMenu'
 import { Parameters } from './routes/Parameters'
 import { Payroll } from './routes/Payroll'
@@ -51,14 +77,31 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
     group: 'Kinh doanh',
     items: [
       { to: '/hom-nay', label: 'B1 · Hôm nay', need: 'report.branch-revenue' },
+      { to: '/doanh-thu', label: 'B2 · Doanh thu', need: 'report.branch-revenue' },
       { to: '/phan-tich-mon', label: 'B3 · Phân tích món', need: 'report.margin-foodcost' },
+      { to: '/gia-von', label: 'B4 · Giá vốn & lãi gộp', need: 'report.margin-foodcost' },
+      { to: '/hieu-suat-bep', label: 'B5 · Hiệu suất bếp', need: 'report.margin-foodcost' },
+      { to: '/vong-quay-ban', label: 'B6 · Vòng quay bàn', need: 'report.branch-revenue' },
+      { to: '/nhan-su-ban-hang', label: 'B7 · Nhân sự', need: 'report.branch-revenue' },
+      { to: '/set-khuyen-mai', label: 'B8 · Set & giảm giá', need: 'report.margin-foodcost' },
+      { to: '/online-dat-ban', label: 'B9 · Online & đặt bàn', need: 'report.branch-revenue' },
+      { to: '/trung-tam-bao-cao', label: 'B10 · Trung tâm báo cáo', need: 'report.branch-revenue' },
+      { to: '/khuyen-mai', label: 'B11 · Khuyến mãi & voucher', need: 'promo.compose' },
+      { to: '/so-khach', label: 'B12 · Sổ khách', need: 'customer.view-book' },
+      { to: '/phan-hoi', label: 'B13 · Phản hồi khách', need: 'feedback.respond' },
+      { to: '/tich-diem', label: 'B14 · Tích điểm & hạng', need: 'customer.view-book' },
+      { to: '/khach-doanh-nghiep', label: 'B15 · Khách doanh nghiệp', need: 'corporate.edit-profile' },
     ],
   },
   {
     group: 'Nhân sự',
     items: [
-      { to: '/xep-lich', label: 'H2 · Xếp lịch tuần', need: 'schedule.publish' },
       { to: '/nhan-vien', label: 'H1 · Hồ sơ nhân viên', need: 'payroll.configure' },
+      { to: '/xep-lich', label: 'H2 · Xếp lịch tuần', need: 'schedule.publish' },
+      { to: '/cham-cong', label: 'H3 · Chấm công hôm nay', need: 'schedule.publish' },
+      { to: '/bang-cong', label: 'H4 · Bảng công tháng', need: 'schedule.publish' },
+      { to: '/nghi-phep', label: 'H5 · Nghỉ phép & đổi ca', need: 'schedule.publish' },
+      { to: '/co-che-luong', label: 'H6 · Cơ chế lương', need: 'payroll.configure' },
       { to: '/ky-luong', label: 'H7 · Kỳ lương', need: 'payroll.view-others' },
     ],
   },
@@ -69,6 +112,7 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
       { to: '/chi-phi', label: 'C2 · Sổ phiếu chi', need: 'expense.record-petty' },
       { to: '/dinh-ky', label: 'C3 · Chi phí định kỳ', need: 'expense.record-petty' },
       { to: '/tai-san', label: 'C4 · Tài sản & khấu hao', need: 'asset.ledger' },
+      { to: '/hoa-don-dau-vao', label: 'C5 · Hoá đơn đầu vào', need: 'expense.approve' },
     ],
   },
   {
@@ -89,8 +133,22 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
       { to: '/mon', label: 'M1 · Món và set' },
       { to: '/cong-thuc', label: 'M4 · Công thức & giá vốn', need: 'cost.view-recipe' },
       { to: '/nguyen-lieu', label: 'M7 · Nguyên liệu', need: 'cost.view-recipe' },
+      { to: '/ban-thanh-pham', label: 'M8 · Bán thành phẩm', need: 'cost.view-recipe' },
+      { to: '/lich-su-cong-thuc', label: 'M9 · Lịch sử công thức', need: 'cost.view-recipe' },
+      { to: '/nhom-mon', label: 'M10 · Cây danh mục', need: 'menu.view-price' },
+      { to: '/set-combo', label: 'M11 · Set & Combo', need: 'cost.view-recipe' },
       { to: '/kho', label: 'S1 · Tổng quan kho', need: 'cost.view-recipe' },
       { to: '/ton-kho', label: 'S2 · Tồn kho', need: 'cost.view-recipe' },
+      { to: '/nha-cung-cap', label: 'S3 · Nhà cung cấp', need: 'cost.view-recipe' },
+      { to: '/dat-hang', label: 'S4 · Đơn đặt hàng', need: 'cost.view-recipe' },
+      { to: '/nhap-kho', label: 'S5 · Nhập kho', need: 'stock.receive' },
+      { to: '/xuat-kho', label: 'S6 · Xuất kho', need: 'stock.write-off' },
+      { to: '/san-xuat', label: 'S7 · Sản xuất nội bộ', need: 'stock.receive' },
+      { to: '/kiem-ke', label: 'S8 · Kiểm kê', need: 'stock.receive' },
+      { to: '/lo-hang', label: 'S9 · Lô & hạn dùng', need: 'cost.view-recipe' },
+      { to: '/chuyen-kho', label: 'S10 · Chuyển kho', need: 'cost.view-recipe' },
+      { to: '/hao-hut', label: 'S11 · Báo cáo hao hụt', need: 'cost.view-recipe' },
+      { to: '/the-kho', label: 'S12 · Thẻ kho', need: 'cost.view-recipe' },
     ],
   },
   {
@@ -127,22 +185,55 @@ export function App() {
             <Routes>
               <Route element={<Shell />}>
                 <Route path="/hom-nay" element={<Today />} />
+                <Route path="/doanh-thu" element={<Revenue />} />
                 <Route path="/phan-tich-mon" element={<MenuMatrix />} />
+                <Route path="/khuyen-mai" element={<Promotions />} />
+                <Route path="/so-khach" element={<Customers />} />
+                <Route path="/phan-hoi" element={<Feedback />} />
+                <Route path="/tich-diem" element={<LoyaltyRules />} />
+                <Route path="/khach-doanh-nghiep" element={<Corporate />} />
+                <Route path="/gia-von" element={<CostMargin />} />
+                <Route path="/hieu-suat-bep" element={<KitchenReport />} />
+                <Route path="/vong-quay-ban" element={<TableTurnover />} />
+                <Route path="/nhan-su-ban-hang" element={<StaffReport />} />
+                <Route path="/set-khuyen-mai" element={<SetsReport />} />
+                <Route path="/online-dat-ban" element={<OnlineReport />} />
+                <Route path="/trung-tam-bao-cao" element={<ReportCenter />} />
                 <Route path="/so-quy" element={<CashBook />} />
                 <Route path="/lai-lo" element={<ProfitLoss />} />
                 <Route path="/mon" element={<Dishes />} />
                 <Route path="/cong-thuc" element={<RecipeList />} />
                 <Route path="/cong-thuc/:dishId" element={<RecipeEditor />} />
                 <Route path="/nguyen-lieu" element={<Ingredients />} />
+                <Route path="/ban-thanh-pham" element={<PrepList />} />
+                <Route path="/ban-thanh-pham/:prepId" element={<PrepEditor />} />
+                <Route path="/lich-su-cong-thuc" element={<RecipeHistory />} />
+                <Route path="/nhom-mon" element={<Categories />} />
+                <Route path="/set-combo" element={<Sets />} />
                 <Route path="/kho" element={<StockOverview />} />
                 <Route path="/ton-kho" element={<StockLevels />} />
+                <Route path="/nha-cung-cap" element={<Suppliers />} />
+                <Route path="/dat-hang" element={<PurchaseOrders />} />
+                <Route path="/nhap-kho" element={<Receiving />} />
+                <Route path="/xuat-kho" element={<StockIssues />} />
+                <Route path="/san-xuat" element={<Production />} />
+                <Route path="/kiem-ke" element={<StockCount />} />
+                <Route path="/lo-hang" element={<Lots />} />
+                <Route path="/chuyen-kho" element={<Transfers />} />
+                <Route path="/hao-hut" element={<WasteReport />} />
+                <Route path="/the-kho" element={<StockCardScreen />} />
                 <Route path="/xep-lich" element={<Schedule />} />
                 <Route path="/nhan-vien" element={<Employees />} />
+                <Route path="/cham-cong" element={<Attendance />} />
+                <Route path="/bang-cong" element={<Timesheet />} />
+                <Route path="/nghi-phep" element={<Leaves />} />
+                <Route path="/co-che-luong" element={<PayrollRules />} />
                 <Route path="/ky-luong" element={<Payroll />} />
                 <Route path="/chi-phi-tong-quan" element={<ExpenseOverview />} />
                 <Route path="/chi-phi" element={<Expenses />} />
                 <Route path="/dinh-ky" element={<RecurringExpenses />} />
                 <Route path="/tai-san" element={<Assets />} />
+                <Route path="/hoa-don-dau-vao" element={<InputInvoices />} />
                 <Route path="/nhat-ky" element={<RevenueJournal />} />
                 <Route path="/hoa-don" element={<InvoiceBook />} />
                 <Route path="/bao-cao-thue" element={<TaxReport />} />

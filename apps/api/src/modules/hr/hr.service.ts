@@ -26,6 +26,7 @@ import { ExpensesService } from '../expenses/expenses.service'
 import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
+import { IdentityService } from '../identity/identity.service'
 import {
   computePayrollLine,
   splitMinutes,
@@ -34,6 +35,7 @@ import {
   type MinuteSplit,
   type PayrollRates,
 } from './domain/payroll'
+import { TimesheetService } from './timesheet.service'
 
 export interface EmployeeInput {
   staffId: number
@@ -72,16 +74,17 @@ const NEXT_STATE: Record<string, string> = {
 /**
  * Nhân sự — H1 hồ sơ · H2 xếp lịch · H7 kỳ lương.
  *
- * DÒNG CHẢY LỊCH → CÔNG → LƯƠNG, mỗi bước khoá bước trước (§26). Ba chỗ cưỡng chế
- * điều đó nằm ở đây:
- *   · `publishSchedule` — lịch nháp nhân viên không thấy, nên công chỉ tính từ
- *     lịch ĐÃ công bố.
- *   · `lockTimesheet` — chốt công đóng băng giờ của kỳ; sau đó sửa lịch của kỳ đó
- *     bị chặn, sai thì bút toán công kỳ sau.
+ * DÒNG CHẢY LỊCH → CÔNG → LƯƠNG, mỗi bước khoá bước trước (§26). Bốn chỗ cưỡng
+ * chế điều đó nằm ở đây:
+ *   · `publishSchedule` — lịch nháp nhân viên không thấy, nên không ai bị xếp ca
+ *     mà không biết.
+ *   · `lockTimesheet` — chốt công đóng băng giờ của kỳ; sau đó sửa lịch VÀ sửa
+ *     công của kỳ đó đều bị chặn, sai thì bút toán công kỳ sau. Còn ca chưa chấm
+ *     ra thì không chốt được.
+ *   · `computeDraft` — giờ công lấy từ BẢNG CÔNG THỰC TẾ (`TimesheetService`),
+ *     không từ lịch xếp.
  *   · `advance` — không bước nào nhảy cóc: không duyệt được kỳ chưa kiểm, không
  *     kiểm được kỳ chưa trình.
- *
- * KHÔNG CÓ CHẤM CÔNG (H3/H10 chưa dựng): giờ công = giờ theo lịch đã công bố.
  */
 @Injectable()
 export class HrService {
@@ -92,6 +95,8 @@ export class HrService {
     private readonly audit: AuditService,
     private readonly expenses: ExpensesService,
     private readonly locks: PeriodLockService,
+    private readonly timesheets: TimesheetService,
+    private readonly identity: IdentityService,
   ) {}
 
   // ================================================= H1 · Hồ sơ nhân viên
@@ -160,6 +165,32 @@ export class HrService {
         throw err
       }
     })
+  }
+
+  /**
+   * Cấp link cá nhân của Kênh nhân viên (H8 · H9).
+   *
+   * Cấp lại là THU HỒI link cũ — một người một link, không có danh sách link còn
+   * sống để ai đó quên mất. Nhật ký ghi lại mỗi lần cấp vì đây là thao tác mở
+   * đường vào phiếu lương của người khác, dù người mở là chính chủ.
+   */
+  async issueChannelLink(employeeId: number, actor: Actor) {
+    const [row] = await this.db
+      .select({ staffId: employees.staffId, fullName: staff.fullName })
+      .from(employees)
+      .innerJoin(staff, eq(staff.id, employees.staffId))
+      .where(eq(employees.id, employeeId))
+    if (!row) throw new NotFoundException('Không có hồ sơ này')
+
+    const { token } = await this.identity.issueChannelLink(row.staffId)
+    await this.audit.writeStandalone({
+      actor,
+      action: 'employee.channel-link-issued',
+      entity: 'employee',
+      entityId: String(employeeId),
+      payload: { staffId: row.staffId },
+    })
+    return { token, fullName: row.fullName }
   }
 
   private assertEmployee(input: EmployeeInput) {
@@ -257,7 +288,10 @@ export class HrService {
               state: e.state,
               note: e.note,
             })),
-            /** Giờ công tuần này, chỉ tính ca ĐÃ công bố */
+            /**
+             * Giờ công DỰ KIẾN của tuần, chỉ tính ca đã công bố. Con số thật thì
+             * ở H4 — lưới này để người xếp lịch cân tải, không phải để trả lương.
+             */
             minutes,
             totalMinutes: minutes.worked + minutes.otNormal + minutes.otRest + minutes.otHoliday,
           }
@@ -476,6 +510,33 @@ export class HrService {
    * hệ số lưu vào `rates` để một lần đổi tham số A6 về sau không viết lại kỳ cũ.
    */
   async lockTimesheet(periodId: number, actor: Actor) {
+    const [target] = await this.db
+      .select()
+      .from(payrollPeriods)
+      .where(eq(payrollPeriods.id, periodId))
+    if (!target) throw new NotFoundException('Không có kỳ lương này')
+
+    /**
+     * Còn ca chưa chấm ra thì chưa chốt được.
+     *
+     * Một bản ghi công thiếu giờ ra tính ra 0 phút, nên chốt lúc này là trả
+     * thiếu nguyên một ca cho người ta — và sau khi chốt thì không sửa ngược
+     * được nữa. Thà chặn ở đây, kèm danh sách đúng ngày nào của ai.
+     */
+    const open = await this.timesheets.openShifts(target.branchId, {
+      from: target.periodStart,
+      to: target.periodEnd,
+    })
+    if (open.length > 0) {
+      throw new ConflictException({
+        code: 'open_shifts',
+        message: `Còn ${open.length} ca chưa chấm ra (${open
+          .slice(0, 3)
+          .map((o) => `${o.fullName} ${o.workDate}`)
+          .join(', ')}${open.length > 3 ? '…' : ''}). Điền giờ ra ở bảng công trước khi chốt.`,
+      })
+    }
+
     return this.db.transaction(async (tx) => {
       const period = await this.requirePeriod(tx, periodId, 'draft')
       const rates = await this.rates(period.branchId)
@@ -525,17 +586,18 @@ export class HrService {
         .innerJoin(staff, eq(staff.id, employees.staffId))
         .where(and(eq(employees.branchId, period.branchId), eq(employees.active, true)))
 
-      const entries = await tx
-        .select()
-        .from(scheduleEntries)
-        .where(
-          and(
-            eq(scheduleEntries.branchId, period.branchId),
-            eq(scheduleEntries.state, 'published'),
-            gte(scheduleEntries.workDate, period.periodStart),
-            lte(scheduleEntries.workDate, period.periodEnd),
-          ),
-        )
+      /**
+       * Giờ công lấy từ BẢNG CÔNG THỰC TẾ (H3/H4), không từ lịch xếp.
+       *
+       * Trả theo lịch nghĩa là trả cho người không đến và quỵt của người ở lại
+       * dọn — hai lỗi ngược chiều nhau, mà bảng lương vẫn ra một con số trông
+       * hợp lý nên không ai đi tìm.
+       */
+      const worked = await this.timesheets.workedSplits(
+        period.branchId,
+        { from: period.periodStart, to: period.periodEnd },
+        rates,
+      )
 
       await tx.delete(payrollLines).where(eq(payrollLines.periodId, periodId))
 
@@ -551,8 +613,12 @@ export class HrService {
       )
 
       const rows = people.map(({ employee, fullName }) => {
-        const mine = entries.filter((e) => e.employeeId === employee.id)
-        const minutes: MinuteSplit = sumSplits(mine.map((e) => splitMinutes(e, rates)))
+        const minutes: MinuteSplit = worked.get(employee.id) ?? {
+          worked: 0,
+          otNormal: 0,
+          otRest: 0,
+          otHoliday: 0,
+        }
         const extra = adjustments.find((a) => a.employeeId === employee.id)
         const fromVouchers = advances.get(employee.id) ?? 0
 

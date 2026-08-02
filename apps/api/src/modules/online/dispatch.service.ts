@@ -12,6 +12,7 @@ import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
 import type { Db } from '../../db/client'
 import { orderLines, orders, ticketItems, tickets } from '../../db/schema'
+import { CustomersService } from '../crm/customers.service'
 import { actorRoles, type Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 import { OrderingService } from '../ordering/ordering.service'
@@ -32,6 +33,7 @@ export class DispatchService {
     @Inject(DB) private readonly db: Db,
     private readonly ordering: OrderingService,
     private readonly audit: AuditService,
+    private readonly customers: CustomersService,
   ) {}
 
   /**
@@ -242,12 +244,22 @@ export class DispatchService {
         }
       }
 
+      /**
+       * §25 B14: "huỷ/hoàn bill tự thu hồi điểm". Đơn đã trả rồi mới huỷ thì
+       * điểm đã tích phải rút lại — nếu không, huỷ đơn liên tục là một cách in
+       * điểm. Đơn chưa tích điểm thì hàm này không ghi gì.
+       */
+      const reclaimed = await this.customers.reclaimForVoidedOrder(tx, {
+        orderId,
+        businessDate: order.businessDate,
+      })
+
       await this.audit.write(tx, {
         actor,
         action: 'order.cancelled',
         entity: 'order',
         entityId: String(orderId),
-        payload: { reason: reason.trim(), from: order.status },
+        payload: { reason: reason.trim(), from: order.status, pointsReclaimed: reclaimed },
       })
 
       await emit(tx, {

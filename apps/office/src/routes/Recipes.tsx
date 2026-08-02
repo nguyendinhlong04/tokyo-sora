@@ -123,8 +123,16 @@ export function RecipeList() {
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Set không có dòng riêng ở đây: set không có công thức của mình, giá vốn của set là tổng
-          giá vốn các món thành phần khách chọn thật. Dải giá vốn min–max của set (M11) và bán
-          thành phẩm lồng nhau (M8) chưa dựng.
+          giá vốn các món thành phần khách chọn thật — dải min–max của nó nằm ở{' '}
+          <Link to="/set-combo" className="text-accent-ink">
+            M11 · Set &amp; Combo
+          </Link>
+          . Bán thành phẩm chèn được thẳng vào bảng công thức như một nguyên liệu; công thức mẻ của
+          chúng khai ở{' '}
+          <Link to="/ban-thanh-pham" className="text-accent-ink">
+            M8
+          </Link>
+          .
         </p>
       </div>
     </>
@@ -209,6 +217,9 @@ export function RecipeEditor() {
         action={
           <>
             <Button onClick={() => navigate('/cong-thuc')}>Về danh sách</Button>
+            <Button onClick={() => navigate(`/lich-su-cong-thuc?kind=dish&id=${dishId}`)}>
+              Lịch sử
+            </Button>
             {mayEdit ? (
               <Button
                 variant="primary"
@@ -358,8 +369,12 @@ export function RecipeEditor() {
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Hao hụt cộng THÊM vào lượng phải xuất: khai 500ml với hao hụt 6% thì kho trừ 530ml —
-          đúng cách quầy bia mất bọt khi rót. Lịch sử phiên bản công thức (M9) chưa dựng, nhưng
-          mỗi lần lưu đều ghi chênh lệch giá vốn vào nhật ký thao tác A7.
+          đúng cách quầy bia mất bọt khi rót. Mỗi lần lưu mà công thức thật sự đổi đều để lại một
+          bản chụp ở{' '}
+          <Link to={`/lich-su-cong-thuc?kind=dish&id=${dishId}`} className="text-accent-ink">
+            M9 · Lịch sử công thức
+          </Link>
+          , và chênh lệch giá vốn vẫn vào nhật ký thao tác A7.
         </p>
       </div>
     </>

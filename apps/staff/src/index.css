@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+@import '@sora/tokens/tokens.css';
+@import '@sora/tokens/fonts.css';
+
+/* Tailwind v4 chỉ dò class trong cây thư mục của app; @sora/ui đi qua node_modules
+   nên bị bỏ qua. Thiếu dòng này thì mọi class CHỈ xuất hiện trong package dùng chung
+   không được sinh CSS — nút size lg tụt từ 55px xuống 24px, dưới sàn chạm 44px. */
+@source '../../../packages/ui/src';

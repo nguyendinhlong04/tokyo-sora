@@ -10,6 +10,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
 import { branches, staff } from './identity'
 
@@ -30,15 +31,41 @@ export const stations = pgTable('stations', {
   sort: integer('sort').notNull().default(0),
 })
 
-export const categories = pgTable('categories', {
-  id: text('id').primaryKey(),
-  parentId: text('parent_id'),
-  nameVi: text('name_vi').notNull(),
-  nameEn: text('name_en'),
-  nameJa: text('name_ja'),
-  kanji: text('kanji'),
-  sort: integer('sort').notNull().default(0),
-})
+/**
+ * M10 — Cây danh mục. Không giới hạn cấp: `parentId` trỏ về chính bảng này.
+ *
+ * Danh mục là CÁCH SẮP THỰC ĐƠN, không phải thứ nghiệp vụ nào chạy theo. Đổi nhóm
+ * của một món không đụng tới định tuyến bếp (trạm nằm trên `dishes`), không đụng
+ * giá, không đụng công thức — nên kéo thả cả cây lúc đổi mùa là thao tác an toàn.
+ *
+ * Khoá ngoại tự trỏ giữ cho cây không mồ côi: xoá nhóm còn nhóm con là bị chặn ở
+ * CSDL, không chỉ ở tầng dịch vụ. Vòng lặp (A là con của B, B là con của A) thì
+ * khoá ngoại không chặn được — kiểm ở `CatalogAdminService.moveCategory`.
+ */
+export const categories = pgTable(
+  'categories',
+  {
+    id: text('id').primaryKey(),
+    parentId: text('parent_id').references((): AnyPgColumn => categories.id),
+    nameVi: text('name_vi').notNull(),
+    nameEn: text('name_en'),
+    nameJa: text('name_ja'),
+    kanji: text('kanji'),
+    /** Ảnh bìa nhóm — trang web và menu online dùng làm ảnh chặng thực đơn */
+    imageUrl: text('image_url'),
+    /**
+     * Kênh hiển thị. Tắt một kênh là cả NHÓM biến mất khỏi kênh đó; món bên trong
+     * vẫn giữ nguyên cờ của mình, nên bật lại nhóm là mọi thứ trở về như cũ.
+     */
+    onlineVisible: boolean('online_visible').notNull().default(true),
+    tableVisible: boolean('table_visible').notNull().default(true),
+    sort: integer('sort').notNull().default(0),
+  },
+  (t) => [
+    check('categories_not_own_parent', sql`${t.parentId} IS NULL OR ${t.parentId} <> ${t.id}`),
+    index('categories_parent_idx').on(t.parentId, t.sort),
+  ],
+)
 
 /**
  * Món — khai báo MỘT LẦN ở cấp chuỗi, mọi kênh chỉ đọc.
@@ -93,6 +120,22 @@ export const dishes = pgTable(
     /** Món ký của bếp — huy hiệu 名物 trên web (W1/W2/W3) và thẻ món của Table */
     signature: boolean('signature').notNull().default(false),
     active: boolean('active').notNull().default(true),
+
+    /**
+     * LỊCH BÁN (§18 "giới hạn ngày · lịch bán"; khai ở M11 nhưng dùng cho mọi món).
+     *
+     * Khác `active` ở chỗ nó có thời hạn: set Tất niên bật từ 20/12 đến 05/02 rồi
+     * tự tắt, còn `active = false` là ngừng bán cho tới khi có người bật lại tay.
+     * Khác 86 ở chỗ 86 là chuyện của một ca; lịch bán là quy tắc lặp lại.
+     */
+    saleFrom: date('sale_from'),
+    saleTo: date('sale_to'),
+    /** Bitmask thứ trong tuần: bit 0 = thứ Hai … bit 6 = Chủ nhật. 127 = cả tuần */
+    saleDays: integer('sale_days').notNull().default(127),
+    /** Phút kể từ 00:00 GIỜ CHI NHÁNH; cả hai NULL = bán suốt giờ mở cửa */
+    saleStartMinute: integer('sale_start_minute'),
+    saleEndMinute: integer('sale_end_minute'),
+
     sort: integer('sort').notNull().default(0),
   },
   (t) => [
@@ -106,6 +149,24 @@ export const dishes = pgTable(
     check(
       'dishes_routing_required',
       sql`${t.kind} = 'set' OR (${t.stationGrill} IS NOT NULL AND ${t.stationNoGrill} IS NOT NULL)`,
+    ),
+    // 0 nghĩa là không bán ngày nào — thứ đó đã có tên là `active = false`
+    check('dishes_sale_days_check', sql`${t.saleDays} BETWEEN 1 AND 127`),
+    check(
+      'dishes_sale_range_check',
+      sql`${t.saleFrom} IS NULL OR ${t.saleTo} IS NULL OR ${t.saleTo} >= ${t.saleFrom}`,
+    ),
+    /**
+     * Khung giờ khai cả cặp hoặc không khai, và không vắt qua nửa đêm: quán đóng
+     * 23:00 (§ ngày làm việc) nên khung 22:00–02:00 chắc chắn là gõ nhầm, và cho
+     * nó qua thì mọi phép so sánh giờ ở dưới phải mọc thêm một nhánh.
+     */
+    check(
+      'dishes_sale_window_check',
+      sql`(${t.saleStartMinute} IS NULL) = (${t.saleEndMinute} IS NULL)
+       AND (${t.saleStartMinute} IS NULL
+            OR (${t.saleStartMinute} BETWEEN 0 AND 1439 AND ${t.saleEndMinute} BETWEEN 1 AND 1440
+                AND ${t.saleEndMinute} > ${t.saleStartMinute}))`,
     ),
     index('dishes_category_idx').on(t.categoryId, t.sort),
   ],

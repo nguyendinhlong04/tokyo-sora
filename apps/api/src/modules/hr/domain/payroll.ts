@@ -85,6 +85,82 @@ export function splitMinutes(shift: ShiftInput, rates: PayrollRates): MinuteSpli
   return { ...empty, worked: standard, otNormal: minutes - standard }
 }
 
+/**
+ * Một ngày công THỰC TẾ, quy từ hai mốc chấm.
+ *
+ * `dayKind` không đến từ bản ghi chấm công mà từ ca đã xếp (hoặc từ lịch nghỉ/lễ
+ * của quán): loại ngày quyết định hệ số 150/200/300%, và để người chấm công tự
+ * khai loại ngày là mở cửa cho việc bấm nhầm thành ngày lễ.
+ */
+export interface WorkedDay {
+  clockIn: Date
+  /** null = đang trong ca, chưa chấm ra — ngày đó chưa tính công được */
+  clockOut: Date | null
+  breakMinutes: number
+  dayKind: DayKind
+}
+
+/** Số phút có mặt đã trừ nghỉ giữa ca; 0 khi chưa chấm ra */
+export function workedMinutesOf(day: WorkedDay): number {
+  if (day.clockOut === null) return 0
+  const span = Math.round((day.clockOut.getTime() - day.clockIn.getTime()) / 60_000)
+  if (span <= 0) throw new RangeError('Giờ ra phải sau giờ vào')
+  return Math.max(0, span - day.breakMinutes)
+}
+
+/**
+ * Chia công thực tế của một ngày thành giờ thường và giờ tăng ca.
+ *
+ * Dùng chung đúng quy tắc với `splitMinutes` để một ca ghi bằng lịch và cùng ca
+ * đó ghi bằng máy chấm công ra cùng một cách phân loại — khác nhau chỉ ở SỐ PHÚT,
+ * không ở cách hiểu luật.
+ */
+export function splitWorkedDay(day: WorkedDay, rates: PayrollRates): MinuteSplit {
+  const minutes = workedMinutesOf(day)
+  const empty = { worked: 0, otNormal: 0, otRest: 0, otHoliday: 0 }
+  if (minutes === 0) return empty
+
+  if (day.dayKind === 'nghi') return { ...empty, otRest: minutes }
+  if (day.dayKind === 'le') return { ...empty, otHoliday: minutes }
+
+  const standard = Math.min(minutes, rates.standardDailyMinutes)
+  return { ...empty, worked: standard, otNormal: minutes - standard }
+}
+
+/** Chênh lệch giữa giờ chấm và giờ xếp, phút. Dương = muộn / về sớm. */
+export interface Punctuality {
+  /** Vào muộn so với ca; âm nghĩa là đến sớm */
+  lateMinutes: number
+  /** Về sớm so với ca; âm nghĩa là ở lại thêm */
+  earlyLeaveMinutes: number
+}
+
+/**
+ * So giờ chấm với ca đã xếp.
+ *
+ * `graceMinutes` là khoảng châm chước: chấm lúc 15:02 cho ca 15:00 không phải là
+ * đi muộn, đó là người bình thường đi làm. Không có khoảng này thì H3 tô đỏ gần
+ * như tất cả mọi người mỗi ngày, và một cảnh báo lúc nào cũng đỏ là cảnh báo
+ * không ai đọc.
+ *
+ * **Đi muộn KHÔNG sinh khoản phạt.** Luật lao động Việt Nam không cho phạt tiền
+ * người lao động (§26 H6); con số này chỉ để quản lý nhìn, còn tiền thì tự khớp
+ * vì lương tính trên giờ có mặt thật.
+ */
+export function punctualityOf(
+  actual: { clockIn: Date; clockOut: Date | null },
+  shift: { startAt: Date; endAt: Date },
+  graceMinutes = 5,
+): Punctuality {
+  const diff = (a: Date, b: Date) => Math.round((a.getTime() - b.getTime()) / 60_000)
+  const late = diff(actual.clockIn, shift.startAt)
+  const early = actual.clockOut === null ? 0 : diff(shift.endAt, actual.clockOut)
+  return {
+    lateMinutes: late > graceMinutes ? late : 0,
+    earlyLeaveMinutes: early > graceMinutes ? early : 0,
+  }
+}
+
 export function sumSplits(splits: readonly MinuteSplit[]): MinuteSplit {
   return splits.reduce<MinuteSplit>(
     (acc, s) => ({

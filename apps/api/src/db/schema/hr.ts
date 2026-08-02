@@ -20,11 +20,15 @@ import { branches, staff } from './identity'
  * tự đó: không chốt công thì không tính được lương nháp, chốt rồi thì lịch của kỳ
  * đó không sửa được nữa.
  *
- * KHÔNG CÓ CHẤM CÔNG. Kiosk H10 và bảng chấm công H3 chưa dựng, nên nguồn giờ
- * công là **lịch đã công bố**: xếp ai vào ca nào thì người đó được tính công ca
- * đó. Đây là cách mọi quán chưa gắn máy chấm công vẫn đang làm, và nó đúng chừng
- * nào lịch được sửa cho khớp thực tế — nên sửa lịch của tuần đã qua là thao tác
- * có ghi nhật ký, không phải thao tác thầm lặng.
+ * Bốn bảng, bốn vai trò khác hẳn nhau:
+ *   · `schedule_entries` — DỰ ĐỊNH. Ai được xếp vào ca nào (H2).
+ *   · `time_entries`     — THỰC TẾ. Ai đã đứng ở quán bao lâu (H3 · H4).
+ *   · `leave_requests`   — NGOẠI LỆ đã được duyệt (H5).
+ *   · `payroll_*`        — TIỀN, tính từ bảng công đã chốt (H7).
+ *
+ * Lương tính từ `time_entries`, KHÔNG từ lịch xếp. Trả theo lịch nghĩa là trả cho
+ * người không đến và quỵt của người ở lại dọn — hai lỗi ngược chiều nhau mà không
+ * ai phát hiện, vì bảng lương vẫn ra một con số trông hợp lý.
  */
 
 /**
@@ -154,6 +158,126 @@ export const scheduleEntries = pgTable(
     // không phải bằng hai dòng — hai dòng sẽ làm giờ công cộng trùng phần nghỉ
     uniqueIndex('schedule_entries_one_per_day').on(t.employeeId, t.workDate),
     index('schedule_entries_grid_idx').on(t.branchId, t.workDate),
+  ],
+)
+
+/**
+ * H3 · H4 — Công THỰC TẾ. Một dòng = một người, một ngày.
+ *
+ * Vào ca và ra ca là hai mốc tuyệt đối (`timestamptz`), không phải hai số phút:
+ * ca đêm vắt qua nửa đêm thì "phút kể từ 00:00" của lúc ra nhỏ hơn lúc vào, và
+ * mọi phép trừ sau đó ra số âm. `workDate` là NGÀY LÀM VIỆC mà ca đó thuộc về,
+ * tính theo múi giờ chi nhánh — nó gắn ca 22:00–02:00 vào đúng một ngày.
+ *
+ * `source` nói con số này từ đâu ra, và đó là thông tin kiểm toán chứ không phải
+ * trang trí: giờ do kiosk ghi và giờ do quản lý gõ tay có mức tin cậy khác nhau,
+ * nên H4 hiện rõ dòng nào đã bị sửa, ai sửa và vì sao.
+ */
+export const timeEntries = pgTable(
+  'time_entries',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    branchId: text('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    employeeId: bigint('employee_id', { mode: 'number' })
+      .notNull()
+      .references(() => employees.id),
+    workDate: date('work_date').notNull(),
+    /** Ca đã xếp tương ứng; NULL khi người này đi làm mà không có trong lịch */
+    scheduleEntryId: bigint('schedule_entry_id', { mode: 'number' }).references(
+      () => scheduleEntries.id,
+    ),
+
+    clockIn: timestamp('clock_in', { withTimezone: true }).notNull(),
+    /** NULL = đang trong ca, chưa chấm ra */
+    clockOut: timestamp('clock_out', { withTimezone: true }),
+    /** Nghỉ giữa ca, phút — mặc định lấy theo ca đã xếp */
+    breakMinutes: integer('break_minutes').notNull().default(0),
+
+    /** 'kiosk' H10 · 'manual' quản lý gõ ở H4 · 'pos' suy từ phiên đăng nhập */
+    source: text('source').notNull().default('kiosk'),
+    /** Ảnh chụp lúc chấm (bật/tắt ở A6) — đường dẫn, chưa có kho ảnh nên để trống */
+    photoUrl: text('photo_url'),
+
+    /** Bắt buộc khi có sửa tay: §4.2b "sửa công tay kèm lý do, ghi nhật ký" */
+    editReason: text('edit_reason'),
+    editedBy: bigint('edited_by', { mode: 'number' }).references(() => staff.id),
+    editedAt: timestamp('edited_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('time_entries_source_check', sql`${t.source} IN ('kiosk','manual','pos')`),
+    check('time_entries_order_check', sql`${t.clockOut} IS NULL OR ${t.clockOut} > ${t.clockIn}`),
+    check('time_entries_break_nonneg', sql`${t.breakMinutes} >= 0`),
+    // Sửa tay mà không nói lý do thì bảng công mất đường truy ngược
+    check(
+      'time_entries_edit_reason_check',
+      sql`${t.source} <> 'manual' OR ${t.editReason} IS NOT NULL`,
+    ),
+    // Một người một ngày một bản ghi công: ca gãy khai bằng `break_minutes`, cùng
+    // quy ước với `schedule_entries` — hai dòng sẽ cộng trùng phần nghỉ
+    uniqueIndex('time_entries_one_per_day').on(t.employeeId, t.workDate),
+    index('time_entries_board_idx').on(t.branchId, t.workDate),
+  ],
+)
+
+/**
+ * H5 — Yêu cầu nghỉ và đổi ca.
+ *
+ * Một bảng cho hai loại vì chúng đi qua CÙNG một hàng đợi duyệt và cùng một hệ
+ * quả: duyệt xong thì lịch H2 và bảng công H4 đổi theo. Tách hai bảng chỉ để rồi
+ * viết hai lần cùng một luồng duyệt.
+ *
+ * Đổi ca có `counterpartId` — người nhận ca. Quy tắc "quản lý duyệt cả cặp" (§26
+ * H5) nghĩa là một bản ghi mang cả hai người, không phải hai bản ghi rời có thể
+ * bị duyệt lệch nhau.
+ */
+export const leaveRequests = pgTable(
+  'leave_requests',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    branchId: text('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    employeeId: bigint('employee_id', { mode: 'number' })
+      .notNull()
+      .references(() => employees.id),
+    /** 'nghi-phep' · 'nghi-khong-luong' · 'nghi-om' · 'doi-ca' */
+    kind: text('kind').notNull(),
+    fromDate: date('from_date').notNull(),
+    toDate: date('to_date').notNull(),
+    /** Người nhận ca — chỉ với `kind = 'doi-ca'` */
+    counterpartId: bigint('counterpart_id', { mode: 'number' }).references(() => employees.id),
+    reason: text('reason').notNull(),
+
+    state: text('state').notNull().default('pending'),
+    decidedBy: bigint('decided_by', { mode: 'number' }).references(() => staff.id),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    /** Lý do từ chối — người bị từ chối có quyền biết vì sao */
+    decisionNote: text('decision_note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check(
+      'leave_requests_kind_check',
+      sql`${t.kind} IN ('nghi-phep','nghi-khong-luong','nghi-om','doi-ca')`,
+    ),
+    check('leave_requests_state_check', sql`${t.state} IN ('pending','approved','rejected')`),
+    check('leave_requests_range_check', sql`${t.toDate} >= ${t.fromDate}`),
+    // Đổi ca phải có người nhận; nghỉ phép thì không
+    check(
+      'leave_requests_counterpart_check',
+      sql`(${t.kind} = 'doi-ca' AND ${t.counterpartId} IS NOT NULL)
+       OR (${t.kind} <> 'doi-ca' AND ${t.counterpartId} IS NULL)`,
+    ),
+    check('leave_requests_not_self', sql`${t.counterpartId} IS DISTINCT FROM ${t.employeeId}`),
+    // Đã quyết thì phải có người quyết và lúc quyết
+    check(
+      'leave_requests_decided_check',
+      sql`${t.state} = 'pending' OR (${t.decidedBy} IS NOT NULL AND ${t.decidedAt} IS NOT NULL)`,
+    ),
+    index('leave_requests_queue_idx').on(t.branchId, t.state, t.fromDate),
   ],
 )
 

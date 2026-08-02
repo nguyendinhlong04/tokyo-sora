@@ -34,6 +34,9 @@ let shiftLead: string
 let orderId: number
 let secondOrderId: number
 let invoiceId: number
+/** Phiếu chi và tờ hoá đơn đầu vào của nhóm bài C5 · F4 */
+let voucherId: number
+let inputInvoiceId: number
 
 /** Tháng đã qua — F6 chỉ khoá được tháng đã kết thúc */
 const CLOSED_MONTH = '2026-06-01'
@@ -299,7 +302,11 @@ describe('F4 — Báo cáo thuế', () => {
     expect(body.summary.vatOutVnd).toBe(120_000)
   })
 
-  it('VAT đầu vào lấy từ phiếu chi đã duyệt', async () => {
+  /**
+   * Đây là ranh giới của C5, và nó là ranh giới về TIỀN THẬT: gõ số VAT lên phiếu
+   * chi không làm khoản đó được khấu trừ. Điều kiện khấu trừ là có tờ hoá đơn.
+   */
+  it('VAT gõ trên phiếu chi mà KHÔNG có hoá đơn thì không vào tờ khai', async () => {
     const created = await inject({
       method: 'POST',
       url: '/api/expenses/vouchers',
@@ -320,10 +327,11 @@ describe('F4 — Báo cáo thuế', () => {
       },
     })
     expect(created.statusCode, created.payload).toBe(201)
+    voucherId = created.json<{ id: number }>().id
     // 1.100.000 trên hạn mức chi vặt ⇒ chờ duyệt; chủ duyệt vì kế toán là người ghi
     await inject({
       method: 'POST',
-      url: `/api/expenses/vouchers/${created.json().id}/approve`,
+      url: `/api/expenses/vouchers/${voucherId}/approve`,
       headers: bearer(owner),
     })
 
@@ -332,8 +340,174 @@ describe('F4 — Báo cáo thuế', () => {
       url: `/api/accounting/tax-report?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
       headers: bearer(accountant),
     })
+    expect(res.json().summary.vatInVnd).toBe(0)
+    expect(res.json().vatInInvoices).toBe(0)
+  })
+
+  it('C5 nêu đúng phiếu chi lớn còn thiếu hoá đơn', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/expenses/input-invoices?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
+      headers: bearer(accountant),
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.json().missingVouchers.map((v: { id: number }) => v.id)).toContain(voucherId)
+    expect(res.json().declaredButUndocumentedVnd).toBe(100_000)
+  })
+
+  it('ghi hoá đơn vào thì VAT mới được khấu trừ', async () => {
+    const created = await inject({
+      method: 'POST',
+      url: '/api/expenses/input-invoices',
+      headers: bearer(accountant),
+      payload: {
+        branchId: fx.branchId,
+        voucherId,
+        sellerName: 'Chủ nhà',
+        sellerTaxCode: '0101234567',
+        invoiceNo: '00012345',
+        serial: '1C26TAA',
+        issuedOn: IN_CLOSED,
+        netVnd: 1_000_000,
+        vatVnd: 100_000,
+        deductible: true,
+        note: null,
+      },
+    })
+    expect(created.statusCode, created.payload).toBe(201)
+    inputInvoiceId = created.json<{ id: number }>().id
+
+    const res = await inject({
+      method: 'GET',
+      url: `/api/accounting/tax-report?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
+      headers: bearer(accountant),
+    })
     expect(res.json().summary.vatInVnd).toBe(100_000)
     expect(res.json().summary.vatPayableVnd).toBe(20_000)
+    expect(res.json().vatInInvoices).toBe(1)
+  })
+
+  it('hoá đơn đó không còn nằm trong danh sách thiếu', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/expenses/input-invoices?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
+      headers: bearer(accountant),
+    })
+    expect(res.json().missingVouchers.map((v: { id: number }) => v.id)).not.toContain(voucherId)
+    expect(res.json().deductibleVnd).toBe(100_000)
+  })
+
+  it('cùng người bán không ghi hai lần cùng một số hoá đơn', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/expenses/input-invoices',
+      headers: bearer(accountant),
+      payload: {
+        branchId: fx.branchId,
+        voucherId: null,
+        sellerName: 'Chủ nhà',
+        sellerTaxCode: '0101234567',
+        invoiceNo: '00012345',
+        serial: null,
+        issuedOn: IN_CLOSED,
+        netVnd: 500_000,
+        vatVnd: 50_000,
+        deductible: true,
+        note: null,
+      },
+    })
+    expect(res.statusCode).toBe(409)
+  })
+
+  it('VAT vượt tiền trước thuế bị chặn — nhiều khả năng gõ nhầm cột', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/expenses/input-invoices',
+      headers: bearer(accountant),
+      payload: {
+        branchId: fx.branchId,
+        voucherId: null,
+        sellerName: 'Nhà cung cấp lạ',
+        sellerTaxCode: '0109999999',
+        invoiceNo: '00099999',
+        serial: null,
+        issuedOn: IN_CLOSED,
+        netVnd: 100_000,
+        vatVnd: 1_000_000,
+        deductible: true,
+        note: null,
+      },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('tổng hoá đơn gắn vào một phiếu không vượt số đã chi', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/expenses/input-invoices',
+      headers: bearer(accountant),
+      payload: {
+        branchId: fx.branchId,
+        voucherId,
+        sellerName: 'Chủ nhà',
+        sellerTaxCode: '0101234567',
+        invoiceNo: '00012346',
+        serial: null,
+        issuedOn: IN_CLOSED,
+        netVnd: 900_000,
+        vatVnd: 90_000,
+        deductible: true,
+        note: null,
+      },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().message).toContain('vượt số đã chi')
+  })
+
+  /**
+   * Hoá đơn có thật nhưng không được khấu trừ vẫn phải ghi nhận — xoá đi rồi quên
+   * là đã có thì lần đối chiếu sau không ai hiểu vì sao thiếu một tờ.
+   */
+  it('đánh dấu không khấu trừ thì tờ hoá đơn còn đó nhưng rời khỏi tờ khai', async () => {
+    const patched = await inject({
+      method: 'PUT',
+      url: `/api/expenses/input-invoices/${inputInvoiceId}`,
+      headers: bearer(accountant),
+      payload: { deductible: false },
+    })
+    expect(patched.statusCode, patched.payload).toBe(200)
+
+    const book = await inject({
+      method: 'GET',
+      url: `/api/expenses/input-invoices?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
+      headers: bearer(accountant),
+    })
+    expect(book.json().rows).toHaveLength(1)
+    expect(book.json().deductibleVnd).toBe(0)
+
+    const tax = await inject({
+      method: 'GET',
+      url: `/api/accounting/tax-report?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
+      headers: bearer(accountant),
+    })
+    expect(tax.json().summary.vatInVnd).toBe(0)
+
+    // Trả lại cho các bài sau
+    await inject({
+      method: 'PUT',
+      url: `/api/expenses/input-invoices/${inputInvoiceId}`,
+      headers: bearer(accountant),
+      payload: { deductible: true },
+    })
+  })
+
+  it('quản lý ca không mở được sổ hoá đơn đầu vào', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/expenses/input-invoices?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
+      headers: bearer(shiftLead),
+    })
+    expect(res.statusCode).toBe(403)
   })
 
   it('đối chiếu HĐĐT với doanh thu hệ thống — lệch thì nêu đúng số chênh', async () => {
@@ -374,14 +548,27 @@ describe('F5 — Công nợ hai chiều', () => {
     expect(res.json().payable.note).toContain('chưa phải sổ công nợ')
   })
 
-  it('phải thu để trống kèm tên hai màn còn thiếu', async () => {
+  /**
+   * Tab Phải thu đọc dòng ghi nợ công ty của B15. Chưa có công ty nào thì bảng
+   * rỗng — nhưng rỗng có CẤU TRÚC, không phải một ô chặn: ngày mai kế toán khai
+   * hồ sơ đầu tiên là con số chạy, không phải đợi sửa mã nguồn.
+   */
+  it('phải thu đọc công nợ khách doanh nghiệp của B15, chia bốn khoang tuổi nợ', async () => {
     const res = await inject({
       method: 'GET',
       url: `/api/accounting/debts?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
       headers: bearer(accountant),
     })
-    expect(res.json().receivable.value).toBeNull()
-    expect(res.json().receivable.blockedBy).toContain('B15')
+    const receivable = res.json().receivable
+    expect(receivable.companies).toEqual([])
+    expect(receivable.totals).toMatchObject({
+      currentVnd: 0,
+      d0to30Vnd: 0,
+      d31to60Vnd: 0,
+      over60Vnd: 0,
+      totalVnd: 0,
+    })
+    expect(receivable.note).toContain('NGÀY ĐẾN HẠN')
   })
 })
 

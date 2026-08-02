@@ -4,11 +4,15 @@ import {
   computePayrollLine,
   formatMinutes,
   hourlyRateOf,
+  punctualityOf,
   shiftMinutes,
   splitMinutes,
+  splitWorkedDay,
   sumSplits,
+  workedMinutesOf,
   type EmployeePay,
   type ShiftInput,
+  type WorkedDay,
 } from './payroll'
 
 const shift = (over: Partial<ShiftInput> = {}): ShiftInput => ({
@@ -231,5 +235,109 @@ describe('hiển thị giờ', () => {
     expect(formatMinutes(510)).toBe('8g30')
     expect(formatMinutes(485)).toBe('8g05')
     expect(formatMinutes(0)).toBe('0g')
+  })
+})
+
+// ===========================================================================
+
+const at = (iso: string) => new Date(iso)
+
+const worked = (over: Partial<WorkedDay> = {}): WorkedDay => ({
+  clockIn: at('2026-08-03T08:00:00+07:00'),
+  clockOut: at('2026-08-03T16:00:00+07:00'),
+  breakMinutes: 0,
+  dayKind: 'thuong',
+  ...over,
+})
+
+describe('công thực tế từ hai mốc chấm (H3 · H4)', () => {
+  it('trừ nghỉ giữa ca như ca xếp', () => {
+    expect(workedMinutesOf(worked({ clockOut: at('2026-08-03T17:00:00+07:00'), breakMinutes: 60 }))).toBe(8 * 60)
+  })
+
+  it('chưa chấm ra thì chưa có công — không đoán bằng giờ tan ca theo lịch', () => {
+    expect(workedMinutesOf(worked({ clockOut: null }))).toBe(0)
+    expect(splitWorkedDay(worked({ clockOut: null }), DEFAULT_RATES)).toEqual({
+      worked: 0,
+      otNormal: 0,
+      otRest: 0,
+      otHoliday: 0,
+    })
+  })
+
+  /**
+   * Ca đêm là chỗ mà "phút kể từ 00:00" hỏng: 02:00 nhỏ hơn 22:00 nên mọi phép
+   * trừ ra số âm. Hai mốc tuyệt đối thì không có vấn đề đó.
+   */
+  it('ca vắt qua nửa đêm ra đúng số giờ, không ra số âm', () => {
+    const dem = worked({
+      clockIn: at('2026-08-03T22:00:00+07:00'),
+      clockOut: at('2026-08-04T02:30:00+07:00'),
+    })
+    expect(workedMinutesOf(dem)).toBe(4 * 60 + 30)
+  })
+
+  it('giờ ra trước giờ vào bị chặn', () => {
+    expect(() =>
+      workedMinutesOf(worked({ clockOut: at('2026-08-03T07:00:00+07:00') })),
+    ).toThrow()
+  })
+
+  it('phân loại tăng ca giống hệt cách phân loại của ca xếp', () => {
+    const chuNhat = worked({ clockOut: at('2026-08-03T14:00:00+07:00'), dayKind: 'nghi' })
+    expect(splitWorkedDay(chuNhat, DEFAULT_RATES)).toEqual({
+      worked: 0,
+      otNormal: 0,
+      otRest: 6 * 60,
+      otHoliday: 0,
+    })
+
+    const daiNgay = worked({ clockOut: at('2026-08-03T18:00:00+07:00') })
+    expect(splitWorkedDay(daiNgay, DEFAULT_RATES)).toEqual({
+      worked: 8 * 60,
+      otNormal: 2 * 60,
+      otRest: 0,
+      otHoliday: 0,
+    })
+  })
+
+  /**
+   * Cùng một ca, ghi bằng lịch và ghi bằng máy chấm công phải ra cùng cách hiểu
+   * luật — khác nhau chỉ ở số phút có mặt.
+   */
+  it('cùng số phút thì chia giống hệt splitMinutes của lịch xếp', () => {
+    const byShift = splitMinutes(shift({ endMinute: 18 * 60 }), DEFAULT_RATES)
+    const byClock = splitWorkedDay(worked({ clockOut: at('2026-08-03T18:00:00+07:00') }), DEFAULT_RATES)
+    expect(byClock).toEqual(byShift)
+  })
+})
+
+describe('đối chiếu giờ chấm với ca xếp (H3)', () => {
+  const ca = { startAt: at('2026-08-03T15:00:00+07:00'), endAt: at('2026-08-03T23:00:00+07:00') }
+
+  it('chấm trong khoảng châm chước không phải đi muộn', () => {
+    const p = punctualityOf({ clockIn: at('2026-08-03T15:02:00+07:00'), clockOut: null }, ca)
+    expect(p.lateMinutes).toBe(0)
+  })
+
+  it('muộn quá khoảng châm chước thì đếm đủ số phút, không trừ phần châm chước', () => {
+    const p = punctualityOf({ clockIn: at('2026-08-03T15:20:00+07:00'), clockOut: null }, ca)
+    expect(p.lateMinutes).toBe(20)
+  })
+
+  it('đến sớm và ở lại thêm đều về 0, không thành số âm trên bảng', () => {
+    const p = punctualityOf(
+      { clockIn: at('2026-08-03T14:40:00+07:00'), clockOut: at('2026-08-03T23:40:00+07:00') },
+      ca,
+    )
+    expect(p).toEqual({ lateMinutes: 0, earlyLeaveMinutes: 0 })
+  })
+
+  it('về sớm đếm được, nhưng chưa chấm ra thì chưa kết luận', () => {
+    expect(
+      punctualityOf({ clockIn: ca.startAt, clockOut: at('2026-08-03T22:00:00+07:00') }, ca)
+        .earlyLeaveMinutes,
+    ).toBe(60)
+    expect(punctualityOf({ clockIn: ca.startAt, clockOut: null }, ca).earlyLeaveMinutes).toBe(0)
   })
 })

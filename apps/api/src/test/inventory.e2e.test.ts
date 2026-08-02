@@ -199,16 +199,34 @@ describe('M7 — Nguyên liệu', () => {
 // ------------------------------------------------------- Nhập kho
 
 describe('Nhập kho & giá bình quân gia quyền di động', () => {
-  it('lô đầu tiên quyết định giá bình quân', async () => {
+  /**
+   * Ba chỉ bò và keg khai `lotRequired`, nên chúng đi qua cửa nhập ĐẦY ĐỦ (S5)
+   * chứ không qua cửa nhập nhanh của M7 — cửa kia không hỏi số lô, và cho nó
+   * nhận hàng bắt buộc lô là mở đường vòng qua chính ràng buộc của §25.
+   */
+  it('nhập nhanh TỪ CHỐI hàng bắt buộc lô — ràng buộc có đường vòng là ràng buộc không tồn tại', async () => {
     const res = await inject({
       method: 'POST',
       url: '/api/inventory/receipts',
+      headers: asOwner(),
+      payload: { branchId: fx.branchId, ingredientId: BO.id, qtyPurchase: 12, totalVnd: 3_420_000 },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toContain('bắt buộc khai lô')
+  })
+
+  it('lô đầu tiên quyết định giá bình quân', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/warehouse/receipts',
       headers: asOwner(),
       payload: {
         branchId: fx.branchId,
         ingredientId: BO.id,
         qtyPurchase: 12,
         totalVnd: 3_420_000,
+        lotCode: 'BO-01',
+        expiresOn: '2026-12-31',
       },
     })
     expect(res.statusCode, res.payload).toBe(201)
@@ -221,9 +239,16 @@ describe('Nhập kho & giá bình quân gia quyền di động', () => {
     // Còn 12.000g @285₫, nhập thêm 8.000g @300₫ ⇒ (3.420.000 + 2.400.000)/20.000 = 291₫
     const res = await inject({
       method: 'POST',
-      url: '/api/inventory/receipts',
+      url: '/api/warehouse/receipts',
       headers: asOwner(),
-      payload: { branchId: fx.branchId, ingredientId: BO.id, qtyPurchase: 8, totalVnd: 2_400_000 },
+      payload: {
+        branchId: fx.branchId,
+        ingredientId: BO.id,
+        qtyPurchase: 8,
+        totalVnd: 2_400_000,
+        lotCode: 'BO-02',
+        expiresOn: '2027-01-15',
+      },
     })
     expect(res.statusCode).toBe(201)
     expect(res.json().costPerBaseMilli).toBe(291_000)
@@ -233,11 +258,18 @@ describe('Nhập kho & giá bình quân gia quyền di động', () => {
   it('quy đổi từ đơn vị mua: 2 keg 20L thành 40.000ml', async () => {
     const res = await inject({
       method: 'POST',
-      url: '/api/inventory/receipts',
+      url: '/api/warehouse/receipts',
       headers: asOwner(),
-      payload: { branchId: fx.branchId, ingredientId: KEG.id, qtyPurchase: 2, totalVnd: 2_400_000 },
+      payload: {
+        branchId: fx.branchId,
+        ingredientId: KEG.id,
+        qtyPurchase: 2,
+        totalVnd: 2_400_000,
+        lotCode: 'KEG-01',
+        expiresOn: '2027-03-01',
+      },
     })
-    expect(res.statusCode).toBe(201)
+    expect(res.statusCode, res.payload).toBe(201)
     expect(await stockOf(KEG.id)).toBe(40_000)
     // 2.400.000₫ / 40.000ml = 60₫/ml
     expect(res.json().costPerBaseMilli).toBe(60_000)
@@ -849,6 +881,23 @@ describe('Công thức mở khoá food cost ở B1 · B3 · F7', () => {
       headers: asOwner(),
       payload: { branchId: fx.branchId, weekStart: monday, employeeId, cells: [] },
     })
+
+    // Lương tính từ CÔNG THỰC TẾ, không từ lịch xếp — ghi công đúng ca đã xếp
+    const punched = await inject({
+      method: 'POST',
+      url: '/api/hr/timesheet',
+      headers: asOwner(),
+      payload: {
+        branchId: fx.branchId,
+        employeeId,
+        workDate: today,
+        clockIn: '08:00',
+        clockOut: '16:00',
+        breakMinutes: 0,
+        reason: 'Nhập từ sổ chấm công giấy',
+      },
+    })
+    expect(punched.statusCode, punched.payload).toBe(201)
 
     const period = await inject({
       method: 'POST',

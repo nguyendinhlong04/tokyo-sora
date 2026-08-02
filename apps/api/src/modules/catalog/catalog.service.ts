@@ -14,6 +14,7 @@ import {
 } from '../../db/schema'
 import type { SetDefinition } from '../kitchen/domain/explode'
 import type { DishRouting } from '../kitchen/domain/routing'
+import { scheduleOf, type SaleSchedule } from './domain/sale-window'
 
 export interface CatalogDish {
   id: string
@@ -23,6 +24,8 @@ export interface CatalogDish {
   /** Giá đã áp ghi đè theo chi nhánh — đây là giá sẽ ĐÓNG BĂNG vào dòng đơn */
   price: number
   routing: DishRouting | null
+  /** Lịch bán M11 — chỗ duy nhất mọi cửa gọi món đi qua, nên cũng là chỗ cưỡng chế */
+  schedule: SaleSchedule
 }
 
 /**
@@ -78,6 +81,7 @@ export class CatalogService {
                 prepSeconds: dish.prepSeconds,
               }
             : null,
+        schedule: scheduleOf(dish),
       })
     }
     return out

@@ -12,6 +12,7 @@ import { DB } from '../../common/db.module'
 import { nextDisplayCode } from '../../common/display-code'
 import { emit } from '../../common/outbox'
 import { ParamsService } from '../../common/params.service'
+import { CustomersService } from '../crm/customers.service'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import { branches, reservationHolds, reservations, tables } from '../../db/schema'
@@ -66,6 +67,7 @@ export class ReservationsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly params: ParamsService,
+    private readonly customers: CustomersService,
   ) {}
 
   // ------------------------------------------------------------ tham số
@@ -255,6 +257,17 @@ export class ReservationsService {
           businessDate,
         })
         .returning()
+
+      /**
+       * §25 B12: Sổ khách "gom tự động từ đặt bàn + đơn online + hoá đơn". Đây là
+       * nguồn thứ nhất. Gom ngay lúc đặt chứ không quét lại về sau: một job quét
+       * là một job có ngày chạy lỗi mà không ai biết.
+       */
+      await this.customers.touch(tx, {
+        phone: input.phone,
+        name: input.name.trim(),
+        businessDate,
+      })
 
       // Suất giữ mềm chuyển thành đặt chỗ thật — giữ lại dòng để không đếm hai lần
       if (ownHold) {

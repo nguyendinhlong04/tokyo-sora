@@ -15,6 +15,7 @@ import {
   approvals,
   branches,
   expenseVouchers,
+  inputInvoices,
   invoices,
   journalEntries,
   orders,
@@ -24,6 +25,7 @@ import {
   staff,
   stockMoves,
 } from '../../db/schema'
+import { CorporateService } from '../crm/corporate.service'
 import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
@@ -58,6 +60,7 @@ export class AccountingService {
     private readonly params: ParamsService,
     private readonly approvals: ApprovalService,
     private readonly audit: AuditService,
+    private readonly corporate: CorporateService,
   ) {}
 
   // =================================== F2 · Nhật ký doanh thu & điều chỉnh
@@ -422,15 +425,23 @@ export class AccountingService {
       orderRows.map((r) => ({ netVnd: Number(r.netVnd), vatVnd: Number(r.vatVnd) })),
     )
 
+    /**
+     * VAT đầu vào lấy từ SỔ HOÁ ĐƠN C5, không từ con số gõ trên phiếu chi.
+     *
+     * Số trên phiếu là ý định của người ghi; tờ hoá đơn mới là bằng chứng, và
+     * điều kiện được khấu trừ là có bằng chứng. Chi 5 triệu tiền chợ không hoá
+     * đơn thì tiền vẫn ra mà VAT không đòi lại được — nếu F4 cộng cả số đó thì
+     * tờ khai thuế khai thừa, và người phát hiện ra sẽ là cơ quan thuế.
+     */
     const [vatIn] = await this.db
-      .select({ vat: money(expenseVouchers.vatVnd) })
-      .from(expenseVouchers)
+      .select({ vat: money(inputInvoices.vatVnd), count: sql<number>`count(*)::int` })
+      .from(inputInvoices)
       .where(
         and(
-          eq(expenseVouchers.branchId, branchId),
-          eq(expenseVouchers.state, 'approved'),
-          gte(expenseVouchers.paidOn, from),
-          lte(expenseVouchers.paidOn, to),
+          eq(inputInvoices.branchId, branchId),
+          eq(inputInvoices.deductible, true),
+          gte(inputInvoices.issuedOn, from),
+          lte(inputInvoices.issuedOn, to),
         ),
       )
 
@@ -490,8 +501,10 @@ export class AccountingService {
         systemOrders: Number(system?.count ?? 0),
         issuedInvoices: Number(invoiced?.count ?? 0),
       },
+      /** Bao nhiêu tờ hoá đơn đứng sau con số khấu trừ — kế toán cần biết trước khi ký tờ khai */
+      vatInInvoices: Number(vatIn?.count ?? 0),
       vatInNote:
-        'VAT đầu vào lấy từ ô VAT trên phiếu chi đã duyệt (C2). Sổ hoá đơn đầu vào riêng (C5) chưa dựng nên chưa đối chiếu được với hoá đơn giấy của nhà cung cấp.',
+        'VAT đầu vào lấy từ sổ hoá đơn đầu vào C5 — chỉ những tờ đánh dấu được khấu trừ. Số VAT gõ trên phiếu chi KHÔNG vào đây: không có hoá đơn thì không khấu trừ được, và C5 liệt kê những phiếu chi lớn còn thiếu hoá đơn.',
       pitNote:
         'TNCN là số đã tạm khấu trừ trên bảng lương. Tỉ lệ đặt ở A6 và mặc định bằng 0 — biểu thuế luỹ tiến chưa cài, kế toán phải xác nhận trước khi nộp tờ khai.',
     }
@@ -506,8 +519,12 @@ export class AccountingService {
    * một tín hiệu THẬT tính được ngay từ dữ liệu đang có — phiếu nhập kho chưa có
    * phiếu chi nào đối ứng. Đó đúng là một khoản đang nợ nhà cung cấp.
    *
-   * PHẢI THU: cần hồ sơ khách doanh nghiệp (B15) và hình thức "ghi nợ công ty" ở
-   * P10. Cả hai chưa có, và không suy ra được từ đâu cả.
+   * PHẢI THU: đọc thẳng dòng ghi nợ công ty của B15 qua `CorporateService`. Không
+   * tính lại tuổi nợ ở đây — hai miền cùng tính một con số là hai màn sẽ có ngày
+   * báo hai số khác nhau, và không ai biết số nào đúng.
+   *
+   * Phải thu là số của CẢ CHUỖI chứ không của riêng chi nhánh: một công ty ăn ở
+   * ba chi nhánh vẫn nợ một hợp đồng, và kế toán đòi một lần.
    */
   async debts(branchId: string, from: string, to: string) {
     const receipts = await this.db
@@ -542,6 +559,9 @@ export class AccountingService {
       )
 
     const receivedVnd = receipts.reduce((sum, r) => sum + Number(r.costVnd), 0)
+    // Tuổi nợ tính tới ngày CUỐI KỲ đang xem, không tới hôm nay: mở lại báo cáo
+    // tháng trước phải ra đúng con số của tháng trước
+    const receivable = await this.corporate.receivables(to)
 
     return {
       branchId,
@@ -557,9 +577,9 @@ export class AccountingService {
           'Đây là tín hiệu thô, chưa phải sổ công nợ: nhập kho chưa gắn được với phiếu chi tương ứng vì đơn đặt hàng (S4) và hồ sơ nhà cung cấp (S3) chưa dựng. Hạn trả và lịch trả tuần cũng nằm ở S3/S4.',
       },
       receivable: {
-        value: null,
-        blockedBy:
-          'Phải thu khách doanh nghiệp cần hồ sơ khách DN (B15) và hình thức "ghi nợ công ty" ở P10 — cả hai chưa dựng',
+        ...receivable,
+        note:
+          'Tuổi nợ đếm từ NGÀY ĐẾN HẠN của từng bill ghi nợ, không từ ngày ăn. Số này của cả chuỗi: một công ty ăn ở ba chi nhánh vẫn nợ một hợp đồng.',
       },
     }
   }

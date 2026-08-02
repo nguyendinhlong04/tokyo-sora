@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { checkPermission, type ActionKey } from '@sora/contracts'
-import { actorRoles } from './actor'
+import { actorRoles, SELF_SERVICE_ACTION } from './actor'
 import type { RequestWithActor } from './auth.guard'
 
 export const REQUIRED_PERMISSION = 'sora:permission'
@@ -35,6 +35,20 @@ export class PermissionGuard implements CanActivate {
 
     const req = context.switchToHttp().getRequest<RequestWithActor>()
     if (!req.actor) throw new ForbiddenException('Chưa xác định được người thao tác')
+
+    /**
+     * Phiên Kênh nhân viên dừng ở đây với mọi thứ ngoài việc của chính mình.
+     *
+     * Chốt chặn nằm TRƯỚC ma trận quyền chứ không phải trong nó: ma trận nói vai
+     * trò này được làm gì, còn dòng này nói cái link mở trên điện thoại cá nhân
+     * thì mở được tới đâu. Trộn hai câu đó vào nhau là phải thêm một cột vào bảng
+     * §4.2 cho mỗi cách đăng nhập mới.
+     */
+    if (req.actor.kind === 'staff' && req.actor.scope === 'self' && action !== SELF_SERVICE_ACTION) {
+      throw new ForbiddenException(
+        'Kênh nhân viên chỉ mở lịch, công và phiếu lương của chính bạn. Việc quản lý cần đăng nhập ở máy của quán.',
+      )
+    }
 
     if (checkPermission(action, actorRoles(req.actor)) === 'deny') {
       throw new ForbiddenException(`Vai trò hiện tại không được phép: ${action}`)

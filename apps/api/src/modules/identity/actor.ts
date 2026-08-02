@@ -15,6 +15,15 @@ export type Actor =
       sessionId: number
       fullName: string
       /**
+       * 'self' = phiên Kênh nhân viên (H8 · H9), mở bằng link cá nhân + PIN.
+       *
+       * Người vẫn mang đủ vai trò của họ — điều đổi là PHẠM VI: PermissionGuard
+       * chỉ cho phiên này đi qua đúng `staff.view-own-record`. Giới hạn ở guard
+       * chứ không ở vai trò, vì cắt vai trò sẽ làm chính người đó không đọc nổi
+       * hồ sơ của mình.
+       */
+      scope: 'full' | 'self'
+      /**
        * Trạm của THIẾT BỊ người này đang đứng, không phải thuộc tính của người.
        * Bếp trưởng đi qua màn ST-02 thì thấy vé ST-02; sang màn ST-06 thấy vé
        * ST-06. Nếu không mang theo thông tin này thì màn bếp mất trạm ngay khi
@@ -88,6 +97,16 @@ export function assertOwnTableSession(actor: Actor, sessionId: number): void {
     throw new ForbiddenException('Mã QR này không mở được bàn khác')
   }
 }
+
+/**
+ * Hành động duy nhất mà phiên Kênh nhân viên mở được.
+ *
+ * Một khoá, không phải một danh sách: mọi thứ H8 · H9 cần — lịch của tôi, công
+ * của tôi, phiếu lương của tôi, gửi yêu cầu nghỉ — đều nằm dưới đúng khoá này ở
+ * §4.2b. Danh sách nhiều dòng sẽ dài ra theo thời gian cho tới lúc không ai nói
+ * được nó chứa gì.
+ */
+export const SELF_SERVICE_ACTION = 'staff.view-own-record'
 
 /** Ghi vào audit_log.actor_kind / actor_id */
 export function actorRef(actor: Actor): { kind: string; id: string | null } {

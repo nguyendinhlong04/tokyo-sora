@@ -28,6 +28,11 @@ const OfficeLoginBody = z.object({
   password: z.string().min(8).max(200),
 })
 
+const ChannelLoginBody = z.object({
+  token: z.string().min(20).max(200),
+  pin: z.string().regex(/^\d{4,6}$/, 'PIN gồm 4–6 chữ số'),
+})
+
 @Controller('api/auth')
 export class IdentityController {
   constructor(private readonly identity: IdentityService) {}
@@ -118,6 +123,34 @@ export class IdentityController {
         id: result.actor.kind === 'staff' ? result.actor.staffId : null,
         fullName: result.actor.kind === 'staff' ? result.actor.fullName : null,
         roles: result.actor.kind === 'staff' ? result.actor.roles : [],
+      },
+    }
+  }
+
+  /**
+   * H8 · H9 Kênh nhân viên: link cá nhân + PIN.
+   *
+   * `@Public` vì đây là cửa vào — link chính là thứ chứng minh người bấm đang cầm
+   * đường dẫn được cấp riêng cho họ. Phiên sinh ra mang phạm vi `self`, nên nó
+   * KHÔNG mở được bất cứ màn vận hành nào dù người đó là thu ngân hay bếp trưởng.
+   */
+  @Public()
+  @Post('channel/login')
+  async channelLogin(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    const input = ChannelLoginBody.parse(body)
+    const result = await this.identity.loginWithChannelToken(input)
+    reply.setCookie(STAFF_COOKIE, result.token, {
+      httpOnly: true,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      expires: result.expiresAt,
+    })
+    return {
+      expiresAt: result.expiresAt,
+      staff: {
+        fullName: result.actor.kind === 'staff' ? result.actor.fullName : null,
+        branchId: result.actor.kind === 'staff' ? result.actor.branchId : null,
       },
     }
   }

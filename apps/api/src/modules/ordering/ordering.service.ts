@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common'
 import { computeOrderTotals, rooms, type OrderLineInput } from '@sora/contracts'
 import { and, asc, eq, sql } from 'drizzle-orm'
-import { businessDateOf } from '../../common/business-date'
+import { businessDateOf, minuteOfDayIn } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { nextDisplayCode, orderNumberOf } from '../../common/display-code'
 import { emit, type DomainEvent } from '../../common/outbox'
@@ -27,6 +27,7 @@ import {
   tickets,
 } from '../../db/schema'
 import { CatalogService } from '../catalog/catalog.service'
+import { describeSchedule, isOnSale } from '../catalog/domain/sale-window'
 import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
@@ -151,12 +152,32 @@ export class OrderingService {
       actor: Actor
     },
   ) {
+    /**
+     * Mốc thời gian để soi lịch bán (M11), lấy MỘT LẦN cho cả lượt gọi: mười món
+     * thêm cùng một phiếu order phải cùng đọc một cái đồng hồ.
+     *
+     * Dùng giờ HIỆN TẠI chứ không phải `order.businessDate`: đơn mở lúc 11 giờ
+     * vẫn có thể thêm món lúc 14 giờ, và suất trưa thì đã hết lúc 14 giờ. Đơn
+     * online đặt trước cho khung giờ sau là ngoại lệ chưa xử — nó cũng đi qua đây
+     * và bị soi theo giờ đặt chứ không phải giờ giao.
+     */
+    const [branch] = await tx
+      .select({ timezone: branches.timezone })
+      .from(branches)
+      .where(eq(branches.id, ctx.branchId))
+    const now = new Date()
+    const at = {
+      businessDate: businessDateOf(now, branch!.timezone),
+      minuteOfDay: minuteOfDayIn(now, branch!.timezone),
+    }
+
     for (const input of ctx.inputs) {
       await this.addOneLine(tx, {
         order: ctx.order,
         branchId: ctx.branchId,
         input,
         actor: ctx.actor,
+        at,
       })
     }
   }
@@ -168,6 +189,7 @@ export class OrderingService {
       branchId: string
       input: AddLineInput
       actor: Actor
+      at: { businessDate: string; minuteOfDay: number }
     },
   ) {
     const { order, branchId, input } = ctx
@@ -179,6 +201,17 @@ export class OrderingService {
     const catalog = await this.catalog.dishesByIds(branchId, [input.dishId], tx)
     const dish = catalog.get(input.dishId)
     if (!dish) throw new NotFoundException(`Không có món ${input.dishId}`)
+
+    /**
+     * Lịch bán (M11) kiểm ở đây, ngay cạnh 86, vì đây là cửa DUY NHẤT mà mọi kênh
+     * gọi món đi qua — POS, Table và đơn online dùng chung đúng đường này.
+     */
+    if (!isOnSale(dish.schedule, ctx.at.businessDate, ctx.at.minuteOfDay)) {
+      throw new ConflictException({
+        code: 'dish_off_schedule',
+        message: `${dish.name} chỉ bán ${describeSchedule(dish.schedule)}`,
+      })
+    }
 
     await this.assertAvailable(tx, branchId, input.dishId, input.qty)
 

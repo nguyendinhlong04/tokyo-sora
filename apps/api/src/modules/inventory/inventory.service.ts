@@ -19,9 +19,13 @@ import {
   ingredients,
   orderLines,
   orders,
+  prepRecipeLines,
+  recipeVersions,
+  staff,
   stockLevels,
   stockMoves,
   ticketItems,
+  type RecipeVersionLine,
 } from '../../db/schema'
 import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
@@ -30,11 +34,14 @@ import {
   dishCost,
   effectiveQtyBase,
   foodCost,
+  lineCostVnd,
   movingAverageMilli,
+  prepCost,
   stockRatio,
   type DishCostBreakdown,
   type RecipeLineInput,
 } from './domain/costing'
+import { bumpStock, consumeLots } from './stock-ledger'
 
 export interface IngredientInput {
   id: string
@@ -46,6 +53,8 @@ export interface IngredientInput {
   basePerPurchase: number
   minLevelBase: number
   lotRequired: boolean
+  /** Bán thành phẩm (M8): pha ra ở bếp chứ không mua ngoài */
+  isSemiFinished: boolean
   active: boolean
   sort: number
 }
@@ -63,9 +72,11 @@ const SLUG = /^[a-z0-9][a-z0-9-]*$/
  *
  * BA QUYẾT ĐỊNH NGHIỆP VỤ (§25) nằm ở ba chỗ trong file này:
  *   1. Giá bình quân gia quyền di động → `receive`
- *   2. Trừ kho khi bếp bấm Xong        → `postSaleForTicket`
- *   3. Bắt buộc lô với hải sản/bò/keg  → CHƯA CƯỠNG CHẾ: cờ `lotRequired` đã có
- *      trên nguyên liệu nhưng bảng lô (S9) chưa dựng nên chưa ai đọc tới.
+ *   2. Trừ kho khi bếp bấm Xong        → `postSaleForTicket`, và lượt trừ đó rút
+ *      lô theo FEFO qua `consumeLots` (S9)
+ *   3. Bắt buộc lô với hải sản/bò/keg  → cưỡng chế ở `WarehouseService.receiveLot`,
+ *      cửa nhập kho đầy đủ của S5. `receive` dưới đây là bản rút gọn còn lại cho
+ *      những lượt nhập không qua đơn đặt hàng.
  *
  * Toàn bộ số lượng trong file này là ĐVT CƠ SỞ và là số nguyên. Đơn vị mua chỉ
  * xuất hiện đúng một chỗ — tham số `qtyPurchase` của `receive` — và được quy đổi
@@ -166,6 +177,26 @@ export class InventoryService {
       const next = { ...current, ...patch, id }
       this.assertIngredient(next as IngredientInput)
 
+      /**
+       * Thôi làm bán thành phẩm thì công thức mẻ phải dọn trước.
+       *
+       * Không chặn ở đây thì cột `prep_yield_base` vi phạm CHECK của CSDL và người
+       * dùng nhận về một chuỗi tên constraint; tệ hơn là công thức mẻ nằm lại
+       * trong bảng, vô hình với mọi màn hình, chờ ngày ai đó bật cờ lại.
+       */
+      if (current.isSemiFinished && next.isSemiFinished === false) {
+        const [line] = await tx
+          .select({ id: prepRecipeLines.ingredientId })
+          .from(prepRecipeLines)
+          .where(eq(prepRecipeLines.prepId, id))
+          .limit(1)
+        if (line) {
+          throw new ConflictException(
+            `${current.name} còn công thức mẻ ở M8 — xoá hết dòng công thức rồi mới bỏ cờ bán thành phẩm`,
+          )
+        }
+      }
+
       await this.approvals.authorize(tx, {
         actor,
         action: 'recipe.edit',
@@ -176,7 +207,10 @@ export class InventoryService {
 
       const [row] = await tx
         .update(ingredients)
-        .set(this.cleanIngredient(next as IngredientInput))
+        .set({
+          ...this.cleanIngredient(next as IngredientInput),
+          prepYieldBase: next.isSemiFinished ? current.prepYieldBase : 0,
+        })
         .where(eq(ingredients.id, id))
         .returning()
 
@@ -202,6 +236,7 @@ export class InventoryService {
       basePerPurchase: input.basePerPurchase,
       minLevelBase: input.minLevelBase,
       lotRequired: input.lotRequired,
+      isSemiFinished: input.isSemiFinished,
       active: input.active,
       sort: input.sort,
     }
@@ -349,17 +384,27 @@ export class InventoryService {
         .where(eq(dishRecipes.dishId, dishId))
       const costAfter = dishCost(priced.map(({ line, ing }) => this.toRecipeInput(line, ing))).costVnd
 
-      // M9 (lịch sử phiên bản công thức) chưa dựng; ghi chênh lệch giá vốn vào nhật
-      // ký A7 để ít nhất còn truy được "ai sửa, giá vốn đổi bao nhiêu"
+      // M9: chụp lại bản vừa lưu. Nhật ký A7 vẫn ghi song song vì nó trả lời câu
+      // hỏi khác — "hôm qua ai đụng vào cái gì" chứ không phải "công thức hồi đó
+      // trông thế nào".
+      const version = await this.writeVersion(tx, {
+        subjectKind: 'dish',
+        subjectId: dishId,
+        rows: priced,
+        yieldBase: null,
+        costVnd: costAfter,
+        actor,
+      })
+
       await this.audit.write(tx, {
         actor,
         action: 'recipe.updated',
         entity: 'dish_recipe',
         entityId: dishId,
-        payload: { lines: lines.length, costBefore, costAfter, delta: costAfter - costBefore },
+        payload: { lines: lines.length, costBefore, costAfter, delta: costAfter - costBefore, version },
       })
 
-      return { dishId, lines: lines.length, costBefore, costAfter }
+      return { dishId, lines: lines.length, costBefore, costAfter, version }
     })
   }
 
@@ -399,13 +444,532 @@ export class InventoryService {
     return new Map([...byDish].map(([dishId, lines]) => [dishId, dishCost(lines)]))
   }
 
+  // ============================================== M8 · Bán thành phẩm
+
+  /**
+   * Danh sách bán thành phẩm kèm HAI con số giá cạnh nhau.
+   *
+   * `standardMilli` là giá theo công thức mẻ; `costPerBaseMilli` là giá thật đang
+   * dùng, do những lượt nấu ở S7 đẩy lên theo bình quân gia quyền. Chênh lệch giữa
+   * chúng là thứ đáng nhìn nhất ở màn này: nước dùng ninh già lửa, sốt pha đặc hơn
+   * công thức, hay đơn giản là giá xương vừa tăng — cả ba đều hiện ra ở đây trước
+   * khi hiện ra ở food cost của mười món dùng nó.
+   */
+  async prepList() {
+    const rows = await this.db
+      .select()
+      .from(ingredients)
+      .where(eq(ingredients.isSemiFinished, true))
+      .orderBy(asc(ingredients.sort), asc(ingredients.name))
+    if (rows.length === 0) return []
+
+    const lines = await this.db
+      .select({ line: prepRecipeLines, ing: ingredients })
+      .from(prepRecipeLines)
+      .innerJoin(ingredients, eq(ingredients.id, prepRecipeLines.ingredientId))
+      .where(
+        inArray(
+          prepRecipeLines.prepId,
+          rows.map((r) => r.id),
+        ),
+      )
+
+    // Món nào đang dùng bán thành phẩm nào — cột "món dùng" và cũng là lời cảnh
+    // báo trước khi ai đó sửa định lượng một mẻ
+    const usage = await this.db
+      .select({ ingredientId: dishRecipes.ingredientId, dishId: dishRecipes.dishId })
+      .from(dishRecipes)
+      .where(
+        inArray(
+          dishRecipes.ingredientId,
+          rows.map((r) => r.id),
+        ),
+      )
+
+    return rows.map((prep) => {
+      const mine = lines.filter((l) => l.line.prepId === prep.id)
+      const cost = prepCost(
+        mine.map(({ line, ing }) => this.toRecipeInput(line, ing)),
+        prep.prepYieldBase,
+      )
+      return {
+        id: prep.id,
+        code: prep.code,
+        name: prep.name,
+        groupName: prep.groupName,
+        baseUnit: prep.baseUnit,
+        yieldBase: prep.prepYieldBase,
+        lineCount: mine.length,
+        batchCostVnd: cost.costVnd,
+        /** Giá vốn mỗi ĐVT cơ sở theo công thức; null = chưa đủ dữ kiện để chia */
+        standardMilli: cost.costPerBaseMilli,
+        /** Giá đang dùng thật, do S7 đẩy lên theo bình quân gia quyền */
+        costPerBaseMilli: prep.costPerBaseMilli,
+        usedByDishes: usage.filter((u) => u.ingredientId === prep.id).length,
+      }
+    })
+  }
+
+  async prepRecipe(prepId: string) {
+    const [prep] = await this.db.select().from(ingredients).where(eq(ingredients.id, prepId))
+    if (!prep) throw new NotFoundException('Không có nguyên liệu này')
+    if (!prep.isSemiFinished) {
+      throw new BadRequestException(
+        `${prep.name} không phải bán thành phẩm — bật cờ đó ở màn Nguyên liệu (M7) trước`,
+      )
+    }
+
+    const rows = await this.db
+      .select({ line: prepRecipeLines, ing: ingredients })
+      .from(prepRecipeLines)
+      .innerJoin(ingredients, eq(ingredients.id, prepRecipeLines.ingredientId))
+      .where(eq(prepRecipeLines.prepId, prepId))
+      .orderBy(asc(prepRecipeLines.sort), asc(ingredients.name))
+
+    const cost = prepCost(
+      rows.map(({ line, ing }) => this.toRecipeInput(line, ing)),
+      prep.prepYieldBase,
+    )
+    const byIngredient = new Map(cost.lines.map((l) => [l.ingredientId, l]))
+
+    return {
+      prep: {
+        id: prep.id,
+        code: prep.code,
+        name: prep.name,
+        baseUnit: prep.baseUnit,
+        yieldBase: prep.prepYieldBase,
+        costPerBaseMilli: prep.costPerBaseMilli,
+      },
+      lines: rows.map(({ line, ing }) => ({
+        ingredientId: ing.id,
+        code: ing.code,
+        name: ing.name,
+        baseUnit: ing.baseUnit,
+        isSemiFinished: ing.isSemiFinished,
+        costPerBaseMilli: ing.costPerBaseMilli,
+        qtyBase: line.qtyBase,
+        wasteBp: line.wasteBp,
+        sort: line.sort,
+        effectiveQtyBase: byIngredient.get(ing.id)!.effectiveQtyBase,
+        costVnd: byIngredient.get(ing.id)!.costVnd,
+        share: byIngredient.get(ing.id)!.share,
+      })),
+      batchCostVnd: cost.costVnd,
+      standardMilli: cost.costPerBaseMilli,
+    }
+  }
+
+  /**
+   * Thay cả cụm công thức mẻ, kèm sản lượng — hai thứ đó là một phép chia, sửa
+   * riêng từng vế thì giữa hai lần gọi giá mỗi ml sẽ sai gấp đôi hoặc còn một nửa.
+   *
+   * Có ghi vào `costPerBaseMilli` KHÔNG? Chỉ khi bán thành phẩm chưa có giá nào cả
+   * (chưa nấu mẻ nào, chưa nhập lần nào). Sau đó thì không: giá thật thuộc về
+   * những lượt nấu ở S7, và để công thức chuẩn đè lên nó là biến giá vốn hàng bán
+   * thành thứ sửa được bằng cách gõ lại định lượng — đúng cái mà bình quân gia
+   * quyền sinh ra để ngăn.
+   */
+  async setPrepRecipe(
+    prepId: string,
+    input: { yieldBase: number; lines: RecipeLineWrite[] },
+    actor: Actor,
+    approval?: ApprovalInput | null,
+  ) {
+    const [prep] = await this.db.select().from(ingredients).where(eq(ingredients.id, prepId))
+    if (!prep) throw new NotFoundException('Không có nguyên liệu này')
+    if (!prep.isSemiFinished) {
+      throw new BadRequestException(
+        `${prep.name} không phải bán thành phẩm — bật cờ đó ở màn Nguyên liệu (M7) trước`,
+      )
+    }
+    if (!Number.isSafeInteger(input.yieldBase) || input.yieldBase < 0) {
+      throw new BadRequestException('Sản lượng mẻ phải là số nguyên không âm')
+    }
+    if (input.lines.length > 0 && input.yieldBase <= 0) {
+      throw new BadRequestException(
+        `Một mẻ ra bao nhiêu ${prep.baseUnit}? Thiếu số này thì không chia được giá mỗi ${prep.baseUnit}`,
+      )
+    }
+
+    const seen = new Set<string>()
+    for (const line of input.lines) {
+      if (line.ingredientId === prepId) {
+        throw new BadRequestException(`${prep.name} không thể là nguyên liệu của chính nó`)
+      }
+      if (seen.has(line.ingredientId)) {
+        throw new BadRequestException(`Nguyên liệu ${line.ingredientId} bị khai hai lần`)
+      }
+      seen.add(line.ingredientId)
+      if (!Number.isSafeInteger(line.qtyBase) || line.qtyBase <= 0) {
+        throw new BadRequestException('Định lượng phải là số nguyên dương theo đơn vị cơ sở')
+      }
+      if (!Number.isSafeInteger(line.wasteBp) || line.wasteBp < 0 || line.wasteBp > 10_000) {
+        throw new BadRequestException('Hao hụt phải trong khoảng 0–100%')
+      }
+    }
+
+    if (seen.size > 0) {
+      const known = await this.db
+        .select({ id: ingredients.id })
+        .from(ingredients)
+        .where(inArray(ingredients.id, [...seen]))
+      const missing = [...seen].filter((id) => !known.some((k) => k.id === id))
+      if (missing.length > 0) {
+        throw new BadRequestException(`Chưa có nguyên liệu: ${missing.join(', ')}`)
+      }
+      await this.assertNoPrepCycle(prepId, [...seen])
+    }
+
+    return this.db.transaction(async (tx) => {
+      await this.approvals.authorize(tx, {
+        actor,
+        action: 'recipe.edit',
+        entity: 'prep_recipe',
+        entityId: prepId,
+        approval,
+      })
+
+      await tx.delete(prepRecipeLines).where(eq(prepRecipeLines.prepId, prepId))
+      if (input.lines.length > 0) {
+        await tx.insert(prepRecipeLines).values(
+          input.lines.map((line, index) => ({
+            prepId,
+            ingredientId: line.ingredientId,
+            qtyBase: line.qtyBase,
+            wasteBp: line.wasteBp,
+            sort: index,
+          })),
+        )
+      }
+      await tx
+        .update(ingredients)
+        .set({ prepYieldBase: input.yieldBase })
+        .where(eq(ingredients.id, prepId))
+
+      const priced = await tx
+        .select({ line: prepRecipeLines, ing: ingredients })
+        .from(prepRecipeLines)
+        .innerJoin(ingredients, eq(ingredients.id, prepRecipeLines.ingredientId))
+        .where(eq(prepRecipeLines.prepId, prepId))
+      const cost = prepCost(
+        priced.map(({ line, ing }) => this.toRecipeInput(line, ing)),
+        input.yieldBase,
+      )
+
+      /**
+       * Mồi giá cho bán thành phẩm chưa từng có giá.
+       *
+       * Không mồi thì mọi món chèn sốt mới sẽ tính sốt bằng 0₫ và báo lãi cao hơn
+       * thực tế — im lặng, cho tới lần nấu đầu tiên. Mồi rồi thì lượt nấu thật đầu
+       * tiên ở S7 sẽ trộn nó theo trọng số như mọi lần nhập khác.
+       */
+      let seeded: number | null = null
+      if (prep.costPerBaseMilli === 0 && cost.costPerBaseMilli !== null && cost.costPerBaseMilli > 0) {
+        seeded = cost.costPerBaseMilli
+        await tx
+          .update(ingredients)
+          .set({ costPerBaseMilli: seeded })
+          .where(eq(ingredients.id, prepId))
+      }
+
+      const version = await this.writeVersion(tx, {
+        subjectKind: 'prep',
+        subjectId: prepId,
+        rows: priced,
+        yieldBase: input.yieldBase,
+        costVnd: cost.costVnd,
+        actor,
+      })
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'prep-recipe.updated',
+        entity: 'prep_recipe',
+        entityId: prepId,
+        payload: {
+          lines: input.lines.length,
+          yieldBase: input.yieldBase,
+          batchCostVnd: cost.costVnd,
+          standardMilli: cost.costPerBaseMilli,
+          seeded,
+          version,
+        },
+      })
+
+      return {
+        prepId,
+        lines: input.lines.length,
+        batchCostVnd: cost.costVnd,
+        standardMilli: cost.costPerBaseMilli,
+        seededMilli: seeded,
+        version,
+      }
+    })
+  }
+
+  /**
+   * Chặn BOM lồng vòng: sốt A dùng sốt B, B dùng lại A.
+   *
+   * CSDL chỉ chặn được vòng dài một bước (`prep_recipe_lines_not_self`). Vòng dài
+   * hơn phải đi hết đồ thị, và nếu để lọt thì phép tính giá vốn không dừng lại ở
+   * đâu cả — không phải sai số, mà là treo.
+   */
+  private async assertNoPrepCycle(prepId: string, componentIds: string[]) {
+    const edges = await this.db
+      .select({ prepId: prepRecipeLines.prepId, ingredientId: prepRecipeLines.ingredientId })
+      .from(prepRecipeLines)
+
+    const children = new Map<string, string[]>()
+    for (const edge of edges) {
+      // Bỏ qua các dòng CŨ của chính công thức đang lưu — chúng sắp bị thay
+      if (edge.prepId === prepId) continue
+      children.set(edge.prepId, [...(children.get(edge.prepId) ?? []), edge.ingredientId])
+    }
+
+    const seen = new Set<string>()
+    const stack = [...componentIds]
+    while (stack.length > 0) {
+      const current = stack.pop()!
+      if (current === prepId) {
+        throw new BadRequestException(
+          'Công thức lồng vòng: bán thành phẩm này rốt cuộc lại dùng chính nó',
+        )
+      }
+      if (seen.has(current)) continue
+      seen.add(current)
+      stack.push(...(children.get(current) ?? []))
+    }
+  }
+
+  // ========================================== M9 · Lịch sử phiên bản
+
+  /**
+   * Chụp bản vừa lưu. Trả về số phiên bản, hoặc null khi không có gì đổi.
+   *
+   * So với bản gần nhất trước khi ghi: bấm Lưu ba lần liên tiếp mà bảng y nguyên
+   * thì lịch sử chỉ nên có một dòng — danh sách toàn phiên bản giống hệt nhau là
+   * thứ làm người ta thôi mở màn M9 ra xem.
+   */
+  private async writeVersion(
+    tx: Tx,
+    input: {
+      subjectKind: 'dish' | 'prep'
+      subjectId: string
+      rows: { line: { ingredientId: string; qtyBase: number; wasteBp: number }; ing: typeof ingredients.$inferSelect }[]
+      yieldBase: number | null
+      costVnd: number
+      actor: Actor
+    },
+  ): Promise<number | null> {
+    const lines: RecipeVersionLine[] = input.rows.map(({ line, ing }) => ({
+      ingredientId: ing.id,
+      name: ing.name,
+      qtyBase: line.qtyBase,
+      wasteBp: line.wasteBp,
+      costPerBaseMilli: ing.costPerBaseMilli,
+      costVnd: lineCostVnd(this.toRecipeInput(line, ing)),
+    }))
+
+    const [latest] = await tx
+      .select()
+      .from(recipeVersions)
+      .where(
+        and(
+          eq(recipeVersions.subjectKind, input.subjectKind),
+          eq(recipeVersions.subjectId, input.subjectId),
+        ),
+      )
+      .orderBy(sql`${recipeVersions.version} desc`)
+      .limit(1)
+
+    if (latest && sameVersionContent(latest, lines, input.yieldBase)) return null
+
+    const [row] = await tx
+      .insert(recipeVersions)
+      .values({
+        subjectKind: input.subjectKind,
+        subjectId: input.subjectId,
+        version: (latest?.version ?? 0) + 1,
+        lines,
+        yieldBase: input.yieldBase,
+        costVnd: input.costVnd,
+        actorId: input.actor.kind === 'staff' ? input.actor.staffId : null,
+      })
+      .returning({ version: recipeVersions.version })
+
+    return row!.version
+  }
+
+  /**
+   * Dòng thời gian chung của mọi công thức — bảng chính của M9.
+   *
+   * Gộp món và bán thành phẩm vào một danh sách vì người mở màn này không đi tìm
+   * "công thức của món X"; họ đi tìm "tuần này ai đụng vào cái gì và giá vốn nhảy
+   * bao nhiêu". Câu hỏi kia đã có cửa riêng ở `versionsOf`.
+   */
+  async recentRecipeChanges(limit = 60) {
+    const rows = await this.db
+      .select({ v: recipeVersions, by: staff.fullName })
+      .from(recipeVersions)
+      .leftJoin(staff, eq(staff.id, recipeVersions.actorId))
+      .orderBy(sql`${recipeVersions.id} desc`)
+      .limit(limit)
+    if (rows.length === 0) return []
+
+    const names = await this.subjectNames(rows.map((r) => r.v))
+
+    /**
+     * Chênh lệch so với phiên bản LIỀN TRƯỚC của cùng công thức, không phải so với
+     * dòng phía trên trong danh sách — danh sách đang trộn nhiều công thức với
+     * nhau, lấy dòng trên là trừ giá vốn của món này cho giá vốn của món khác.
+     */
+    const previous = await this.db
+      .select({
+        subjectKind: recipeVersions.subjectKind,
+        subjectId: recipeVersions.subjectId,
+        version: recipeVersions.version,
+        costVnd: recipeVersions.costVnd,
+      })
+      .from(recipeVersions)
+    const costByKey = new Map(
+      previous.map((p) => [`${p.subjectKind}:${p.subjectId}:${p.version}`, p.costVnd]),
+    )
+
+    return rows.map(({ v, by }) => ({
+      id: v.id,
+      subjectKind: v.subjectKind,
+      subjectId: v.subjectId,
+      subjectName: names.get(`${v.subjectKind}:${v.subjectId}`) ?? v.subjectId,
+      version: v.version,
+      lineCount: v.lines.length,
+      yieldBase: v.yieldBase,
+      costVnd: v.costVnd,
+      previousCostVnd: costByKey.get(`${v.subjectKind}:${v.subjectId}:${v.version - 1}`) ?? null,
+      actorName: by,
+      createdAt: v.createdAt,
+    }))
+  }
+
+  /** Các phiên bản của MỘT công thức, mới nhất trước */
+  async versionsOf(subjectKind: 'dish' | 'prep', subjectId: string) {
+    const rows = await this.db
+      .select({ v: recipeVersions, by: staff.fullName })
+      .from(recipeVersions)
+      .leftJoin(staff, eq(staff.id, recipeVersions.actorId))
+      .where(
+        and(
+          eq(recipeVersions.subjectKind, subjectKind),
+          eq(recipeVersions.subjectId, subjectId),
+        ),
+      )
+      .orderBy(sql`${recipeVersions.version} desc`)
+
+    const names = await this.subjectNames(rows.map((r) => r.v))
+    return {
+      subjectKind,
+      subjectId,
+      subjectName: names.get(`${subjectKind}:${subjectId}`) ?? subjectId,
+      versions: rows.map(({ v, by }) => ({
+        version: v.version,
+        lineCount: v.lines.length,
+        yieldBase: v.yieldBase,
+        costVnd: v.costVnd,
+        actorName: by,
+        createdAt: v.createdAt,
+      })),
+    }
+  }
+
+  /**
+   * So hai bản — cột phải của M9.
+   *
+   * Ghép theo NGUYÊN LIỆU chứ không theo thứ tự dòng: đổi thứ tự bảng không phải
+   * là đổi công thức, và một bảng so sánh coi việc kéo một dòng lên trên là "sửa
+   * bốn dòng" thì không giúp ai đọc được cái gì.
+   */
+  async compareVersions(subjectKind: 'dish' | 'prep', subjectId: string, from: number, to: number) {
+    const rows = await this.db
+      .select({ v: recipeVersions, by: staff.fullName })
+      .from(recipeVersions)
+      .where(
+        and(
+          eq(recipeVersions.subjectKind, subjectKind),
+          eq(recipeVersions.subjectId, subjectId),
+          inArray(recipeVersions.version, [from, to]),
+        ),
+      )
+      .leftJoin(staff, eq(staff.id, recipeVersions.actorId))
+
+    const left = rows.find((r) => r.v.version === from)
+    const right = rows.find((r) => r.v.version === to)
+    if (!left || !right) throw new NotFoundException('Không có phiên bản này')
+
+    const beforeById = new Map(left.v.lines.map((l) => [l.ingredientId, l]))
+    const afterById = new Map(right.v.lines.map((l) => [l.ingredientId, l]))
+    const ids = [...new Set([...beforeById.keys(), ...afterById.keys()])]
+
+    return {
+      subjectKind,
+      subjectId,
+      from: this.versionHead(left.v, left.by),
+      to: this.versionHead(right.v, right.by),
+      lines: ids.map((id) => {
+        const before = beforeById.get(id) ?? null
+        const after = afterById.get(id) ?? null
+        return {
+          ingredientId: id,
+          name: (after ?? before)!.name,
+          before,
+          after,
+          change: before === null ? 'added' : after === null ? 'removed' : sameLine(before, after) ? 'same' : 'changed',
+        } as const
+      }),
+    }
+  }
+
+  private versionHead(v: typeof recipeVersions.$inferSelect, actorName: string | null) {
+    return {
+      version: v.version,
+      costVnd: v.costVnd,
+      yieldBase: v.yieldBase,
+      actorName,
+      createdAt: v.createdAt,
+    }
+  }
+
+  /** Tên hiển thị của các công thức trong danh sách: món lấy ở `dishes`, mẻ ở `ingredients` */
+  private async subjectNames(versions: { subjectKind: 'dish' | 'prep'; subjectId: string }[]) {
+    const dishIds = versions.filter((v) => v.subjectKind === 'dish').map((v) => v.subjectId)
+    const prepIds = versions.filter((v) => v.subjectKind === 'prep').map((v) => v.subjectId)
+
+    const [dishRows, prepRows] = await Promise.all([
+      dishIds.length
+        ? this.db.select({ id: dishes.id, name: dishes.nameVi }).from(dishes).where(inArray(dishes.id, dishIds))
+        : Promise.resolve([]),
+      prepIds.length
+        ? this.db
+            .select({ id: ingredients.id, name: ingredients.name })
+            .from(ingredients)
+            .where(inArray(ingredients.id, prepIds))
+        : Promise.resolve([]),
+    ])
+
+    return new Map([
+      ...dishRows.map((r) => [`dish:${r.id}`, r.name] as const),
+      ...prepRows.map((r) => [`prep:${r.id}`, r.name] as const),
+    ])
+  }
+
   // ================================================= Nhập kho & điều chỉnh
 
   /**
-   * Nhập kho (rút gọn của S5) — cửa DUY NHẤT làm đổi giá bình quân.
+   * Nhập nhanh từ M7 — dùng cho ĐỒ KHÔ, thứ không cần truy ngược theo lô.
    *
-   * Chưa có: số lô, hạn dùng, nhiệt độ nhận, ảnh chứng từ, cảnh báo lệch giá so
-   * với lần nhập trước, và ràng buộc `lotRequired`. Tất cả nằm ở S5/S9.
+   * Hàng khai `lotRequired` (hải sản sống, thịt bò, keg) bị TỪ CHỐI ở đây và
+   * phải đi qua S5: cửa này không hỏi số lô, nên cho nó nhận hàng bắt buộc lô
+   * nghĩa là mở một đường vòng qua chính ràng buộc mà §25 đặt ra. Một ràng buộc
+   * có đường vòng là một ràng buộc không tồn tại.
    */
   async receive(
     input: {
@@ -433,6 +997,11 @@ export class InventoryService {
         .where(eq(ingredients.id, input.ingredientId))
         .for('update')
       if (!ing) throw new NotFoundException('Không có nguyên liệu này')
+      if (ing.lotRequired) {
+        throw new BadRequestException(
+          `${ing.name} bắt buộc khai lô và hạn dùng — nhập ở màn Nhập kho (S5), không nhập nhanh ở đây`,
+        )
+      }
 
       const qtyBase = Math.round(input.qtyPurchase * ing.basePerPurchase)
       if (qtyBase <= 0) {
@@ -460,7 +1029,7 @@ export class InventoryService {
         .set({ costPerBaseMilli: nextMilli })
         .where(eq(ingredients.id, input.ingredientId))
 
-      await this.bumpStock(tx, input.branchId, input.ingredientId, qtyBase)
+      await bumpStock(tx, input.branchId, input.ingredientId, qtyBase)
 
       const businessDate = businessDateOf(new Date(), branch.timezone)
       await tx.insert(stockMoves).values({
@@ -533,7 +1102,7 @@ export class InventoryService {
       const [ing] = await tx.select().from(ingredients).where(eq(ingredients.id, input.ingredientId))
       if (!ing) throw new NotFoundException('Không có nguyên liệu này')
 
-      await this.bumpStock(tx, input.branchId, input.ingredientId, input.qtyBaseDelta)
+      await bumpStock(tx, input.branchId, input.ingredientId, input.qtyBaseDelta)
 
       await tx.insert(stockMoves).values({
         branchId: input.branchId,
@@ -634,7 +1203,28 @@ export class InventoryService {
         .returning({ ingredientId: stockMoves.ingredientId, qtyBase: stockMoves.qtyBase })
 
       for (const move of inserted) {
-        await this.bumpStock(tx, line.branchId, move.ingredientId, Number(move.qtyBase))
+        await bumpStock(tx, line.branchId, move.ingredientId, Number(move.qtyBase))
+
+        /**
+         * Rút lô theo FEFO (S9), SAU khi bút toán đã ghi được.
+         *
+         * Thứ tự này bắt buộc: `onConflictDoNothing` là chỗ chống trừ đôi, nên
+         * chỉ những lượt THẬT SỰ ghi được mới được rút lô. Rút trước rồi mới ghi
+         * là hàng đợi offline của màn bếp gửi lại một lần sẽ rút lô thêm một lần
+         * nữa dù bút toán bị bỏ qua.
+         *
+         * Bút toán bán KHÔNG mang `lot_id`, và đó là hệ quả có chủ ý của hai
+         * ràng buộc gặp nhau: sổ kho chỉ THÊM (trigger 9004 chặn UPDATE), còn chỉ
+         * số chống trừ đôi buộc mỗi dòng đơn × nguyên liệu chỉ có MỘT bút toán
+         * bán. Chia nhỏ theo lô sẽ phá chỗ chống trừ đôi; ghi lô sau bằng UPDATE
+         * thì đụng sổ bất biến. Đường truy ngược của lô vẫn còn — nó nằm ở lượng
+         * còn lại của từng lô và ngày rút, đúng như thẻ kho giấy vẫn làm.
+         *
+         * Bán KHÔNG bị chặn khi lô không đủ: món đã nấu và đã ra khỏi bếp, từ
+         * chối ở đây không làm miếng thịt quay về tủ. Chênh lệch giữa sổ lô và sổ
+         * tồn sẽ lộ ra ở kiểm kê — đúng chỗ nó nên lộ ra.
+         */
+        await consumeLots(tx, line.branchId, move.ingredientId, -Number(move.qtyBase))
       }
       posted += inserted.length
     }
@@ -711,19 +1301,6 @@ export class InventoryService {
 
   // --------------------------------------------------------------- phụ trợ
 
-  private async bumpStock(tx: Tx, branchId: string, ingredientId: string, delta: number) {
-    await tx
-      .insert(stockLevels)
-      .values({ branchId, ingredientId, qtyBase: delta })
-      .onConflictDoUpdate({
-        target: [stockLevels.branchId, stockLevels.ingredientId],
-        set: {
-          qtyBase: sql`${stockLevels.qtyBase} + ${delta}`,
-          updatedAt: new Date(),
-        },
-      })
-  }
-
   private async requireBranch(branchId: string) {
     const [branch] = await this.db.select().from(branches).where(eq(branches.id, branchId))
     if (!branch) throw new NotFoundException(`Không có chi nhánh ${branchId}`)
@@ -742,4 +1319,31 @@ export class InventoryService {
     const last = new Date(Date.UTC(year!, month!, 0))
     return { from: `${today.slice(0, 7)}-01`, to: last.toISOString().slice(0, 10) }
   }
+}
+
+/**
+ * Hai bản chụp có giống nhau không (M9).
+ *
+ * So theo nguyên liệu, không theo thứ tự dòng — kéo một dòng lên trên không phải
+ * là sửa công thức. GIÁ nguyên liệu cố ý KHÔNG tham gia so sánh: giá xương tăng
+ * không phải là ai đó sửa công thức, và sinh một phiên bản mới mỗi lần nhập hàng
+ * sẽ nhấn chìm những lần sửa thật.
+ */
+function sameVersionContent(
+  latest: { lines: RecipeVersionLine[]; yieldBase: number | null },
+  lines: RecipeVersionLine[],
+  yieldBase: number | null,
+): boolean {
+  if (latest.yieldBase !== yieldBase) return false
+  if (latest.lines.length !== lines.length) return false
+
+  const before = new Map(latest.lines.map((l) => [l.ingredientId, l]))
+  return lines.every((line) => {
+    const other = before.get(line.ingredientId)
+    return other !== undefined && sameLine(other, line)
+  })
+}
+
+function sameLine(a: RecipeVersionLine, b: RecipeVersionLine): boolean {
+  return a.qtyBase === b.qtyBase && a.wasteBp === b.wasteBp
 }

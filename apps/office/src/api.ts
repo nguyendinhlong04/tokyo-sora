@@ -222,6 +222,580 @@ export interface CmsJob {
   updatedBy: string | null
 }
 
+// ------------------------------------------------------- B2 · B4 … B9
+
+export interface Slice {
+  key: string
+  label: string
+  value: number
+  previous: number
+  diff: number
+  percent: number | null
+  /** Tỉ trọng trong kỳ hiện tại */
+  share: number
+}
+
+/** Tỉ lệ có thể chưa đo được — mẫu số 0 thì `null`, không phải 0 */
+export interface RateDelta {
+  value: number | null
+  previous: number | null
+}
+
+export interface RevenueReport {
+  branchId: string
+  period: ResolvedPeriod
+  total: Delta
+  orders: Delta
+  guests: Delta
+  perGuest: Delta
+  daily: { day: string; value: number; baselineDay: string | null; baseline: number }[]
+  byHour: Slice[]
+  byArea: Slice[]
+  byType: Slice[]
+  byChannel: Slice[]
+  byPayment: Slice[]
+}
+
+export interface CostMarginReport {
+  branchId: string
+  period: ResolvedPeriod
+  target: number
+  revenue: Delta
+  cogs: Delta
+  grossMargin: Delta
+  foodCost: { value: number | null; previous: number | null; overTarget: boolean | null }
+  daily: {
+    day: string
+    revenueVnd: number
+    cogsVnd: number
+    foodCost: number | null
+    overTarget: boolean | null
+  }[]
+  byCategory: {
+    key: string
+    label: string
+    revenueVnd: number
+    cogsVnd: number
+    grossVnd: number
+    foodCost: number | null
+    grossDelta: Delta
+  }[]
+}
+
+export interface KitchenReport {
+  branchId: string
+  period: ResolvedPeriod
+  avgSeconds: Delta
+  tickets: Delta
+  lateRate: RateDelta
+  byStation: {
+    key: string
+    total: number
+    late: number
+    avgSeconds: number
+    p90Seconds: number
+    bySource: Record<string, number>
+    lateRate: number | null
+  }[]
+  byHour: { key: string; label: string; avgSeconds: number; tickets: number; lateRate: number | null }[]
+  slowestDishes: {
+    dishId: string
+    name: string
+    avgSeconds: number
+    served: number
+    lateRate: number | null
+  }[]
+}
+
+export interface TurnoverReport {
+  branchId: string
+  period: ResolvedPeriod
+  avgMinutes: Delta
+  sessions: Delta
+  guests: Delta
+  turnsPerTableDay: number | null
+  byTable: {
+    tableId: number
+    code: string
+    areaName: string | null
+    seatMax: number
+    sessions: number
+    turnsPerDay: number
+    avgMinutes: number
+    guests: number
+    revenueVnd: number
+    occupancy: number | null
+  }[]
+  byHour: { key: string; label: string; sessions: number; avgMinutes: number }[]
+}
+
+export interface StaffReport {
+  branchId: string
+  period: ResolvedPeriod
+  rows: {
+    staffId: string
+    fullName: string
+    revenue: Delta
+    orders: number
+    perOrderVnd: number
+    cancels: number
+    approvalRequests: number
+  }[]
+  totals: { revenueVnd: number; cancels: number; approvalRequests: number }
+}
+
+export interface SetsReport {
+  branchId: string
+  period: ResolvedPeriod
+  sets: {
+    dishId: string
+    name: string
+    sold: number
+    soldDelta: Delta
+    revenueVnd: number
+    cogsVnd: number
+    grossVnd: number
+    foodCost: number | null
+  }[]
+  discount: {
+    ordersWithDiscount: number
+    ordersTotal: number
+    rate: number | null
+    amountVnd: Delta
+    avgWithDiscountVnd: number
+    avgWithoutDiscountVnd: number
+  }
+  promotionsNote: string
+}
+
+export interface OnlineReport {
+  branchId: string
+  period: ResolvedPeriod
+  online: {
+    orders: Delta
+    revenue: Delta
+    cancelRate: RateDelta
+    avgDeliverySeconds: Delta
+    byHour: { key: string; label: string; orders: number; cancelled: number }[]
+  }
+  reservations: {
+    total: Delta
+    seated: Delta
+    noShowRate: RateDelta
+    cancelRate: RateDelta
+    bySeatKind: { key: string; label: string; total: number; noShow: number; noShowRate: number | null }[]
+  }
+}
+
+// ------------------------------------------------------------ S3 … S12
+
+export interface SupplierItemRow {
+  supplierId: number
+  ingredientId: string
+  ingredientName: string
+  priceVnd: number
+  minOrderPurchase: number
+  leadTimeDays: number
+  preferred: boolean
+}
+
+export interface SupplierRow {
+  id: number
+  code: string
+  name: string
+  taxCode: string | null
+  contactName: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  paymentTermDays: number
+  cutoffMinute: number | null
+  note: string | null
+  active: boolean
+  items: SupplierItemRow[]
+}
+
+export interface SupplierInput {
+  code: string
+  name: string
+  taxCode: string | null
+  contactName: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  paymentTermDays: number
+  cutoffMinute: number | null
+  note: string | null
+  active: boolean
+}
+
+export interface ReorderRow {
+  ingredientId: string
+  ingredientName: string
+  groupName: string | null
+  baseUnit: string
+  purchaseUnit: string
+  onHandBase: number
+  minLevelBase: number
+  perDayBase: number
+  /** Còn đủ bán mấy ngày nữa; null khi kỳ qua không bán gì */
+  daysOfCover: number | null
+  pendingPurchase: number
+  suggestPurchase: number
+  supplierId: number | null
+  supplierName: string | null
+  priceVnd: number | null
+  leadTimeDays: number
+}
+
+export interface PurchaseOrderLine {
+  id: number
+  ingredientId: string
+  ingredientName: string
+  purchaseUnit: string
+  qtyPurchase: number
+  priceVnd: number
+  receivedPurchase: number
+  outstandingPurchase: number
+}
+
+export interface PurchaseOrderRow {
+  id: number
+  displayCode: string
+  branchId: string
+  supplierId: number
+  supplierName: string
+  state: 'draft' | 'sent' | 'received' | 'cancelled'
+  expectedOn: string | null
+  note: string | null
+  createdByName: string | null
+  totalVnd: number
+  lines: PurchaseOrderLine[]
+}
+
+export interface ReceiveResult {
+  ingredientId: string
+  lotId: number | null
+  qtyBase: number
+  costPerBaseMilli: number
+  costPerBaseMilliBefore: number
+  unitPaidVnd: number
+  agreedPriceVnd: number | null
+  /** Lệch so với giá thoả thuận, điểm cơ bản. Cảnh báo chứ không chặn. */
+  priceVarianceBp: number | null
+}
+
+export type ExpiryBand = 'het-han' | 'sap-het' | 'con-han' | 'khong-han'
+
+export interface LotRow {
+  id: number
+  ingredientId: string
+  ingredientName: string
+  baseUnit: string
+  lotCode: string
+  receivedOn: string
+  labelExpiresOn: string | null
+  /** Hạn THẬT — keg đã đục tính từ ngày đục */
+  expiresOn: string | null
+  band: ExpiryBand
+  qtyInBase: number
+  qtyRemainBase: number
+  remainValueVnd: number
+  state: 'sealed' | 'open'
+  openedAt: string | null
+  receiveTempDeciC: number | null
+  supplierName: string | null
+  tappable: boolean
+}
+
+export interface LotBook {
+  branchId: string
+  today: string
+  lots: LotRow[]
+  summary: {
+    expired: number
+    expiringSoon: number
+    expiredValueVnd: number
+    expiringSoonValueVnd: number
+  }
+}
+
+export interface CountLine {
+  ingredientId: string
+  ingredientName: string
+  groupName: string | null
+  baseUnit: string
+  snapshotBase: number
+  countedBase: number | null
+  diffBase: number | null
+  diffVnd: number | null
+  note: string | null
+  countedAt: string | null
+}
+
+export interface CountSheet {
+  id: number
+  branchId: string
+  groupName: string | null
+  state: 'counting' | 'closed' | 'cancelled'
+  businessDate: string
+  openedAt: string
+  closedAt: string | null
+  lines: CountLine[]
+  countedLines: number
+  diffVnd: number
+}
+
+export interface TransferLine {
+  ingredientId: string
+  ingredientName: string
+  baseUnit: string
+  qtyBase: number
+  receivedBase: number | null
+}
+
+export interface TransferRow {
+  id: number
+  displayCode: string
+  fromBranchId: string
+  toBranchId: string
+  state: 'sent' | 'received' | 'rejected'
+  note: string | null
+  sentByName: string | null
+  sentAt: string
+  receivedAt: string | null
+  businessDate: string
+  direction: 'in' | 'out'
+  lines: TransferLine[]
+}
+
+export interface WasteRow {
+  ingredientId: string
+  ingredientName: string
+  groupName: string | null
+  baseUnit: string
+  theoreticalBase: number
+  saleBase: number
+  writeOffBase: number
+  writeOffVnd: number
+  internalBase: number
+  internalVnd: number
+  countBase: number
+  actualBase: number
+  diffBase: number
+  diffVnd: number
+  ratio: number | null
+  isDraftBeer: boolean
+}
+
+export interface WasteReport {
+  branchId: string
+  from: string
+  to: string
+  rows: WasteRow[]
+  totals: { varianceVnd: number; writeOffVnd: number; internalVnd: number }
+  draftBeer: {
+    ingredientId: string
+    ingredientName: string
+    baseUnit: string
+    pouredBase: number
+    kegUsedBase: number
+    diffBase: number
+    diffVnd: number
+    ratio: number | null
+  }[]
+}
+
+export interface StockCardMove {
+  id: number
+  businessDate: string
+  createdAt: string
+  kind: string
+  qtyBase: number
+  costVnd: number
+  lotCode: string | null
+  docKind: string | null
+  docId: number | null
+  orderLineId: number | null
+  note: string | null
+  actorName: string | null
+  /** Tồn ngay sau bút toán này */
+  balanceBase: number
+}
+
+export interface StockCard {
+  branchId: string
+  ingredient: { id: string; name: string; baseUnit: string; costPerBaseMilli: number }
+  from: string
+  to: string
+  openingBase: number
+  closingBase: number
+  moves: StockCardMove[]
+}
+
+export interface ProductionResult {
+  runId: number
+  totalInVnd: number
+  totalInBase: number
+  totalOutBase: number
+  /** Hao = vào trừ ra; tiền của nó đã nằm trong giá đầu ra */
+  wasteBase: number
+  outputs: { ingredientId: string; qtyBase: number; costVnd: number; unitCostMilli: number }[]
+}
+
+// ---------------------------------------------------------------- C5
+
+export interface InputInvoiceRow {
+  id: number
+  branchId: string
+  voucherId: number | null
+  sellerName: string
+  sellerTaxCode: string
+  invoiceNo: string
+  serial: string | null
+  issuedOn: string
+  netVnd: number
+  vatVnd: number
+  deductible: boolean
+  note: string | null
+  createdAt: string
+  voucherMemo: string | null
+  voucherAmount: number | null
+  categoryName: string | null
+  createdByName: string | null
+}
+
+export interface MissingInvoiceVoucher {
+  id: number
+  paidOn: string
+  supplier: string | null
+  memo: string | null
+  amountVnd: number
+  vatVnd: number
+  categoryName: string
+}
+
+export interface InputInvoiceBook {
+  branchId: string
+  from: string
+  to: string
+  /** Phiếu chi từ mức này trở lên mà thiếu hoá đơn thì bị nêu tên */
+  thresholdVnd: number
+  rows: InputInvoiceRow[]
+  /** Con số F4 cộng vào thuế đầu vào */
+  deductibleVnd: number
+  /** VAT đã gõ trên phiếu chi nhưng không có hoá đơn đứng sau — không khấu trừ được */
+  declaredButUndocumentedVnd: number
+  missingVouchers: MissingInvoiceVoucher[]
+}
+
+export interface InputInvoiceInput {
+  branchId: string
+  voucherId: number | null
+  sellerName: string
+  sellerTaxCode: string
+  invoiceNo: string
+  serial: string | null
+  issuedOn: string
+  netVnd: number
+  vatVnd: number
+  deductible: boolean
+  note: string | null
+}
+
+// --------------------------------------------------------- H3 · H4 · H5
+
+export type AttendanceStatus =
+  | 'dang-lam'
+  | 'xong-ca'
+  | 'vang'
+  | 'chua-toi-gio'
+  | 'nghi'
+  | 'ngoai-lich'
+
+export interface AttendanceRow {
+  employeeId: number
+  staffId: number
+  fullName: string
+  position: string
+  scheduled: { startMinute: number; endMinute: number; dayKind: DayKind } | null
+  clockIn: string | null
+  clockOut: string | null
+  breakMinutes: number
+  source: 'kiosk' | 'manual' | 'pos' | null
+  workedMinutes: number
+  lateMinutes: number
+  earlyLeaveMinutes: number
+  onLeave: string | null
+  status: AttendanceStatus
+  /** Có phiên đăng nhập POS/KDS mà chưa chấm công */
+  warnWorkedWithoutClock: boolean
+  /** Đã chấm công mà không có hoạt động nào ở quán */
+  warnClockWithoutWork: boolean
+}
+
+export interface AttendanceBoard {
+  branchId: string
+  workDate: string
+  rows: AttendanceRow[]
+  summary: { scheduled: number; clockedIn: number; late: number; absent: number; working: number }
+}
+
+export interface TimesheetDay {
+  workDate: string
+  clockIn: string
+  clockOut: string | null
+  breakMinutes: number
+  dayKind: DayKind
+  source: 'kiosk' | 'manual' | 'pos'
+  editReason: string | null
+  editedBy: string | null
+  worked: number
+  otNormal: number
+  otRest: number
+  otHoliday: number
+}
+
+export interface TimesheetRow {
+  employeeId: number
+  fullName: string
+  position: string
+  payKind: PayKind
+  days: TimesheetDay[]
+  total: { worked: number; otNormal: number; otRest: number; otHoliday: number }
+  /** Ngày có ca mà không có công và cũng không có phép */
+  missingDays: string[]
+  leaveDays: number
+  openShifts: number
+}
+
+export interface TimesheetGrid {
+  branchId: string
+  from: string
+  to: string
+  locked: { id: number; state: string; periodStart: string; periodEnd: string } | null
+  rows: TimesheetRow[]
+}
+
+export type LeaveKind = 'nghi-phep' | 'nghi-khong-luong' | 'nghi-om' | 'doi-ca'
+
+export interface LeaveRow {
+  id: number
+  employeeId: number
+  employeeName: string
+  kind: LeaveKind
+  fromDate: string
+  toDate: string
+  counterpartId: number | null
+  counterpartName: string | null
+  reason: string
+  state: 'pending' | 'approved' | 'rejected'
+  decidedBy: string | null
+  decidedAt: string | null
+  decisionNote: string | null
+  createdAt: string
+}
+
 export interface DishRow {
   id: string
   code: string
@@ -251,6 +825,12 @@ export interface DishRow {
   tableOrderable: boolean
   signature: boolean
   active: boolean
+  /** Lịch bán M11 — khai ở màn Set & Combo, dùng chung cho mọi món */
+  saleFrom: string | null
+  saleTo: string | null
+  saleDays: number
+  saleStartMinute: number | null
+  saleEndMinute: number | null
   sort: number
   onlinePrice: number | null
   override: {
@@ -292,6 +872,64 @@ export interface DishDetail {
   overrides: { branchId: string; price: number | null; active: boolean | null }[]
 }
 
+// ------------------------------------------------ M10 · Cây danh mục
+
+export interface CategoryNode {
+  id: string
+  parentId: string | null
+  nameVi: string
+  nameEn: string | null
+  nameJa: string | null
+  kanji: string | null
+  imageUrl: string | null
+  onlineVisible: boolean
+  tableVisible: boolean
+  sort: number
+  /** Cấp trong cây, 0 = gốc — màn M10 thụt lề theo con số này */
+  depth: number
+  dishCount: number
+  /** Gồm cả món nằm trong nhóm con */
+  totalDishCount: number
+  childCount: number
+}
+
+export type CategoryInput = Pick<
+  CategoryNode,
+  'id' | 'parentId' | 'nameVi' | 'nameEn' | 'nameJa' | 'kanji' | 'imageUrl' | 'onlineVisible' | 'tableVisible'
+>
+
+// ------------------------------------------------- M11 · Set & Combo
+
+export interface SaleSchedule {
+  saleFrom: string | null
+  saleTo: string | null
+  /** Bitmask thứ: bit 0 = T2 … bit 6 = CN. 127 = cả tuần */
+  saleDays: number
+  saleStartMinute: number | null
+  saleEndMinute: number | null
+}
+
+export interface SetOverviewRow {
+  id: string
+  code: string
+  nameVi: string
+  active: boolean
+  priceVnd: number
+  onlineVisible: boolean
+  tableOrderable: boolean
+  branchOverride: { price: number | null; active: boolean | null } | null
+  courses: { groupId: string; label: string; pickCount: number | null; minVnd: number; maxVnd: number }[]
+  courseCount: number
+  costMinVnd: number
+  costMaxVnd: number
+  /** null khi còn món thành phần chưa khai công thức — dải chưa đọc được */
+  foodCostMin: number | null
+  foodCostMax: number | null
+  unknownDishes: string[]
+  schedule: SaleSchedule
+  scheduleLabel: string | null
+}
+
 // ------------------------------------------- Kho & công thức M7 · M4 · S1 · S2
 
 /**
@@ -320,6 +958,8 @@ export interface IngredientRow {
   costPerPurchaseVnd: number
   minLevelBase: number
   lotRequired: boolean
+  /** Pha ở bếp chứ không mua ngoài — công thức mẻ khai ở M8 */
+  isSemiFinished: boolean
   active: boolean
   sort: number
   qtyBase: number
@@ -369,6 +1009,97 @@ export interface RecipeView {
   percent: number | null
   band: FoodCostBand
   grossProfitVnd: number | null
+}
+
+// ------------------------------------------------- M8 · Bán thành phẩm
+
+export interface PrepRow {
+  id: string
+  code: string
+  name: string
+  groupName: string | null
+  baseUnit: string
+  /** Sản lượng một mẻ chuẩn, ĐVT cơ sở; 0 = chưa khai */
+  yieldBase: number
+  lineCount: number
+  batchCostVnd: number
+  /** Giá vốn mỗi ĐVT cơ sở THEO CÔNG THỨC; null = chưa đủ dữ kiện */
+  standardMilli: number | null
+  /** Giá đang dùng thật, do lượt nấu S7 đẩy lên theo bình quân gia quyền */
+  costPerBaseMilli: number
+  usedByDishes: number
+}
+
+export interface PrepRecipeView {
+  prep: {
+    id: string
+    code: string
+    name: string
+    baseUnit: string
+    yieldBase: number
+    costPerBaseMilli: number
+  }
+  lines: (RecipeLine & { isSemiFinished: boolean })[]
+  batchCostVnd: number
+  standardMilli: number | null
+}
+
+// -------------------------------------------- M9 · Lịch sử công thức
+
+export type RecipeSubjectKind = 'dish' | 'prep'
+
+export interface RecipeChangeRow {
+  id: number
+  subjectKind: RecipeSubjectKind
+  subjectId: string
+  subjectName: string
+  version: number
+  lineCount: number
+  yieldBase: number | null
+  costVnd: number
+  /** Giá vốn của phiên bản liền trước; null = đây là bản đầu tiên */
+  previousCostVnd: number | null
+  actorName: string | null
+  createdAt: string
+}
+
+export interface RecipeVersionRow {
+  version: number
+  lineCount: number
+  yieldBase: number | null
+  costVnd: number
+  actorName: string | null
+  createdAt: string
+}
+
+export interface RecipeVersionList {
+  subjectKind: RecipeSubjectKind
+  subjectId: string
+  subjectName: string
+  versions: RecipeVersionRow[]
+}
+
+export interface RecipeVersionLineSnapshot {
+  ingredientId: string
+  name: string
+  qtyBase: number
+  wasteBp: number
+  costPerBaseMilli: number
+  costVnd: number
+}
+
+export interface RecipeVersionCompare {
+  subjectKind: RecipeSubjectKind
+  subjectId: string
+  from: { version: number; costVnd: number; yieldBase: number | null; actorName: string | null; createdAt: string }
+  to: { version: number; costVnd: number; yieldBase: number | null; actorName: string | null; createdAt: string }
+  lines: {
+    ingredientId: string
+    name: string
+    before: RecipeVersionLineSnapshot | null
+    after: RecipeVersionLineSnapshot | null
+    change: 'added' | 'removed' | 'changed' | 'same'
+  }[]
 }
 
 export interface StockOverview {
@@ -491,7 +1222,7 @@ export interface DebtReport {
     receiptCount: number
     note: string
   }
-  receivable: BlockedTile
+  receivable: ReceivableReport & { note: string }
 }
 
 export interface PeriodLock {
@@ -936,6 +1667,242 @@ export interface Approval {
   reason: string
 }
 
+// ------------------------------------- B11 · B12 · B13 · B14 · B15 (nhóm CRM)
+
+export type PromotionKind = 'percent' | 'amount' | 'free_dish' | 'set_price'
+export type PromotionState = 'draft' | 'active' | 'paused' | 'ended'
+
+export interface PromotionInput {
+  code: string
+  name: string
+  kind: PromotionKind
+  percentBp: number | null
+  amountVnd: number | null
+  targetDishId: string | null
+  setPriceVnd: number | null
+  maxDiscountVnd: number | null
+  channels: string[]
+  branchIds: string[]
+  weekdays: number[]
+  fromMinute: number | null
+  toMinute: number | null
+  minOrderVnd: number
+  requiresVoucher: boolean
+  startsOn: string
+  endsOn: string
+}
+
+export interface PromotionRow extends PromotionInput {
+  id: number
+  state: PromotionState
+  targetDishName: string | null
+  activatedAt: string | null
+  activatedBy: string | null
+  uses: number
+  discountVnd: number
+  voucherCount: number
+  voucherLive: number
+}
+
+export interface PromoVoucherRow {
+  id: number
+  code: string
+  maxUses: number
+  usedCount: number
+  expiresOn: string | null
+  state: 'live' | 'void'
+}
+
+export interface CustomerRow {
+  id: number
+  phone: string
+  /** true = vai trò hiện tại chỉ được thấy SĐT che ba số giữa */
+  phoneMasked: boolean
+  name: string | null
+  allergies: string | null
+  note: string | null
+  firstSeenOn: string
+  lastSeenOn: string
+  visits: number
+  spendTotalVnd: number
+  spend12MonthsVnd: number
+  pointsBalance: number
+  tier: 'dong' | 'bac' | 'vang'
+  tierLabel: string
+  noShowCount: number
+}
+
+export interface LoyaltyConfig {
+  vndPerPoint: number
+  vndPerPointRedeem: number
+  redeemCapVndPerOrder: number
+  expiryMonths: number
+  tierSilverVnd: number
+  tierGoldVnd: number
+}
+
+export interface LoyaltyEntry {
+  id: number
+  kind: 'earn' | 'redeem' | 'reclaim' | 'adjust' | 'expire'
+  points: number
+  orderId: number | null
+  baseVnd: number | null
+  reason: string | null
+  staffName: string | null
+  businessDate: string
+  expiresOn: string | null
+}
+
+export interface CustomerProfile {
+  id: number
+  phone: string
+  phoneMasked: boolean
+  name: string | null
+  allergies: string | null
+  note: string | null
+  firstSeenOn: string
+  lastSeenOn: string
+  spendTotalVnd: number
+  spend12MonthsVnd: number
+  visitCount: number
+  loyalty: {
+    balance: number
+    tier: CustomerRow['tier']
+    tierLabel: string
+    next: { tier: CustomerRow['tier']; remainingVnd: number } | null
+    config: LoyaltyConfig
+    entries: LoyaltyEntry[]
+  }
+  visits: {
+    orderId: number
+    displayCode: string
+    branchId: string
+    channel: string
+    businessDate: string
+    moneyTotal: number
+    paymentState: string
+  }[]
+  favourites: { dishId: string; name: string; times: number; qty: number }[]
+  bookings: {
+    id: number
+    displayCode: string
+    branchId: string
+    slotAt: string
+    guestCount: number
+    status: string
+  }[]
+}
+
+export interface FeedbackItem {
+  id: number
+  orderId: number
+  displayCode: string
+  stars: number
+  comment: string | null
+  source: 'table' | 'online'
+  state: 'new' | 'assigned' | 'resolved'
+  assignedTo: number | null
+  assignedName: string | null
+  dueAt: string | null
+  resolution: string | null
+  resolvedAt: string | null
+  businessDate: string
+  createdAt: string
+  moneyTotal: number
+  dishes: { name: string; qty: number }[]
+  overdue: boolean
+}
+
+export interface FeedbackQueue {
+  rules: { 'feedback.complaintStars': number; 'feedback.responseHours': number }
+  items: FeedbackItem[]
+}
+
+export interface FeedbackSummary {
+  overall: { count: number; average: number; oneStar: number; fiveStar: number; open: number }
+  byShift: { shiftId: number | null; openedAt: string | null; count: number; average: number }[]
+  byDish: { dishId: string; name: string; count: number; billAverage: number }[]
+}
+
+export interface CorporateInput {
+  code: string
+  name: string
+  taxCode: string
+  contactName: string | null
+  contactPhone: string | null
+  contactEmail: string | null
+  address: string | null
+  creditLimitVnd: number
+  paymentTermDays: number
+  reconcileDay: number
+  blockAfterOverdueDays: number | null
+  einvoiceMode: 'per-bill' | 'aggregate' | null
+  active: boolean
+}
+
+export interface AgingBuckets {
+  currentVnd: number
+  d0to30Vnd: number
+  d31to60Vnd: number
+  over60Vnd: number
+  totalVnd: number
+  maxOverdueDays: number
+}
+
+export interface CorporateRow extends CorporateInput {
+  id: number
+  einvoiceModeEffective: 'per-bill' | 'aggregate'
+  blockAfterOverdueDaysEffective: number
+  aging: AgingBuckets
+  outstandingVnd: number
+  availableVnd: number
+  /** null = POS ghi nợ được; có chữ = lý do bị chặn */
+  blockedReason: string | null
+}
+
+export interface CorporateStatement {
+  company: CorporateRow
+  period: { from: string; to: string }
+  charges: {
+    id: number
+    orderId: number
+    displayCode: string
+    branchId: string
+    amountVnd: number
+    chargedOn: string
+    dueOn: string
+    signer: string | null
+    settledVnd: number
+    remainingVnd: number
+    overdueDays: number
+  }[]
+  settlements: {
+    id: number
+    chargeId: number
+    kind: 'payment' | 'write-off'
+    amountVnd: number
+    paidOn: string
+    note: string | null
+    byName: string | null
+  }[]
+  aging: AgingBuckets
+  totals: { chargedVnd: number; settledVnd: number; outstandingVnd: number }
+}
+
+export interface ReceivableReport {
+  companies: {
+    id: number
+    code: string
+    name: string
+    creditLimitVnd: number
+    paymentTermDays: number
+    contactName: string | null
+    contactPhone: string | null
+    aging: AgingBuckets
+  }[]
+  totals: AgingBuckets
+}
+
 export const api = {
   officeLogin: (input: { branchId: string; email: string; password: string }) =>
     apiFetch<{ token: string; staff: OfficeStaff }>('/api/auth/office/login', {
@@ -1191,6 +2158,30 @@ export const api = {
       method: 'DELETE',
     }),
 
+  // -------------------------------------------------------------------- M10
+
+  categories: () => apiFetch<CategoryNode[]>('/api/admin/categories'),
+
+  createCategory: (input: CategoryInput) =>
+    apiFetch<CategoryNode>('/api/admin/categories', { method: 'POST', body: input }),
+
+  updateCategory: (id: string, patch: Partial<CategoryInput>) =>
+    apiFetch<CategoryNode>(`/api/admin/categories/${id}`, { method: 'PATCH', body: patch }),
+
+  moveCategory: (id: string, parentId: string | null, position: number) =>
+    apiFetch<{ id: string; position: number }>(`/api/admin/categories/${id}/move`, {
+      method: 'PUT',
+      body: { parentId, position },
+    }),
+
+  deleteCategory: (id: string) =>
+    apiFetch<{ deleted: boolean }>(`/api/admin/categories/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------- M11
+
+  sets: (branchId: string) =>
+    apiFetch<SetOverviewRow[]>(`/api/admin/sets?branch=${encodeURIComponent(branchId)}`),
+
   // -------------------------------------------------------------------- O10
 
   deliveryZones: (branchId: string) =>
@@ -1222,6 +2213,29 @@ export const api = {
 
   profitLoss: (branchId: string, period: PeriodChoice, basis: PnlBasis = 'don-tich') =>
     apiFetch<PnlReport>(`/api/reports/pnl?${periodQuery(branchId, period)}&basis=${basis}`),
+
+  // ------------------------------------------------- B2 · B4 … B9
+
+  revenueReport: (branchId: string, period: PeriodChoice) =>
+    apiFetch<RevenueReport>(`/api/reports/revenue?${periodQuery(branchId, period)}`),
+
+  costMargin: (branchId: string, period: PeriodChoice) =>
+    apiFetch<CostMarginReport>(`/api/reports/cost-margin?${periodQuery(branchId, period)}`),
+
+  kitchenReport: (branchId: string, period: PeriodChoice) =>
+    apiFetch<KitchenReport>(`/api/reports/kitchen?${periodQuery(branchId, period)}`),
+
+  tableTurnover: (branchId: string, period: PeriodChoice) =>
+    apiFetch<TurnoverReport>(`/api/reports/table-turnover?${periodQuery(branchId, period)}`),
+
+  staffReport: (branchId: string, period: PeriodChoice) =>
+    apiFetch<StaffReport>(`/api/reports/staff?${periodQuery(branchId, period)}`),
+
+  setsReport: (branchId: string, period: PeriodChoice) =>
+    apiFetch<SetsReport>(`/api/reports/sets?${periodQuery(branchId, period)}`),
+
+  onlineReport: (branchId: string, period: PeriodChoice) =>
+    apiFetch<OnlineReport>(`/api/reports/online?${periodQuery(branchId, period)}`),
 
   // --------------------------------------------- M7 · M4 · S1 · S2
 
@@ -1271,6 +2285,38 @@ export const api = {
       '/api/inventory/dish-costs',
     ),
 
+  // ------------------------------------------------------------- M8
+
+  preps: () => apiFetch<PrepRow[]>('/api/inventory/preps'),
+
+  prepRecipe: (prepId: string) => apiFetch<PrepRecipeView>(`/api/inventory/preps/${prepId}`),
+
+  setPrepRecipe: (
+    prepId: string,
+    input: { yieldBase: number; lines: { ingredientId: string; qtyBase: number; wasteBp: number }[] },
+    approval?: Approval | null,
+  ) =>
+    apiFetch<{
+      lines: number
+      batchCostVnd: number
+      standardMilli: number | null
+      /** Giá vừa được mồi cho bán thành phẩm chưa từng có giá; null = không mồi */
+      seededMilli: number | null
+      version: number | null
+    }>(`/api/inventory/preps/${prepId}`, { method: 'PUT', body: { ...input, approval } }),
+
+  // ------------------------------------------------------------- M9
+
+  recipeChanges: () => apiFetch<RecipeChangeRow[]>('/api/inventory/recipe-changes'),
+
+  recipeVersions: (kind: RecipeSubjectKind, subjectId: string) =>
+    apiFetch<RecipeVersionList>(`/api/inventory/recipe-versions/${kind}/${subjectId}`),
+
+  compareRecipeVersions: (kind: RecipeSubjectKind, subjectId: string, from: number, to: number) =>
+    apiFetch<RecipeVersionCompare>(
+      `/api/inventory/recipe-versions/${kind}/${subjectId}/compare?from=${from}&to=${to}`,
+    ),
+
   receiveStock: (input: {
     branchId: string
     ingredientId: string
@@ -1289,6 +2335,228 @@ export const api = {
     apiFetch<{ delta: number }>('/api/inventory/adjustments', {
       method: 'POST',
       body: { ...input, approval },
+    }),
+
+  // ---------------------------------------------------------- S3 … S12
+
+  suppliers: () => apiFetch<SupplierRow[]>('/api/warehouse/suppliers'),
+
+  saveSupplier: (input: SupplierInput, id?: number) =>
+    id
+      ? apiFetch<SupplierRow>(`/api/warehouse/suppliers/${id}`, { method: 'PUT', body: input })
+      : apiFetch<SupplierRow>('/api/warehouse/suppliers', { method: 'POST', body: input }),
+
+  setSupplierItem: (input: {
+    supplierId: number
+    ingredientId: string
+    priceVnd: number
+    minOrderPurchase: number
+    leadTimeDays: number
+    preferred: boolean
+  }) => apiFetch<{ supplierId: number }>('/api/warehouse/supplier-items', { method: 'PUT', body: input }),
+
+  removeSupplierItem: (supplierId: number, ingredientId: string) =>
+    apiFetch<{ removed: boolean }>(`/api/warehouse/suppliers/${supplierId}/items/${ingredientId}`, {
+      method: 'DELETE',
+    }),
+
+  purchaseOrders: (branchId: string, state?: string) =>
+    apiFetch<PurchaseOrderRow[]>(
+      `/api/warehouse/purchase-orders?branch=${encodeURIComponent(branchId)}${state ? `&state=${state}` : ''}`,
+    ),
+
+  reorderSuggestions: (branchId: string) =>
+    apiFetch<ReorderRow[]>(
+      `/api/warehouse/reorder-suggestions?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  createPurchaseOrder: (input: {
+    branchId: string
+    supplierId: number
+    expectedOn: string | null
+    note: string | null
+    lines: { ingredientId: string; qtyPurchase: number; priceVnd: number }[]
+  }) =>
+    apiFetch<{ id: number; displayCode: string }>('/api/warehouse/purchase-orders', {
+      method: 'POST',
+      body: input,
+    }),
+
+  sendPurchaseOrder: (id: number) =>
+    apiFetch<{ state: string }>(`/api/warehouse/purchase-orders/${id}/send`, { method: 'POST' }),
+
+  cancelPurchaseOrder: (id: number, reason: string) =>
+    apiFetch<{ state: string }>(`/api/warehouse/purchase-orders/${id}/cancel`, {
+      method: 'POST',
+      body: { reason },
+    }),
+
+  /** S5 — cửa nhập đầy đủ: có lô, hạn dùng, nhiệt độ, đơn đặt hàng, cảnh báo lệch giá */
+  receiveLot: (input: {
+    branchId: string
+    ingredientId: string
+    qtyPurchase: number
+    totalVnd: number
+    supplierId: number | null
+    purchaseOrderId: number | null
+    lotCode: string | null
+    expiresOn: string | null
+    receiveTempDeciC: number | null
+    note: string | null
+  }) => apiFetch<ReceiveResult>('/api/warehouse/receipts', { method: 'POST', body: input }),
+
+  issueStock: (
+    input: {
+      branchId: string
+      kind: 'write_off' | 'internal'
+      ingredientId: string
+      qtyBase: number
+      reason: string
+    },
+    approval?: Approval | null,
+  ) =>
+    apiFetch<{ qtyBase: number; shortBase: number }>('/api/warehouse/issues', {
+      method: 'POST',
+      body: { ...input, approval },
+    }),
+
+  produce: (input: {
+    branchId: string
+    kind: 'pha-che' | 'pha-loc' | 'duc-keg'
+    inputs: { ingredientId: string; qtyBase: number }[]
+    outputs: { ingredientId: string; qtyBase: number; costShareBp: number }[]
+    note: string | null
+  }) => apiFetch<ProductionResult>('/api/warehouse/production', { method: 'POST', body: input }),
+
+  tapKeg: (lotId: number, branchId: string) =>
+    apiFetch<{ lotId: number; expiresOn: string | null }>(`/api/warehouse/lots/${lotId}/tap`, {
+      method: 'POST',
+      body: { branchId },
+    }),
+
+  lots: (branchId: string, all = false) =>
+    apiFetch<LotBook>(`/api/warehouse/lots?branch=${encodeURIComponent(branchId)}${all ? '&all=true' : ''}`),
+
+  openCount: (branchId: string, groupName: string | null) =>
+    apiFetch<{ id: number; lines: number }>('/api/warehouse/counts', {
+      method: 'POST',
+      body: { branchId, groupName },
+    }),
+
+  countSheet: (id: number) => apiFetch<CountSheet>(`/api/warehouse/counts/${id}`),
+
+  saveCountLines: (
+    id: number,
+    lines: { ingredientId: string; countedBase: number; note: string | null }[],
+  ) => apiFetch<{ saved: number }>(`/api/warehouse/counts/${id}/lines`, { method: 'PUT', body: { lines } }),
+
+  closeCount: (id: number, approval?: Approval | null) =>
+    apiFetch<{ adjusted: number; diffVnd: number }>(`/api/warehouse/counts/${id}/close`, {
+      method: 'POST',
+      body: { approval },
+    }),
+
+  cancelCount: (id: number) =>
+    apiFetch<{ state: string }>(`/api/warehouse/counts/${id}/cancel`, { method: 'POST' }),
+
+  transfers: (branchId: string) =>
+    apiFetch<TransferRow[]>(`/api/warehouse/transfers?branch=${encodeURIComponent(branchId)}`),
+
+  sendTransfer: (input: {
+    fromBranchId: string
+    toBranchId: string
+    note: string | null
+    lines: { ingredientId: string; qtyBase: number }[]
+  }) =>
+    apiFetch<{ id: number; displayCode: string }>('/api/warehouse/transfers', {
+      method: 'POST',
+      body: input,
+    }),
+
+  receiveTransfer: (id: number, lines: { ingredientId: string; receivedBase: number }[]) =>
+    apiFetch<{ shortageVnd: number }>(`/api/warehouse/transfers/${id}/receive`, {
+      method: 'POST',
+      body: { lines },
+    }),
+
+  wasteReport: (branchId: string, from: string, to: string) =>
+    apiFetch<WasteReport>(
+      `/api/warehouse/waste?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
+    ),
+
+  stockCard: (branchId: string, ingredientId: string, from: string, to: string) =>
+    apiFetch<StockCard>(
+      `/api/warehouse/stock-card?branch=${encodeURIComponent(branchId)}&ingredient=${encodeURIComponent(ingredientId)}&from=${from}&to=${to}`,
+    ),
+
+  // --------------------------------------------------------------- C5
+
+  inputInvoices: (branchId: string, from: string, to: string) =>
+    apiFetch<InputInvoiceBook>(
+      `/api/expenses/input-invoices?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
+    ),
+
+  createInputInvoice: (input: InputInvoiceInput) =>
+    apiFetch<{ id: number }>('/api/expenses/input-invoices', { method: 'POST', body: input }),
+
+  updateInputInvoice: (
+    id: number,
+    patch: { voucherId?: number | null; deductible?: boolean; note?: string | null },
+  ) => apiFetch<{ id: number }>(`/api/expenses/input-invoices/${id}`, { method: 'PUT', body: patch }),
+
+  deleteInputInvoice: (id: number) =>
+    apiFetch<{ deleted: boolean }>(`/api/expenses/input-invoices/${id}`, { method: 'DELETE' }),
+
+  // ---------------------------------------------------- H3 · H4 · H5
+
+  attendance: (branchId: string, date: string) =>
+    apiFetch<AttendanceBoard>(
+      `/api/hr/attendance?branch=${encodeURIComponent(branchId)}&date=${date}`,
+    ),
+
+  timesheet: (branchId: string, from: string, to: string) =>
+    apiFetch<TimesheetGrid>(
+      `/api/hr/timesheet?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
+    ),
+
+  saveTimesheetEntry: (
+    input: {
+      branchId: string
+      employeeId: number
+      workDate: string
+      clockIn: string
+      clockOut: string | null
+      breakMinutes: number
+      reason: string
+    },
+    approval?: Approval | null,
+  ) => apiFetch<{ id: number }>('/api/hr/timesheet', { method: 'POST', body: { ...input, approval } }),
+
+  deleteTimesheetEntry: (id: number, branchId: string, reason: string) =>
+    apiFetch<{ deleted: boolean }>(`/api/hr/timesheet/${id}`, {
+      method: 'DELETE',
+      body: { branchId, reason },
+    }),
+
+  leaves: (branchId: string, state?: string) =>
+    apiFetch<LeaveRow[]>(
+      `/api/hr/leaves?branch=${encodeURIComponent(branchId)}${state ? `&state=${state}` : ''}`,
+    ),
+
+  createLeave: (input: {
+    branchId: string
+    employeeId: number
+    kind: LeaveKind
+    fromDate: string
+    toDate: string
+    counterpartId: number | null
+    reason: string
+  }) => apiFetch<{ id: number }>('/api/hr/leaves', { method: 'POST', body: input }),
+
+  decideLeave: (id: number, branchId: string, approve: boolean, note: string | null) =>
+    apiFetch<{ state: string; shiftsChanged: number }>(`/api/hr/leaves/${id}/decision`, {
+      method: 'POST',
+      body: { branchId, approve, note },
     }),
 
   // ---------------------------------------------- H1 · H2 · H7
@@ -1483,4 +2751,101 @@ export const api = {
       method: 'POST',
       body: { branchId, month, note },
     }),
+
+  // ------------------------------- B11 · B12 · B13 · B14 · B15
+
+  promotions: () => apiFetch<PromotionRow[]>('/api/crm/promotions'),
+
+  savePromotion: (input: PromotionInput, id?: number) =>
+    apiFetch<PromotionRow>(id ? `/api/crm/promotions/${id}` : '/api/crm/promotions', {
+      method: id ? 'PUT' : 'POST',
+      body: input,
+    }),
+
+  setPromotionState: (
+    id: number,
+    state: 'active' | 'paused' | 'ended',
+    approval?: Approval | null,
+  ) =>
+    apiFetch<PromotionRow>(`/api/crm/promotions/${id}/state`, {
+      method: 'POST',
+      body: { state, approval: approval ?? null },
+    }),
+
+  promoVouchers: (promotionId: number) =>
+    apiFetch<PromoVoucherRow[]>(`/api/crm/promotions/${promotionId}/vouchers`),
+
+  issueVouchers: (input: {
+    promotionId: number
+    prefix: string
+    count: number
+    maxUses: number
+    expiresOn: string | null
+  }) => apiFetch<PromoVoucherRow[]>('/api/crm/promotions/vouchers', { method: 'POST', body: input }),
+
+  voidVoucher: (id: number) =>
+    apiFetch<PromoVoucherRow>(`/api/crm/promotions/vouchers/${id}/void`, { method: 'POST' }),
+
+  customers: (search: string) =>
+    apiFetch<CustomerRow[]>(
+      `/api/crm/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`,
+    ),
+
+  customer: (id: number) => apiFetch<CustomerProfile>(`/api/crm/customers/${id}`),
+
+  saveCustomer: (input: {
+    phone: string
+    name: string | null
+    allergies: string | null
+    note: string | null
+  }) => apiFetch<{ id: number }>('/api/crm/customers', { method: 'PUT', body: input }),
+
+  loyaltyConfig: (branchId: string) =>
+    apiFetch<LoyaltyConfig>(`/api/crm/loyalty/config?branch=${encodeURIComponent(branchId)}`),
+
+  adjustPoints: (input: { customerId: number; points: number; reason: string }) =>
+    apiFetch<LoyaltyEntry>('/api/crm/loyalty/adjust', { method: 'POST', body: input }),
+
+  feedbackQueue: (branchId: string, includeResolved: boolean) =>
+    apiFetch<FeedbackQueue>(
+      `/api/crm/feedback?branch=${encodeURIComponent(branchId)}&resolved=${includeResolved}`,
+    ),
+
+  feedbackSummary: (branchId: string, from: string, to: string) =>
+    apiFetch<FeedbackSummary>(
+      `/api/crm/feedback/summary?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
+    ),
+
+  /** Không truyền `staffId` = nhận việc cho chính mình */
+  assignFeedback: (id: number, staffId?: number) =>
+    apiFetch<FeedbackItem>(`/api/crm/feedback/${id}/assign`, {
+      method: 'POST',
+      body: { staffId: staffId ?? null },
+    }),
+
+  resolveFeedback: (id: number, resolution: string) =>
+    apiFetch<FeedbackItem>(`/api/crm/feedback/${id}/resolve`, {
+      method: 'POST',
+      body: { resolution },
+    }),
+
+  corporate: () => apiFetch<CorporateRow[]>('/api/crm/corporate'),
+
+  saveCorporate: (input: CorporateInput, id?: number) =>
+    apiFetch<CorporateRow>(id ? `/api/crm/corporate/${id}` : '/api/crm/corporate', {
+      method: id ? 'PUT' : 'POST',
+      body: input,
+    }),
+
+  corporateStatement: (id: number, from: string, to: string) =>
+    apiFetch<CorporateStatement>(`/api/crm/corporate/${id}/statement?from=${from}&to=${to}`),
+
+  settleCorporate: (input: {
+    chargeId: number
+    kind: 'payment' | 'write-off'
+    amountVnd: number
+    paidOn: string
+    note: string | null
+  }) =>
+    apiFetch<{ id: number }>('/api/crm/corporate/settlements', { method: 'POST', body: input }),
 }

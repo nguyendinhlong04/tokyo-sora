@@ -29,6 +29,7 @@ const EMPTY: IngredientInput = {
   basePerPurchase: 1_000,
   minLevelBase: 0,
   lotRequired: false,
+  isSemiFinished: false,
   active: true,
   sort: 0,
 }
@@ -293,6 +294,11 @@ function IngredientForm({
           label="Bắt buộc khai lô khi nhập"
         />
         <Toggle
+          on={draft.isSemiFinished}
+          onToggle={() => set('isSemiFinished', !draft.isSemiFinished)}
+          label="Bán thành phẩm (pha ở bếp)"
+        />
+        <Toggle
           on={draft.active}
           onToggle={() => set('active', !draft.active)}
           label="Đang dùng"
@@ -307,7 +313,9 @@ function IngredientForm({
 
       <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
         Chọn đơn vị cơ sở đủ nhỏ để định lượng công thức luôn là số nguyên: gam cho thịt rau, ml
-        cho chất lỏng, cái cho đồ đếm được. Đơn vị mua là thứ ghi trên hoá đơn nhà cung cấp.
+        cho chất lỏng, cái cho đồ đếm được. Đơn vị mua là thứ ghi trên hoá đơn nhà cung cấp.{' '}
+        <span className="text-ink-body">Bán thành phẩm</span> là thứ pha ở bếp chứ không mua ngoài
+        (sốt, nước dùng, kim chi) — bật cờ đó rồi khai công thức mẻ ở M8.
       </p>
     </section>
   )

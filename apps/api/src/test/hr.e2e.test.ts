@@ -9,10 +9,10 @@
  */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { hash } from '@node-rs/argon2'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
-import { parameters, staff, staffRoles } from '../db/schema'
+import { parameters, staff, staffRoles, timeEntries } from '../db/schema'
 import { bootTestApp, type Fixtures } from './harness'
 
 let app: NestFastifyApplication
@@ -30,6 +30,9 @@ let shiftLead: string
 
 let cookEmployeeId: number
 let periodId: number
+/** R13 có PIN để đóng vai người duyệt trong luồng △ của `timesheet.edit-manual` */
+let hrManagerStaffId: number
+const HR_PIN = '4913'
 
 const inject = (opts: Parameters<NestFastifyApplication['inject']>[0]) => app.inject(opts)
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` })
@@ -72,8 +75,13 @@ beforeAll(async () => {
   close = boot.close
 
   await makeOfficeUser('CHU01', 'Chủ quán', 'chu@tokyosora.vn', 'R10')
-  await makeOfficeUser('NS01', 'Nhân sự Mai', 'ns@tokyosora.vn', 'R13')
+  hrManagerStaffId = await makeOfficeUser('NS01', 'Nhân sự Mai', 'ns@tokyosora.vn', 'R13')
   await makeOfficeUser('KT01', 'Kế toán Vân', 'kt@tokyosora.vn', 'R8')
+  // Người duyệt △ xác minh bằng PIN ngay tại chỗ (§4.3.1), nên R13 phải có PIN
+  await db
+    .update(staff)
+    .set({ pinHash: await hash(HR_PIN) })
+    .where(eq(staff.id, hrManagerStaffId))
 
   // Quản lý ca dùng chính tài khoản Lan của harness
   const passwordHash = await hash(OFFICE_PASSWORD)
@@ -300,6 +308,301 @@ describe('H2 — Xếp lịch tuần', () => {
     const me = grid.json().employees.find((e: { employeeId: number }) => e.employeeId === cookEmployeeId)
     expect(me.totalMinutes).toBe(0) // vừa chép, còn là nháp
     expect(me.cells.every((c: { dayKind: string }) => c.dayKind === 'thuong')).toBe(true)
+  })
+})
+
+// ------------------------------------------------------------ H3 · H4 · H5
+
+/** Ca đã xếp của tuần WEEK, dùng để ghi công thực tế khớp với lịch */
+const SHIFTS: { date: string; in: string; out: string; break: number }[] = [
+  ...[0, 1, 2, 3].map((i) => ({ date: day(i), in: '08:00', out: '17:00', break: 60 })),
+  { date: day(4), in: '08:00', out: '18:00', break: 0 },
+  { date: day(6), in: '10:00', out: '16:00', break: 0 },
+]
+
+describe('H3 · H4 — công THỰC TẾ, không phải lịch xếp', () => {
+  it('chưa ai chấm thì bảng công trống, dù lịch đã công bố đủ sáu ca', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/hr/timesheet?branch=${fx.branchId}&from=${day(0)}&to=${day(6)}`,
+      headers: bearer(shiftLead),
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    const me = res.json().rows.find((r: { employeeId: number }) => r.employeeId === cookEmployeeId)
+    expect(me.days).toHaveLength(0)
+    // Sáu ngày có ca mà không có công và cũng không có phép — vắng thật
+    expect(me.missingDays).toHaveLength(6)
+  })
+
+  it('quản lý CA sửa công tay phải có người khác duyệt — đây là dấu △ của §4.2b', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/hr/timesheet',
+      headers: bearer(shiftLead),
+      payload: {
+        branchId: fx.branchId,
+        employeeId: cookEmployeeId,
+        workDate: day(0),
+        clockIn: '08:00',
+        clockOut: '17:00',
+        breakMinutes: 60,
+        reason: 'Quên chấm vào',
+      },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().code).toBe('requires_approval')
+  })
+
+  it('có PIN của R13 duyệt thì quản lý ca sửa được, và bản ghi duyệt được lưu', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/hr/timesheet',
+      headers: bearer(shiftLead),
+      payload: {
+        branchId: fx.branchId,
+        employeeId: cookEmployeeId,
+        workDate: day(5),
+        clockIn: '09:00',
+        clockOut: '15:00',
+        breakMinutes: 0,
+        reason: 'Vào làm hộ ca thứ Bảy, kiosk chưa ghép',
+        approval: {
+          approverStaffId: hrManagerStaffId,
+          approverPin: HR_PIN,
+          reason: 'Đã đối chiếu camera',
+        },
+      },
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+
+    // Dọn lại: ngày thứ Bảy không nằm trong lịch nên nó sẽ làm lệch tổng của bài sau
+    const [entry] = await db
+      .select({ id: timeEntries.id })
+      .from(timeEntries)
+      .where(and(eq(timeEntries.employeeId, cookEmployeeId), eq(timeEntries.workDate, day(5))))
+    const removed = await inject({
+      method: 'DELETE',
+      url: `/api/hr/timesheet/${entry!.id}`,
+      headers: bearer(hrManager),
+      payload: { branchId: fx.branchId, reason: 'Ghi nhầm ngày' },
+    })
+    expect(removed.statusCode, removed.payload).toBe(200)
+  })
+
+  it('sửa công tay không có lý do bị chặn', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/hr/timesheet',
+      headers: bearer(hrManager),
+      payload: {
+        branchId: fx.branchId,
+        employeeId: cookEmployeeId,
+        workDate: day(0),
+        clockIn: '08:00',
+        clockOut: '17:00',
+        breakMinutes: 60,
+        reason: '   ',
+      },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('quản lý NHÂN SỰ ghi công trực tiếp — R13 không cần duyệt', async () => {
+    for (const shift of SHIFTS) {
+      const res = await inject({
+        method: 'POST',
+        url: '/api/hr/timesheet',
+        headers: bearer(hrManager),
+        payload: {
+          branchId: fx.branchId,
+          employeeId: cookEmployeeId,
+          workDate: shift.date,
+          clockIn: shift.in,
+          clockOut: shift.out,
+          breakMinutes: shift.break,
+          reason: 'Nhập từ sổ chấm công giấy',
+        },
+      })
+      expect(res.statusCode, res.payload).toBe(201)
+    }
+  })
+
+  /**
+   * Đây là điều đáng chứng minh nhất của cả nhóm H: giờ công đến từ bảng công,
+   * và nó chia đúng ba loại theo LOẠI NGÀY của ca đã xếp — bản ghi chấm công
+   * không tự khai được nó là ngày nghỉ.
+   */
+  it('bảng công chia đúng ba loại theo loại ngày của ca đã xếp', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/hr/timesheet?branch=${fx.branchId}&from=${day(0)}&to=${day(6)}`,
+      headers: bearer(shiftLead),
+    })
+    const me = res.json().rows.find((r: { employeeId: number }) => r.employeeId === cookEmployeeId)
+    expect(me.total.worked).toBe(1_920 + 480)
+    expect(me.total.otNormal).toBe(120)
+    expect(me.total.otRest).toBe(360)
+    expect(me.missingDays).toHaveLength(0)
+    // Dòng nào sửa tay thì bảng công nói rõ ai sửa và vì sao
+    expect(me.days[0].source).toBe('manual')
+    expect(me.days[0].editedBy).toBe('Nhân sự Mai')
+    expect(me.days[0].editReason).toContain('sổ chấm công giấy')
+  })
+
+  it('công ÍT hơn lịch thì lương theo công, không theo lịch', async () => {
+    const shorter = await inject({
+      method: 'POST',
+      url: '/api/hr/timesheet',
+      headers: bearer(hrManager),
+      payload: {
+        branchId: fx.branchId,
+        employeeId: cookEmployeeId,
+        workDate: day(3),
+        clockIn: '08:00',
+        clockOut: '13:00',
+        breakMinutes: 0,
+        reason: 'Về sớm vì việc nhà',
+      },
+    })
+    expect(shorter.statusCode, shorter.payload).toBe(201)
+
+    const res = await inject({
+      method: 'GET',
+      url: `/api/hr/timesheet?branch=${fx.branchId}&from=${day(0)}&to=${day(6)}`,
+      headers: bearer(shiftLead),
+    })
+    const me = res.json().rows.find((r: { employeeId: number }) => r.employeeId === cookEmployeeId)
+    // Ngày thứ Năm rút từ 8g xuống 5g ⇒ mất 180 phút so với lịch
+    expect(me.total.worked).toBe(1_920 + 480 - 180)
+
+    // Trả lại cho các bài sau, để con số kỳ lương vẫn so được với bản trước
+    const restore = await inject({
+      method: 'POST',
+      url: '/api/hr/timesheet',
+      headers: bearer(hrManager),
+      payload: {
+        branchId: fx.branchId,
+        employeeId: cookEmployeeId,
+        workDate: day(3),
+        clockIn: '08:00',
+        clockOut: '17:00',
+        breakMinutes: 60,
+        reason: 'Đối chiếu lại camera: về đúng giờ',
+      },
+    })
+    expect(restore.statusCode).toBe(201)
+  })
+
+  it('bảng chấm công hôm nay nói rõ ai vắng, ai muộn, ai đang làm', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/hr/attendance?branch=${fx.branchId}&date=${day(0)}`,
+      headers: bearer(shiftLead),
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    const me = res.json().rows.find((r: { employeeId: number }) => r.employeeId === cookEmployeeId)
+    expect(me.status).toBe('xong-ca')
+    expect(me.workedMinutes).toBe(480)
+    expect(res.json().summary.clockedIn).toBe(1)
+  })
+
+  it('quản lý ca xem được bảng công nhưng KHÔNG xem được lương — nguyên tắc cứng 4', async () => {
+    const timesheet = await inject({
+      method: 'GET',
+      url: `/api/hr/timesheet?branch=${fx.branchId}&from=${day(0)}&to=${day(6)}`,
+      headers: bearer(shiftLead),
+    })
+    expect(timesheet.statusCode).toBe(200)
+    expect(JSON.stringify(timesheet.json())).not.toContain('netPay')
+  })
+})
+
+describe('H5 — Nghỉ phép & đổi ca', () => {
+  let requestId = 0
+
+  it('gửi yêu cầu nghỉ phép', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/hr/leaves',
+      headers: bearer(hrManager),
+      payload: {
+        branchId: fx.branchId,
+        employeeId: cookEmployeeId,
+        kind: 'nghi-phep',
+        fromDate: day(8),
+        toDate: day(9),
+        reason: 'Về quê giỗ',
+      },
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+    requestId = res.json().id
+  })
+
+  it('đổi ca không chọn người nhận bị chặn — duyệt nửa cặp là hỏng cả hai lịch', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/hr/leaves',
+      headers: bearer(hrManager),
+      payload: {
+        branchId: fx.branchId,
+        employeeId: cookEmployeeId,
+        kind: 'doi-ca',
+        fromDate: day(8),
+        toDate: day(8),
+        reason: 'Bận buổi chiều',
+      },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('duyệt nghỉ thì ca của những ngày đó rời khỏi lịch', async () => {
+    const before = await inject({
+      method: 'GET',
+      url: `/api/hr/schedule?branch=${fx.branchId}&week=${day(7)}`,
+      headers: bearer(shiftLead),
+    })
+    const beforeCells = before
+      .json()
+      .employees.find((e: { employeeId: number }) => e.employeeId === cookEmployeeId).cells.length
+
+    const res = await inject({
+      method: 'POST',
+      url: `/api/hr/leaves/${requestId}/decision`,
+      headers: bearer(shiftLead),
+      payload: { branchId: fx.branchId, approve: true, note: null },
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+
+    const after = await inject({
+      method: 'GET',
+      url: `/api/hr/schedule?branch=${fx.branchId}&week=${day(7)}`,
+      headers: bearer(shiftLead),
+    })
+    const afterCells = after
+      .json()
+      .employees.find((e: { employeeId: number }) => e.employeeId === cookEmployeeId).cells.length
+    expect(afterCells).toBeLessThan(beforeCells)
+  })
+
+  it('quyết rồi thì không quyết lại', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: `/api/hr/leaves/${requestId}/decision`,
+      headers: bearer(shiftLead),
+      payload: { branchId: fx.branchId, approve: false, note: 'Đổi ý' },
+    })
+    expect(res.statusCode).toBe(409)
+  })
+
+  it('ngày đã duyệt nghỉ không còn bị đếm là vắng trên bảng công', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/hr/timesheet?branch=${fx.branchId}&from=${day(7)}&to=${day(13)}`,
+      headers: bearer(shiftLead),
+    })
+    const me = res.json().rows.find((r: { employeeId: number }) => r.employeeId === cookEmployeeId)
+    expect(me.leaveDays).toBe(2)
+    expect(me.missingDays).not.toContain(day(8))
   })
 })
 

@@ -11,7 +11,15 @@ import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
 import type { Db } from '../../db/client'
-import { devices, pairingCodes, staff, staffRoles, staffSessions, tableSessions } from '../../db/schema'
+import {
+  devices,
+  employees,
+  pairingCodes,
+  staff,
+  staffRoles,
+  staffSessions,
+  tableSessions,
+} from '../../db/schema'
 import type { Actor, StaffActor } from './actor'
 import { hashToken, newPairingCode, newToken } from './tokens'
 
@@ -220,6 +228,7 @@ export class IdentityService {
         deviceId: input.deviceId,
         sessionId: session!.id,
         fullName: person.fullName,
+        scope: 'full',
         // Trạm do AuthGuard gắn theo thiết bị của từng request, không lưu vào phiên
         stationId: null,
       },
@@ -313,6 +322,111 @@ export class IdentityService {
         deviceId: null,
         sessionId: session!.id,
         fullName: person.fullName,
+        scope: 'full',
+        stationId: null,
+      },
+    }
+  }
+
+  // ------------------------------------------------------- Kênh nhân viên
+
+  /**
+   * H1 cấp link cá nhân cho một người (§26 H8 "vào bằng link cá nhân + PIN").
+   *
+   * Trả về token đúng MỘT LẦN, y như mã ghép thiết bị: cấp lại thì link cũ chết
+   * ngay lập tức, nên người mất điện thoại chỉ cần xin cấp lại. Không có đường
+   * nào đọc lại token đã cấp — chỉ có bản băm nằm trong CSDL.
+   */
+  async issueChannelLink(staffId: number): Promise<{ token: string }> {
+    const [person] = await this.db
+      .select()
+      .from(staff)
+      .where(and(eq(staff.id, staffId), eq(staff.active, true)))
+    if (!person) throw new UnauthorizedException('Tài khoản không tồn tại hoặc đã ngưng')
+    if (!person.pinHash) {
+      // Link không đi kèm PIN thì nó là một cái khoá không có chìa: bất kỳ ai cầm
+      // được đường dẫn cũng mở được lịch và phiếu lương của người này.
+      throw new BadRequestException('Người này chưa có PIN — đặt PIN ở A1 trước khi cấp link')
+    }
+
+    const token = newToken()
+    await this.db
+      .update(staff)
+      .set({ channelTokenHash: hashToken(token) })
+      .where(eq(staff.id, staffId))
+    return { token }
+  }
+
+  /**
+   * Link cá nhân + PIN → phiên phạm vi `self`.
+   *
+   * Chi nhánh lấy từ HỒ SƠ NHÂN SỰ chứ không nhận từ máy khách: kênh này không có
+   * bộ chọn chi nhánh và cũng không nên có — nó chỉ mở đúng việc của một người.
+   */
+  async loginWithChannelToken(input: {
+    token: string
+    pin: string
+  }): Promise<{ token: string; expiresAt: Date; actor: Actor }> {
+    const [person] = await this.db
+      .select()
+      .from(staff)
+      .where(and(eq(staff.channelTokenHash, hashToken(input.token)), eq(staff.active, true)))
+    // Link sai thì dừng ngay, không đếm vào bộ chặn PIN: người dò link chưa chạm
+    // tới PIN của ai, mà khoá theo link sai sẽ cho họ cách khoá phiên người khác
+    if (!person) throw new UnauthorizedException('Link không còn hiệu lực. Xin quản lý cấp lại.')
+
+    const throttleKey = `channel:${person.id}`
+    const max = await this.params.getNumber('auth.pinMaxAttemptsPerMinute', 5)
+    const lockout = await this.params.getNumber('auth.pinLockoutMinutes', 5)
+    const sessionHours = await this.params.getNumber('auth.staffSessionHours', 12)
+    this.throttle.check(throttleKey, max, lockout)
+
+    const ok = person.pinHash ? await argonVerify(person.pinHash, input.pin).catch(() => false) : false
+    if (!ok) {
+      this.throttle.fail(throttleKey)
+      throw new UnauthorizedException('PIN không đúng')
+    }
+    this.throttle.succeed(throttleKey)
+
+    const [employee] = await this.db
+      .select({ branchId: employees.branchId })
+      .from(employees)
+      .where(and(eq(employees.staffId, person.id), eq(employees.active, true)))
+    if (!employee) {
+      throw new ForbiddenException('Bạn chưa có hồ sơ nhân viên — hỏi quản lý nhân sự')
+    }
+
+    const roles = await this.rolesOf(person.id, employee.branchId)
+    if (roles.length === 0) {
+      throw new ForbiddenException('Tài khoản chưa được phân vai trò ở chi nhánh này')
+    }
+
+    const token = newToken()
+    const expiresAt = new Date(Date.now() + sessionHours * 3_600_000)
+    const [session] = await this.db
+      .insert(staffSessions)
+      .values({
+        staffId: person.id,
+        deviceId: null,
+        branchId: employee.branchId,
+        scope: 'self',
+        tokenHash: hashToken(token),
+        expiresAt,
+      })
+      .returning({ id: staffSessions.id })
+
+    return {
+      token,
+      expiresAt,
+      actor: {
+        kind: 'staff',
+        staffId: person.id,
+        roles,
+        branchId: employee.branchId,
+        deviceId: null,
+        sessionId: session!.id,
+        fullName: person.fullName,
+        scope: 'self',
         stationId: null,
       },
     }
@@ -349,6 +463,7 @@ export class IdentityService {
         staffId: staffSessions.staffId,
         deviceId: staffSessions.deviceId,
         branchId: staffSessions.branchId,
+        scope: staffSessions.scope,
         fullName: staff.fullName,
       })
       .from(staffSessions)
@@ -369,6 +484,7 @@ export class IdentityService {
       deviceId: row.deviceId,
       sessionId: row.sessionId,
       fullName: row.fullName,
+      scope: row.scope === 'self' ? 'self' : 'full',
       // AuthGuard gắn trạm theo thiết bị đang gọi — cùng một người đứng ở màn ST-02
       // hay ST-06 phải thấy hàng vé khác nhau.
       stationId: null,

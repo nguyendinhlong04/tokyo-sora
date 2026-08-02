@@ -3,6 +3,7 @@ import { AdminModule } from './modules/admin/admin.module'
 import { CommonModule } from './common/common.module'
 import { ConfigBundleModule } from './modules/config-bundle/config-bundle.module'
 import { AccountingModule } from './modules/accounting/accounting.module'
+import { CrmModule } from './modules/crm/crm.module'
 import { ExpensesModule } from './modules/expenses/expenses.module'
 import { HrModule } from './modules/hr/hr.module'
 import { Public } from './modules/identity/auth.guard'
@@ -43,6 +44,7 @@ class HealthController {
     ExpensesModule,
     HrModule,
     AccountingModule,
+    CrmModule,
     ReportsModule,
   ],
   controllers: [HealthController],

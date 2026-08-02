@@ -38,6 +38,13 @@ export const staff = pgTable('staff', {
   /** Tài khoản Office */
   email: text('email').unique(),
   passwordHash: text('password_hash'),
+  /**
+   * Link cá nhân của Kênh nhân viên (H8 · H9) — chỉ lưu bản băm, cấp lại là link
+   * cũ chết ngay. Nó đóng đúng vai trò của thiết bị đã ghép trong luồng POS: yếu
+   * tố SỞ HỮU đứng cạnh PIN. Yếu hơn thiết bị thật vì link chuyển tiếp được qua
+   * Zalo, nên phiên mở bằng nó bị giới hạn phạm vi — xem `staff_sessions.scope`.
+   */
+  channelTokenHash: text('channel_token_hash').unique(),
   /** TOTP mã hoá at-rest; bắt buộc với R7/R8/R10/R11/R13 */
   totpSecretEnc: text('totp_secret_enc'),
   active: boolean('active').notNull().default(true),
@@ -138,12 +145,24 @@ export const staffSessions = pgTable(
     branchId: text('branch_id')
       .notNull()
       .references(() => branches.id),
+    /**
+     * 'full' — phiên vận hành hoặc Office: mang trọn vai trò của người đăng nhập.
+     * 'self' — Kênh nhân viên: CHỈ mở được việc của chính mình (§26 H8 · H9).
+     *
+     * Cột này tồn tại vì link cá nhân là yếu tố sở hữu yếu hơn thiết bị đã ghép.
+     * Không có nó thì điện thoại của một thu ngân, mở bằng một cái link chuyển
+     * tiếp được, trở thành một cái POS đứng ngoài quán.
+     */
+    scope: text('scope').notNull().default('full'),
     tokenHash: text('token_hash').notNull().unique(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
   },
-  (t) => [index('staff_sessions_staff_idx').on(t.staffId, t.expiresAt)],
+  (t) => [
+    check('staff_sessions_scope_check', sql`${t.scope} IN ('full','self')`),
+    index('staff_sessions_staff_idx').on(t.staffId, t.expiresAt),
+  ],
 )
 
 /** Ca làm việc của thu ngân — mốc đối soát tiền mặt (P1 mở · P14 đóng) */

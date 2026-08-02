@@ -42,6 +42,12 @@ export const BLANK_DISH: DishDraft = {
   tableOrderable: true,
   signature: false,
   active: true,
+  // Lịch bán mặc định = không giới hạn gì; khai hạn mùa và khung giờ ở M11
+  saleFrom: null,
+  saleTo: null,
+  saleDays: 127,
+  saleStartMinute: null,
+  saleEndMinute: null,
   sort: 0,
 }
 

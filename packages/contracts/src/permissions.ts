@@ -280,6 +280,75 @@ export const ACTIONS = {
     label: 'Xem Lãi/Lỗ chi nhánh dạng gộp (không chi tiết lương)',
     grants: { R7: A, R8: A, R11: A, R10: A },
   },
+
+  // ======================= §4.2b — Marketing · Tích điểm · Công nợ khách DN
+  //
+  // Hai đoạn cuối §4.2b không viết dưới dạng bảng mà dưới dạng văn xuôi:
+  //
+  //   "Quyền marketing (R9): soạn khuyến mãi/voucher và trả lời phản hồi khách
+  //    được phép; KÍCH HOẠT khuyến mãi cần R11/R10 duyệt (vì đụng giá); xem Sổ
+  //    khách được nhưng SĐT che 3 số giữa."
+  //
+  //   "Quyền tích điểm & công nợ: đổi điểm tại quầy — R2 được, trong trần mỗi
+  //    giao dịch (tham số); điều chỉnh điểm tay — chỉ R11/R10, kèm lý do, ghi A7;
+  //    ghi nợ công ty tại P10 — R2 thao tác nhưng cần R7 duyệt + chữ ký khách;
+  //    gạch nợ / xoá nợ — R8, mức lớn R10; hồ sơ khách doanh nghiệp — R2 xem,
+  //    R8/R11 sửa."
+  //
+  // Đó vẫn là bản thiết kế nói, chỉ khác cách trình bày — nên mã hoá ở đây là
+  // chép tài liệu, không phải lớp cài đặt tự nghĩ ra quyền. Chỗ nào tài liệu
+  // KHÔNG nêu tên vai trò thì `note` ghi rõ vì sao vai trò đó có mặt.
+
+  'promo.compose': {
+    label: 'Soạn chương trình khuyến mãi & lô voucher',
+    grants: { R9: A, R11: A, R10: A },
+    note: 'R11 có mặt vì khuyến mãi là danh mục CẤP CHUỖI (§4.1) — cùng lý do R11 sửa được giá bán',
+  },
+  'promo.activate': {
+    label: 'Kích hoạt / dừng chương trình khuyến mãi',
+    grants: { R9: P, R11: A, R10: A },
+    note: 'Kích hoạt là đụng giá bán nên R9 phải xin duyệt — người duyệt chỉ có thể là R11 hoặc R10',
+  },
+  'feedback.respond': {
+    label: 'Xử lý & trả lời phản hồi khách',
+    grants: { R7: A, R9: A, R11: A, R10: A },
+    note: 'Tài liệu nêu R9; R7 có mặt vì hàng đợi khiếu nại gán việc cho vận hành chi nhánh và điểm trung bình đổ về B1 của quản lý ca',
+  },
+  /**
+   * Hai khoá cho MỘT màn: đọc được Sổ khách là một chuyện, đọc được đủ mười số
+   * điện thoại là chuyện khác. Tách ra vì "SĐT che 3 số giữa với vai trò không
+   * cần thấy" (§25 B12) chỉ cưỡng chế được khi có một khoá riêng để hỏi.
+   */
+  'customer.view-book': {
+    label: 'Xem Sổ khách (SĐT che 3 số giữa)',
+    grants: { R2: A, R3: A, R7: A, R8: A, R9: A, R11: A, R12: A, R10: A },
+  },
+  'customer.view-phone-full': {
+    label: 'Xem số điện thoại khách đầy đủ',
+    grants: { R2: A, R3: A, R7: A, R8: A, R11: A, R12: A, R10: A },
+    note: 'R9 marketing cố ý vắng mặt — đó chính là "vai trò không cần thấy" của §25 B12',
+  },
+  'loyalty.redeem-at-pos': {
+    label: 'Đổi điểm cho khách tại quầy (trong trần mỗi giao dịch)',
+    grants: { R2: A, R7: A, R10: A },
+  },
+  'loyalty.adjust-manual': {
+    label: 'Điều chỉnh điểm bằng tay (kèm lý do, ghi A7)',
+    grants: { R11: A, R10: A },
+  },
+  'corporate.charge-at-pos': {
+    label: 'Ghi nợ công ty tại quầy',
+    grants: { R2: P, R7: A, R10: A },
+    note: 'R2 thao tác nhưng cần R7 duyệt + chữ ký khách — chữ ký là bằng chứng ngoài hệ thống, PIN duyệt là bằng chứng trong hệ thống',
+  },
+  'corporate.edit-profile': {
+    label: 'Sửa hồ sơ & hạn mức nợ khách doanh nghiệp',
+    grants: { R8: A, R11: A, R10: A },
+  },
+  'corporate.settle-writeoff': {
+    label: 'Gạch nợ / xoá nợ khách doanh nghiệp',
+    grants: { R8: A, R10: A },
+  },
 } as const satisfies Record<string, ActionDef>
 
 export type ActionKey = keyof typeof ACTIONS

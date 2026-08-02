@@ -635,14 +635,59 @@ export function Debts() {
               </p>
             </section>
 
-            <section className="rounded-md border border-dashed border-line-3 bg-surface-1 p-5">
+            <section className="rounded-md border border-line-1 bg-surface-1 p-5">
               <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
                 Phải thu khách doanh nghiệp
               </p>
-              <p className="mt-2 font-mono text-[length:var(--fs-d3)] leading-none text-line-4">—</p>
-              <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-                {data.receivable.blockedBy}. Tuổi nợ, nhắc nợ và gạch nợ khi tiền về đều dựa trên
-                bill ghi nợ — chưa có bill nào như vậy thì chưa có gì để tính.
+
+              {data.receivable.companies.length === 0 ? (
+                <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                  Chưa công ty nào đang nợ. Hồ sơ và hạn mức khai ở B15; bill ghi nợ phát sinh khi
+                  thu ngân chọn <em>Ghi nợ công ty</em> ở P10.
+                </p>
+              ) : (
+                <>
+                  <div className="mt-4 grid grid-cols-4 gap-3">
+                    <AgingCell label="Chưa tới hạn" value={data.receivable.totals.currentVnd} />
+                    <AgingCell label="Quá 1–30 ngày" value={data.receivable.totals.d0to30Vnd} warn />
+                    <AgingCell label="Quá 31–60" value={data.receivable.totals.d31to60Vnd} warn />
+                    <AgingCell label="Quá 60 ngày" value={data.receivable.totals.over60Vnd} danger />
+                  </div>
+
+                  <div className="mt-4 flex flex-col">
+                    {data.receivable.companies.map((company) => (
+                      <div
+                        key={company.id}
+                        className="grid grid-cols-[1fr_130px_120px] items-center gap-3 border-b border-line-1 py-2 last:border-b-0"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-[length:var(--fs-c1)] text-ink-body">
+                            {company.name}
+                          </span>
+                          <span className="mt-0.5 block font-mono text-[length:var(--fs-c2)] text-ink-mute">
+                            {company.code} · NET {company.paymentTermDays}
+                          </span>
+                        </span>
+                        <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-hi">
+                          {formatVnd(company.aging.totalVnd)}
+                        </span>
+                        <span className="text-right text-[length:var(--fs-c1)]">
+                          {company.aging.maxOverdueDays > 0 ? (
+                            <span className="text-danger">
+                              quá {company.aging.maxOverdueDays} ngày
+                            </span>
+                          ) : (
+                            <span className="text-ink-mute">trong hạn</span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                {data.receivable.note}
               </p>
             </section>
           </div>
@@ -819,5 +864,26 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
         {value}
       </span>
     </span>
+  )
+}
+
+/** Một khoang tuổi nợ. Khoang "chưa tới hạn" cố ý KHÔNG tô cảnh báo — nó không phải nợ xấu */
+function AgingCell({
+  label,
+  value,
+  warn,
+  danger,
+}: {
+  label: string
+  value: number
+  warn?: boolean
+  danger?: boolean
+}) {
+  const tone = value === 0 ? 'text-ink-mute' : danger ? 'text-danger' : warn ? 'text-warn' : 'text-ink-hi'
+  return (
+    <div className="rounded-sm border border-line-1 bg-canvas px-3 py-2.5">
+      <p className="text-[length:var(--fs-c2)] text-ink-mute">{label}</p>
+      <p className={`mt-1 font-mono text-[length:var(--fs-b2)] ${tone}`}>{formatVnd(value)}</p>
+    </div>
   )
 }

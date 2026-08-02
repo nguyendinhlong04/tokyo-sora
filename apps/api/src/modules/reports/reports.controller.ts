@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { actorRoles } from '../identity/actor'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
+import { BusinessReportsService } from './business.service'
 import { COMPARE_KINDS, PERIOD_KINDS } from './domain/period'
 import { ReportsService } from './reports.service'
 
@@ -40,7 +41,10 @@ const PeriodQuery = z
  */
 @Controller('api/reports')
 export class ReportsController {
-  constructor(private readonly reports: ReportsService) {}
+  constructor(
+    private readonly reports: ReportsService,
+    private readonly business: BusinessReportsService,
+  ) {}
 
   /** B1 — Hôm nay */
   @Get('today')
@@ -84,6 +88,68 @@ export class ReportsController {
       basis,
       detailLevel,
     })
+  }
+
+  // ============================================ B2 · B4 … B9
+
+  /**
+   * Bảy màn dưới đây chia làm hai mức quyền, đúng nguyên tắc §4.3.3 tách quyền
+   * xem GIÁ VỐN khỏi quyền xem DOANH THU:
+   *   · `report.branch-revenue`  — B2 doanh thu · B6 vòng quay bàn · B7 nhân sự ·
+   *     B9 online & đặt bàn. Quản lý ca đọc được.
+   *   · `report.margin-foodcost` — B4 giá vốn & lãi gộp · B8 set. Thêm bếp trưởng,
+   *     vì đó là người sửa công thức khi food cost bung.
+   * B5 hiệu suất bếp gắn `report.margin-foodcost` chứ không gắn doanh thu: nó
+   * không có con số tiền nào, nhưng bếp trưởng là người đọc nó nhiều nhất.
+   */
+
+  /** B2 — Doanh thu, cắt theo năm lát */
+  @Get('revenue')
+  @RequirePermission('report.branch-revenue')
+  revenue(@Query('branch') branch: string, @Query() query: Record<string, string>) {
+    return this.business.revenue(this.requireBranch(branch), PeriodQuery.parse(query))
+  }
+
+  /** B4 — Giá vốn & lãi gộp */
+  @Get('cost-margin')
+  @RequirePermission('report.margin-foodcost')
+  costMargin(@Query('branch') branch: string, @Query() query: Record<string, string>) {
+    return this.business.costAndMargin(this.requireBranch(branch), PeriodQuery.parse(query))
+  }
+
+  /** B5 — Hiệu suất bếp */
+  @Get('kitchen')
+  @RequirePermission('report.margin-foodcost')
+  kitchen(@Query('branch') branch: string, @Query() query: Record<string, string>) {
+    return this.business.kitchenPerformance(this.requireBranch(branch), PeriodQuery.parse(query))
+  }
+
+  /** B6 — Vòng quay bàn */
+  @Get('table-turnover')
+  @RequirePermission('report.branch-revenue')
+  tableTurnover(@Query('branch') branch: string, @Query() query: Record<string, string>) {
+    return this.business.tableTurnover(this.requireBranch(branch), PeriodQuery.parse(query))
+  }
+
+  /** B7 — Nhân sự. Không có số lương ở đây — nguyên tắc cứng thứ tư. */
+  @Get('staff')
+  @RequirePermission('report.branch-revenue')
+  staffPerformance(@Query('branch') branch: string, @Query() query: Record<string, string>) {
+    return this.business.staffPerformance(this.requireBranch(branch), PeriodQuery.parse(query))
+  }
+
+  /** B8 — Set & giảm giá */
+  @Get('sets')
+  @RequirePermission('report.margin-foodcost')
+  sets(@Query('branch') branch: string, @Query() query: Record<string, string>) {
+    return this.business.setsAndPromotions(this.requireBranch(branch), PeriodQuery.parse(query))
+  }
+
+  /** B9 — Online & đặt bàn */
+  @Get('online')
+  @RequirePermission('report.branch-revenue')
+  online(@Query('branch') branch: string, @Query() query: Record<string, string>) {
+    return this.business.onlineAndReservations(this.requireBranch(branch), PeriodQuery.parse(query))
   }
 
   private requireBranch(branch: string | undefined): string {

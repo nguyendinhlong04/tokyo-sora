@@ -6,6 +6,7 @@ import {
   foodCostBand,
   lineCostVnd,
   movingAverageMilli,
+  prepCost,
   stockRatio,
   type RecipeLineInput,
 } from './costing'
@@ -89,6 +90,38 @@ describe('giá vốn món và cột đóng góp', () => {
     const result = dishCost([line({ ingredientId: 'x', costPerBaseMilli: 0 })])
     expect(result.costVnd).toBe(0)
     expect(result.lines[0]!.share).toBe(0)
+  })
+})
+
+describe('giá vốn mẻ bán thành phẩm (M8)', () => {
+  const NUOC_DUNG: RecipeLineInput[] = [
+    // 3kg xương @18₫/g = 54.000₫
+    line({ ingredientId: 'xuong', qtyBase: 3_000, costPerBaseMilli: 18_000 }),
+    // 500g hành @12₫/g = 6.000₫
+    line({ ingredientId: 'hanh', qtyBase: 500, costPerBaseMilli: 12_000 }),
+  ]
+
+  it('chia tiền mẻ cho sản lượng ra giá mỗi ml', () => {
+    // 60.000₫ cho 8.000ml = 7,5₫/ml = 7.500 phần nghìn đồng
+    const result = prepCost(NUOC_DUNG, 8_000)
+    expect(result.costVnd).toBe(60_000)
+    expect(result.costPerBaseMilli).toBe(7_500)
+  })
+
+  it('giữ được giá dưới một đồng mỗi ml thay vì làm tròn thành 1₫', () => {
+    // 240.000₫ pha loãng ra 400.000ml = 0,6₫/ml
+    const result = prepCost([line({ ingredientId: 'siro', qtyBase: 1_000, costPerBaseMilli: 240_000 })], 400_000)
+    expect(result.costPerBaseMilli).toBe(600)
+  })
+
+  it('chưa khai sản lượng thì giá là CHƯA BIẾT, không phải 0', () => {
+    expect(prepCost(NUOC_DUNG, 0).costPerBaseMilli).toBeNull()
+  })
+
+  it('vẫn trả cột đóng góp của từng nguyên liệu như bảng công thức món', () => {
+    const result = prepCost(NUOC_DUNG, 8_000)
+    expect(result.lines[0]!.share).toBeCloseTo(0.9)
+    expect(result.lines.reduce((s, l) => s + l.costVnd, 0)).toBe(result.costVnd)
   })
 })
 

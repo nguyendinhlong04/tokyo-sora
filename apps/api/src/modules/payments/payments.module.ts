@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { CrmModule } from '../crm/crm.module'
 import { MockBankProvider, PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider'
 import { PaymentsController } from './payments.controller'
 import { PaymentsService } from './payments.service'
@@ -24,7 +25,11 @@ function createProvider(): PaymentProvider {
   return new MockBankProvider(secret ?? 'dev-bank-secret')
 }
 
+// CrmModule để tích điểm ngay trong transaction thu tiền — §25 B14 "điểm chỉ
+// sinh từ sự kiện thanh-toan.nhan". Chiều phụ thuộc một hướng: CRM không biết gì
+// về thanh toán, nên không có vòng.
 @Module({
+  imports: [CrmModule],
   controllers: [PaymentsController, SplitPaymentController],
   providers: [
     PaymentsService,

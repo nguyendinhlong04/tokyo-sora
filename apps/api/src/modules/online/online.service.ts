@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common'
 import { formatVnd, rooms } from '@sora/contracts'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
-import { businessDateOf, startOfBusinessDay } from '../../common/business-date'
+import { businessDateOf, minuteOfDayIn, startOfBusinessDay } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { nextDisplayCode } from '../../common/display-code'
 import { emit } from '../../common/outbox'
@@ -25,8 +25,10 @@ import {
   orderLines,
   orders,
 } from '../../db/schema'
+import { isOnSale, scheduleOf } from '../catalog/domain/sale-window'
 import type { Actor } from '../identity/actor'
 import { hashToken, newToken } from '../identity/tokens'
+import { CustomersService } from '../crm/customers.service'
 import { OrderingService, type AddLineInput } from '../ordering/ordering.service'
 import { buildSlots, checkSlot, earliestOpenSlot, slotStart, type SlotOptions } from './domain/slots'
 
@@ -60,6 +62,7 @@ export class OnlineService {
     @Inject(DB) private readonly db: Db,
     private readonly params: ParamsService,
     private readonly ordering: OrderingService,
+    private readonly customers: CustomersService,
   ) {}
 
   // ------------------------------------------------------ O1 chọn chi nhánh
@@ -114,10 +117,20 @@ export class OnlineService {
       soldOut.filter((a) => a.status === 'sold_out').map((a) => a.dishId),
     )
 
+    /**
+     * Lịch bán (M11) lọc ngay tại đây, tính theo GIỜ CHI NHÁNH: thực đơn online là
+     * bản đọc trực tiếp, không có cache 304 như config bundle, nên nó nói được sự
+     * thật của 11 giờ trưa và của 3 giờ chiều bằng hai câu trả lời khác nhau.
+     */
+    const now = new Date()
+    const today = businessDateOf(now, branch.timezone)
+    const minuteNow = minuteOfDayIn(now, branch.timezone)
+
     const menu = dishRows
       .filter((d) => {
         const override = overrideByDish.get(d.id)
         if (override?.active === false) return false
+        if (!isOnSale(scheduleOf(d), today, minuteNow)) return false
         // Cờ của chi nhánh (O11) đè lên cờ cấp chuỗi, cả bật lẫn tắt
         return override?.onlineVisible ?? d.onlineVisible
       })
@@ -156,7 +169,11 @@ export class OnlineService {
         phone: branch.phone,
         openHours: branch.openHours,
       },
-      categories: categoryRows.map((c) => ({ id: c.id, nameVi: c.nameVi, kanji: c.kanji })),
+      // Nhóm tắt kênh online (M10) không hiện; món trong nhóm đó vẫn bán nếu chính
+      // nó bật online — nhóm chỉ là cách sắp thực đơn, không phải cái công tắc bán
+      categories: categoryRows
+        .filter((c) => c.onlineVisible)
+        .map((c) => ({ id: c.id, nameVi: c.nameVi, kanji: c.kanji, imageUrl: c.imageUrl })),
       dishes: menu,
     }
   }
@@ -373,6 +390,13 @@ export class OnlineService {
           businessDate,
         })
         .returning()
+
+      /** §25 B12: nguồn thứ hai của Sổ khách — đơn online (xem `reservations.service`) */
+      await this.customers.touch(tx, {
+        phone: input.customer.phone,
+        name: input.customer.name,
+        businessDate,
+      })
 
       await this.ordering.appendLines(tx, {
         order: created!,

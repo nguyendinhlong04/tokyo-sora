@@ -85,6 +85,11 @@ const PARAMETERS: {
   { key: 'expense.ownerApprovalVnd', value: 20_000_000, unit: 'đồng', sensitive: true },
   { key: 'expense.assetThresholdVnd', value: 5_000_000, unit: 'đồng', sensitive: true },
 
+  // Kho (§25 S4 · S9)
+  { key: 'stock.consumptionWindowDays', value: 14, unit: 'ngày' },
+  { key: 'stock.reorderCoverDays', value: 7, unit: 'ngày' },
+  { key: 'stock.expiryWarnDays', value: 3, unit: 'ngày' },
+
   // Hoá đơn điện tử (§30.2 · màn A9 là cửa vào theo ngữ cảnh của những khoá này).
   // MST và hợp đồng là CỦA CHUỖI — một mã số thuế, một hợp đồng HĐĐT; chỉ ký hiệu
   // mới riêng từng địa điểm kinh doanh, và nó nằm ở vòng lặp cấp chi nhánh bên dưới.
@@ -94,6 +99,90 @@ const PARAMETERS: {
   { key: 'einvoice.certificateExpiry', value: '', unit: 'YYYY-MM-DD', sensitive: true },
   // Mặc định TẮT: bật một cấu hình chưa khai xong là mỗi bill rơi vào hàng đợi lỗi F3
   { key: 'einvoice.enabled', value: false, sensitive: true },
+
+  // Tích điểm (§29.1 nhóm "Tích điểm" — B14 là cửa vào theo ngữ cảnh của đúng
+  // những khoá này, cùng cách H6 làm với `payroll.*`). Nhạy cảm vì mỗi khoá ở đây
+  // đều là tiền: điểm phát ra là nghĩa vụ của quán với khách.
+  { key: 'loyalty.vndPerPoint', value: 10_000, unit: 'đồng / 1 điểm', sensitive: true },
+  { key: 'loyalty.vndPerPointRedeem', value: 1_000, unit: 'đồng / 1 điểm', sensitive: true },
+  { key: 'loyalty.redeemCapVndPerOrder', value: 100_000, unit: 'đồng', sensitive: true },
+  { key: 'loyalty.expiryMonths', value: 12, unit: 'tháng' },
+  // Ba hạng: dưới ngưỡng Bạc là Đồng. Xét theo chi tiêu 12 tháng TRƯỢT, không theo năm dương lịch
+  { key: 'loyalty.tierSilverVnd', value: 5_000_000, unit: 'đồng / 12 tháng' },
+  { key: 'loyalty.tierGoldVnd', value: 20_000_000, unit: 'đồng / 12 tháng' },
+
+  // Công nợ khách doanh nghiệp (§29.1 nhóm "Công nợ DN")
+  { key: 'corporate.defaultCreditLimitVnd', value: 20_000_000, unit: 'đồng', sensitive: true },
+  { key: 'corporate.blockAfterOverdueDays', value: 15, unit: 'ngày', sensitive: true },
+  { key: 'corporate.einvoiceMode', value: 'per-bill', unit: 'per-bill | aggregate' },
+
+  // Phản hồi khách (§25 B13) — từ mấy sao trở xuống thì một lượt đánh giá trở
+  // thành khiếu nại phải có người xử lý. Ngưỡng nào cũng là một con số lưu động,
+  // nên nó có nhà ở đây chứ không nằm rải trong mã nguồn.
+  { key: 'feedback.complaintStars', value: 3, unit: 'sao' },
+  { key: 'feedback.responseHours', value: 24, unit: 'giờ' },
+]
+
+/**
+ * Nhà cung cấp S3 và giá thoả thuận.
+ *
+ * Giá ở đây là MỐC để S5 cảnh báo khi phiếu nhập lệch giá, và để S4 dựng đơn mà
+ * không bắt thủ kho nhớ giá. Không có mốc thì hai màn đó không so được với gì.
+ *
+ * Nguyên liệu thì seeder KHÔNG tạo — chúng được khai tay ở M7, vì định lượng và
+ * đơn vị cơ sở là quyết định của bếp chứ không suy được từ bản thiết kế. Nên các
+ * dòng `items` dưới đây chỉ gắn được khi mã nguyên liệu đã tồn tại; mã chưa có
+ * thì bỏ qua lặng lẽ thay vì làm hỏng cả lượt nạp.
+ */
+const SUPPLIERS: {
+  code: string
+  name: string
+  taxCode: string | null
+  contactName: string | null
+  phone: string | null
+  paymentTermDays: number
+  items: {
+    ingredientId: string
+    priceVnd: number
+    minOrderPurchase: number
+    leadTimeDays: number
+    preferred: boolean
+  }[]
+}[] = [
+  {
+    code: 'NCC-BO',
+    name: 'Lò mổ Vissan',
+    taxCode: '0301234567',
+    contactName: 'Anh Tú',
+    phone: '0901234567',
+    paymentTermDays: 15,
+    items: [
+      { ingredientId: 'ba-chi-bo', priceVnd: 285_000, minOrderPurchase: 5, leadTimeDays: 1, preferred: true },
+      { ingredientId: 'than-bo', priceVnd: 420_000, minOrderPurchase: 3, leadTimeDays: 1, preferred: true },
+    ],
+  },
+  {
+    code: 'NCC-BIA',
+    name: 'Nhà phân phối Sapporo',
+    taxCode: '0102345678',
+    contactName: 'Chị Hà',
+    phone: '0912345678',
+    paymentTermDays: 30,
+    items: [
+      { ingredientId: 'keg-sapporo', priceVnd: 1_800_000, minOrderPurchase: 1, leadTimeDays: 3, preferred: true },
+    ],
+  },
+  {
+    code: 'NCC-RAU',
+    name: 'Chợ đầu mối Long Biên',
+    taxCode: null,
+    contactName: 'Cô Lan',
+    phone: '0923456789',
+    paymentTermDays: 0,
+    items: [
+      { ingredientId: 'hanh-tay', priceVnd: 12_000, minOrderPurchase: 10, leadTimeDays: 1, preferred: true },
+    ],
+  },
 ]
 
 /**
@@ -668,6 +757,28 @@ async function seed(db: Db) {
         sensitive: true,
       })
       .onConflictDoNothing()
+  }
+
+  // ---- Nhà cung cấp S3 ----
+  for (const supplier of SUPPLIERS) {
+    const { items, ...row } = supplier
+    const [created] = await db
+      .insert(s.suppliers)
+      .values(row)
+      .onConflictDoUpdate({ target: s.suppliers.code, set: row })
+      .returning({ id: s.suppliers.id })
+    for (const item of items) {
+      // Nguyên liệu có thể chưa khai — bỏ qua thay vì làm hỏng cả lượt nạp
+      const [ing] = await db
+        .select({ id: s.ingredients.id })
+        .from(s.ingredients)
+        .where(eq(s.ingredients.id, item.ingredientId))
+      if (!ing) continue
+      await db
+        .insert(s.supplierItems)
+        .values({ supplierId: created!.id, ...item })
+        .onConflictDoNothing()
+    }
   }
 
   // ---- Máy in A5 ----

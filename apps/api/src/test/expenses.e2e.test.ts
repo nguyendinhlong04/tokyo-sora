@@ -489,6 +489,23 @@ describe('Tạm ứng ở C2 tự khấu trừ vào kỳ lương H7', () => {
       payload: { branchId: fx.branchId, weekStart: monday, employeeId, cells: [] },
     })
 
+    // Lương tính từ CÔNG THỰC TẾ, không từ lịch xếp — ghi công đúng ca đã xếp
+    const punched = await inject({
+      method: 'POST',
+      url: '/api/hr/timesheet',
+      headers: bearer(owner),
+      payload: {
+        branchId: fx.branchId,
+        employeeId,
+        workDate: monday,
+        clockIn: '08:00',
+        clockOut: '16:00',
+        breakMinutes: 0,
+        reason: 'Nhập từ sổ chấm công giấy',
+      },
+    })
+    expect(punched.statusCode, punched.payload).toBe(201)
+
     const period = await inject({
       method: 'POST',
       url: '/api/hr/payroll/periods',

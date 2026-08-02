@@ -1,0 +1,31 @@
+{
+  "name": "@sora/staff",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4177 --strictPort",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sora/contracts": "workspace:*",
+    "@sora/core": "workspace:*",
+    "@sora/tokens": "workspace:*",
+    "@sora/ui": "workspace:*",
+    "@tanstack/react-query": "^5.101.4",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-router": "^8.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

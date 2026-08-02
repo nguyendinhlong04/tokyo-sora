@@ -158,6 +158,68 @@ export const expenseVouchers = pgTable(
 )
 
 /**
+ * C5 — Hoá đơn VAT ĐẦU VÀO. Một dòng = một tờ hoá đơn của nhà cung cấp.
+ *
+ * Tách khỏi `expense_vouchers` vì hai thứ khác nhau, và sự khác nhau đó chính là
+ * điều kiện được khấu trừ thuế: phiếu chi là **tiền đã ra**, hoá đơn là **chứng
+ * từ chứng minh khoản đó được khấu trừ VAT**. Chi 5 triệu tiền chợ có phiếu chi
+ * mà không có hoá đơn thì tiền vẫn ra, còn VAT thì không đòi lại được.
+ *
+ * Nên F4 lấy VAT đầu vào từ BẢNG NÀY, không lấy con số gõ trên phiếu chi. Số gõ
+ * trên phiếu là ý định; tờ hoá đơn mới là bằng chứng, và cơ quan thuế hỏi bằng
+ * chứng.
+ *
+ * Quan hệ với phiếu chi là 1-nhiều theo chiều ngược: một tờ hoá đơn gắn nhiều
+ * nhất một phiếu chi (`voucherId`), nhưng một phiếu chi có thể chưa có tờ nào —
+ * và đó chính là cảnh báo mà C5 tồn tại để nêu.
+ */
+export const inputInvoices = pgTable(
+  'input_invoices',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    branchId: text('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    /** Phiếu chi tương ứng; NULL = hoá đơn về trước khi ghi phiếu */
+    voucherId: bigint('voucher_id', { mode: 'number' }).references(() => expenseVouchers.id),
+
+    sellerName: text('seller_name').notNull(),
+    /** MST người bán — 10 số, đơn vị phụ thuộc thêm '-' và 3 số */
+    sellerTaxCode: text('seller_tax_code').notNull(),
+    invoiceNo: text('invoice_no').notNull(),
+    /** Ký hiệu hoá đơn của người bán, VD 1C26TAA */
+    serial: text('serial'),
+    issuedOn: date('issued_on').notNull(),
+
+    /** Tiền TRƯỚC thuế */
+    netVnd: bigint('net_vnd', { mode: 'number' }).notNull(),
+    /** VAT được khấu trừ — con số F4 cộng vào thuế đầu vào */
+    vatVnd: bigint('vat_vnd', { mode: 'number' }).notNull().default(0),
+    /**
+     * Không phải hoá đơn nào cũng được khấu trừ: chi tiếp khách vượt mức, hoá đơn
+     * mang tên cá nhân, hàng dùng cho hoạt động không chịu thuế. Cờ này để kế toán
+     * ghi nhận tờ hoá đơn mà vẫn loại nó khỏi số khấu trừ — thay vì xoá nó đi rồi
+     * quên mất là đã có.
+     */
+    deductible: boolean('deductible').notNull().default(true),
+    note: text('note'),
+
+    createdBy: bigint('created_by', { mode: 'number' }).references(() => staff.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('input_invoices_amount_check', sql`${t.netVnd} > 0 AND ${t.vatVnd} >= 0`),
+    // VAT vượt tiền trước thuế là gõ nhầm cột — chặn ngay thay vì để F4 ra số lạ
+    check('input_invoices_vat_check', sql`${t.vatVnd} <= ${t.netVnd}`),
+    check('input_invoices_tax_code_check', sql`${t.sellerTaxCode} ~ '^[0-9]{10}(-[0-9]{3})?$'`),
+    /** Một người bán không phát hành hai lần cùng một số hoá đơn */
+    uniqueIndex('input_invoices_seller_no_unique').on(t.sellerTaxCode, t.invoiceNo),
+    index('input_invoices_branch_date_idx').on(t.branchId, t.issuedOn),
+    index('input_invoices_voucher_idx').on(t.voucherId),
+  ],
+)
+
+/**
  * Mặt DỒN TÍCH: chi phí thuộc về tháng nào. Một dòng = một khoản mục × một tháng
  * × một nguồn.
  *

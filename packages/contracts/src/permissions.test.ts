@@ -84,13 +84,37 @@ const HR_ROWS: [ActionKey, string][] = [
   ['report.pnl-branch-summary', '.xx.xx'],
 ]
 
+/**
+ * Hai đoạn VĂN XUÔI cuối §4.2b — "Quyền marketing (R9)" và "Quyền tích điểm &
+ * công nợ". Tài liệu không kẻ bảng cho chúng, nên fixture này chép lại kèm
+ * nguyên văn mệnh đề để đối chiếu được bằng mắt: cột thứ ba là câu trong tài
+ * liệu, cột thứ hai là ô tương ứng.
+ *
+ * Bộ cột riêng — chỉ tám vai trò mà hai đoạn đó nhắc tới:
+ */
+const CRM_COLUMN_ORDER: Role[] = ['R2', 'R3', 'R7', 'R8', 'R9', 'R11', 'R12', 'R10']
+
+const CRM_ROWS: [ActionKey, string, string][] = [
+  ['promo.compose', '....xx.x', 'soạn khuyến mãi/voucher … được phép'],
+  ['promo.activate', '....ax.x', 'kích hoạt khuyến mãi cần R11/R10 duyệt (vì đụng giá)'],
+  ['feedback.respond', '..x.xx.x', 'trả lời phản hồi khách được phép'],
+  ['customer.view-book', 'xxxxxxxx', 'xem Sổ khách được nhưng SĐT che 3 số giữa'],
+  ['customer.view-phone-full', 'xxxx.xxx', '… "vai trò không cần thấy" thì bị che'],
+  ['loyalty.redeem-at-pos', 'x.x....x', 'đổi điểm tại quầy — R2 được, trong trần mỗi giao dịch'],
+  ['loyalty.adjust-manual', '.....x.x', 'điều chỉnh điểm tay — chỉ R11/R10, kèm lý do, ghi A7'],
+  ['corporate.charge-at-pos', 'a.x....x', 'ghi nợ công ty tại P10 — R2 thao tác nhưng cần R7 duyệt'],
+  ['corporate.edit-profile', '...x.x.x', 'hồ sơ khách doanh nghiệp — R8/R11 sửa'],
+  ['corporate.settle-writeoff', '...x...x', 'gạch nợ / xoá nợ — R8, mức lớn R10'],
+]
+
 const SYMBOL: Record<string, Permission> = { '.': 'deny', x: 'allow', a: 'approve' }
 
 describe('Ma trận khớp 1:1 với bảng §4.2 trong tài liệu', () => {
-  it('mã hoá đủ 31 hành động của §4.2 và 16 của §4.2b', () => {
+  it('mã hoá đủ 31 hành động của §4.2 và 16 + 10 của §4.2b', () => {
     expect(DOC_ROWS).toHaveLength(31)
     expect(HR_ROWS).toHaveLength(16)
-    expect(Object.keys(ACTIONS)).toHaveLength(47)
+    expect(CRM_ROWS).toHaveLength(10)
+    expect(Object.keys(ACTIONS)).toHaveLength(57)
   })
 
   it.each(DOC_ROWS)('%s khớp từng ô', (action, row) => {
@@ -157,6 +181,53 @@ describe('Ma trận khớp 1:1 với bảng §4.2b — Nhân sự & Chi phí', (
   })
 })
 
+describe('Hai đoạn văn xuôi §4.2b — Marketing · Tích điểm · Công nợ khách DN', () => {
+  it.each(CRM_ROWS)('%s khớp từng ô — "%s"', (action, row) => {
+    expect(row).toHaveLength(CRM_COLUMN_ORDER.length)
+    CRM_COLUMN_ORDER.forEach((role, i) => {
+      expect(checkPermission(action, [role]), `${action} × ${role}`).toBe(SYMBOL[row[i]!])
+    })
+  })
+
+  it('kích hoạt khuyến mãi là đụng giá: R9 xin, chỉ R11 hoặc R10 duyệt được', () => {
+    const marketer = { id: 'nv-20', roles: ['R9'] as Role[] }
+    expect(needsApproval('promo.activate', marketer.roles)).toBe(true)
+    expect(checkApproval('promo.activate', marketer, { id: 'nv-21', roles: ['R11'] })).toEqual({
+      ok: true,
+    })
+    expect(checkApproval('promo.activate', marketer, { id: 'nv-22', roles: ['R10'] })).toEqual({
+      ok: true,
+    })
+    // Quản lý ca không đụng được giá bán nên cũng không mở được khuyến mãi
+    expect(checkApproval('promo.activate', marketer, { id: 'nv-09', roles: ['R7'] })).toEqual({
+      ok: false,
+      code: 'nguoi-duyet-khong-du-quyen',
+    })
+  })
+
+  it('ghi nợ công ty: thu ngân thao tác, quản lý ca duyệt — thu ngân khác không duyệt được', () => {
+    const cashier = { id: 'nv-02', roles: ['R2'] as Role[] }
+    expect(
+      checkApproval('corporate.charge-at-pos', cashier, { id: 'nv-09', roles: ['R7'] }),
+    ).toEqual({ ok: true })
+    expect(
+      checkApproval('corporate.charge-at-pos', cashier, { id: 'nv-03', roles: ['R2'] }),
+    ).toEqual({ ok: false, code: 'nguoi-duyet-khong-du-quyen' })
+  })
+
+  it('điểm không cộng tay được bởi ai ngoài R11 · R10', () => {
+    const adjusters = ROLES.filter((r) => isPermitted('loyalty.adjust-manual', [r]))
+    expect(adjusters).toEqual(['R10', 'R11'])
+  })
+
+  it('marketing thấy Sổ khách nhưng KHÔNG thấy đủ số điện thoại', () => {
+    expect(can('customer.view-book', ['R9'])).toBe(true)
+    expect(isPermitted('customer.view-phone-full', ['R9'])).toBe(false)
+    // Lễ tân thì ngược lại — họ là người gọi cho khách
+    expect(can('customer.view-phone-full', ['R3'])).toBe(true)
+  })
+})
+
 describe('Bất biến của mô hình quyền', () => {
   it('chủ (R10) làm được mọi việc quản trị, không việc nào phải xin duyệt', () => {
     // `payment.self-serve` là NGOẠI LỆ duy nhất và đúng theo tài liệu: đó không
@@ -194,9 +265,20 @@ describe('Bất biến của mô hình quyền', () => {
     }
   })
 
-  it('marketing chỉ sửa được nội dung website, không đụng vận hành', () => {
+  it('marketing chỉ chạm nội dung, khuyến mãi và phản hồi — không đụng vận hành', () => {
     const allowed = (Object.keys(ACTIONS) as ActionKey[]).filter((a) => isPermitted(a, ['R9']))
-    expect(allowed).toEqual(['menu.view-price', 'cms.edit'])
+    expect(allowed).toEqual([
+      'menu.view-price',
+      'cms.edit',
+      'promo.compose',
+      'promo.activate',
+      'feedback.respond',
+      'customer.view-book',
+    ])
+    // Không một đồng nào, không một dòng tồn kho nào đi qua tay marketing
+    expect(isPermitted('bill.discount-upto-10', ['R9'])).toBe(false)
+    expect(isPermitted('menu.edit-price', ['R9'])).toBe(false)
+    expect(isPermitted('report.branch-revenue', ['R9'])).toBe(false)
   })
 
   it('kiêm nhiệm nhiều vai trò thì lấy mức cao nhất', () => {
@@ -259,9 +341,9 @@ describe('Duyệt △ — phân tách nhiệm vụ (PHẦN G)', () => {
 })
 
 describe('permissionMatrix — nguồn render màn A2', () => {
-  it('trả đủ 47 dòng (§4.2 và §4.2b) × 14 vai trò', () => {
+  it('trả đủ 57 dòng (§4.2 và §4.2b) × 14 vai trò', () => {
     const matrix = permissionMatrix()
-    expect(matrix).toHaveLength(47)
+    expect(matrix).toHaveLength(57)
     for (const row of matrix) {
       expect(Object.keys(row.byRole)).toHaveLength(ROLES.length)
     }

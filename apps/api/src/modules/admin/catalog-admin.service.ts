@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { rooms } from '@sora/contracts'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
 import { isUniqueViolation } from '../../common/pg-error'
@@ -20,9 +20,14 @@ import {
   setGroups,
   stations,
 } from '../../db/schema'
+import { describeSchedule, scheduleOf } from '../catalog/domain/sale-window'
+import { setCostRange } from '../catalog/domain/set-cost'
 import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
+import { foodCost } from '../inventory/domain/costing'
+import { InventoryService } from '../inventory/inventory.service'
+import type { SetDefinition } from '../kitchen/domain/explode'
 
 export interface DishInput {
   id: string
@@ -55,7 +60,36 @@ export interface DishInput {
   tableOrderable: boolean
   signature: boolean
   active: boolean
+  /** Lịch bán (M11) — xem `catalog/domain/sale-window.ts` */
+  saleFrom: string | null
+  saleTo: string | null
+  saleDays: number
+  saleStartMinute: number | null
+  saleEndMinute: number | null
   sort: number
+}
+
+export interface CategoryInput {
+  id: string
+  parentId: string | null
+  nameVi: string
+  nameEn: string | null
+  nameJa: string | null
+  kanji: string | null
+  imageUrl: string | null
+  onlineVisible: boolean
+  tableVisible: boolean
+}
+
+/** Một dòng của cây M10: bản ghi nhóm + vị trí trong cây + số món */
+export type CategoryTreeRow = typeof categories.$inferSelect & {
+  /** 0 = nhóm gốc; màn M10 thụt lề theo con số này */
+  depth: number
+  /** Món gắn thẳng vào nhóm này */
+  dishCount: number
+  /** Gồm cả món nằm trong nhóm con — con số phải nhìn trước khi xoá */
+  totalDishCount: number
+  childCount: number
 }
 
 export interface SetCourseInput {
@@ -80,6 +114,9 @@ export class CatalogAdminService {
     @Inject(DB) private readonly db: Db,
     private readonly approvals: ApprovalService,
     private readonly audit: AuditService,
+    // M11 đọc giá vốn món thành phần bằng ĐÚNG hàm mà M4 dùng — hai bản cài đặt
+    // của cùng một phép tính sẽ trôi lệch, và lệch ở giá vốn thì không ai nhìn ra
+    private readonly inventory: InventoryService,
   ) {}
 
   // ------------------------------------------------------------------- đọc
@@ -395,6 +432,324 @@ export class CatalogAdminService {
     })
   }
 
+  // ============================================== M10 · Cây danh mục
+
+  /**
+   * Cả cây, phẳng, đã sắp theo thứ tự duyệt trước — màn M10 chỉ việc thụt lề theo
+   * `depth`. Kèm số món TRỰC TIẾP trong nhóm và tổng gồm cả nhóm con: xoá nhóm cha
+   * rỗng nhưng có 40 món nằm trong nhóm con là chuyện phải thấy trước khi bấm.
+   */
+  async categoryTree() {
+    const [rows, counts] = await Promise.all([
+      this.db.select().from(categories).orderBy(asc(categories.sort), asc(categories.nameVi)),
+      this.db
+        .select({ categoryId: dishes.categoryId, count: sql<number>`count(*)::int` })
+        .from(dishes)
+        .groupBy(dishes.categoryId),
+    ])
+
+    const directCount = new Map(counts.map((c) => [c.categoryId ?? '', Number(c.count)]))
+    const childrenOf = new Map<string, typeof rows>()
+    for (const row of rows) {
+      const key = row.parentId ?? ''
+      childrenOf.set(key, [...(childrenOf.get(key) ?? []), row])
+    }
+
+    const out: CategoryTreeRow[] = []
+
+    const walk = (parentId: string, depth: number): number => {
+      let subtree = 0
+      for (const row of childrenOf.get(parentId) ?? []) {
+        const index = out.length
+        const direct = directCount.get(row.id) ?? 0
+        out.push({
+          ...row,
+          depth,
+          dishCount: direct,
+          totalDishCount: direct,
+          childCount: (childrenOf.get(row.id) ?? []).length,
+        })
+        // Tổng của cây con chỉ biết được sau khi đi hết cây con — quay lại điền
+        const below = walk(row.id, depth + 1)
+        out[index]!.totalDishCount = direct + below
+        subtree += direct + below
+      }
+      return subtree
+    }
+    walk('', 0)
+
+    /**
+     * Nhóm mồ côi (cha đã bị xoá bằng tay ngoài ứng dụng) sẽ không xuất hiện trong
+     * lượt duyệt trên. Đẩy chúng ra cuối thay vì để mất hẳn: một nhóm không nhìn
+     * thấy trên M10 nhưng vẫn gắn với 12 món là thứ tệ hơn một nhóm xếp sai chỗ.
+     */
+    for (const row of rows) {
+      if (!out.some((o) => o.id === row.id)) {
+        const direct = directCount.get(row.id) ?? 0
+        out.push({ ...row, depth: 0, dishCount: direct, totalDishCount: direct, childCount: 0 })
+      }
+    }
+
+    return out
+  }
+
+  async createCategory(input: CategoryInput, actor: Actor) {
+    if (!/^[a-z0-9-]{2,40}$/.test(input.id)) {
+      throw new BadRequestException('Mã nhóm chỉ gồm chữ thường, số và dấu gạch ngang')
+    }
+    if (!input.nameVi.trim()) throw new BadRequestException('Nhóm phải có tên tiếng Việt')
+    if (input.parentId) await this.requireCategory(input.parentId)
+
+    try {
+      const [row] = await this.db
+        .insert(categories)
+        .values({ ...this.cleanCategory(input), sort: await this.nextSort(input.parentId) })
+        .returning()
+      await this.write(actor, 'category.created', row!.id, { nameVi: row!.nameVi }, 'category')
+      await this.announceCategories(row!.id)
+      return row!
+    } catch (err) {
+      if (isUniqueViolation(err)) throw new ConflictException(`Đã có nhóm mang mã ${input.id}`)
+      throw err
+    }
+  }
+
+  /**
+   * Sửa nội dung nhóm. KHÔNG đổi cha ở đây — chuyển chỗ là `moveCategory`, vì nó
+   * phải đánh số lại hai danh sách anh em và kiểm vòng lặp.
+   */
+  async updateCategory(id: string, patch: Partial<CategoryInput>, actor: Actor) {
+    const current = await this.requireCategory(id)
+    const next = { ...current, ...patch, id, parentId: current.parentId } as CategoryInput
+    if (!next.nameVi.trim()) throw new BadRequestException('Nhóm phải có tên tiếng Việt')
+
+    const [row] = await this.db
+      .update(categories)
+      .set(this.cleanCategory(next))
+      .where(eq(categories.id, id))
+      .returning()
+
+    await this.write(actor, 'category.updated', id, { ...patch }, 'category')
+    await this.announceCategories(id)
+    return row!
+  }
+
+  /**
+   * Kéo thả: chuyển nhóm sang cha mới, chèn vào vị trí thứ `position`.
+   *
+   * Đánh số lại CẢ danh sách anh em thay vì nhét một số ở giữa: thứ tự thưa
+   * (0, 10, 20…) sẽ hết chỗ sau vài lần kéo và người dùng không hiểu vì sao lần
+   * này thả không ăn. Vài chục nhóm thì viết lại cả cột `sort` là chuyện rẻ.
+   *
+   * "Đổi danh mục KHÔNG ảnh hưởng định tuyến bếp" (§24 M10): đúng theo cấu trúc,
+   * vì trạm nằm trên `dishes` chứ không trên nhóm. Không có gì phải làm thêm ở
+   * đây — chỉ có một thứ phải giữ: đừng bao giờ đem trạm về bảng này.
+   */
+  async moveCategory(id: string, parentId: string | null, position: number, actor: Actor) {
+    const current = await this.requireCategory(id)
+    if (parentId) {
+      await this.requireCategory(parentId)
+      await this.assertNotDescendant(id, parentId)
+    }
+
+    return this.db.transaction(async (tx) => {
+      const siblings = await tx
+        .select({ id: categories.id })
+        .from(categories)
+        .where(parentId === null ? isNull(categories.parentId) : eq(categories.parentId, parentId))
+        .orderBy(asc(categories.sort), asc(categories.nameVi))
+
+      const order = siblings.map((s) => s.id).filter((s) => s !== id)
+      order.splice(Math.max(0, Math.min(position, order.length)), 0, id)
+
+      for (const [index, siblingId] of order.entries()) {
+        await tx
+          .update(categories)
+          .set(siblingId === id ? { parentId, sort: index } : { sort: index })
+          .where(eq(categories.id, siblingId))
+      }
+
+      // Danh sách anh em CŨ cũng phải liền số lại, nếu không lần kéo sau tính sai vị trí
+      if (current.parentId !== parentId) {
+        const old = await tx
+          .select({ id: categories.id })
+          .from(categories)
+          .where(
+            current.parentId === null
+              ? isNull(categories.parentId)
+              : eq(categories.parentId, current.parentId),
+          )
+          .orderBy(asc(categories.sort), asc(categories.nameVi))
+        for (const [index, sibling] of old.entries()) {
+          await tx.update(categories).set({ sort: index }).where(eq(categories.id, sibling.id))
+        }
+      }
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'category.moved',
+        entity: 'category',
+        entityId: id,
+        payload: { from: current.parentId, to: parentId, position },
+      })
+      return { id, parentId, position: order.indexOf(id) }
+    })
+  }
+
+  /**
+   * Xoá nhóm — chỉ khi nó rỗng cả hai chiều.
+   *
+   * Cho xoá nhóm còn món thì `dishes.category_id` thành NULL và mười mấy món rơi
+   * xuống "Chưa xếp nhóm" mà không ai bấm gì thêm; cho xoá nhóm còn nhóm con thì
+   * khoá ngoại chặn và người dùng nhận một lỗi Postgres. Nói trước bằng tiếng Việt
+   * dễ hơn cả hai.
+   */
+  async deleteCategory(id: string, actor: Actor) {
+    await this.requireCategory(id)
+
+    const [child] = await this.db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.parentId, id))
+      .limit(1)
+    if (child) throw new ConflictException('Nhóm còn nhóm con — chuyển hoặc xoá nhóm con trước')
+
+    const [dish] = await this.db
+      .select({ id: dishes.id })
+      .from(dishes)
+      .where(eq(dishes.categoryId, id))
+      .limit(1)
+    if (dish) throw new ConflictException('Nhóm còn món — chuyển món sang nhóm khác trước')
+
+    await this.db.delete(categories).where(eq(categories.id, id))
+    await this.write(actor, 'category.deleted', id, {}, 'category')
+    await this.announceCategories(id)
+    return { id, deleted: true }
+  }
+
+  private cleanCategory(input: CategoryInput) {
+    return {
+      id: input.id,
+      parentId: input.parentId,
+      nameVi: input.nameVi.trim(),
+      nameEn: input.nameEn?.trim() || null,
+      nameJa: input.nameJa?.trim() || null,
+      kanji: input.kanji?.trim() || null,
+      imageUrl: input.imageUrl?.trim() || null,
+      onlineVisible: input.onlineVisible,
+      tableVisible: input.tableVisible,
+    }
+  }
+
+  private async requireCategory(id: string) {
+    const [row] = await this.db.select().from(categories).where(eq(categories.id, id))
+    if (!row) throw new NotFoundException(`Không có nhóm ${id}`)
+    return row
+  }
+
+  private async nextSort(parentId: string | null) {
+    const [row] = await this.db
+      .select({ max: sql<number>`coalesce(max(${categories.sort}), -1)::int` })
+      .from(categories)
+      .where(parentId === null ? isNull(categories.parentId) : eq(categories.parentId, parentId))
+    return Number(row?.max ?? -1) + 1
+  }
+
+  /** Thả một nhóm vào chính cây con của nó là cắt cả nhánh đó khỏi cây */
+  private async assertNotDescendant(id: string, candidateParentId: string) {
+    const rows = await this.db
+      .select({ id: categories.id, parentId: categories.parentId })
+      .from(categories)
+    const parentOf = new Map(rows.map((r) => [r.id, r.parentId]))
+
+    let cursor: string | null = candidateParentId
+    const seen = new Set<string>()
+    while (cursor !== null) {
+      if (cursor === id) {
+        throw new BadRequestException('Không thả được một nhóm vào chính nhóm con của nó')
+      }
+      if (seen.has(cursor)) break // dữ liệu đã vòng sẵn — không phải lỗi của lần thả này
+      seen.add(cursor)
+      cursor = parentOf.get(cursor) ?? null
+    }
+  }
+
+  // ============================================== M11 · Set & Combo
+
+  /**
+   * Danh sách set kèm DẢI giá vốn min–max và food cost tương ứng (§24 M11).
+   *
+   * Một con số giá vốn duy nhất cho set là con số bịa: set "chọn 4 trong 10" có
+   * giá vốn khác nhau tuỳ khách gọi ba chỉ hay dẻ sườn. Màn này hiện cả hai đầu
+   * dải, và food cost ở đầu đắt nhất mới là con số dùng để quyết định giá bán —
+   * khách chọn đắt nhất không phải trường hợp hiếm, đó là trường hợp mặc định.
+   */
+  async setsOverview(branchId: string | null) {
+    const [setRows, overrides, groupRows, itemRows, costIndex] = await Promise.all([
+      this.db.select().from(dishes).where(eq(dishes.kind, 'set')).orderBy(asc(dishes.sort), asc(dishes.nameVi)),
+      branchId
+        ? this.db.select().from(dishBranchOverrides).where(eq(dishBranchOverrides.branchId, branchId))
+        : Promise.resolve([]),
+      this.db.select().from(setGroups).orderBy(asc(setGroups.sort)),
+      this.db.select().from(setGroupItems).orderBy(asc(setGroupItems.sort)),
+      this.inventory.dishCostIndex(),
+    ])
+
+    const componentIds = [...new Set(itemRows.map((i) => i.dishId))]
+    const componentRows = componentIds.length
+      ? await this.db
+          .select({ id: dishes.id, nameVi: dishes.nameVi })
+          .from(dishes)
+          .where(inArray(dishes.id, componentIds))
+      : []
+    const nameOf = new Map(componentRows.map((c) => [c.id, c.nameVi]))
+    const overrideByDish = new Map(overrides.map((o) => [o.dishId, o]))
+    const costOf = (dishId: string) => costIndex.get(dishId)?.costVnd ?? null
+
+    return setRows.map((set) => {
+      const groups = groupRows.filter((g) => g.setDishId === set.id)
+      const definition: SetDefinition = {
+        setDishId: set.id,
+        label: set.nameVi,
+        groups: groups.map((g) => ({
+          id: g.id,
+          label: g.label,
+          pickCount: g.pickCount,
+          batchOffset: g.batchOffset,
+          items: itemRows
+            .filter((i) => i.groupId === g.id)
+            .map((i) => ({ dishId: i.dishId, qty: i.qty, portionLabel: i.portionLabel })),
+        })),
+      }
+
+      const range = setCostRange(definition, costOf)
+      const override = overrideByDish.get(set.id)
+      const price = override?.price ?? set.basePrice
+      const schedule = scheduleOf(set)
+
+      return {
+        id: set.id,
+        code: set.code,
+        nameVi: set.nameVi,
+        active: override?.active ?? set.active,
+        priceVnd: price,
+        onlineVisible: override?.onlineVisible ?? set.onlineVisible,
+        tableOrderable: set.tableOrderable,
+        branchOverride: override ? { price: override.price, active: override.active } : null,
+        courses: range.courses,
+        courseCount: groups.length,
+        costMinVnd: range.minVnd,
+        costMaxVnd: range.maxVnd,
+        /** null khi còn món thành phần chưa có công thức — dải chưa đọc được */
+        foodCostMin: range.unknownDishIds.length > 0 ? null : foodCost(range.minVnd, price, true).percent,
+        foodCostMax: range.unknownDishIds.length > 0 ? null : foodCost(range.maxVnd, price, true).percent,
+        unknownDishes: range.unknownDishIds.map((id) => nameOf.get(id) ?? id),
+        schedule,
+        scheduleLabel: describeSchedule(schedule),
+      }
+    })
+  }
+
   // ---------------------------------------------------------------- phụ trợ
 
   /**
@@ -424,9 +779,36 @@ export class CatalogAdminService {
     })
   }
 
-  private async write(actor: Actor, action: string, entityId: string, payload: Record<string, unknown>) {
+  /**
+   * Cây danh mục vừa đổi — cùng sự kiện, cùng kênh với món.
+   *
+   * Nhóm nằm trong config bundle của mọi thiết bị: đổi tên nhóm mà không báo thì
+   * POS còn hiện tên cũ cho tới lần khởi động sau, và bảng phím món của thu ngân
+   * lệch hẳn với màn Office mà không ai giải thích được vì sao.
+   */
+  private async announceCategories(categoryId: string) {
     await this.db.transaction(async (tx) => {
-      await this.audit.write(tx, { actor, action, entity: 'dish', entityId, payload })
+      const targets = (await this.db.select({ id: branches.id }).from(branches)).map((b) => b.id)
+      for (const id of targets) {
+        await emit(tx, {
+          branchId: id,
+          topic: 'mon.cap-nhat',
+          rooms: [rooms.config(id)],
+          payload: { categoryId },
+        })
+      }
+    })
+  }
+
+  private async write(
+    actor: Actor,
+    action: string,
+    entityId: string,
+    payload: Record<string, unknown>,
+    entity: 'dish' | 'category' = 'dish',
+  ) {
+    await this.db.transaction(async (tx) => {
+      await this.audit.write(tx, { actor, action, entity, entityId, payload })
     })
   }
 }
@@ -459,5 +841,30 @@ function assertDish(input: DishInput) {
     throw new BadRequestException(
       'Món bán online phải có mô tả ngắn — trang đặt món hiện thẳng dòng này dưới tên món',
     )
+  }
+
+  assertSaleSchedule(input)
+}
+
+/**
+ * Lịch bán (M11). Nói trước bằng tiếng Việt những gì CHECK của CSDL cũng chặn —
+ * "dishes_sale_window_check" trên màn hình không giúp ai sửa được lịch.
+ */
+function assertSaleSchedule(input: DishInput) {
+  if (input.saleDays < 1 || input.saleDays > 127) {
+    throw new BadRequestException(
+      'Lịch bán phải còn ít nhất một ngày trong tuần — không bán ngày nào thì tắt món (Đang bán)',
+    )
+  }
+  if ((input.saleStartMinute === null) !== (input.saleEndMinute === null)) {
+    throw new BadRequestException('Khung giờ bán phải khai cả giờ mở lẫn giờ đóng')
+  }
+  if (input.saleStartMinute !== null && input.saleEndMinute! <= input.saleStartMinute) {
+    throw new BadRequestException(
+      'Giờ đóng phải sau giờ mở — quán đóng cửa trong đêm nên khung giờ không vắt qua nửa đêm',
+    )
+  }
+  if (input.saleFrom !== null && input.saleTo !== null && input.saleTo < input.saleFrom) {
+    throw new BadRequestException('Ngày kết thúc lịch bán phải sau ngày bắt đầu')
   }
 }

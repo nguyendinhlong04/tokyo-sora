@@ -133,6 +133,19 @@ export class HrController {
     return this.hr.saveEmployee(EmployeeBody.parse(body), req.actor!, id)
   }
 
+  /**
+   * Cấp link cá nhân của Kênh nhân viên (H8 · H9).
+   *
+   * Đứng ở H1 chứ không ở A1 vì đây là bước của hồ sơ nhân sự: chỉ người có hồ sơ
+   * mới có lịch, có công và có phiếu lương để mà xem. Token trả về đúng một lần —
+   * quản lý gửi cho nhân viên qua Zalo rồi thì không đọc lại được nữa.
+   */
+  @Post('employees/:id/channel-link')
+  @RequirePermission('payroll.configure')
+  channelLink(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
+    return this.hr.issueChannelLink(id, req.actor!)
+  }
+
   // ------------------------------------------------------------- H2
 
   @Get('schedule')

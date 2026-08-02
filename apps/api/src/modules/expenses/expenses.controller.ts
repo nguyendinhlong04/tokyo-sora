@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -70,6 +71,26 @@ const AssetBody = z.object({
 
 const MonthBody = z.object({ branchId: z.string().min(1), month: BusinessDate })
 
+const InputInvoiceBody = z.object({
+  branchId: z.string().min(1),
+  voucherId: z.number().int().positive().nullable().default(null),
+  sellerName: z.string().min(1).max(160),
+  sellerTaxCode: z.string().regex(/^\d{10}(-\d{3})?$/, 'MST gồm 10 số, đơn vị phụ thuộc thêm -3 số'),
+  invoiceNo: z.string().min(1).max(40),
+  serial: z.string().max(20).nullable().default(null),
+  issuedOn: BusinessDate,
+  netVnd: z.number().int().positive(),
+  vatVnd: z.number().int().min(0).default(0),
+  deductible: z.boolean().default(true),
+  note: z.string().max(300).nullable().default(null),
+})
+
+const InputInvoicePatch = z.object({
+  voucherId: z.number().int().positive().nullable().optional(),
+  deductible: z.boolean().optional(),
+  note: z.string().max(300).nullable().optional(),
+})
+
 /**
  * Chi phí & tài sản — C1 · C2 · C3 · C4 · C6.
  *
@@ -131,6 +152,49 @@ export class ExpensesController {
   @RequirePermission('expense.approve')
   approveVoucher(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
     return this.expenses.approveVoucher(id, req.actor!)
+  }
+
+  // ------------------------------------------------------- C5
+
+  /**
+   * Hoá đơn đầu vào đứng sau quyền `expense.approve` (R8 · R10), không phải sau
+   * `expense.record-petty`: đây là chứng từ quyết định số VAT được khấu trừ trên
+   * tờ khai thuế, tức là việc của kế toán chứ không phải của người ghi chi vặt.
+   */
+  @Get('input-invoices')
+  @RequirePermission('expense.approve')
+  inputInvoices(
+    @Query('branch') branch: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    return this.expenses.inputInvoices(
+      this.requireBranch(branch),
+      BusinessDate.parse(from),
+      BusinessDate.parse(to),
+    )
+  }
+
+  @Post('input-invoices')
+  @RequirePermission('expense.approve')
+  createInputInvoice(@Body() body: unknown, @Req() req: RequestWithActor) {
+    return this.expenses.createInputInvoice(InputInvoiceBody.parse(body), req.actor!)
+  }
+
+  @Put('input-invoices/:id')
+  @RequirePermission('expense.approve')
+  updateInputInvoice(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    return this.expenses.updateInputInvoice(id, InputInvoicePatch.parse(body), req.actor!)
+  }
+
+  @Delete('input-invoices/:id')
+  @RequirePermission('expense.approve')
+  deleteInputInvoice(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
+    return this.expenses.deleteInputInvoice(id, req.actor!)
   }
 
   /** Nhân viên để chọn khi ghi phiếu tạm ứng */
