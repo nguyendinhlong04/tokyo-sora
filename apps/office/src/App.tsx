@@ -2,6 +2,7 @@ import { ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
 import { Branches } from './routes/Branches'
+import { Dishes } from './routes/Dishes'
 import { Floorplan } from './routes/Floorplan'
 import { Login } from './routes/Login'
 import { Parameters } from './routes/Parameters'
@@ -20,6 +21,10 @@ const queryClient = new QueryClient({
  * một mục chưa có.
  */
 const NAV = [
+  {
+    group: 'Món & kho',
+    items: [{ to: '/mon', label: 'M1 · Món và set' }],
+  },
   {
     group: 'Quản trị',
     items: [
@@ -42,12 +47,13 @@ export function App() {
           <SessionProvider>
             <Routes>
               <Route element={<Shell />}>
+                <Route path="/mon" element={<Dishes />} />
                 <Route path="/tham-so" element={<Parameters />} />
                 <Route path="/so-do-ban" element={<Floorplan />} />
                 <Route path="/chi-nhanh" element={<Branches />} />
                 <Route path="/nhan-dat" element={<ReservationConfig />} />
               </Route>
-              <Route path="*" element={<Navigate to="/tham-so" replace />} />
+              <Route path="*" element={<Navigate to="/mon" replace />} />
             </Routes>
           </SessionProvider>
         </BrowserRouter>

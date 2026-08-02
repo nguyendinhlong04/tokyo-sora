@@ -71,6 +71,63 @@ export interface TableInput {
   active: boolean
 }
 
+export interface DishRow {
+  id: string
+  code: string
+  kind: 'dish' | 'set' | 'drink'
+  categoryId: string | null
+  subCategory: string | null
+  nameVi: string
+  nameEn: string | null
+  nameJa: string | null
+  kana: string | null
+  shortDesc: string | null
+  longDesc: string | null
+  allergens: string[] | null
+  tags: string[] | null
+  routingMethod: 'fixed' | 'song' | 'nuong' | 'linh_hoat' | null
+  stationGrill: string | null
+  stationNoGrill: string | null
+  stationTakeaway: string | null
+  stationDelivery: string | null
+  secondaryStation: string | null
+  primaryLabel: string | null
+  secondaryLabel: string | null
+  prepSeconds: number
+  basePrice: number
+  vatCode: string
+  onlineVisible: boolean
+  tableOrderable: boolean
+  signature: boolean
+  active: boolean
+  sort: number
+  override: { price: number | null; active: boolean | null } | null
+  /** Giá và trạng thái chi nhánh đang xem thật sự bán */
+  effectivePrice: number
+  effectiveActive: boolean
+}
+
+export interface SetCourse {
+  label: string
+  kanji: string | null
+  pickCount: number | null
+  batchOffset: number
+  items: { dishId: string; qty: number; portionLabel: string | null }[]
+}
+
+export interface DishDetail {
+  dish: DishRow
+  courses: SetCourse[]
+  overrides: { branchId: string; price: number | null; active: boolean | null }[]
+}
+
+/** PIN người duyệt — gửi kèm khi vai trò chỉ ở mức △ với hành động đang làm */
+export interface Approval {
+  approverStaffId: number
+  approverPin: string
+  reason: string
+}
+
 export const api = {
   officeLogin: (input: { branchId: string; email: string; password: string }) =>
     apiFetch<{ token: string; staff: OfficeStaff }>('/api/auth/office/login', {
@@ -137,4 +194,48 @@ export const api = {
 
   deactivateTable: (id: number) =>
     apiFetch<TableRow>(`/api/admin/tables/${id}`, { method: 'DELETE' }),
+
+  // --------------------------------------------------------------------- M1
+
+  dishes: (branchId: string) =>
+    apiFetch<DishRow[]>(`/api/admin/dishes?branch=${encodeURIComponent(branchId)}`),
+
+  dishPickers: () =>
+    apiFetch<{
+      categories: { id: string; nameVi: string; kanji: string | null }[]
+      stations: { id: string; name: string; kanji: string | null }[]
+    }>('/api/admin/dishes/pickers'),
+
+  dishDetail: (id: string) => apiFetch<DishDetail>(`/api/admin/dishes/${id}`),
+
+  createDish: (input: Omit<DishRow, 'override' | 'effectivePrice' | 'effectiveActive'>) =>
+    apiFetch<DishRow>('/api/admin/dishes', { method: 'POST', body: input }),
+
+  updateDish: (
+    id: string,
+    patch: Partial<Omit<DishRow, 'override' | 'effectivePrice' | 'effectiveActive'>>,
+    approval?: Approval | null,
+  ) => apiFetch<DishRow>(`/api/admin/dishes/${id}`, { method: 'PATCH', body: { ...patch, approval } }),
+
+  setDishCourses: (id: string, courses: SetCourse[]) =>
+    apiFetch<{ courses: number }>(`/api/admin/dishes/${id}/courses`, {
+      method: 'PUT',
+      body: { courses },
+    }),
+
+  setDishOverride: (
+    id: string,
+    branchId: string,
+    input: { price: number | null; active: boolean | null },
+    approval?: Approval | null,
+  ) =>
+    apiFetch<{ price: number | null }>(`/api/admin/dishes/${id}/branches/${branchId}`, {
+      method: 'PATCH',
+      body: { ...input, approval },
+    }),
+
+  clearDishOverride: (id: string, branchId: string) =>
+    apiFetch<{ cleared: boolean }>(`/api/admin/dishes/${id}/branches/${branchId}`, {
+      method: 'DELETE',
+    }),
 }
