@@ -15,6 +15,7 @@ import { ParamsService } from '../../common/params.service'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import { branches, reservationHolds, reservations, tables } from '../../db/schema'
+import type { Actor } from '../identity/actor'
 import { hashToken, newToken } from '../identity/tokens'
 import {
   buildReservationSlots,
@@ -49,6 +50,12 @@ export interface ConfirmInput extends HoldInput {
   note?: string | null
   /** Mã suất đang giữ mềm, nếu khách đi đúng luồng W6 */
   holdToken?: string | null
+  /**
+   * Ai ghi suất này. Mặc định `web`; R2 trên POS truyền `phone` khi nhân viên đặt
+   * hộ qua điện thoại. Cố ý KHÔNG nhận từ thân yêu cầu của khách — nguồn là thứ
+   * dùng để tính tỉ lệ no-show, để khách tự khai thì con số đó vô nghĩa.
+   */
+  source?: 'web' | 'phone'
 }
 
 /** Trạng thái coi là còn chiếm chỗ — huỷ và no-show thì trả suất về lưới */
@@ -202,7 +209,7 @@ export class ReservationsService {
    * lưới hiện ra và lúc bấm xác nhận có thể có người khác lấy mất, và không gì
    * ngăn ai đó gọi thẳng API với mốc giờ tự chế.
    */
-  async confirm(input: ConfirmInput) {
+  async confirm(input: ConfirmInput, actor?: Actor) {
     const branch = await this.branch(input.branchId)
     await this.assertGuestCount(input.guestCount)
     const businessDate = await this.assertDateInHorizon(input.date, branch.timezone)
@@ -243,7 +250,8 @@ export class ReservationsService {
           customerName: input.name.trim(),
           customerPhone: input.phone.trim(),
           note: input.note?.trim() || null,
-          source: 'web',
+          source: input.source ?? 'web',
+          createdBy: actor?.kind === 'staff' ? actor.staffId : null,
           businessDate,
         })
         .returning()

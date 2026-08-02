@@ -11,6 +11,8 @@ export interface TableTileProps {
   guestCount?: number | null
   total?: number | null
   minutesOpen?: number | null
+  /** Giờ hẹn của đặt chỗ sắp tới trên bàn này — nhãn `Đặt 19:00` (§P2) */
+  reservedAt?: string | null
   onClick?: () => void
 }
 
@@ -40,6 +42,7 @@ export function TableTile({
   guestCount,
   total,
   minutesOpen,
+  reservedAt,
   onClick,
 }: TableTileProps) {
   const style = STATE_STYLE[state]
@@ -50,12 +53,18 @@ export function TableTile({
       className={[
         'flex min-h-[124px] flex-col justify-between rounded-md border-2 bg-surface-1 p-3 text-left',
         'transition-colors hover:bg-surface-3',
-        style.ring,
+        // Bàn đã hứa cho khách đặt: viền chấm vàng đồng, thấy được cả khi bàn trống
+        reservedAt && state === 'empty' ? 'border-dotted border-accent' : style.ring,
       ].join(' ')}
       style={{ transitionDuration: 'var(--dur-micro)' }}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="font-mono text-[length:var(--fs-t1)] font-semibold text-ink-hi">{code}</span>
+        {reservedAt ? (
+          <span className="rounded-sm border border-accent px-1.5 py-0.5 font-mono text-[length:var(--fs-c2)] text-accent-ink">
+            Đặt {reservedAt}
+          </span>
+        ) : null}
         {hasGrill ? (
           // Bàn có bếp than: nhân viên phải biết ngay vì nó đổi cả định tuyến bếp
           <span className="text-[length:var(--fs-b2)] text-ember-2" title="Bàn có bếp than">

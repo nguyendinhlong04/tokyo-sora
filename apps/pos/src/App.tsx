@@ -8,7 +8,9 @@ import { usePwaUpdate } from './pwa'
 import { Dispatch } from './routes/Dispatch'
 import { ExternalChannels } from './routes/ExternalChannels'
 import { Floorplan } from './routes/Floorplan'
+import { LateReservations } from './routes/LateReservations'
 import { Pay } from './routes/Pay'
+import { Reservations } from './routes/Reservations'
 import { ShiftLogin } from './routes/ShiftLogin'
 import { TableOrder } from './routes/TableOrder'
 import { TableRequests } from './routes/TableRequests'
@@ -41,6 +43,8 @@ export function App() {
                 <Route path="/yeu-cau" element={<TableRequests />} />
                 <Route path="/dieu-phoi" element={<Dispatch />} />
                 <Route path="/kenh-ngoai" element={<ExternalChannels />} />
+                <Route path="/dat-cho" element={<Reservations />} />
+                <Route path="/qua-gio" element={<LateReservations />} />
                 <Route path="/table/:sessionId" element={<TableOrder />} />
                 <Route path="/table/:sessionId/pay" element={<Pay />} />
               </Route>
@@ -75,6 +79,15 @@ function Shell() {
     refetchInterval: 15_000,
   })
 
+  // Badge P13: đặt bàn hôm nay chưa ngồi. Khách đặt trên web xong là nhà hàng
+  // phải biết ngay, không đợi ai nhớ mở màn đặt bàn (§30.3).
+  const reservations = useQuery({
+    queryKey: ['reservations', branchId, 'today-badge'],
+    queryFn: () => api.reservationBoard(branchId!),
+    enabled: Boolean(branchId) && Boolean(staff),
+    refetchInterval: 30_000,
+  })
+
   if (!ready) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-canvas text-ink-mute">
@@ -88,6 +101,9 @@ function Shell() {
   const pendingRequests = requests.data?.requests.length ?? 0
   // Đơn online đang chạy — con số để thu ngân biết có việc mà không phải mở màn
   const liveOnline = dispatch.data?.orders.length ?? 0
+  const bookingsToday = (reservations.data?.reservations ?? []).filter(
+    (r) => r.status === 'pending' || r.status === 'confirmed',
+  ).length
 
   return (
     <div className="min-h-dvh bg-canvas text-ink-body">
@@ -99,6 +115,9 @@ function Shell() {
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={() => void navigate('/dieu-phoi')}>
             Đơn online{liveOnline > 0 ? ` · ${liveOnline}` : ''}
+          </Button>
+          <Button variant="ghost" onClick={() => void navigate('/dat-cho')}>
+            Đặt bàn{bookingsToday > 0 ? ` · ${bookingsToday}` : ''}
           </Button>
           <Button
             variant={pendingRequests > 0 ? 'primary' : 'ghost'}

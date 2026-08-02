@@ -6,7 +6,10 @@ import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
 import { isUniqueViolation } from '../../common/pg-error'
 import type { Db } from '../../db/client'
-import { areas, branches, orders, tableSessions, tables } from '../../db/schema'
+import { areas, branches, orders, reservations, tableSessions, tables } from '../../db/schema'
+
+/** Bàn có đặt chỗ trong ngần này phút tới thì hiện nhãn ở P2 và cảnh báo ở P3 (§P2) */
+const RESERVATION_WARN_MINUTES = 90
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 import { hashToken, newToken } from '../identity/tokens'
@@ -18,8 +21,45 @@ export class FloorplanService {
     private readonly audit: AuditService,
   ) {}
 
-  /** P2 sơ đồ bàn: bàn + phiên đang mở + tiền tạm tính */
+  /**
+   * Đặt chỗ sắp tới của từng bàn.
+   *
+   * Truy vấn nằm ở đây chứ không gọi sang dịch vụ quầy đặt bàn: module đặt bàn
+   * đã phụ thuộc vào module gọi món (để mở phiên bàn khi khách tới), nối ngược
+   * lại là tạo vòng phụ thuộc cho một câu SELECT.
+   */
+  private async upcomingReservations(branchId: string, withinMinutes = RESERVATION_WARN_MINUTES) {
+    const now = new Date()
+    const rows = await this.db
+      .select({
+        id: reservations.id,
+        tableId: reservations.tableId,
+        displayCode: reservations.displayCode,
+        slotAt: reservations.slotAt,
+        guestCount: reservations.guestCount,
+        customerName: reservations.customerName,
+        status: reservations.status,
+      })
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.branchId, branchId),
+          sql`${reservations.status} IN ('pending','confirmed')`,
+          sql`${reservations.tableId} IS NOT NULL`,
+          sql`${reservations.endAt} >= ${now}`,
+          sql`${reservations.slotAt} <= ${new Date(now.getTime() + withinMinutes * 60_000)}`,
+        ),
+      )
+      .orderBy(reservations.slotAt)
+
+    const byTable = new Map<number, (typeof rows)[number]>()
+    for (const row of rows) if (!byTable.has(row.tableId!)) byTable.set(row.tableId!, row)
+    return byTable
+  }
+
+  /** P2 sơ đồ bàn: bàn + phiên đang mở + tiền tạm tính + đặt chỗ sắp tới */
   async floorplan(branchId: string) {
+    const upcoming = await this.upcomingReservations(branchId)
     const rows = await this.db
       .select({
         table: tables,
@@ -57,6 +97,16 @@ export class FloorplanService {
             displayCode: order?.displayCode ?? null,
             total: order?.moneyTotal ?? 0,
             paymentState: order?.paymentState ?? 'unpaid',
+          }
+        : null,
+      /** Nhãn `Đặt 19:00` + viền chấm brass trên ô bàn (P2) */
+      reservation: upcoming.get(table.id)
+        ? {
+            id: upcoming.get(table.id)!.id,
+            displayCode: upcoming.get(table.id)!.displayCode,
+            slotAt: upcoming.get(table.id)!.slotAt,
+            guestCount: upcoming.get(table.id)!.guestCount,
+            customerName: upcoming.get(table.id)!.customerName,
           }
         : null,
     }))
@@ -130,12 +180,40 @@ export class FloorplanService {
     })
   }
 
-  /** P3 mở bàn */
+  /**
+   * P3 mở bàn.
+   *
+   * Bàn có khách đặt trong 90 phút tới thì CHẶN lần bấm đầu và nói rõ ai đặt lúc
+   * mấy giờ: xếp khách vãng lai vào bàn đã hứa cho người khác là cách chắc chắn
+   * nhất để mất cả hai. Nhân viên vẫn quyết được — bấm lại với `ignoreReservation`
+   * là mở, và lựa chọn đó ghi vào nhật ký.
+   */
   async openTable(
     tableId: number,
-    input: { guestCount: number; note?: string | null },
+    input: { guestCount: number; note?: string | null; ignoreReservation?: boolean },
     actor: Actor,
   ) {
+    const [target] = await this.db.select().from(tables).where(eq(tables.id, tableId))
+    if (!target) throw new NotFoundException('Không có bàn này')
+
+    const upcoming = (await this.upcomingReservations(target.branchId)).get(tableId)
+    if (upcoming && !input.ignoreReservation) {
+      throw new ConflictException({
+        code: 'table_reserved',
+        message: `Bàn ${target.code} đã dành cho ${upcoming.customerName} lúc ${upcoming.slotAt.toLocaleTimeString(
+          'vi-VN',
+          { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' },
+        )} (${upcoming.guestCount} khách)`,
+        reservation: {
+          id: upcoming.id,
+          displayCode: upcoming.displayCode,
+          slotAt: upcoming.slotAt,
+          customerName: upcoming.customerName,
+          guestCount: upcoming.guestCount,
+        },
+      })
+    }
+
     return this.db.transaction(async (tx) => {
       const [table] = await tx.select().from(tables).where(eq(tables.id, tableId))
       if (!table) throw new NotFoundException('Không có bàn này')
@@ -183,7 +261,12 @@ export class FloorplanService {
         action: 'table.opened',
         entity: 'table_session',
         entityId: String(session!.id),
-        payload: { tableCode: table.code, guestCount: input.guestCount },
+        payload: {
+          tableCode: table.code,
+          guestCount: input.guestCount,
+          // Mở đè lên bàn đã hứa cho khách đặt là quyết định phải truy được
+          overrodeReservation: upcoming ? upcoming.displayCode : undefined,
+        },
       })
 
       return session!

@@ -10,6 +10,8 @@ import { OrderingService } from './ordering.service'
 const OpenTableBody = z.object({
   guestCount: z.number().int().min(1).max(50),
   note: z.string().max(300).nullish(),
+  /** Bàn có đặt chỗ sắp tới thì phải xác nhận lần hai mới mở (P3) */
+  ignoreReservation: z.boolean().optional(),
 })
 
 const AddLinesBody = z.object({

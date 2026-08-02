@@ -26,6 +26,72 @@ export interface TableRow {
   seatMin: number
   seatMax: number
   session: SessionSummary | null
+  /** Đặt chỗ trong 90 phút tới — nhãn `Đặt 19:00` trên ô bàn (P2) */
+  reservation: {
+    id: number
+    displayCode: string
+    slotAt: string
+    guestCount: number
+    customerName: string
+  } | null
+}
+
+export type ReservationStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'seated'
+  | 'done'
+  | 'cancelled'
+  | 'no_show'
+
+export interface ReservationRow {
+  id: number
+  displayCode: string
+  status: ReservationStatus
+  seatKind: 'standard' | 'grill' | 'private'
+  guestCount: number
+  slotAt: string
+  endAt: string
+  tableId: number | null
+  customerName: string
+  customerPhone: string
+  note: string | null
+  source: 'web' | 'phone' | 'walkin'
+  cancelReason: string | null
+}
+
+export interface ReservationBoard {
+  branchId: string
+  businessDate: string
+  tables: {
+    id: number
+    code: string
+    area: string | null
+    kind: 'standard' | 'grill' | 'private'
+    hasGrill: boolean
+    seatMax: number
+  }[]
+  reservations: ReservationRow[]
+  serverNow: string
+  lateAfterMinutes: number
+}
+
+export interface ReservationDetail extends ReservationRow {
+  history: { visits: number; noShows: number }
+  fittingTables: {
+    id: number
+    code: string
+    area: string | null
+    seatMax: number
+    free: boolean
+    occupiedNow: boolean
+    takenBy: string | null
+  }[]
+}
+
+export interface LateReservation extends ReservationRow {
+  lateMinutes: number
+  canNoShow: boolean
 }
 
 export interface OrderLineRow {
@@ -229,13 +295,72 @@ export const api = {
       `/api/table-requests?branch=${encodeURIComponent(branchId)}`,
     ),
 
+  // --- R1 · R2 · R4 · P13 quầy đặt bàn ---
+
+  reservationBoard: (branchId: string, date?: string) =>
+    apiFetch<ReservationBoard>(
+      `/api/desk/reservations?branch=${encodeURIComponent(branchId)}${date ? `&date=${date}` : ''}`,
+    ),
+
+  reservationDetail: (id: number) => apiFetch<ReservationDetail>(`/api/desk/reservations/${id}`),
+
+  lateReservations: (branchId: string) =>
+    apiFetch<{ serverNow: string; holdMinutes: number; rows: LateReservation[] }>(
+      `/api/desk/reservations/late?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  noShowStats: (branchId: string) =>
+    apiFetch<{ days: number; sources: { source: string; total: number; noShow: number; rate: number }[] }>(
+      `/api/desk/reservations/no-show-stats?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  assignReservationTable: (id: number, tableId: number | null) =>
+    apiFetch<ReservationDetail>(`/api/desk/reservations/${id}/table`, {
+      method: 'PATCH',
+      body: { tableId },
+    }),
+
+  setReservationNote: (id: number, note: string | null) =>
+    apiFetch<ReservationDetail>(`/api/desk/reservations/${id}/note`, {
+      method: 'PATCH',
+      body: { note },
+    }),
+
+  confirmReservation: (id: number) =>
+    apiFetch<ReservationDetail>(`/api/desk/reservations/${id}/confirm`, { method: 'POST' }),
+
+  /** "Đã đến" mở phiên bàn — từ đây mọi thứ đi tiếp qua vòng vận hành tại bàn */
+  arriveReservation: (id: number, tableId?: number | null) =>
+    apiFetch<{ reservation: ReservationDetail; sessionId: number }>(
+      `/api/desk/reservations/${id}/arrive`,
+      { method: 'POST', body: { tableId } },
+    ),
+
+  noShowReservation: (id: number) =>
+    apiFetch<ReservationDetail>(`/api/desk/reservations/${id}/no-show`, { method: 'POST' }),
+
+  cancelReservation: (id: number, reason: string) =>
+    apiFetch<ReservationDetail>(`/api/desk/reservations/${id}/cancel`, {
+      method: 'POST',
+      body: { reason },
+    }),
+
   // --- Thao tác ghi: đi qua hàng đợi offline, kể cả khi đang online ---
 
-  openTable: (tableId: number, guestCount: number, tableCode: string) =>
+  /**
+   * P3 mở bàn. `ignoreReservation` là lần bấm thứ hai sau khi máy chủ báo bàn đã
+   * dành cho khách đặt — nhân viên vẫn là người quyết.
+   */
+  openTable: (
+    tableId: number,
+    guestCount: number,
+    tableCode: string,
+    ignoreReservation = false,
+  ) =>
     enqueue<{ id: number }>({
       method: 'POST',
       path: `/api/tables/${tableId}/open`,
-      payload: { guestCount },
+      payload: { guestCount, ignoreReservation },
       label: `Mở bàn ${tableCode}`,
     }),
 

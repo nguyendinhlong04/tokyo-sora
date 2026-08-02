@@ -22,6 +22,8 @@ export function Floorplan() {
   const queryClient = useQueryClient()
   const [opening, setOpening] = useState<TableRow | null>(null)
   const [guestCount, setGuestCount] = useState(2)
+  /** Bàn có khách đặt — đã hỏi lại và nhân viên vẫn muốn mở */
+  const [override, setOverride] = useState(false)
 
   const tables = useQuery({
     queryKey: ['tables', branchId],
@@ -47,15 +49,29 @@ export function Floorplan() {
     onError: (err: Error) => toast(err.message, 'danger'),
   })
 
+  /**
+   * P3 mở bàn. Bàn đã hứa cho khách đặt thì máy chủ chặn lần bấm đầu; lần thứ
+   * hai nhân viên bấm là mở đè, và lựa chọn đó nằm trong nhật ký.
+   */
   const openTable = useMutation({
-    mutationFn: (row: TableRow) => api.openTable(row.id, guestCount, row.code),
-    onSuccess: (result, row) => {
+    mutationFn: ({ row, override }: { row: TableRow; override: boolean }) =>
+      api.openTable(row.id, guestCount, row.code, override),
+    onSuccess: (result, { row }) => {
       setOpening(null)
+      setOverride(false)
       void queryClient.invalidateQueries({ queryKey: ['tables', branchId] })
+      void queryClient.invalidateQueries({ queryKey: ['reservations'] })
       if (result?.id) void navigate(`/table/${result.id}?code=${row.code}`)
       else toast('Đang chờ mạng — bàn sẽ mở khi gửi được', 'warn')
     },
-    onError: (err: Error) => toast(err.message, 'danger'),
+    onError: (err: Error) => {
+      /**
+       * Suất mới đặt xen vào giữa lúc mở sơ đồ và lúc bấm — máy chủ vẫn chặn,
+       * hộp thoại giữ nguyên và đổi thành nút xác nhận lần hai.
+       */
+      if (err.message.includes('đã dành cho')) setOverride(true)
+      toast(err.message, 'danger')
+    },
   })
 
   const byArea = new Map<string, TableRow[]>()
@@ -96,10 +112,23 @@ export function Floorplan() {
                   state={stateOf(row)}
                   guestCount={row.session?.guestCount}
                   total={row.session?.total}
+                  // Nhãn `Đặt 19:00` — bàn này đã hứa cho ai đó trong 90 phút tới
+                  reservedAt={
+                    row.reservation
+                      ? new Date(row.reservation.slotAt).toLocaleTimeString('vi-VN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : undefined
+                  }
                   onClick={() => {
                     if (row.session) void navigate(`/table/${row.session.id}?code=${row.code}`)
                     else {
                       setGuestCount(Math.min(2, row.seatMax))
+                      // Cảnh báo đã hiện ngay trong hộp thoại, nên lần bấm đầu
+                      // cũng chính là lần xác nhận — không bắt bấm hai lần để
+                      // đọc lại một câu vừa đọc
+                      setOverride(Boolean(row.reservation))
                       setOpening(row)
                     }
                   }}
@@ -118,16 +147,32 @@ export function Floorplan() {
           <>
             <Button onClick={() => setOpening(null)}>Huỷ</Button>
             <Button
-              variant="primary"
+              variant={override ? 'danger' : 'primary'}
               disabled={openTable.isPending}
-              onClick={() => opening && openTable.mutate(opening)}
+              onClick={() => opening && openTable.mutate({ row: opening, override })}
             >
-              Mở bàn
+              {override ? 'Vẫn mở bàn' : 'Mở bàn'}
             </Button>
           </>
         }
       >
         <div className="flex flex-col gap-4">
+          {opening?.reservation ? (
+            <div className="rounded-sm border border-warn bg-warn/8 p-3">
+              <p className="text-[length:var(--fs-b2)] text-ink-hi">
+                Bàn này đã dành cho <strong>{opening.reservation.customerName}</strong> lúc{' '}
+                {new Date(opening.reservation.slotAt).toLocaleTimeString('vi-VN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}{' '}
+                ({opening.reservation.guestCount} khách · {opening.reservation.displayCode}).
+              </p>
+              <p className="mt-2 text-[length:var(--fs-c1)] text-ink-mute">
+                Xếp khách khác vào đây thì lát nữa phải mời một trong hai bàn đứng dậy. Còn bàn
+                trống khác không?
+              </p>
+            </div>
+          ) : null}
           <SectionLabel>Số khách</SectionLabel>
           <div className="flex flex-wrap gap-2">
             {Array.from({ length: opening?.seatMax ?? 4 }, (_, i) => i + 1).map((n) => (
