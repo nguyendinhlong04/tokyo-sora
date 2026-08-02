@@ -237,6 +237,9 @@ const OFFICE_ACCOUNTS: { code: string; fullName: string; email: string; roles: s
   { code: 'CHUOI01', fullName: 'Quản lý chuỗi', email: 'chuoi@tokyosora.vn', roles: ['R11'] },
   { code: 'KETOAN01', fullName: 'Kế toán', email: 'ketoan@tokyosora.vn', roles: ['R8'] },
   { code: 'NHANSU01', fullName: 'Quản lý nhân sự', email: 'nhansu@tokyosora.vn', roles: ['R13'] },
+  // R9 chỉ mở được đúng một màn — A8 nội dung website. Có tài khoản này thì thử
+  // được ranh giới đó thật, thay vì tin rằng nó hẹp.
+  { code: 'MARKETING01', fullName: 'Marketing', email: 'marketing@tokyosora.vn', roles: ['R9'] },
 ]
 
 /** PIN dev — mọi nhân viên dùng 4 số khác nhau, chỉ dành cho môi trường phát triển */

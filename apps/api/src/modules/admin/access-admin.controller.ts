@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common'
 import { ROLES } from '@sora/contracts'
 import { z } from 'zod'
+import { actorBranchId } from '../identity/actor'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { AccessAdminService } from './access-admin.service'
@@ -133,13 +134,14 @@ export class AccessAdminController {
 
   @Get('audit')
   @RequirePermission('audit.view-log')
-  audit(@Query() query: unknown) {
+  audit(@Query() query: unknown, @Req() req: RequestWithActor) {
     const q = AuditQuery.parse(query)
     assertRange(q.from, q.to)
     return this.access.auditTrail({
       branchId: q.branch ?? null,
+      viewerBranchId: actorBranchId(req.actor!),
       from: q.from,
-      to: nextDay(q.to),
+      to: q.to,
       action: q.action ?? null,
       actorId: q.actor ?? null,
       beforeId: q.before ?? null,
@@ -149,22 +151,18 @@ export class AccessAdminController {
 
   @Get('audit/filters')
   @RequirePermission('audit.view-log')
-  auditFilters(@Query() query: unknown) {
+  auditFilters(@Query() query: unknown, @Req() req: RequestWithActor) {
     const q = AuditQuery.pick({ branch: true, from: true, to: true }).parse(query)
     assertRange(q.from, q.to)
     return this.access.auditActions({
       branchId: q.branch ?? null,
+      viewerBranchId: actorBranchId(req.actor!),
       from: q.from,
-      to: nextDay(q.to),
+      to: q.to,
     })
   }
 }
 
 function assertRange(from: string, to: string) {
   if (from > to) throw new BadRequestException('Ngày bắt đầu phải trước ngày kết thúc')
-}
-
-/** Khoảng lọc bao gồm cả ngày `to`, nên biên trên là 00:00 của ngày kế */
-function nextDay(iso: string): string {
-  return new Date(Date.parse(`${iso}T00:00:00.000Z`) + 86_400_000).toISOString().slice(0, 10)
 }

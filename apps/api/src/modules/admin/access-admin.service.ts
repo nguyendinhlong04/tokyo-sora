@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common'
 import { ROLES, ROLE_LABELS, type Role } from '@sora/contracts'
 import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm'
+import { startOfBusinessDay } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { isUniqueViolation } from '../../common/pg-error'
 import type { Db } from '../../db/client'
@@ -31,6 +32,9 @@ export interface AccountInput {
 
 /** Vai trò mở được màn quản trị — mất hết là không ai vào lại được A1 */
 const ADMIN_ROLE: Role = 'R10'
+
+/** Dùng khi không tra được chi nhánh nào — cùng mặc định với cột `branches.timezone` */
+const DEFAULT_TIMEZONE = 'Asia/Ho_Chi_Minh'
 
 /**
  * A1 · A2 · A7 — ai là ai, ai được làm gì, và ai đã làm gì.
@@ -295,6 +299,8 @@ export class AccessAdminService {
    */
   async auditTrail(filter: {
     branchId: string | null
+    /** Chi nhánh của người đang xem — quyết định múi giờ khi lọc cả chuỗi */
+    viewerBranchId: string | null
     from: string
     to: string
     action: string | null
@@ -302,12 +308,8 @@ export class AccessAdminService {
     beforeId: number | null
     limit: number
   }) {
-    const where = [
-      gte(auditLog.createdAt, new Date(`${filter.from}T00:00:00.000Z`)),
-      // `to` là ngày bao gồm cả ngày đó — cộng một ngày rồi so `<` để không phải
-      // dựa vào độ chính xác của 23:59:59.999
-      lt(auditLog.createdAt, new Date(`${filter.to}T00:00:00.000Z`)),
-    ]
+    const window = await this.window(filter)
+    const where = [gte(auditLog.createdAt, window.start), lt(auditLog.createdAt, window.end)]
     if (filter.branchId) where.push(eq(auditLog.branchId, filter.branchId))
     if (filter.action) where.push(eq(auditLog.action, filter.action))
     if (filter.actorId !== null) {
@@ -348,11 +350,14 @@ export class AccessAdminService {
   }
 
   /** Danh sách hành động CÓ THẬT trong khoảng đang xem — nguồn cho ô lọc */
-  async auditActions(filter: { branchId: string | null; from: string; to: string }) {
-    const where = [
-      gte(auditLog.createdAt, new Date(`${filter.from}T00:00:00.000Z`)),
-      lt(auditLog.createdAt, new Date(`${filter.to}T00:00:00.000Z`)),
-    ]
+  async auditActions(filter: {
+    branchId: string | null
+    viewerBranchId: string | null
+    from: string
+    to: string
+  }) {
+    const window = await this.window(filter)
+    const where = [gte(auditLog.createdAt, window.start), lt(auditLog.createdAt, window.end)]
     if (filter.branchId) where.push(eq(auditLog.branchId, filter.branchId))
 
     const [actions, actors] = await Promise.all([
@@ -380,6 +385,36 @@ export class AccessAdminService {
   }
 
   // ============================================================== phụ trợ
+
+  /**
+   * Khoảng thời gian tuyệt đối của một dải ngày, theo MÚI GIỜ CHI NHÁNH.
+   *
+   * Cắt theo nửa đêm UTC sẽ lệch bảy tiếng: người quản lý chọn "hôm nay" mà thao
+   * tác lúc 0h30 sáng lại rơi vào khoảng của ngày hôm trước — đúng những giờ mà
+   * người đọc nhật ký quan tâm nhất. Biên trên lấy 00:00 của ngày kế rồi so `<`,
+   * nên khoảng bao gồm trọn ngày `to` mà không phải tin vào 23:59:59.999.
+   */
+  private async window(filter: {
+    branchId: string | null
+    viewerBranchId: string | null
+    from: string
+    to: string
+  }) {
+    const timezone = await this.timezoneOf(filter.branchId ?? filter.viewerBranchId)
+    return {
+      start: startOfBusinessDay(filter.from, timezone),
+      end: startOfBusinessDay(nextDay(filter.to), timezone),
+    }
+  }
+
+  private async timezoneOf(branchId: string | null): Promise<string> {
+    if (!branchId) return DEFAULT_TIMEZONE
+    const [row] = await this.db
+      .select({ timezone: branches.timezone })
+      .from(branches)
+      .where(eq(branches.id, branchId))
+    return row?.timezone ?? DEFAULT_TIMEZONE
+  }
 
   private async insertAccount(input: AccountInput & { password: string | null; pin: string | null }) {
     try {
@@ -490,4 +525,9 @@ function assertPin(pin: string | null) {
 function assertPassword(password: string | null) {
   if (password === null) return
   if (password.length < 8) throw new BadRequestException('Mật khẩu Office tối thiểu 8 ký tự')
+}
+
+/** Ngày kế tiếp theo lịch, dùng làm biên trên nửa mở của khoảng lọc */
+function nextDay(iso: string): string {
+  return new Date(Date.parse(`${iso}T00:00:00.000Z`) + 86_400_000).toISOString().slice(0, 10)
 }

@@ -15,7 +15,7 @@ import { hash } from '@node-rs/argon2'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
-import { devices, staff, staffRoles, staffSessions } from '../db/schema'
+import { auditLog, devices, staff, staffRoles, staffSessions } from '../db/schema'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
 import { bootTestApp, type Fixtures } from './harness'
@@ -199,6 +199,15 @@ describe('A1 — Tài khoản', () => {
   })
 
   it('không khoá được tài khoản Chủ / Admin cuối cùng', async () => {
+    // Bộ fixture có sẵn một R10 nữa (Lan) — cho nghỉ trước để CHU01 thành người cuối
+    const lan = await inject({
+      method: 'PATCH',
+      url: `/api/admin/accounts/${fx.managerId}`,
+      headers: asOwner(),
+      payload: { active: false },
+    })
+    expect(lan.statusCode, lan.payload).toBe(200)
+
     const res = await inject({
       method: 'PATCH',
       url: `/api/admin/accounts/${ownerId}`,
@@ -242,8 +251,9 @@ describe('A1 — Tài khoản', () => {
     })
     expect(res.statusCode).toBe(200)
 
-    // Trả lại trạng thái cũ cho các bộ test sau — phiên của owner đã bị cắt
+    // Trả lại trạng thái cũ cho các bộ test sau — khoá tài khoản đã cắt phiên của họ
     await db.update(staff).set({ active: true }).where(eq(staff.id, ownerId))
+    await db.update(staff).set({ active: true }).where(eq(staff.id, fx.managerId))
     await db.update(staffSessions).set({ revokedAt: null }).where(eq(staffSessions.staffId, ownerId))
   })
 
@@ -648,13 +658,22 @@ describe('A8 — CMS website', () => {
     expect(res.json()[0]).toMatchObject({ title: 'Phục vụ bàn', branchName: null, slots: 6 })
   })
 
-  it('marketing KHÔNG chạm được vào giá món hay chi nhánh', async () => {
-    const dishes = await inject({
+  it('marketing ĐỌC được thực đơn nhưng không sửa được giá, và không chạm vào chi nhánh', async () => {
+    // §4.2 cho R9 dòng `menu.view-price` — người viết bài phải xem được món họ viết
+    const read = await inject({
       method: 'GET',
       url: `/api/admin/dishes?branch=${fx.branchId}`,
       headers: asMarketing(),
     })
-    expect(dishes.statusCode).toBe(403)
+    expect(read.statusCode).toBe(200)
+
+    const price = await inject({
+      method: 'PATCH',
+      url: '/api/admin/dishes/bachibo',
+      headers: asMarketing(),
+      payload: { basePrice: 1_000 },
+    })
+    expect(price.statusCode).toBe(403)
 
     const branch = await inject({
       method: 'PATCH',
@@ -737,6 +756,34 @@ describe('A7 — Nhật ký thao tác', () => {
 
     const accounts = await inject({ method: 'GET', url: '/api/admin/accounts', headers: asManager() })
     expect(accounts.statusCode).toBe(403)
+  })
+
+  /**
+   * Cắt khoảng theo nửa đêm UTC sẽ lệch bảy tiếng so với Hà Nội: thao tác lúc
+   * 0h30 sáng rơi vào khoảng của ngày hôm trước — đúng những giờ mà người đọc
+   * nhật ký quan tâm nhất khi đi tìm chuyện bất thường.
+   */
+  it('khoảng ngày cắt theo múi giờ chi nhánh, không theo giờ UTC', async () => {
+    const today = new Date().toISOString().slice(0, 10)
+    const [dawn] = await db
+      .insert(auditLog)
+      .values({
+        branchId: fx.branchId,
+        actorKind: 'system',
+        action: 'test.rang-sang',
+        entity: 'test',
+        entityId: '1',
+        // 00:30 giờ Hà Nội hôm nay = 17:30 UTC hôm qua
+        createdAt: new Date(`${today}T00:30:00+07:00`),
+      })
+      .returning({ id: auditLog.id })
+
+    const res = await inject({
+      method: 'GET',
+      url: `/api/admin/audit?from=${today}&to=${today}&action=test.rang-sang&branch=${fx.branchId}`,
+      headers: asOwner(),
+    })
+    expect(res.json().rows.map((r: { id: number }) => r.id)).toContain(dawn!.id)
   })
 
   it('ô lọc chỉ liệt kê hành động có thật trong khoảng đang xem', async () => {

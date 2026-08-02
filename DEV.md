@@ -161,9 +161,13 @@ ghép — Office chạy trên máy tính của quản lý, không phải máy c�
 | chuoi@tokyosora.vn | R11 Quản lý chuỗi | `sora-dev-2026` |
 | ketoan@tokyosora.vn | R8 Kế toán | `sora-dev-2026` |
 | nhansu@tokyosora.vn | R13 Quản lý nhân sự | `sora-dev-2026` |
+| marketing@tokyosora.vn | R9 Marketing | `sora-dev-2026` |
 
-> Màn cấu hình (A6, A3, A10, R3) gắn quyền `admin.manage-accounts-roles` — theo ma trận
-> §4.2 chỉ R10 có. Đăng nhập bằng `chuoi@` sẽ vào được Office nhưng các nút sửa mờ đi.
+> Cả nhóm quản trị (A1–A6, A9, A10) và R3 gắn quyền `admin.manage-accounts-roles` — theo
+> ma trận §4.2 chỉ R10 có. Đăng nhập bằng `chuoi@` sẽ vào được Office nhưng cột trái không
+> hiện những màn đó. Hai ngoại lệ: **A7 nhật ký** mở cho R7 · R8 · R11 · R10 (`audit.view-log`),
+> và **A8 nội dung website** mở cho R9 · R10 (`cms.edit`) — `marketing@` chỉ thấy đúng một
+> mục trong cột trái, đó là ranh giới đang được cưỡng chế chứ không phải lỗi.
 
 > **Vì sao cần bốn tài khoản:** hai luồng đòi nhiều người. Phiếu chi trên hạn mức chi
 > vặt phải do NGƯỜI KHÁC duyệt (§4.3.1 — không ai tự duyệt việc của mình), nên ghi
