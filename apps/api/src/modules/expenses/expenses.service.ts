@@ -9,6 +9,7 @@ import { and, asc, eq, gte, lte, sql } from 'drizzle-orm'
 import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
+import { PeriodLockService } from '../../common/period-lock.service'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
@@ -81,6 +82,7 @@ export class ExpensesService {
     private readonly params: ParamsService,
     private readonly approvals: ApprovalService,
     private readonly audit: AuditService,
+    private readonly locks: PeriodLockService,
   ) {}
 
   // ==================================================== C6 · Khoản mục
@@ -168,6 +170,8 @@ export class ExpensesService {
    */
   async createVoucher(input: VoucherInput, actor: Actor, approval?: ApprovalInput | null) {
     const branch = await this.requireBranch(input.branchId)
+    // Kỳ đã khoá sổ (F6) không nhận phiếu chi mới — kể cả phiếu ghi lùi ngày
+    await this.locks.assertOpen(input.branchId, [input.paidOn], 'ghi phiếu chi')
     const [category] = await this.db
       .select()
       .from(expenseCategories)
@@ -251,6 +255,8 @@ export class ExpensesService {
       if (actor.kind === 'staff' && voucher.createdBy === actor.staffId) {
         throw new ConflictException('Không ai tự duyệt phiếu chi của mình')
       }
+      // Duyệt là lúc phiếu thành chi phí, nên nó cũng phải nằm trong kỳ còn mở
+      await this.locks.assertOpen(voucher.branchId, [voucher.paidOn], 'duyệt phiếu chi')
 
       const [approved] = await tx
         .update(expenseVouchers)

@@ -1,5 +1,6 @@
 export * from './identity'
 export * from './catalog'
+export * from './accounting'
 export * from './hr'
 export * from './expenses'
 export * from './inventory'

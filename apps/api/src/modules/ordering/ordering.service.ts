@@ -17,6 +17,7 @@ import type { Db } from '../../db/client'
 import {
   branches,
   dishAvailability,
+  journalEntries,
   orderBatches,
   orderLines,
   orders,
@@ -675,6 +676,30 @@ export class OrderingService {
         .returning({ ticketId: ticketItems.ticketId })
 
       const money = await this.recomputeTotals(tx, line.orderId, order!.branchId)
+
+      /**
+       * Bút toán ngược vào sổ doanh thu F2.
+       *
+       * Trước đây huỷ món chỉ để lại dấu ở nhật ký thao tác A7 — đủ để truy ai
+       * làm, nhưng KHÔNG đủ để kế toán thấy doanh thu đã bị điều chỉnh bao nhiêu.
+       * F2 là "nhật ký doanh thu & điều chỉnh", nên điều chỉnh phải nằm trong sổ
+       * đó chứ không nằm trong nhật ký thao tác.
+       *
+       * Chỉ ghi khi món ĐÃ GỬI BẾP: huỷ món chưa gửi là sửa đơn đang soạn, không
+       * phải điều chỉnh doanh thu — ghi cả hai sẽ làm sổ ngập những dòng vô nghĩa.
+       */
+      if (alreadySent && line.priceTotal > 0) {
+        await tx.insert(journalEntries).values({
+          branchId: order!.branchId,
+          kind: 'void',
+          orderId: line.orderId,
+          amount: -line.priceTotal,
+          actorId: actor.kind === 'staff' ? actor.staffId : null,
+          approvalId,
+          memo: `Huỷ ${line.nameSnapshot} × ${line.qty} — ${input.reason.trim()}`,
+          businessDate: order!.businessDate,
+        })
+      }
 
       for (const ticketId of new Set(voidedItems.map((i) => i.ticketId))) {
         const [ticket] = await tx.select().from(tickets).where(eq(tickets.id, ticketId))

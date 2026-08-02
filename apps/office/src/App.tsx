@@ -2,6 +2,7 @@ import type { ActionKey } from '@sora/contracts'
 import { ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
+import { Debts, InvoiceBook, PeriodClose, RevenueJournal, TaxReport } from './routes/Accounting'
 import { Branches } from './routes/Branches'
 import { CashBook } from './routes/CashBook'
 import { Assets, ExpenseOverview, RecurringExpenses } from './routes/CostCenter'
@@ -67,6 +68,11 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
     group: 'Tài chính',
     items: [
       { to: '/so-quy', label: 'F1 · Sổ quỹ & đối soát', need: 'accounting.ledger-close-period' },
+      { to: '/nhat-ky', label: 'F2 · Nhật ký doanh thu', need: 'accounting.ledger-close-period' },
+      { to: '/hoa-don', label: 'F3 · Sổ hoá đơn điện tử', need: 'accounting.ledger-close-period' },
+      { to: '/bao-cao-thue', label: 'F4 · Báo cáo thuế', need: 'accounting.ledger-close-period' },
+      { to: '/cong-no', label: 'F5 · Công nợ', need: 'accounting.ledger-close-period' },
+      { to: '/khoa-so', label: 'F6 · Khoá sổ kỳ', need: 'accounting.ledger-close-period' },
       { to: '/lai-lo', label: 'F7 · Lãi / Lỗ', need: 'report.pnl-branch-summary' },
     ],
   },
@@ -123,6 +129,11 @@ export function App() {
                 <Route path="/chi-phi" element={<Expenses />} />
                 <Route path="/dinh-ky" element={<RecurringExpenses />} />
                 <Route path="/tai-san" element={<Assets />} />
+                <Route path="/nhat-ky" element={<RevenueJournal />} />
+                <Route path="/hoa-don" element={<InvoiceBook />} />
+                <Route path="/bao-cao-thue" element={<TaxReport />} />
+                <Route path="/cong-no" element={<Debts />} />
+                <Route path="/khoa-so" element={<PeriodClose />} />
                 <Route path="/tham-so" element={<Parameters />} />
                 <Route path="/so-do-ban" element={<Floorplan />} />
                 <Route path="/chi-nhanh" element={<Branches />} />

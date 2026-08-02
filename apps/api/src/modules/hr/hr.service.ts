@@ -9,6 +9,7 @@ import {
 import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
+import { PeriodLockService } from '../../common/period-lock.service'
 import { isUniqueViolation } from '../../common/pg-error'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
@@ -90,6 +91,7 @@ export class HrService {
     private readonly approvals: ApprovalService,
     private readonly audit: AuditService,
     private readonly expenses: ExpensesService,
+    private readonly locks: PeriodLockService,
   ) {}
 
   // ================================================= H1 · Hồ sơ nhân viên
@@ -443,6 +445,11 @@ export class HrService {
       throw new BadRequestException('Kỳ lương phải kết thúc sau khi bắt đầu')
     }
     await this.requireBranch(input.branchId)
+    await this.locks.assertOpen(
+      input.branchId,
+      [input.periodStart, input.periodEnd],
+      'mở kỳ lương',
+    )
 
     return this.db.transaction(async (tx) => {
       try {
@@ -811,6 +818,10 @@ export class HrService {
   }
 
   private async assertWeekEditable(branchId: string, weekStart: string, weekEnd: string) {
+    // Hai lớp khác nhau: khoá sổ kế toán (F6) chặn cả tháng, còn chốt công (H7)
+    // chỉ chặn kỳ lương. Một tuần vắt qua mốc tháng thì lớp đầu kiểm cả hai tháng.
+    await this.locks.assertOpen(branchId, [weekStart, weekEnd], 'sửa lịch làm')
+
     const locked = await this.lockedPeriodCovering(branchId, weekStart, weekEnd)
     if (locked) {
       throw new ConflictException({

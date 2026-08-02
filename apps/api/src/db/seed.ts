@@ -597,6 +597,24 @@ async function seed(db: Db) {
       .onConflictDoNothing()
   }
 
+  /**
+   * Ký hiệu hoá đơn điện tử — RIÊNG từng chi nhánh (§30.2: một mã số thuế, một
+   * hợp đồng HĐĐT, mỗi địa điểm kinh doanh một ký hiệu M). Nên đây là tham số
+   * cấp chi nhánh, không phải mặc định cấp chuỗi như mọi tham số khác.
+   */
+  for (const [index, branch] of branchRows.entries()) {
+    await db
+      .insert(s.parameters)
+      .values({
+        key: 'einvoice.serial',
+        branchId: branch.id,
+        value: `C26M${String.fromCharCode(65 + index)}A`,
+        unit: 'ký hiệu',
+        sensitive: true,
+      })
+      .onConflictDoNothing()
+  }
+
   // ---- Cây khoản mục C6 ----
   for (const c of EXPENSE_CATEGORIES) {
     await db

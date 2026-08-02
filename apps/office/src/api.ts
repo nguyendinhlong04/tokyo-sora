@@ -243,6 +243,118 @@ export interface StockMove {
   createdAt: string
 }
 
+// --------------------------------- Kế toán F2 · F3 · F4 · F5 · F6
+
+export interface JournalRow {
+  id: number
+  kind: 'sale' | 'discount' | 'comp' | 'void' | 'refund' | 'payment' | 'shift_adjust'
+  amount: number
+  memo: string | null
+  orderCode: string | null
+  actorName: string | null
+  approverName: string | null
+  approvalReason: string | null
+  businessDate: string
+  createdAt: string
+}
+
+export interface JournalView {
+  branchId: string
+  from: string
+  to: string
+  rows: JournalRow[]
+  totals: { kind: string; amount: number }[]
+  readOnly: boolean
+}
+
+export type InvoiceState = 'pending' | 'issued' | 'failed' | 'voided' | 'replaced'
+
+export interface InvoiceRow {
+  id: number
+  branchId: string
+  orderId: number
+  orderCode: string
+  serial: string
+  invoiceNo: string | null
+  taxCode: string | null
+  state: InvoiceState
+  lastError: string | null
+  amountSub: number
+  amountVat: number
+  amountTotal: number
+  replacesId: number | null
+  voidReason: string | null
+  issuedAt: string | null
+  issuedByName: string | null
+  businessDate: string
+}
+
+export interface InvoiceBook {
+  branchId: string
+  /** Ký hiệu hoá đơn của chi nhánh; null = chưa khai ở A6 */
+  serial: string | null
+  rows: InvoiceRow[]
+  queue: { id: number; orderCode: string; error: string | null }[]
+  /** Bill đã trả đủ mà chưa có hoá đơn nào */
+  missing: {
+    orderId: number
+    displayCode: string
+    moneySub: number
+    moneyVat: number
+    moneyTotal: number
+    businessDate: string
+  }[]
+}
+
+export interface TaxReport {
+  branchId: string
+  from: string
+  to: string
+  buckets: { rate: number; netVnd: number; vatVnd: number }[]
+  summary: {
+    vatOutVnd: number
+    vatInVnd: number
+    /** Dương = phải nộp; âm = được khấu trừ chuyển kỳ sau */
+    vatPayableVnd: number
+    pitWithheldVnd: number
+  }
+  reconciliation: {
+    systemVnd: number
+    invoicedVnd: number
+    diffVnd: number
+    matched: boolean
+    systemOrders: number
+    issuedInvoices: number
+  }
+  vatInNote: string
+  pitNote: string
+}
+
+export interface DebtReport {
+  branchId: string
+  from: string
+  to: string
+  payable: {
+    receivedVnd: number
+    vouchersVnd: number
+    receiptCount: number
+    note: string
+  }
+  receivable: BlockedTile
+}
+
+export interface PeriodLock {
+  month: string
+  lockedAt: string
+  lockedByName: string | null
+  note: string | null
+}
+
+export interface PeriodReadiness {
+  month: string
+  blockers: string[]
+}
+
 // ------------------------------------- Chi phí & tài sản C1 · C2 · C3 · C4 · C6
 
 /** Dòng của F7 mà một khoản mục cộng vào */
@@ -1036,4 +1148,49 @@ export const api = {
     month: string
     amountVnd: number
   }) => apiFetch<{ amountVnd: number }>('/api/expenses/budgets', { method: 'PUT', body: input }),
+
+  // ------------------------------- F2 · F3 · F4 · F5 · F6
+
+  journal: (branchId: string, from: string, to: string) =>
+    apiFetch<JournalView>(
+      `/api/accounting/journal?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
+    ),
+
+  invoiceBook: (branchId: string, from: string, to: string) =>
+    apiFetch<InvoiceBook>(
+      `/api/accounting/invoices?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
+    ),
+
+  issueInvoice: (orderId: number) =>
+    apiFetch<InvoiceRow>(`/api/accounting/invoices/issue/${orderId}`, { method: 'POST' }),
+
+  voidInvoice: (id: number, input: { reason: string; replace: boolean }, approval?: Approval | null) =>
+    apiFetch<{ voided: number; replacement: InvoiceRow | null }>(
+      `/api/accounting/invoices/${id}/void`,
+      { method: 'POST', body: { ...input, approval } },
+    ),
+
+  taxReport: (branchId: string, from: string, to: string) =>
+    apiFetch<TaxReport>(
+      `/api/accounting/tax-report?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
+    ),
+
+  debts: (branchId: string, from: string, to: string) =>
+    apiFetch<DebtReport>(
+      `/api/accounting/debts?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
+    ),
+
+  periodLocks: (branchId: string) =>
+    apiFetch<PeriodLock[]>(`/api/accounting/periods?branch=${encodeURIComponent(branchId)}`),
+
+  periodReadiness: (branchId: string, month: string) =>
+    apiFetch<PeriodReadiness>(
+      `/api/accounting/periods/readiness?branch=${encodeURIComponent(branchId)}&month=${month}`,
+    ),
+
+  lockPeriod: (branchId: string, month: string, note: string | null) =>
+    apiFetch<{ locked: boolean }>('/api/accounting/periods/lock', {
+      method: 'POST',
+      body: { branchId, month, note },
+    }),
 }

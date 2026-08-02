@@ -9,6 +9,7 @@ import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { isUniqueViolation } from '../../common/pg-error'
+import { PeriodLockService } from '../../common/period-lock.service'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
@@ -76,6 +77,7 @@ export class InventoryService {
     @Inject(DB) private readonly db: Db,
     private readonly approvals: ApprovalService,
     private readonly audit: AuditService,
+    private readonly locks: PeriodLockService,
   ) {}
 
   // ==================================================== M7 · Nguyên liệu
@@ -512,6 +514,12 @@ export class InventoryService {
     if (!input.note?.trim()) throw new BadRequestException('Điều chỉnh tồn bắt buộc ghi lý do')
 
     const branch = await this.requireBranch(input.branchId)
+    // Điều chỉnh tồn đổi giá vốn hàng bán, nên kỳ đã khoá sổ không nhận
+    await this.locks.assertOpen(
+      input.branchId,
+      [businessDateOf(new Date(), branch.timezone)],
+      'điều chỉnh tồn',
+    )
 
     return this.db.transaction(async (tx) => {
       await this.approvals.authorize(tx, {
