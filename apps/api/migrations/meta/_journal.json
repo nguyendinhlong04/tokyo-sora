@@ -43,6 +43,13 @@
       "when": 1785595423401,
       "tag": "0005_huge_invisible_woman",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785633451877,
+      "tag": "0006_volatile_pyro",
+      "breakpoints": true
     }
   ]
 }

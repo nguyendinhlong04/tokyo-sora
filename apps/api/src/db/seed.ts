@@ -55,6 +55,15 @@ const PARAMETERS: {
   { key: 'online.slotCapacity', value: 6, unit: 'đơn' },
   { key: 'reservation.softHoldMinutes', value: 10, unit: 'phút' },
   { key: 'reservation.tableHoldMinutes', value: 15, unit: 'phút' },
+  // Lưới đặt bàn W6 (§R3): bước lưới, thời lượng bữa theo nhóm, đệm dọn, tầm nhận đặt
+  { key: 'reservation.slotStepMinutes', value: 30, unit: 'phút' },
+  { key: 'reservation.mealMinutesSmall', value: 90, unit: 'phút' },
+  { key: 'reservation.mealMinutesLarge', value: 120, unit: 'phút' },
+  { key: 'reservation.turnBufferMinutes', value: 15, unit: 'phút' },
+  { key: 'reservation.leadMinutes', value: 60, unit: 'phút' },
+  { key: 'reservation.horizonDays', value: 30, unit: 'ngày' },
+  { key: 'reservation.maxGuestsOnline', value: 10, unit: 'khách' },
+  { key: 'reservation.autoConfirm', value: true },
 ]
 
 /**
@@ -115,6 +124,10 @@ interface SeedBranch {
   addr?: string
   phone?: string
   hours?: string
+  /** '18 bàn · 6 bàn có bếp' — nguồn để dựng sơ đồ bàn của chi nhánh chưa vẽ */
+  tables?: string
+  /** ['Khu bếp than tại bàn', '3 phòng riêng'] */
+  zones?: string[]
 }
 interface SeedDishRow {
   id: string
@@ -132,6 +145,7 @@ interface SeedDishRow {
   isVegetarian: boolean
   isSpicy: boolean
   hasSeafood: boolean
+  isSignature: boolean
   active: boolean
   stationsFromKitchen: string[]
 }
@@ -139,7 +153,8 @@ interface SeedTable {
   n: string
   z: string
   grill: number
-  cap: number
+  /** Vắng ở vài bàn trong prototype — mặc định 4 chỗ */
+  cap?: number
 }
 
 /**
@@ -190,6 +205,87 @@ function parseQty(display: string | undefined): number {
   if (!display) return 1
   const match = /^(\d+)\s*(phần|bát|con|xiên|cái|suất)/i.exec(display.trim())
   return match ? Number(match[1]) : 1
+}
+
+const AREA_NAMES: Record<string, string> = {
+  sakura: 'Khu Sakura',
+  momiji: 'Khu Momiji',
+  sumi: 'Khu Sumi',
+  rieng: 'Phòng riêng',
+  private: 'Phòng riêng',
+}
+/** Zone nào là phòng riêng — quyết định `kind` của bàn, và W6 lọc chỗ theo cột đó */
+const PRIVATE_ZONES = new Set(['private', 'rieng'])
+
+/** Dựng khu vực + bàn của một chi nhánh, gọi lại được nhiều lần; trả về số bàn */
+async function seedFloorplan(db: Db, branchId: string, rows: SeedTable[]): Promise<number> {
+  const areaIdByZone = new Map<string, number>()
+  for (const zone of new Set(rows.map((t) => t.z))) {
+    const name = AREA_NAMES[zone] ?? zone
+    const existing = await db.query.areas.findFirst({
+      where: (a, { and, eq }) => and(eq(a.branchId, branchId), eq(a.name, name)),
+    })
+    if (existing) {
+      areaIdByZone.set(zone, existing.id)
+      continue
+    }
+    const [created] = await db
+      .insert(s.areas)
+      .values({ branchId, name })
+      .returning({ id: s.areas.id })
+    areaIdByZone.set(zone, created!.id)
+  }
+
+  for (const t of rows) {
+    const hasGrill = t.grill === 1
+    const row = {
+      branchId,
+      areaId: areaIdByZone.get(t.z)!,
+      code: t.n,
+      kind: PRIVATE_ZONES.has(t.z) ? 'private' : hasGrill ? 'grill' : 'standard',
+      hasGrill,
+      // Bàn khai có bếp buộc phải nói loại bếp (ràng buộc tables_grill_consistency)
+      grillType: hasGrill ? 'than' : null,
+      seatMin: 2,
+      seatMax: t.cap ?? 4,
+    }
+    await db
+      .insert(s.tables)
+      .values(row)
+      .onConflictDoUpdate({ target: [s.tables.branchId, s.tables.code], set: row })
+  }
+  return rows.length
+}
+
+/**
+ * Sơ đồ bàn suy từ dòng mô tả của chi nhánh: '14 bàn · 8 bàn có bếp' + '2 phòng riêng'.
+ *
+ * Chỉ chi nhánh Cầu Giấy có bản vẽ thật trong bộ thiết kế. Hai chi nhánh còn lại
+ * mà không có bàn nào thì W5 hiện "0 bàn" và W6 báo kín chỗ mọi khung — nên seed
+ * dựng đúng số lượng đã công bố ở A10 để cả ba chi nhánh chạy được. Bản vẽ thật
+ * sẽ đè lên khi vẽ ở A3.
+ */
+function layoutFromDescription(branch: SeedBranch): SeedTable[] {
+  const total = Number(/(\d+)\s*bàn/.exec(branch.tables ?? '')?.[1] ?? 0)
+  const grill = Number(/(\d+)\s*bàn có bếp/.exec(branch.tables ?? '')?.[1] ?? 0)
+  const privateRooms = Number(
+    /(\d+)\s*phòng riêng/.exec((branch.zones ?? []).join(' '))?.[1] ?? 0,
+  )
+
+  const rows: SeedTable[] = []
+  for (let i = 0; i < total; i++) {
+    const hasGrill = i < grill
+    rows.push({
+      n: String(i + 1).padStart(2, '0'),
+      z: hasGrill ? 'sakura' : 'momiji',
+      grill: hasGrill ? 1 : 0,
+      cap: 4,
+    })
+  }
+  for (let i = 0; i < privateRooms; i++) {
+    rows.push({ n: `P${i + 1}`, z: 'rieng', grill: 1, cap: 8 })
+  }
+  return rows
 }
 
 async function seed(db: Db) {
@@ -264,6 +360,8 @@ async function seed(db: Db) {
        * nhịp tại bàn — hai thứ đó bán online là bán một trải nghiệm hỏng.
        */
       onlineVisible: !isSet && d.group !== 'lau',
+      /** Huy hiệu 名物 trên W1/W2/W3 — cờ của bếp, không phải của người viết web */
+      signature: d.isSignature,
       active: d.active,
     }
     await db.insert(s.dishes).values(row).onConflictDoUpdate({ target: s.dishes.id, set: row })
@@ -352,42 +450,13 @@ async function seed(db: Db) {
     }
   }
 
-  // ---- Khu vực & bàn (dùng cho chi nhánh đầu tiên) ----
+  // ---- Khu vực & bàn ----
   const branchId = branchRows[0]!.id
   const tableRows = await readJson<{ tables: SeedTable[] }>('tables.json')
-  const zoneNames: Record<string, string> = { sakura: 'Khu Sakura', sumi: 'Khu Sumi', private: 'Phòng riêng' }
-  const areaIdByZone = new Map<string, number>()
-  for (const zone of new Set(tableRows.tables.map((t) => t.z))) {
-    const existing = await db.query.areas.findFirst({
-      where: (a, { and, eq }) => and(eq(a.branchId, branchId), eq(a.name, zoneNames[zone] ?? zone)),
-    })
-    if (existing) {
-      areaIdByZone.set(zone, existing.id)
-      continue
-    }
-    const [created] = await db
-      .insert(s.areas)
-      .values({ branchId, name: zoneNames[zone] ?? zone })
-      .returning({ id: s.areas.id })
-    areaIdByZone.set(zone, created!.id)
-  }
-  for (const t of tableRows.tables) {
-    const hasGrill = t.grill === 1
-    const row = {
-      branchId,
-      areaId: areaIdByZone.get(t.z)!,
-      code: t.n,
-      kind: t.z === 'private' ? 'private' : hasGrill ? 'grill' : 'standard',
-      hasGrill,
-      // Bàn khai có bếp buộc phải nói loại bếp (ràng buộc tables_grill_consistency)
-      grillType: hasGrill ? 'than' : null,
-      seatMin: 2,
-      seatMax: t.cap,
-    }
-    await db
-      .insert(s.tables)
-      .values(row)
-      .onConflictDoUpdate({ target: [s.tables.branchId, s.tables.code], set: row })
+  // Chi nhánh đầu có sơ đồ thật; hai chi nhánh còn lại suy từ dòng mô tả ở A10
+  let tableCount = await seedFloorplan(db, branchId, tableRows.tables)
+  for (const b of branchRows.slice(1)) {
+    tableCount += await seedFloorplan(db, b.id, layoutFromDescription(b))
   }
 
   // ---- Vùng giao hàng (O10) ----
@@ -433,7 +502,7 @@ async function seed(db: Db) {
     stations: STATIONS.length,
     categories: cats.length,
     dishes: dishes.length,
-    tables: tableRows.tables.length,
+    tables: tableCount,
     staff: staffRows.length,
     parameters: PARAMETERS.length,
     // Món chỉ xuất hiện trong set mà chưa có trong danh mục — nhập ở Office M1

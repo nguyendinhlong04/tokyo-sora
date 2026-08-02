@@ -84,6 +84,8 @@ export const dishes = pgTable(
 
     onlineVisible: boolean('online_visible').notNull().default(false),
     tableOrderable: boolean('table_orderable').notNull().default(true),
+    /** Món ký của bếp — huy hiệu 名物 trên web (W1/W2/W3) và thẻ món của Table */
+    signature: boolean('signature').notNull().default(false),
     active: boolean('active').notNull().default(true),
     sort: integer('sort').notNull().default(0),
   },

@@ -9,6 +9,7 @@ export const WS_TOPICS = {
   ticketVoid: 'ticket.void',
   ticketRush: 'ticket.rush',
   ticketReady: 'ticket.ready',
+  reservationCreated: 'reservation.created',
   tableOpened: 'table.opened',
   tableRequest: 'table.request',
   tablePaid: 'table.paid',
