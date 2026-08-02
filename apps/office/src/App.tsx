@@ -1,14 +1,19 @@
+import type { ActionKey } from '@sora/contracts'
 import { ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
 import { Branches } from './routes/Branches'
+import { CashBook } from './routes/CashBook'
 import { DeliveryZones } from './routes/DeliveryZones'
 import { Dishes } from './routes/Dishes'
 import { Floorplan } from './routes/Floorplan'
 import { Login } from './routes/Login'
+import { MenuMatrix } from './routes/MenuMatrix'
 import { OnlineMenu } from './routes/OnlineMenu'
 import { Parameters } from './routes/Parameters'
+import { ProfitLoss } from './routes/ProfitLoss'
 import { ReservationConfig } from './routes/ReservationConfig'
+import { Today } from './routes/Today'
 import { SessionProvider, useSession } from './session-context'
 
 const queryClient = new QueryClient({
@@ -18,11 +23,28 @@ const queryClient = new QueryClient({
 /**
  * Điều hướng của Office — nhóm theo đúng cột trái của bản thiết kế.
  *
- * Chỉ liệt kê những màn ĐÃ dựng. Bốn nhóm còn lại (Món & kho, Kinh doanh, Nhân
- * sự, Tài chính) thêm vào khi có màn thật: một mục bấm vào không ra gì tệ hơn
- * một mục chưa có.
+ * Chỉ liệt kê những màn ĐÃ dựng. Các nhóm còn lại (Kho, Nhân sự) thêm vào khi có
+ * màn thật: một mục bấm vào không ra gì tệ hơn một mục chưa có.
+ *
+ * Mục nào khai `need` thì chỉ hiện với vai trò có quyền đó — cùng lý do: mục bấm
+ * vào chỉ để nhận màn "không được phép" là mục thừa. Guard ở máy chủ vẫn là thứ
+ * cưỡng chế, đây chỉ là dọn màn hình.
  */
-const NAV = [
+const NAV: { group: string; items: { to: string; label: string; need?: ActionKey }[] }[] = [
+  {
+    group: 'Kinh doanh',
+    items: [
+      { to: '/hom-nay', label: 'B1 · Hôm nay', need: 'report.branch-revenue' },
+      { to: '/phan-tich-mon', label: 'B3 · Phân tích món', need: 'report.margin-foodcost' },
+    ],
+  },
+  {
+    group: 'Tài chính',
+    items: [
+      { to: '/so-quy', label: 'F1 · Sổ quỹ & đối soát', need: 'accounting.ledger-close-period' },
+      { to: '/lai-lo', label: 'F7 · Lãi / Lỗ', need: 'accounting.ledger-close-period' },
+    ],
+  },
   {
     group: 'Món & kho',
     items: [{ to: '/mon', label: 'M1 · Món và set' }],
@@ -53,6 +75,10 @@ export function App() {
           <SessionProvider>
             <Routes>
               <Route element={<Shell />}>
+                <Route path="/hom-nay" element={<Today />} />
+                <Route path="/phan-tich-mon" element={<MenuMatrix />} />
+                <Route path="/so-quy" element={<CashBook />} />
+                <Route path="/lai-lo" element={<ProfitLoss />} />
                 <Route path="/mon" element={<Dishes />} />
                 <Route path="/tham-so" element={<Parameters />} />
                 <Route path="/so-do-ban" element={<Floorplan />} />
@@ -71,7 +97,7 @@ export function App() {
 }
 
 function Shell() {
-  const { staff, ready, branchId, signOut } = useSession()
+  const { staff, ready, branchId, signOut, can } = useSession()
 
   if (!ready) {
     return (
@@ -81,6 +107,11 @@ function Shell() {
     )
   }
   if (!staff) return <Login />
+
+  const visible = NAV.map((group) => ({
+    group: group.group,
+    items: group.items.filter((item) => !item.need || can(item.need)),
+  })).filter((group) => group.items.length > 0)
 
   return (
     <div className="flex min-h-dvh bg-canvas font-sans text-ink-body">
@@ -102,7 +133,7 @@ function Shell() {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3">
-          {NAV.map((group) => (
+          {visible.map((group) => (
             <div key={group.group} className="mb-4">
               <p className="px-5 pb-2 text-[length:var(--fs-c2)] font-semibold tracking-[0.14em] text-ink-mute uppercase">
                 {group.group}

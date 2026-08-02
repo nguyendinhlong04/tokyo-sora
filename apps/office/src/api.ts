@@ -141,6 +141,163 @@ export interface DishDetail {
   overrides: { branchId: string; price: number | null; active: boolean | null }[]
 }
 
+// ------------------------------------------------------- Báo cáo B1 · B3 · F1 · F7
+
+export type PeriodKind = 'ngay' | 'tuan' | 'thang' | 'quy' | 'tuy-chon'
+export type CompareKind = 'ky-truoc' | 'tuan-truoc' | 'nam-truoc'
+
+export interface PeriodChoice {
+  kind: PeriodKind
+  compare: CompareKind
+  anchor?: string
+  from?: string
+  to?: string
+}
+
+export interface ResolvedPeriod {
+  kind: PeriodKind
+  compare: CompareKind
+  current: { from: string; to: string }
+  baseline: { from: string; to: string }
+  days: number
+}
+
+export interface Delta {
+  value: number
+  previous: number
+  diff: number
+  /** null khi kỳ trước bằng 0 — không có phần trăm để in */
+  percent: number | null
+}
+
+export interface Tile {
+  value: number
+  vsYesterday: Delta
+  vsLastWeek: Delta
+}
+
+/** Ô chưa có nguồn dữ liệu; `blockedBy` nói rõ màn nào mở khoá nó */
+export interface BlockedTile {
+  value: null
+  blockedBy: string
+}
+
+export interface TodayReport {
+  branchId: string
+  date: string
+  yesterday: string
+  lastWeek: string
+  revenue: Tile
+  guests: Tile
+  perGuest: Tile
+  orderCount: Tile
+  foodCost: BlockedTile
+  hourly: { hour: number; revenue: number; orders: number; baselineRevenue: number }[]
+  soldOut: { dishId: string; code: string; name: string; status: string; remaining: number | null }[]
+  stockAlert: BlockedTile
+}
+
+export type Quadrant = 'ngoi-sao' | 'bo-sua' | 'cau-do' | 'bo-di'
+
+export interface MenuMatrixReport {
+  branchId: string
+  period: ResolvedPeriod
+  costBasis: 'gia-ban' | 'gia-von'
+  costNote: string | null
+  popularityCut: number
+  contributionCut: number
+  totals: { dishes: number; qty: number; revenue: number; contribution: number }
+  rows: {
+    dishId: string
+    code: string
+    name: string
+    qty: number
+    revenue: number
+    qtyShare: number
+    unitContribution: number
+    quadrant: Quadrant
+    previousQuadrant: Quadrant | null
+    previousQty: number
+  }[]
+}
+
+export interface CashbookReport {
+  branchId: string
+  date: string
+  shifts: {
+    id: number
+    cashier: string | null
+    state: string
+    openedAt: string
+    closedAt: string | null
+    openingCash: number
+    cashIn: number
+    expected: number | null
+    counted: number | null
+    variance: number | null
+    note: string | null
+  }[]
+  byKind: { kind: string; paid: number; count: number }[]
+  transfers: {
+    paymentId: number
+    kind: string
+    amount: number
+    vaNumber: string | null
+    bankRef: string | null
+    paidAt: string | null
+    orderCode: string | null
+  }[]
+  pending: {
+    paymentId: number
+    kind: string
+    amount: number
+    vaNumber: string | null
+    createdAt: string
+  }[]
+  unmatchedBankEvents: {
+    id: number
+    provider: string
+    bankRef: string
+    vaNumber: string | null
+    amount: number
+    matchState: string
+    receivedAt: string
+  }[]
+  adjustments: { id: number; amount: number; memo: string | null; createdAt: string }[]
+  cashOut: BlockedTile
+  otherIncome: BlockedTile
+}
+
+export interface PnlRow {
+  key: string
+  label: string
+  amount: number | null
+  baseline: number | null
+  kind: 'revenue' | 'deduction' | 'cost' | 'subtotal' | 'memo'
+  blockedBy?: string
+  note?: string
+}
+
+export interface PnlReport {
+  branchId: string
+  period: ResolvedPeriod
+  rows: PnlRow[]
+  orderCount: number
+  primeCost: BlockedTile
+}
+
+function periodQuery(branchId: string, period: PeriodChoice): string {
+  const params = new URLSearchParams({
+    branch: branchId,
+    kind: period.kind,
+    compare: period.compare,
+  })
+  if (period.anchor) params.set('anchor', period.anchor)
+  if (period.from) params.set('from', period.from)
+  if (period.to) params.set('to', period.to)
+  return params.toString()
+}
+
 /** PIN người duyệt — gửi kèm khi vai trò chỉ ở mức △ với hành động đang làm */
 export interface Approval {
   approverStaffId: number
@@ -277,4 +434,22 @@ export const api = {
 
   deleteZone: (id: number) =>
     apiFetch<{ deleted: boolean }>(`/api/admin/delivery-zones/${id}`, { method: 'DELETE' }),
+
+  // ------------------------------------------------- B1 · B3 · F1 · F7
+
+  today: (branchId: string, date: string | null) =>
+    apiFetch<TodayReport>(
+      `/api/reports/today?branch=${encodeURIComponent(branchId)}${date ? `&date=${date}` : ''}`,
+    ),
+
+  menuMatrix: (branchId: string, period: PeriodChoice) =>
+    apiFetch<MenuMatrixReport>(`/api/reports/menu-matrix?${periodQuery(branchId, period)}`),
+
+  cashbook: (branchId: string, date: string | null) =>
+    apiFetch<CashbookReport>(
+      `/api/reports/cashbook?branch=${encodeURIComponent(branchId)}${date ? `&date=${date}` : ''}`,
+    ),
+
+  profitLoss: (branchId: string, period: PeriodChoice) =>
+    apiFetch<PnlReport>(`/api/reports/pnl?${periodQuery(branchId, period)}`),
 }

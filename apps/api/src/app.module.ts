@@ -9,6 +9,7 @@ import { OnlineModule } from './modules/online/online.module'
 import { OrderingModule } from './modules/ordering/ordering.module'
 import { PaymentsModule } from './modules/payments/payments.module'
 import { RealtimeModule } from './modules/realtime/realtime.module'
+import { ReportsModule } from './modules/reports/reports.module'
 import { ReservationsModule } from './modules/reservations/reservations.module'
 import { SiteModule } from './modules/site/site.module'
 
@@ -34,6 +35,7 @@ class HealthController {
     ReservationsModule,
     SiteModule,
     AdminModule,
+    ReportsModule,
   ],
   controllers: [HealthController],
 })

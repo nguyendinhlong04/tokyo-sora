@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common'
-import { and, asc, desc, eq, gte, inArray, lte, ne, sql, type SQLWrapper } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, lt, lte, ne, sql, type SQLWrapper } from 'drizzle-orm'
 import { businessDateOf, startOfBusinessDay } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import type { Db } from '../../db/client'
@@ -21,11 +21,21 @@ import {
   addDays,
   delta,
   resolvePeriod,
+  type CompareKind,
   type DateRange,
   type Delta,
-  type PeriodInput,
+  type PeriodKind,
   type ResolvedPeriod,
 } from './domain/period'
+
+/** Kỳ do màn hình chọn; `anchor` bỏ trống = neo vào ngày làm việc hôm nay */
+export interface PeriodQuery {
+  kind: PeriodKind
+  compare: CompareKind
+  anchor: string | null
+  from?: string
+  to?: string
+}
 
 /**
  * Tổng tiền phải cộng bằng float8, không phải ::int.
@@ -265,7 +275,11 @@ export class ReportsService {
       })
       .from(orders)
       .where(and(eq(orders.branchId, branchId), inArray(orders.businessDate, [date, baseline]), live))
-      .groupBy(orders.businessDate, sql`2`)
+      // Gom theo SỐ THỨ TỰ CỘT (1 = ngày, 2 = giờ), không lặp lại biểu thức: múi giờ
+      // đi vào câu lệnh dưới dạng tham số, mà lặp biểu thức thì hai lần xuất hiện
+      // nhận hai số tham số khác nhau ⇒ Postgres coi là hai biểu thức khác nhau và
+      // từ chối GROUP BY. Đổi thứ tự cột trong `select` ở trên thì phải sửa cả đây.
+      .groupBy(sql`1`, sql`2`)
 
     if (rows.length === 0) return []
 
@@ -306,9 +320,8 @@ export class ReportsService {
 
   // ==================================================== B3 · Phân tích món
 
-  async menuMatrix(branchId: string, input: PeriodInput): Promise<MenuMatrixReport> {
-    await this.requireBranch(branchId)
-    const period = resolvePeriod(input)
+  async menuMatrix(branchId: string, input: PeriodQuery): Promise<MenuMatrixReport> {
+    const period = await this.resolveFor(branchId, input)
 
     const [current, baseline] = await Promise.all([
       this.dishStats(branchId, period.current),
@@ -326,7 +339,10 @@ export class ReportsService {
       costNote:
         'Trục đóng góp đang dùng GIÁ BÁN vì chưa có giá vốn: công thức (M4) và giá bình quân từ kho (S2) chưa dựng. Món giá cao mà nguyên liệu cũng đắt sẽ nằm cao hơn thực tế.',
       popularityCut: matrix.popularityCut,
-      contributionCut: matrix.contributionCut,
+      // Tiền ra khỏi API là SỐ NGUYÊN đồng (§money.ts). Phép chia ở tầng miền sinh
+      // số lẻ, và số lẻ đó chỉ để xếp ô — làm tròn ở đây, đúng một lần, thay vì
+      // bắt mỗi nơi hiển thị tự nhớ làm tròn.
+      contributionCut: Math.round(matrix.contributionCut),
       totals: matrix.totals,
       rows: matrix.rows.map((r) => ({
         dishId: r.dishId,
@@ -335,7 +351,7 @@ export class ReportsService {
         qty: r.qty,
         revenue: r.revenue,
         qtyShare: r.qtyShare,
-        unitContribution: r.unitContribution,
+        unitContribution: Math.round(r.unitContribution),
         quadrant: r.quadrant,
         previousQuadrant: shift.get(r.dishId) ?? null,
         previousQty: previousQty.get(r.dishId) ?? 0,
@@ -488,7 +504,9 @@ export class ReportsService {
         and(
           ne(bankEvents.matchState, 'matched'),
           gte(bankEvents.receivedAt, dayStart),
-          lte(bankEvents.receivedAt, dayEnd),
+          // `lt` chứ không `lte`: đúng nửa đêm là của ngày HÔM SAU, không phải của
+          // cả hai ngày — đối soát mà một khoản hiện ở hai ngày là đối soát sai
+          lt(bankEvents.receivedAt, dayEnd),
         ),
       )
       .orderBy(desc(bankEvents.receivedAt))
@@ -552,9 +570,8 @@ export class ReportsService {
 
   // ============================================================= F7 · P&L
 
-  async profitLoss(branchId: string, input: PeriodInput): Promise<PnlReport> {
-    await this.requireBranch(branchId)
-    const period = resolvePeriod(input)
+  async profitLoss(branchId: string, input: PeriodQuery): Promise<PnlReport> {
+    const period = await this.resolveFor(branchId, input)
 
     const [now, before] = await Promise.all([
       this.revenueOf(branchId, period.current),
@@ -804,5 +821,13 @@ export class ReportsService {
     const [branch] = await this.db.select().from(branches).where(eq(branches.id, branchId))
     if (!branch) throw new NotFoundException(`Không có chi nhánh ${branchId}`)
     return branch
+  }
+
+  private async resolveFor(branchId: string, input: PeriodQuery): Promise<ResolvedPeriod> {
+    const branch = await this.requireBranch(branchId)
+    return resolvePeriod({
+      ...input,
+      anchor: input.anchor ?? businessDateOf(new Date(), branch.timezone),
+    })
   }
 }
