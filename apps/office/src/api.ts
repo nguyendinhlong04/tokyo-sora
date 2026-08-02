@@ -71,6 +71,157 @@ export interface TableInput {
   active: boolean
 }
 
+// ------------------------------------------------------- A1 · A2 · A4 · A5 · A7
+
+export type RoleCode = string
+
+export interface RoleGrant {
+  roleCode: RoleCode
+  /** null = phạm vi toàn chuỗi */
+  branchId: string | null
+}
+
+export interface AccountRow {
+  id: number
+  code: string
+  fullName: string
+  phone: string | null
+  email: string | null
+  active: boolean
+  /** Đăng nhập Office được không — bản băm không bao giờ rời máy chủ */
+  hasPassword: boolean
+  /** Đăng nhập POS/kiosk được không */
+  hasPin: boolean
+  roles: RoleGrant[]
+  employeeBranchId: string | null
+}
+
+export interface AccountInput {
+  code: string
+  fullName: string
+  phone: string | null
+  email: string | null
+  active: boolean
+  password: string | null
+  pin: string | null
+  roles: RoleGrant[]
+}
+
+export interface RoleHolder {
+  staffId: number
+  fullName: string
+}
+
+export interface RoleAssignments {
+  branches: { id: string; name: string }[]
+  roles: {
+    code: RoleCode
+    label: string
+    chainWide: RoleHolder[]
+    byBranch: Record<string, RoleHolder[]>
+  }[]
+}
+
+export interface DeviceRow {
+  id: number
+  kind: 'pos' | 'cashier' | 'kds' | 'kiosk' | 'bridge'
+  name: string
+  stationId: string | null
+  stationName: string | null
+  pairedAt: string
+  pairedByName: string | null
+  revokedAt: string | null
+  /** Ai đang đăng nhập trên máy này ngay lúc này */
+  signedIn: string[]
+}
+
+export interface PendingCode {
+  code: string
+  kind: string
+  stationId: string | null
+  expiresAt: string
+}
+
+export interface PrinterRow {
+  id: number
+  branchId: string
+  name: string
+  kind: 'bill' | 'tem'
+  stationId: string | null
+  stationName: string | null
+  host: string
+  port: number
+  template: string
+  copies: number
+  active: boolean
+  updatedAt: string
+  updatedBy: string | null
+}
+
+export interface PrinterInput {
+  branchId: string
+  name: string
+  kind: PrinterRow['kind']
+  stationId: string | null
+  host: string
+  port: number
+  template: string
+  copies: number
+  active: boolean
+}
+
+export interface AuditRow {
+  id: number
+  branchId: string | null
+  actorKind: string
+  actorId: string | null
+  actorName: string | null
+  action: string
+  entity: string
+  entityId: string
+  payload: unknown
+  approvalId: number | null
+  deviceId: number | null
+  createdAt: string
+}
+
+export interface EinvoiceConfig {
+  branchId: string
+  chain: {
+    taxCode: string
+    provider: string
+    certificateSerial: string
+    certificateExpiry: string
+  }
+  branch: { serial: string; enabled: boolean }
+  /** Số ngày còn lại của chứng thư số; null khi chưa khai */
+  certificateDaysLeft: number | null
+}
+
+export interface CmsPost {
+  id: number
+  title: string
+  category: string
+  excerpt: string | null
+  publishedOn: string
+  published: boolean
+  updatedAt: string
+  updatedBy: string | null
+}
+
+export interface CmsJob {
+  id: number
+  title: string
+  branchId: string | null
+  branchName: string | null
+  employment: string
+  slots: number
+  published: boolean
+  sort: number
+  updatedAt: string
+  updatedBy: string | null
+}
+
 export interface DishRow {
   id: string
   code: string
@@ -851,6 +1002,145 @@ export const api = {
 
   deactivateTable: (id: number) =>
     apiFetch<TableRow>(`/api/admin/tables/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------- A1
+
+  accounts: () => apiFetch<AccountRow[]>('/api/admin/accounts'),
+
+  createAccount: (input: AccountInput) =>
+    apiFetch<AccountRow>('/api/admin/accounts', { method: 'POST', body: input }),
+
+  updateAccount: (
+    id: number,
+    patch: Partial<Pick<AccountRow, 'code' | 'fullName' | 'phone' | 'email' | 'active'>>,
+  ) => apiFetch<AccountRow>(`/api/admin/accounts/${id}`, { method: 'PATCH', body: patch }),
+
+  setAccountPassword: (id: number, value: string) =>
+    apiFetch<{ hasPassword: boolean }>(`/api/admin/accounts/${id}/password`, {
+      method: 'PUT',
+      body: { value },
+    }),
+
+  setAccountPin: (id: number, value: string) =>
+    apiFetch<{ hasPin: boolean }>(`/api/admin/accounts/${id}/pin`, {
+      method: 'PUT',
+      body: { value },
+    }),
+
+  setAccountRoles: (id: number, roles: RoleGrant[]) =>
+    apiFetch<AccountRow>(`/api/admin/accounts/${id}/roles`, { method: 'PUT', body: { roles } }),
+
+  // -------------------------------------------------------------------- A2
+
+  roleAssignments: () => apiFetch<RoleAssignments>('/api/admin/roles'),
+
+  // -------------------------------------------------------------------- A4
+
+  devices: (branchId: string) =>
+    apiFetch<{
+      devices: DeviceRow[]
+      pendingCodes: PendingCode[]
+      stations: { id: string; name: string }[]
+    }>(`/api/admin/devices?branch=${encodeURIComponent(branchId)}`),
+
+  /** Cửa duy nhất sinh mã ghép — dùng chung với luồng K1 của POS */
+  createPairingCode: (input: { branchId: string; kind: string; stationId: string | null }) =>
+    apiFetch<{ code: string; expiresAt: string }>('/api/auth/pairing-codes', {
+      method: 'POST',
+      body: input,
+    }),
+
+  revokeDevice: (id: number) =>
+    apiFetch<{ sessionsKilled: number }>(`/api/admin/devices/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------- A5
+
+  printers: (branchId: string) =>
+    apiFetch<{
+      printers: PrinterRow[]
+      stations: { id: string; name: string }[]
+      templates: Record<PrinterRow['kind'], string[]>
+    }>(`/api/admin/printers?branch=${encodeURIComponent(branchId)}`),
+
+  createPrinter: (input: PrinterInput) =>
+    apiFetch<PrinterRow>('/api/admin/printers', { method: 'POST', body: input }),
+
+  updatePrinter: (id: number, patch: Partial<PrinterInput>) =>
+    apiFetch<PrinterRow>(`/api/admin/printers/${id}`, { method: 'PATCH', body: patch }),
+
+  deletePrinter: (id: number) =>
+    apiFetch<{ deleted: boolean }>(`/api/admin/printers/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------- A7
+
+  auditTrail: (query: {
+    branchId: string | null
+    from: string
+    to: string
+    action: string | null
+    actorId: number | null
+    beforeId: number | null
+  }) => {
+    const search = new URLSearchParams({ from: query.from, to: query.to })
+    if (query.branchId) search.set('branch', query.branchId)
+    if (query.action) search.set('action', query.action)
+    if (query.actorId !== null) search.set('actor', String(query.actorId))
+    if (query.beforeId !== null) search.set('before', String(query.beforeId))
+    return apiFetch<{ rows: AuditRow[]; nextBefore: number | null }>(
+      `/api/admin/audit?${search.toString()}`,
+    )
+  },
+
+  auditFilters: (query: { branchId: string | null; from: string; to: string }) => {
+    const search = new URLSearchParams({ from: query.from, to: query.to })
+    if (query.branchId) search.set('branch', query.branchId)
+    return apiFetch<{ actions: string[]; actors: { id: number; fullName: string }[] }>(
+      `/api/admin/audit/filters?${search.toString()}`,
+    )
+  },
+
+  // -------------------------------------------------------------------- A9
+
+  einvoice: (branchId: string) =>
+    apiFetch<EinvoiceConfig>(`/api/admin/einvoice?branch=${encodeURIComponent(branchId)}`),
+
+  setEinvoice: (
+    branchId: string,
+    patch: Partial<{
+      taxCode: string
+      provider: string
+      certificateSerial: string
+      certificateExpiry: string
+      serial: string
+      enabled: boolean
+    }>,
+  ) => apiFetch<EinvoiceConfig>('/api/admin/einvoice', { method: 'PUT', body: { branchId, ...patch } }),
+
+  // -------------------------------------------------------------------- A8
+
+  cmsPosts: () => apiFetch<CmsPost[]>('/api/admin/cms/posts'),
+
+  createCmsPost: (input: Omit<CmsPost, 'id' | 'updatedAt' | 'updatedBy'>) =>
+    apiFetch<CmsPost>('/api/admin/cms/posts', { method: 'POST', body: input }),
+
+  updateCmsPost: (id: number, patch: Partial<Omit<CmsPost, 'id' | 'updatedAt' | 'updatedBy'>>) =>
+    apiFetch<CmsPost>(`/api/admin/cms/posts/${id}`, { method: 'PATCH', body: patch }),
+
+  deleteCmsPost: (id: number) =>
+    apiFetch<{ deleted: boolean }>(`/api/admin/cms/posts/${id}`, { method: 'DELETE' }),
+
+  cmsJobs: () => apiFetch<CmsJob[]>('/api/admin/cms/jobs'),
+
+  createCmsJob: (input: Omit<CmsJob, 'id' | 'branchName' | 'updatedAt' | 'updatedBy'>) =>
+    apiFetch<CmsJob>('/api/admin/cms/jobs', { method: 'POST', body: input }),
+
+  updateCmsJob: (
+    id: number,
+    patch: Partial<Omit<CmsJob, 'id' | 'branchName' | 'updatedAt' | 'updatedBy'>>,
+  ) => apiFetch<CmsJob>(`/api/admin/cms/jobs/${id}`, { method: 'PATCH', body: patch }),
+
+  deleteCmsJob: (id: number) =>
+    apiFetch<{ deleted: boolean }>(`/api/admin/cms/jobs/${id}`, { method: 'DELETE' }),
 
   // --------------------------------------------------------------------- M1
 

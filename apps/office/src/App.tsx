@@ -3,16 +3,23 @@ import { ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
 import { Debts, InvoiceBook, PeriodClose, RevenueJournal, TaxReport } from './routes/Accounting'
+import { Accounts } from './routes/Accounts'
+import { AuditLog } from './routes/AuditLog'
 import { Branches } from './routes/Branches'
 import { CashBook } from './routes/CashBook'
+import { Cms } from './routes/Cms'
 import { Assets, ExpenseOverview, RecurringExpenses } from './routes/CostCenter'
 import { DeliveryZones } from './routes/DeliveryZones'
+import { Devices } from './routes/Devices'
 import { Dishes } from './routes/Dishes'
+import { EInvoice } from './routes/EInvoice'
 import { Employees } from './routes/Employees'
 import { Expenses } from './routes/Expenses'
 import { Floorplan } from './routes/Floorplan'
 import { Ingredients } from './routes/Ingredients'
 import { Login } from './routes/Login'
+import { Printers } from './routes/Printers'
+import { Roles } from './routes/Roles'
 import { MenuMatrix } from './routes/MenuMatrix'
 import { OnlineMenu } from './routes/OnlineMenu'
 import { Parameters } from './routes/Parameters'
@@ -89,9 +96,16 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
   {
     group: 'Quản trị',
     items: [
-      { to: '/tham-so', label: 'A6 · Trung tâm tham số' },
-      { to: '/so-do-ban', label: 'A3 · Khu vực & bàn' },
-      { to: '/chi-nhanh', label: 'A10 · Chi nhánh' },
+      { to: '/tai-khoan', label: 'A1 · Tài khoản', need: 'admin.manage-accounts-roles' },
+      { to: '/vai-tro', label: 'A2 · Vai trò & quyền', need: 'admin.manage-accounts-roles' },
+      { to: '/so-do-ban', label: 'A3 · Khu vực & bàn', need: 'admin.manage-accounts-roles' },
+      { to: '/thiet-bi', label: 'A4 · Thiết bị', need: 'admin.manage-accounts-roles' },
+      { to: '/may-in', label: 'A5 · Máy in', need: 'admin.manage-accounts-roles' },
+      { to: '/tham-so', label: 'A6 · Trung tâm tham số', need: 'admin.manage-accounts-roles' },
+      { to: '/nhat-ky-thao-tac', label: 'A7 · Nhật ký thao tác', need: 'audit.view-log' },
+      { to: '/noi-dung-web', label: 'A8 · Nội dung website', need: 'cms.edit' },
+      { to: '/hoa-don-dien-tu', label: 'A9 · Hoá đơn điện tử', need: 'admin.manage-accounts-roles' },
+      { to: '/chi-nhanh', label: 'A10 · Chi nhánh', need: 'admin.manage-accounts-roles' },
     ],
   },
   {
@@ -134,8 +148,15 @@ export function App() {
                 <Route path="/bao-cao-thue" element={<TaxReport />} />
                 <Route path="/cong-no" element={<Debts />} />
                 <Route path="/khoa-so" element={<PeriodClose />} />
-                <Route path="/tham-so" element={<Parameters />} />
+                <Route path="/tai-khoan" element={<Accounts />} />
+                <Route path="/vai-tro" element={<Roles />} />
                 <Route path="/so-do-ban" element={<Floorplan />} />
+                <Route path="/thiet-bi" element={<Devices />} />
+                <Route path="/may-in" element={<Printers />} />
+                <Route path="/tham-so" element={<Parameters />} />
+                <Route path="/nhat-ky-thao-tac" element={<AuditLog />} />
+                <Route path="/noi-dung-web" element={<Cms />} />
+                <Route path="/hoa-don-dien-tu" element={<EInvoice />} />
                 <Route path="/chi-nhanh" element={<Branches />} />
                 <Route path="/vung-giao" element={<DeliveryZones />} />
                 <Route path="/menu-online" element={<OnlineMenu />} />

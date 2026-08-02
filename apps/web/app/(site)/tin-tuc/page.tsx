@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { PhotoFrame } from '../../../components/visuals'
-import { POSTS } from '../../../content/site'
+import { formatPostDate, getPosts } from '../../../lib/site'
 
 export const metadata: Metadata = {
   title: 'Tin tức',
@@ -12,12 +12,13 @@ export const metadata: Metadata = {
 /**
  * W8 — Tin tức.
  *
- * Bài viết đang nằm ở file nội dung: màn CMS website (A8) chưa dựng, và dựng một
- * bảng bài viết chỉ để trang này có chỗ đọc thì sẽ thành nguồn thứ hai phải bỏ đi
- * khi A8 lên. Đổi sang API là đổi đúng hàm lấy dữ liệu ở đầu trang này.
+ * Bài viết soạn ở A8 (CMS website) và về đây qua `/api/site/posts` — chỉ bài đã
+ * bật và đã tới ngày đăng. API im lặng thì `getPosts` trả mảng rỗng: trang vẫn
+ * dựng phần chữ thay vì trắng bóc, đúng cam kết ở `lib/site.ts`.
  */
-export default function NewsPage() {
-  const [lead, ...rest] = POSTS
+export default async function NewsPage() {
+  const posts = await getPosts()
+  const [lead, ...rest] = posts
 
   return (
     <>
@@ -43,7 +44,7 @@ export default function NewsPage() {
                   {lead.category}
                 </span>
                 <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                  {lead.date}
+                  {formatPostDate(lead.publishedOn)}
                 </span>
               </div>
               <h2 className="mt-6 font-display text-[30px] leading-tight font-light text-ink-hi lg:text-[length:var(--fs-d2)]">
@@ -70,7 +71,7 @@ export default function NewsPage() {
                 </span>
                 <span className="h-2.5 w-px bg-line-3" />
                 <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                  {post.date}
+                  {formatPostDate(post.publishedOn)}
                 </span>
               </div>
               <h3 className="mt-3.5 font-display text-[24px] leading-tight font-light text-ink-hi lg:text-[length:var(--fs-d3)]">

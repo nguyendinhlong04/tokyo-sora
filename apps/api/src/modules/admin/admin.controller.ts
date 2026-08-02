@@ -32,6 +32,18 @@ const BranchBody = z.object({
   active: z.boolean().optional(),
 })
 
+const EinvoiceBody = z.object({
+  branchId: z.string().min(1),
+  /** Cấp chuỗi — §30.2: một mã số thuế, một hợp đồng HĐĐT */
+  taxCode: z.string().max(20).optional(),
+  provider: z.string().max(120).optional(),
+  certificateSerial: z.string().max(80).optional(),
+  certificateExpiry: z.string().max(10).optional(),
+  /** Cấp chi nhánh — mỗi địa điểm kinh doanh một ký hiệu M riêng */
+  serial: z.string().max(6).optional(),
+  enabled: z.boolean().optional(),
+})
+
 const AreaBody = z.object({ branchId: z.string().min(1), name: z.string().min(1).max(80) })
 
 const TableBody = z.object({
@@ -88,6 +100,22 @@ export class AdminController {
   ) {
     if (!branch) throw new BadRequestException('Thiếu mã chi nhánh')
     return this.admin.clearParameterOverride(key, branch, req.actor!)
+  }
+
+  // ---------------------------------------------------------------- A9
+
+  @Get('einvoice')
+  @RequirePermission('admin.manage-accounts-roles')
+  einvoice(@Query('branch') branch: string) {
+    if (!branch) throw new BadRequestException('Thiếu mã chi nhánh')
+    return this.admin.einvoice(branch)
+  }
+
+  @Put('einvoice')
+  @RequirePermission('admin.manage-accounts-roles')
+  setEinvoice(@Body() body: unknown, @Req() req: RequestWithActor) {
+    const { branchId, ...input } = EinvoiceBody.parse(body)
+    return this.admin.setEinvoice(branchId, input, req.actor!)
   }
 
   // --------------------------------------------------------------- A10

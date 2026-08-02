@@ -62,6 +62,25 @@ export interface SiteMenu {
   sets: SiteSet[]
 }
 
+/** W8 — bài viết do A8 soạn. Bài đầu danh sách là bài mới nhất. */
+export interface SitePost {
+  id: number
+  title: string
+  category: string
+  excerpt: string | null
+  /** YYYY-MM-DD như A8 lưu; trang tin tự định dạng lại */
+  publishedOn: string
+}
+
+/** W9 — vị trí đang tuyển. `branchName` null nghĩa là tuyển cho cả ba chi nhánh. */
+export interface SiteJob {
+  id: number
+  title: string
+  branchName: string | null
+  employment: string
+  slots: number
+}
+
 async function siteGet<T>(path: string, fallback: T): Promise<T> {
   try {
     const res = await fetch(apiUrl(path), { next: { revalidate: REVALIDATE_SECONDS } })
@@ -81,7 +100,21 @@ export function getBranches(): Promise<SiteBranch[]> {
   return siteGet<SiteBranch[]>('/api/site/branches', [])
 }
 
+export function getPosts(): Promise<SitePost[]> {
+  return siteGet<SitePost[]>('/api/site/posts', [])
+}
+
+export function getJobs(): Promise<SiteJob[]> {
+  return siteGet<SiteJob[]>('/api/site/jobs', [])
+}
+
 // ------------------------------------------------------------------ tiện ích
+
+/** '2026-07-12' → '12.07.2026' — cách trang tin vẫn hiển thị ngày */
+export function formatPostDate(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
+}
 
 /** Nhóm món theo chương thực đơn, giữ đúng thứ tự nhóm và bỏ nhóm rỗng */
 export function groupByCategory(menu: SiteMenu) {

@@ -21,6 +21,7 @@ import {
   stations,
   tables,
 } from '../../db/schema'
+import { activePrintersOf } from '../admin/device-admin.service'
 import type { Actor } from '../identity/actor'
 
 /**
@@ -194,6 +195,12 @@ export class ConfigBundleService {
           active: t.active,
         })),
       },
+      /**
+       * Máy in A5. Cầu in (`devices.kind = 'bridge'`) không có màn hình nào để
+       * cấu hình, nên nếu địa chỉ máy in không đi theo bundle thì đổi một cái máy
+       * in phải sửa file trên cái máy đặt ở góc bếp.
+       */
+      printers: await activePrintersOf(this.db, branchId),
       params: await this.params.allForBranch(branchId),
     }
   }

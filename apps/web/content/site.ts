@@ -1,11 +1,14 @@
 /**
- * Chữ nghĩa của website thương hiệu — W1, W4, W7, W8, W9.
+ * Chữ nghĩa của website thương hiệu — W1, W4, W7, W9.
  *
  * Mọi con số vận hành (giá, giờ mở, số bàn, còn bàn hay không) đều lấy từ API.
  * Chỗ này chỉ giữ thứ không có trong CSDL: lời hứa của quán, câu chuyện bếp
- * trưởng, bài viết và tin tuyển dụng. Khi A8 (CMS website) lên thì tin tức và
- * tuyển dụng chuyển sang đó, phần còn lại vẫn nằm đây vì nó là bản sắc chứ
- * không phải nội dung đổi hằng tuần.
+ * trưởng, lời dẫn từng chương thực đơn — bản sắc viết một lần, không phải nội
+ * dung đổi hằng tuần.
+ *
+ * **Tin tức (W8) và danh sách vị trí tuyển dụng (W9) đã chuyển sang A8** và về
+ * đây qua `/api/site/posts` · `/api/site/jobs`. Đừng thêm lại vào file này: hai
+ * nguồn cho một dữ liệu là hai nguồn sẽ lệch nhau.
  */
 
 export const SITE = {
@@ -193,48 +196,6 @@ export const OFFERS = [
   },
 ]
 
-/** W8 — tin tức. Bài đầu là bài nổi bật. */
-export const POSTS = [
-  {
-    id: 'p1',
-    title: 'Chúng tôi đổi sang than hoa Bình Định',
-    category: 'Bếp',
-    date: '12.07.2026',
-    excerpt:
-      'Ba tháng thử mười hai loại than. Đây là loại giữ nhiệt lâu nhất mà không để lại vị đắng khói trên miếng thịt.',
-  },
-  { id: 'p2', title: 'Thăn bò về mỗi thứ Ba', category: 'Nguyên liệu', date: '28.06.2026', excerpt: '' },
-  { id: 'p3', title: 'Mở chi nhánh Thảo Điền', category: 'Chi nhánh', date: '15.06.2026', excerpt: '' },
-  {
-    id: 'p4',
-    title: 'Lớp học nướng cho mười hai người',
-    category: 'Sự kiện',
-    date: '02.06.2026',
-    excerpt: '',
-  },
-  {
-    id: 'p5',
-    title: 'Set Kiwami có thêm lõi vai bò',
-    category: 'Thực đơn',
-    date: '21.05.2026',
-    excerpt: '',
-  },
-  {
-    id: 'p6',
-    title: 'Bếp trưởng Nakamura nói về khói',
-    category: 'Câu chuyện',
-    date: '09.05.2026',
-    excerpt: '',
-  },
-  {
-    id: 'p7',
-    title: 'Giờ vàng buổi trưa từ tháng Tám',
-    category: 'Ưu đãi',
-    date: '26.04.2026',
-    excerpt: '',
-  },
-]
-
 /** W9 — việc cần trao đổi qua biểu mẫu liên hệ */
 export const CONTACT_SUBJECTS = [
   'Đặt bàn nhóm trên 10 khách',
@@ -244,26 +205,9 @@ export const CONTACT_SUBJECTS = [
   'Việc khác',
 ]
 
-/** W9 — tuyển dụng */
+/** W9 — lời dẫn khối tuyển dụng. Danh sách vị trí thì đọc từ A8. */
 export const RECRUIT = {
   lead: 'Chúng tôi trả lương theo giờ công thật, có phụ cấp ca tối và bữa ăn trong ca. Chưa có kinh nghiệm vẫn nhận — trạm chiên và trạm rau học được trong hai tuần.',
-  jobs: [
-    { title: 'Bếp trưởng trạm nướng', branch: 'Thảo Điền', type: 'Toàn thời gian', slots: '1 vị trí' },
-    { title: 'Phụ bếp trạm chiên', branch: 'Cầu Giấy', type: 'Toàn thời gian', slots: '2 vị trí' },
-    {
-      title: 'Phục vụ bàn',
-      branch: 'Cả ba chi nhánh',
-      type: 'Toàn thời gian · ca tối',
-      slots: '6 vị trí',
-    },
-    { title: 'Thu ngân', branch: 'Hồ Tây', type: 'Toàn thời gian', slots: '1 vị trí' },
-    {
-      title: 'Nhân viên chuẩn bị than',
-      branch: 'Cầu Giấy',
-      type: 'Bán thời gian',
-      slots: '2 vị trí',
-    },
-  ],
 }
 
 /** Kiểu chỗ khách chọn ở W6 — khớp `tables.kind` trong CSDL */

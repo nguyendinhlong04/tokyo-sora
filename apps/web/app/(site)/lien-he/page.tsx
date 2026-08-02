@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ContactForm } from '../../../components/ContactForm'
 import { PhotoFrame } from '../../../components/visuals'
 import { BRANCH_EXTRAS, RECRUIT, SITE } from '../../../content/site'
-import { getBranches } from '../../../lib/site'
+import { getBranches, getJobs } from '../../../lib/site'
 
 export const metadata: Metadata = {
   title: 'Liên hệ & tuyển dụng',
@@ -12,9 +12,14 @@ export const metadata: Metadata = {
   alternates: { canonical: '/lien-he' },
 }
 
-/** W9 — Liên hệ & tuyển dụng */
+/**
+ * W9 — Liên hệ & tuyển dụng.
+ *
+ * Vị trí đang tuyển soạn ở A8; lời dẫn thì ở lại file nội dung vì nó là cách quán
+ * tự giới thiệu chứ không phải thứ đổi mỗi khi mở một vị trí mới.
+ */
 export default async function ContactPage() {
-  const branches = await getBranches()
+  const [branches, jobs] = await Promise.all([getBranches(), getJobs()])
 
   return (
     <>
@@ -94,31 +99,46 @@ export default async function ContactPage() {
               </p>
             </div>
 
-            <ul>
-              {RECRUIT.jobs.map((job) => (
-                <li
-                  key={job.title}
-                  className="grid items-center gap-3 border-b border-line-1 py-5 lg:grid-cols-[1fr_200px_140px_auto] lg:gap-6 lg:py-6"
-                >
-                  <p className="text-[length:var(--fs-t2)] font-semibold text-ink-hi">{job.title}</p>
-                  <p className="text-[length:var(--fs-b2)] text-ink-body">{job.branch}</p>
-                  <p className="text-[length:var(--fs-b2)] text-ink-mute">{job.type}</p>
-                  <div className="flex items-center gap-5 lg:justify-self-end">
-                    <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                      {job.slots}
-                    </span>
-                    <a
-                      href={`mailto:${SITE.recruitEmail}?subject=${encodeURIComponent(
-                        `Ứng tuyển ${job.title} — ${job.branch}`,
-                      )}`}
-                      className="inline-flex h-11 items-center rounded-sm border border-line-3 px-5 text-[length:var(--fs-b2)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
+            {jobs.length === 0 ? (
+              <p className="text-[length:var(--fs-b1)] leading-relaxed text-ink-mute">
+                Hiện chưa có vị trí nào đang mở. Cứ gửi hồ sơ về{' '}
+                <a href={`mailto:${SITE.recruitEmail}`} className="text-accent-ink">
+                  {SITE.recruitEmail}
+                </a>{' '}
+                — chúng tôi giữ lại và liên hệ khi có chỗ.
+              </p>
+            ) : (
+              <ul>
+                {jobs.map((job) => {
+                  const where = job.branchName ?? 'Cả ba chi nhánh'
+                  return (
+                    <li
+                      key={job.id}
+                      className="grid items-center gap-3 border-b border-line-1 py-5 lg:grid-cols-[1fr_200px_140px_auto] lg:gap-6 lg:py-6"
                     >
-                      Ứng tuyển
-                    </a>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                      <p className="text-[length:var(--fs-t2)] font-semibold text-ink-hi">
+                        {job.title}
+                      </p>
+                      <p className="text-[length:var(--fs-b2)] text-ink-body">{where}</p>
+                      <p className="text-[length:var(--fs-b2)] text-ink-mute">{job.employment}</p>
+                      <div className="flex items-center gap-5 lg:justify-self-end">
+                        <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                          {job.slots} vị trí
+                        </span>
+                        <a
+                          href={`mailto:${SITE.recruitEmail}?subject=${encodeURIComponent(
+                            `Ứng tuyển ${job.title} — ${where}`,
+                          )}`}
+                          className="inline-flex h-11 items-center rounded-sm border border-line-3 px-5 text-[length:var(--fs-b2)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
+                        >
+                          Ứng tuyển
+                        </a>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </div>
         </div>
       </section>

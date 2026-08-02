@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { asc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import type { Db } from '../../db/client'
 import {
@@ -9,6 +9,8 @@ import {
   dishes,
   setGroupItems,
   setGroups,
+  siteJobs,
+  sitePosts,
   tables,
 } from '../../db/schema'
 
@@ -86,6 +88,47 @@ export class SiteService {
         },
       }
     })
+  }
+
+  /**
+   * W8 — tin tức, do A8 soạn.
+   *
+   * Chỉ bài ĐÃ BẬT và ĐÃ TỚI NGÀY ĐĂNG: bài hẹn giờ cho tuần sau mà lọt ra hôm
+   * nay thì việc hẹn ngày chẳng còn nghĩa gì. Bài mới nhất đứng đầu và trang tin
+   * lấy đó làm bài nổi bật.
+   */
+  async posts() {
+    const today = new Date().toISOString().slice(0, 10)
+    const rows = await this.db
+      .select({
+        id: sitePosts.id,
+        title: sitePosts.title,
+        category: sitePosts.category,
+        excerpt: sitePosts.excerpt,
+        publishedOn: sitePosts.publishedOn,
+      })
+      .from(sitePosts)
+      .where(and(eq(sitePosts.published, true), sql`${sitePosts.publishedOn} <= ${today}`))
+      .orderBy(desc(sitePosts.publishedOn), desc(sitePosts.id))
+      .limit(24)
+    return rows
+  }
+
+  /** W9 — tin tuyển dụng đang mở. `branchName` null nghĩa là tuyển cả chuỗi. */
+  async jobs() {
+    const rows = await this.db
+      .select({
+        id: siteJobs.id,
+        title: siteJobs.title,
+        branchName: branches.name,
+        employment: siteJobs.employment,
+        slots: siteJobs.slots,
+      })
+      .from(siteJobs)
+      .leftJoin(branches, eq(branches.id, siteJobs.branchId))
+      .where(eq(siteJobs.published, true))
+      .orderBy(asc(siteJobs.sort), asc(siteJobs.id))
+    return rows
   }
 
   /**

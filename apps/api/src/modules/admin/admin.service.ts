@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common'
-import { and, asc, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { isUniqueViolation } from '../../common/pg-error'
 import { ParamsService } from '../../common/params.service'
@@ -14,8 +14,22 @@ import {
   tableSessions,
   tables,
 } from '../../db/schema'
+import { assertInvoiceSerial } from '../accounting/domain/accounting'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
+
+/**
+ * Khoá tham số của A9. Gom vào một chỗ vì hai nơi cùng đọc chúng: màn A9 và
+ * `AccountingService.serialOf` lúc phát hành hoá đơn.
+ */
+const EINVOICE = {
+  taxCode: 'einvoice.taxCode',
+  provider: 'einvoice.provider',
+  certSerial: 'einvoice.certificateSerial',
+  certExpiry: 'einvoice.certificateExpiry',
+  serial: 'einvoice.serial',
+  enabled: 'einvoice.enabled',
+} as const
 
 export interface TableInput {
   branchId: string
@@ -153,6 +167,142 @@ export class AdminService {
       from: deleted[0]!.value,
     })
     return { key, branchId, cleared: true }
+  }
+
+  // ------------------------------------------------------------------ A9
+
+  /**
+   * Hoá đơn điện tử — cửa vào theo ngữ cảnh của chính sổ tham số A6.
+   *
+   * Không có bảng riêng, và đó là quyết định chứ không phải lười: §29.1 nói rõ
+   * "H6 và các màn cấu hình khác là cửa vào theo ngữ cảnh của cùng bộ tham số —
+   * sửa ở đâu cũng là sửa một chỗ". `AccountingService.serialOf` vốn đã đọc
+   * `einvoice.serial` từ đây; dựng thêm một bảng là tạo nguồn thứ hai cho một con
+   * số đã có nguồn, rồi một ngày nào đó hai nguồn lệch nhau.
+   *
+   * Phạm vi theo §30.2: **một mã số thuế cho cả chuỗi** (một hợp đồng HĐĐT), còn
+   * **ký hiệu thì riêng từng địa điểm kinh doanh**. Nên MST và nhà cung cấp là
+   * mặc định cấp chuỗi, ký hiệu và công tắc là ghi đè cấp chi nhánh.
+   */
+  async einvoice(branchId: string) {
+    const rows = await this.db
+      .select()
+      .from(parameters)
+      .where(
+        and(
+          inArray(parameters.key, Object.values(EINVOICE)),
+          or(isNull(parameters.branchId), eq(parameters.branchId, branchId)),
+        ),
+      )
+
+    const chain = (key: string) => rows.find((r) => r.key === key && r.branchId === null)?.value
+    /**
+     * Giá trị engine THẬT SỰ đọc: ghi đè của chi nhánh nếu có, ngược lại mặc định
+     * chuỗi — cùng quy tắc với `ParamsService.get`, tức là cùng con số mà
+     * `AccountingService.serialOf` dùng lúc phát hành. Hiện một con số khác con số
+     * sẽ được dùng là cách chắc chắn nhất để kế toán tin sai.
+     */
+    const effective = (key: string) =>
+      rows.find((r) => r.key === key && r.branchId === branchId)?.value ?? chain(key)
+    const text = (value: unknown) => (typeof value === 'string' ? value : '')
+
+    return {
+      branchId,
+      chain: {
+        taxCode: text(chain(EINVOICE.taxCode)),
+        provider: text(chain(EINVOICE.provider)),
+        certificateSerial: text(chain(EINVOICE.certSerial)),
+        certificateExpiry: text(chain(EINVOICE.certExpiry)),
+      },
+      branch: {
+        serial: text(effective(EINVOICE.serial)),
+        enabled: effective(EINVOICE.enabled) === true,
+      },
+      /** Chứng thư hết hạn là hoá đơn ngừng phát hành — cảnh báo trước 30 ngày */
+      certificateDaysLeft: daysUntil(text(chain(EINVOICE.certExpiry))),
+    }
+  }
+
+  /**
+   * Khai cấu hình hoá đơn điện tử.
+   *
+   * Kiểm ký hiệu NGAY TẠI ĐÂY bằng đúng hàm mà miền kế toán dùng lúc phát hành:
+   * ký hiệu sai chuẩn nếu lọt qua thì lỗi chỉ lộ ra vào lúc khách đứng chờ hoá
+   * đơn ở quầy, và người sửa được nó thì đang ở nhà.
+   *
+   * Bật công tắc mà chưa có đủ MST + ký hiệu là bật một cái không chạy được, nên
+   * chặn luôn — thà không bật được còn hơn bật rồi mỗi bill đều rơi vào hàng đợi
+   * lỗi của F3.
+   */
+  async setEinvoice(
+    branchId: string,
+    input: {
+      taxCode?: string
+      provider?: string
+      certificateSerial?: string
+      certificateExpiry?: string
+      serial?: string
+      enabled?: boolean
+    },
+    actor: Actor,
+  ) {
+    const before = await this.einvoice(branchId)
+
+    const taxCode = (input.taxCode ?? before.chain.taxCode).trim()
+    const serial = (input.serial ?? before.branch.serial).trim()
+    const certExpiry = (input.certificateExpiry ?? before.chain.certificateExpiry).trim()
+    const enabled = input.enabled ?? before.branch.enabled
+
+    if (taxCode !== '' && !/^\d{10}(-\d{3})?$/.test(taxCode)) {
+      throw new BadRequestException('Mã số thuế gồm 10 số, đơn vị phụ thuộc thêm "-" và 3 số')
+    }
+    if (certExpiry !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(certExpiry)) {
+      throw new BadRequestException('Ngày hết hạn chứng thư số viết theo mẫu YYYY-MM-DD')
+    }
+    let normalisedSerial = ''
+    if (serial !== '') {
+      try {
+        normalisedSerial = assertInvoiceSerial(serial)
+      } catch (err) {
+        throw new BadRequestException((err as Error).message)
+      }
+    }
+    if (enabled && (taxCode === '' || normalisedSerial === '')) {
+      throw new ConflictException(
+        'Chưa đủ để bật: hoá đơn điện tử cần mã số thuế của chuỗi và ký hiệu riêng của chi nhánh này',
+      )
+    }
+
+    const changedBy = actor.kind === 'staff' ? actor.staffId : null
+    const writes: { key: string; value: unknown; branchId: string | null }[] = []
+    if (input.taxCode !== undefined) writes.push({ key: EINVOICE.taxCode, value: taxCode, branchId: null })
+    if (input.provider !== undefined) {
+      writes.push({ key: EINVOICE.provider, value: input.provider.trim(), branchId: null })
+    }
+    if (input.certificateSerial !== undefined) {
+      writes.push({ key: EINVOICE.certSerial, value: input.certificateSerial.trim(), branchId: null })
+    }
+    if (input.certificateExpiry !== undefined) {
+      writes.push({ key: EINVOICE.certExpiry, value: certExpiry, branchId: null })
+    }
+    if (input.serial !== undefined) {
+      writes.push({ key: EINVOICE.serial, value: normalisedSerial, branchId })
+    }
+    if (input.enabled !== undefined) {
+      writes.push({ key: EINVOICE.enabled, value: enabled, branchId })
+    }
+
+    for (const write of writes) {
+      await this.params.set(write.key, write.value, { branchId: write.branchId, changedBy })
+    }
+    if (writes.length > 0) {
+      // Không ghi giá trị chứng thư số vào nhật ký — chỉ ghi rằng nó đã đổi
+      await this.write(actor, 'einvoice.configured', branchId, {
+        keys: writes.map((w) => w.key),
+        enabled,
+      })
+    }
+    return this.einvoice(branchId)
   }
 
   // ----------------------------------------------------------------- A10
@@ -389,6 +539,13 @@ export class AdminService {
       })
     })
   }
+}
+
+/** Số ngày còn lại tới một mốc YYYY-MM-DD; null khi chưa khai */
+function daysUntil(iso: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null
+  const today = new Date().toISOString().slice(0, 10)
+  return Math.round((Date.parse(iso) - Date.parse(today)) / 86_400_000)
 }
 
 /** '11:00–14:00 · 17:00–23:00' — cùng định dạng mà miền đặt bàn đọc */

@@ -2,13 +2,17 @@ import { sql } from 'drizzle-orm'
 import {
   bigint,
   boolean,
+  check,
   index,
+  integer,
   jsonb,
   pgTable,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
+import { stations } from './catalog'
 import { branches, staff } from './identity'
 
 /**
@@ -55,6 +59,57 @@ export const parameters = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('parameters_key_scope_unique').on(t.key, sql`coalesce(${t.branchId}, '*')`)],
+)
+
+/**
+ * Máy in A5 — bill ở quầy và tem dán món ở trạm.
+ *
+ * Nằm cạnh tham số vì cùng một loại dữ liệu: thứ cầu in ĐỌC LÚC CHẠY qua bundle
+ * cấu hình. Cầu in (`devices.kind = 'bridge'`) không có màn hình nào để cấu hình,
+ * nên nếu địa chỉ máy in không đi theo bundle thì đổi một cái máy in phải sửa file
+ * trên máy đặt ở góc bếp.
+ *
+ * Máy in tem GẮN TRẠM, máy in bill thì không: tem dán lên hộp ngay tại trạm đóng
+ * gói, còn bill in ở quầy thu ngân nơi khách đứng trả tiền. Ràng buộc bên dưới
+ * cưỡng chế đúng điều đó thay vì trông chờ người nhập nhớ.
+ */
+export const printers = pgTable(
+  'printers',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    branchId: text('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    name: text('name').notNull(),
+    kind: text('kind').notNull(),
+    /** Trạm mà tem của nó đi ra; NULL với máy in bill */
+    stationId: text('station_id').references(() => stations.id),
+    /** Địa chỉ trong mạng LAN của quán — cầu in mở socket tới đây */
+    host: text('host').notNull(),
+    port: integer('port').notNull().default(9100),
+    /** Khổ giấy + bản mẫu: k80-bill · k58-bill · tem-40x30 · tem-50x30 */
+    template: text('template').notNull(),
+    copies: smallint('copies').notNull().default(1),
+    active: boolean('active').notNull().default(true),
+    updatedBy: bigint('updated_by', { mode: 'number' }).references(() => staff.id),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('printers_kind_check', sql`${t.kind} IN ('bill','tem')`),
+    check(
+      'printers_template_check',
+      sql`${t.template} IN ('k80-bill','k58-bill','tem-40x30','tem-50x30')`,
+    ),
+    // Tem phải biết dán ở trạm nào; bill in ở quầy nên không gắn trạm
+    check(
+      'printers_station_check',
+      sql`(${t.kind} = 'tem' AND ${t.stationId} IS NOT NULL)
+       OR (${t.kind} = 'bill' AND ${t.stationId} IS NULL)`,
+    ),
+    check('printers_port_check', sql`${t.port} BETWEEN 1 AND 65535`),
+    check('printers_copies_check', sql`${t.copies} BETWEEN 1 AND 5`),
+    uniqueIndex('printers_branch_name_unique').on(t.branchId, t.name),
+  ],
 )
 
 /** Lịch sử đổi tham số — APPEND-ONLY (trigger chặn UPDATE/DELETE) */

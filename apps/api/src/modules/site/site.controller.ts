@@ -20,4 +20,18 @@ export class SiteController {
   menu() {
     return this.site.menu()
   }
+
+  /** W8 — tin tức, soạn ở A8 */
+  @Public()
+  @Get('posts')
+  posts() {
+    return this.site.posts()
+  }
+
+  /** W9 — tuyển dụng, soạn ở A8 */
+  @Public()
+  @Get('jobs')
+  jobs() {
+    return this.site.jobs()
+  }
 }

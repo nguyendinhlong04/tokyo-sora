@@ -84,6 +84,58 @@ const PARAMETERS: {
   { key: 'expense.pettyCashVnd', value: 2_000_000, unit: 'đồng', sensitive: true },
   { key: 'expense.ownerApprovalVnd', value: 20_000_000, unit: 'đồng', sensitive: true },
   { key: 'expense.assetThresholdVnd', value: 5_000_000, unit: 'đồng', sensitive: true },
+
+  // Hoá đơn điện tử (§30.2 · màn A9 là cửa vào theo ngữ cảnh của những khoá này).
+  // MST và hợp đồng là CỦA CHUỖI — một mã số thuế, một hợp đồng HĐĐT; chỉ ký hiệu
+  // mới riêng từng địa điểm kinh doanh, và nó nằm ở vòng lặp cấp chi nhánh bên dưới.
+  { key: 'einvoice.taxCode', value: '', unit: 'mã số thuế', sensitive: true },
+  { key: 'einvoice.provider', value: '', sensitive: true },
+  { key: 'einvoice.certificateSerial', value: '', sensitive: true },
+  { key: 'einvoice.certificateExpiry', value: '', unit: 'YYYY-MM-DD', sensitive: true },
+  // Mặc định TẮT: bật một cấu hình chưa khai xong là mỗi bill rơi vào hàng đợi lỗi F3
+  { key: 'einvoice.enabled', value: false, sensitive: true },
+]
+
+/**
+ * Máy in A5 mỗi chi nhánh — một máy bill ở quầy, một máy tem ở trạm đóng gói.
+ *
+ * Địa chỉ 10.0.x.x là dải LAN của quán; cầu in đọc chúng từ bundle cấu hình. Máy
+ * tem gắn ST-01 vì đó là trạm ra món lạnh và cũng là nơi đóng gói đơn mang về.
+ */
+const PRINTERS: { name: string; kind: 'bill' | 'tem'; stationId: string | null; host: string; template: string }[] = [
+  { name: 'Quầy thu ngân', kind: 'bill', stationId: null, host: '10.0.0.21', template: 'k80-bill' },
+  { name: 'Tem đóng gói', kind: 'tem', stationId: 'ST-01', host: '10.0.0.22', template: 'tem-40x30' },
+]
+
+/**
+ * Nội dung website A8 — chuyển nguyên từ `apps/web/content/site.ts`.
+ *
+ * File nội dung đó đã ghi sẵn: "khi A8 lên thì tin tức và tuyển dụng chuyển sang
+ * đó". Đây là lượt chuyển ấy; hai mảng bên kia đã bị gỡ để không còn nguồn thứ hai.
+ */
+const SITE_POSTS: { title: string; category: string; excerpt: string | null; publishedOn: string }[] = [
+  {
+    title: 'Chúng tôi đổi sang than hoa Bình Định',
+    category: 'Bếp',
+    publishedOn: '2026-07-12',
+    excerpt:
+      'Ba tháng thử mười hai loại than. Đây là loại giữ nhiệt lâu nhất mà không để lại vị đắng khói trên miếng thịt.',
+  },
+  { title: 'Thăn bò về mỗi thứ Ba', category: 'Nguyên liệu', publishedOn: '2026-06-28', excerpt: null },
+  { title: 'Mở chi nhánh Thảo Điền', category: 'Chi nhánh', publishedOn: '2026-06-15', excerpt: null },
+  { title: 'Lớp học nướng cho mười hai người', category: 'Sự kiện', publishedOn: '2026-06-02', excerpt: null },
+  { title: 'Set Kiwami có thêm lõi vai bò', category: 'Thực đơn', publishedOn: '2026-05-21', excerpt: null },
+  { title: 'Bếp trưởng Nakamura nói về khói', category: 'Câu chuyện', publishedOn: '2026-05-09', excerpt: null },
+  { title: 'Giờ vàng buổi trưa từ tháng Tám', category: 'Ưu đãi', publishedOn: '2026-04-26', excerpt: null },
+]
+
+/** `branchIndex` null = tuyển cho cả chuỗi (cột `branch_id` để trống) */
+const SITE_JOBS: { title: string; branchIndex: number | null; employment: string; slots: number }[] = [
+  { title: 'Bếp trưởng trạm nướng', branchIndex: 2, employment: 'Toàn thời gian', slots: 1 },
+  { title: 'Phụ bếp trạm chiên', branchIndex: 0, employment: 'Toàn thời gian', slots: 2 },
+  { title: 'Phục vụ bàn', branchIndex: null, employment: 'Toàn thời gian · ca tối', slots: 6 },
+  { title: 'Thu ngân', branchIndex: 1, employment: 'Toàn thời gian', slots: 1 },
+  { title: 'Nhân viên chuẩn bị than', branchIndex: 0, employment: 'Bán thời gian', slots: 2 },
 ]
 
 /**
@@ -615,6 +667,39 @@ async function seed(db: Db) {
       .onConflictDoNothing()
   }
 
+  // ---- Máy in A5 ----
+  for (const branch of branchRows) {
+    for (const p of PRINTERS) {
+      await db
+        .insert(s.printers)
+        .values({ branchId: branch.id, ...p })
+        .onConflictDoNothing()
+    }
+  }
+
+  // ---- Nội dung website A8 ----
+  for (const post of SITE_POSTS) {
+    const [existing] = await db
+      .select({ id: s.sitePosts.id })
+      .from(s.sitePosts)
+      .where(eq(s.sitePosts.title, post.title))
+    if (!existing) await db.insert(s.sitePosts).values({ ...post, published: true })
+  }
+  for (const [index, job] of SITE_JOBS.entries()) {
+    const [existing] = await db
+      .select({ id: s.siteJobs.id })
+      .from(s.siteJobs)
+      .where(eq(s.siteJobs.title, job.title))
+    if (existing) continue
+    const { branchIndex, ...rest } = job
+    await db.insert(s.siteJobs).values({
+      ...rest,
+      branchId: branchIndex === null ? null : (branchRows[branchIndex]?.id ?? null),
+      published: true,
+      sort: index,
+    })
+  }
+
   // ---- Cây khoản mục C6 ----
   for (const c of EXPENSE_CATEGORIES) {
     await db
@@ -638,6 +723,9 @@ async function seed(db: Db) {
     tables: tableCount,
     staff: staffRows.length,
     parameters: PARAMETERS.length,
+    printers: branchRows.length * PRINTERS.length,
+    baiViet: SITE_POSTS.length,
+    tinTuyenDung: SITE_JOBS.length,
     // Món chỉ xuất hiện trong set mà chưa có trong danh mục — nhập ở Office M1
     setItemsChuaCoTrongDanhMuc: skippedSetItems,
   }
