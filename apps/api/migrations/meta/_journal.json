@@ -50,6 +50,13 @@
       "when": 1785633451877,
       "tag": "0006_volatile_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785638321629,
+      "tag": "0007_military_baron_strucker",
+      "breakpoints": true
     }
   ]
 }

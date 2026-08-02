@@ -129,9 +129,12 @@ export const staffSessions = pgTable(
     staffId: bigint('staff_id', { mode: 'number' })
       .notNull()
       .references(() => staff.id),
-    deviceId: bigint('device_id', { mode: 'number' })
-      .notNull()
-      .references(() => devices.id),
+    /**
+     * NULL với phiên Office: người quản lý đăng nhập bằng email trên máy tính
+     * của họ, không có thiết bị nào của chi nhánh để ghép. Phiên vận hành (POS,
+     * KDS) thì vẫn gắn cứng thiết bị — thu hồi thiết bị là phiên chết theo.
+     */
+    deviceId: bigint('device_id', { mode: 'number' }).references(() => devices.id),
     branchId: text('branch_id')
       .notNull()
       .references(() => branches.id),

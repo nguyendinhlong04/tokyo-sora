@@ -109,6 +109,19 @@ const ROLE_BY_TITLE: Record<string, string> = {
   Bếp: 'R4',
 }
 
+/**
+ * Tài khoản Sora Office cho môi trường dev.
+ *
+ * Bộ nhân viên trong prototype dừng ở cấp chi nhánh (thu ngân, phục vụ, trưởng
+ * ca) nên không ai mở được màn quản trị. Thêm một tài khoản chủ chuỗi — vai trò
+ * gán ở phạm vi TOÀN CHUỖI (branch_id NULL) đúng như §5.
+ */
+const DEV_OFFICE_PASSWORD = 'sora-dev-2026'
+const OFFICE_ACCOUNTS: { code: string; fullName: string; email: string; roles: string[] }[] = [
+  { code: 'CHU01', fullName: 'Chủ quán', email: 'chu@tokyosora.vn', roles: ['R10'] },
+  { code: 'CHUOI01', fullName: 'Quản lý chuỗi', email: 'chuoi@tokyosora.vn', roles: ['R11'] },
+]
+
 /** PIN dev — mọi nhân viên dùng 4 số khác nhau, chỉ dành cho môi trường phát triển */
 const DEV_PINS: Record<string, string> = {
   hoa: '1101',
@@ -487,6 +500,28 @@ async function seed(db: Db) {
       .insert(s.staffRoles)
       .values({ staffId: created!.id, roleCode, branchId })
       .onConflictDoNothing()
+  }
+
+  // ---- Tài khoản Office ----
+  for (const account of OFFICE_ACCOUNTS) {
+    const row = {
+      code: account.code,
+      fullName: account.fullName,
+      email: account.email,
+      passwordHash: await hash(DEV_OFFICE_PASSWORD),
+    }
+    const [created] = await db
+      .insert(s.staff)
+      .values(row)
+      .onConflictDoUpdate({ target: s.staff.code, set: row })
+      .returning({ id: s.staff.id })
+    for (const roleCode of account.roles) {
+      await db
+        .insert(s.staffRoles)
+        // branchId NULL = phạm vi toàn chuỗi
+        .values({ staffId: created!.id, roleCode, branchId: null })
+        .onConflictDoNothing()
+    }
   }
 
   // ---- Tham số A6 ----

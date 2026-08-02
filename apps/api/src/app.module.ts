@@ -1,4 +1,5 @@
 import { Controller, Get, Module } from '@nestjs/common'
+import { AdminModule } from './modules/admin/admin.module'
 import { CommonModule } from './common/common.module'
 import { ConfigBundleModule } from './modules/config-bundle/config-bundle.module'
 import { Public } from './modules/identity/auth.guard'
@@ -32,6 +33,7 @@ class HealthController {
     OnlineModule,
     ReservationsModule,
     SiteModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

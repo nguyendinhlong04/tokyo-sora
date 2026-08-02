@@ -151,3 +151,18 @@ PIN 4 số, chỉ dùng ở môi trường phát triển (xem `apps/api/src/db/s
 Đăng nhập cần **thiết bị đã ghép**: PIN đứng một mình không dùng được. Thiết bị đầu
 tiên của chi nhánh phải tạo bản ghi trực tiếp trong CSDL (đúng như lúc mở quán thật);
 từ thiết bị đó mới sinh được mã ghép 6 số cho các máy sau.
+
+Sora Office (`localhost:5176`) đăng nhập bằng **email + mật khẩu**, không cần thiết bị
+ghép — Office chạy trên máy tính của quản lý, không phải máy của chi nhánh:
+
+| Tài khoản | Vai trò | Mật khẩu |
+|---|---|---|
+| chu@tokyosora.vn | R10 Chủ / Admin | `sora-dev-2026` |
+| chuoi@tokyosora.vn | R11 Quản lý chuỗi | `sora-dev-2026` |
+
+> Màn cấu hình (A6, A3, A10, R3) gắn quyền `admin.manage-accounts-roles` — theo ma trận
+> §4.2 chỉ R10 có. Đăng nhập bằng `chuoi@` sẽ vào được Office nhưng các nút sửa mờ đi.
+
+> Trên máy dev, cookie phiên dùng chung theo `localhost` bất kể cổng, nên đăng nhập
+> Office xong thì POS coi như đang là người đó. Ngoài đời hai app ở hai tên miền nên
+> không đụng nhau; ở dev cứ đăng nhập lại app nào mình đang thử.

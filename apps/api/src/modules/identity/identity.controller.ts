@@ -22,6 +22,12 @@ const LoginBody = z.object({
   pin: z.string().regex(/^\d{4,6}$/, 'PIN gồm 4–6 chữ số'),
 })
 
+const OfficeLoginBody = z.object({
+  branchId: z.string().min(1),
+  email: z.string().email().max(160),
+  password: z.string().min(8).max(200),
+})
+
 @Controller('api/auth')
 export class IdentityController {
   constructor(private readonly identity: IdentityService) {}
@@ -71,6 +77,33 @@ export class IdentityController {
     }
 
     const result = await this.identity.loginWithPin({ ...input, deviceId })
+    reply.setCookie(STAFF_COOKIE, result.token, {
+      httpOnly: true,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      expires: result.expiresAt,
+    })
+    return {
+      token: result.token,
+      expiresAt: result.expiresAt,
+      staff: {
+        id: result.actor.kind === 'staff' ? result.actor.staffId : null,
+        fullName: result.actor.kind === 'staff' ? result.actor.fullName : null,
+        roles: result.actor.kind === 'staff' ? result.actor.roles : [],
+      },
+    }
+  }
+
+  /**
+   * Đăng nhập Sora Office. `@Public` vì đây chính là cửa vào — không có thiết bị
+   * ghép nào để nhận diện trước.
+   */
+  @Public()
+  @Post('office/login')
+  async officeLogin(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    const input = OfficeLoginBody.parse(body)
+    const result = await this.identity.loginWithPassword(input)
     reply.setCookie(STAFF_COOKIE, result.token, {
       httpOnly: true,
       sameSite: 'strict',

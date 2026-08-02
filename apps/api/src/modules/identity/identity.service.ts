@@ -247,6 +247,77 @@ export class IdentityService {
     return [...new Set(rows.map((r) => r.roleCode as Role))]
   }
 
+  /**
+   * Đăng nhập Sora Office bằng email và mật khẩu.
+   *
+   * KHÔNG đòi thiết bị ghép như luồng PIN: Office chạy trên máy tính của quản lý
+   * và kế toán, không phải máy của chi nhánh. Đổi lại, phiên chỉ mở đúng một chi
+   * nhánh và vai trò vẫn phải có ở chi nhánh đó (hoặc là vai trò cấp chuỗi).
+   *
+   * Cùng bộ đếm chặn thử sai với PIN — khoá theo email nên dò mật khẩu của một
+   * người không làm khoá luôn người khác.
+   */
+  async loginWithPassword(input: {
+    email: string
+    password: string
+    branchId: string
+  }): Promise<{ token: string; expiresAt: Date; actor: Actor }> {
+    const email = input.email.trim().toLowerCase()
+    const throttleKey = `office:${email}`
+    const max = await this.params.getNumber('auth.pinMaxAttemptsPerMinute', 5)
+    const lockout = await this.params.getNumber('auth.pinLockoutMinutes', 5)
+    const sessionHours = await this.params.getNumber('auth.staffSessionHours', 12)
+    this.throttle.check(throttleKey, max, lockout)
+
+    const [person] = await this.db
+      .select()
+      .from(staff)
+      .where(and(eq(staff.email, email), eq(staff.active, true)))
+
+    const ok = person?.passwordHash
+      ? await argonVerify(person.passwordHash, input.password).catch(() => false)
+      : false
+    if (!person || !ok) {
+      this.throttle.fail(throttleKey)
+      // Cùng một câu cho email sai và mật khẩu sai — không xác nhận hộ ai có tài khoản
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng')
+    }
+    this.throttle.succeed(throttleKey)
+
+    const roles = await this.rolesOf(person.id, input.branchId)
+    if (roles.length === 0) {
+      throw new ForbiddenException('Tài khoản chưa được phân vai trò ở chi nhánh này')
+    }
+
+    const token = newToken()
+    const expiresAt = new Date(Date.now() + sessionHours * 3_600_000)
+    const [session] = await this.db
+      .insert(staffSessions)
+      .values({
+        staffId: person.id,
+        deviceId: null,
+        branchId: input.branchId,
+        tokenHash: hashToken(token),
+        expiresAt,
+      })
+      .returning({ id: staffSessions.id })
+
+    return {
+      token,
+      expiresAt,
+      actor: {
+        kind: 'staff',
+        staffId: person.id,
+        roles,
+        branchId: input.branchId,
+        deviceId: null,
+        sessionId: session!.id,
+        fullName: person.fullName,
+        stationId: null,
+      },
+    }
+  }
+
   /** Xác minh PIN của NGƯỜI DUYỆT trong luồng △ — không tạo phiên */
   async verifyPinOnly(staffId: number, pin: string, branchId: string): Promise<Role[] | null> {
     const [person] = await this.db

@@ -10,7 +10,8 @@ export type Actor =
       staffId: number
       roles: Role[]
       branchId: string
-      deviceId: number
+      /** NULL khi đăng nhập Office bằng email — không có thiết bị ghép */
+      deviceId: number | null
       sessionId: number
       fullName: string
       /**
