@@ -1,0 +1,306 @@
+import { formatVnd } from '@sora/contracts'
+import { Button, ErrorState, useToast } from '@sora/ui'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { api, type EmployeeInput, type EmployeeRow, type PayKind } from '../api'
+import { PageHeader } from '../components/PageHeader'
+import { Field, formatDay } from '../components/report'
+import { useSession } from '../session-context'
+
+/**
+ * H1 — Hồ sơ nhân viên.
+ *
+ * Màn này chứa ĐƠN GIÁ LƯƠNG, nên nó nằm sau quyền `payroll.configure` chứ không
+ * sau quyền xếp lịch: quản lý ca xếp được ca cho người này nhưng không mở được hồ
+ * sơ của họ. Đó là nguyên tắc cứng thứ tư của §4.2b, và nó chỉ có nghĩa nếu hai
+ * màn tách nhau đúng ở chỗ này.
+ *
+ * Hồ sơ gắn 1-1 với TÀI KHOẢN ĐĂNG NHẬP đã có: không tạo người mới ở đây, vì một
+ * người có hồ sơ lương mà không đăng nhập được thì không ai chấm công cho họ, và
+ * một tài khoản có hai hồ sơ thì kỳ lương trả hai lần.
+ */
+
+const PAY_KIND_LABELS: Record<PayKind, string> = {
+  hourly: 'Theo giờ',
+  monthly: 'Theo tháng',
+}
+
+const blank = (branchId: string, staffId: number): EmployeeInput => ({
+  staffId,
+  branchId,
+  position: '',
+  payKind: 'hourly',
+  hourlyRateVnd: 0,
+  monthlySalaryVnd: 0,
+  fixedAllowanceVnd: 0,
+  startedOn: new Date().toISOString().slice(0, 10),
+  endedOn: null,
+  bankAccount: null,
+  active: true,
+})
+
+export function Employees() {
+  const { branchId } = useSession()
+  const toast = useToast()
+  const queryClient = useQueryClient()
+  const [draft, setDraft] = useState<{ input: EmployeeInput; id?: number } | null>(null)
+
+  const rows = useQuery({
+    queryKey: ['employees', branchId],
+    queryFn: () => api.employees(branchId!),
+    enabled: Boolean(branchId),
+  })
+  const candidates = useQuery({
+    queryKey: ['employee-candidates', branchId],
+    queryFn: () => api.employeeCandidates(branchId!),
+    enabled: Boolean(branchId),
+  })
+
+  const save = useMutation({
+    mutationFn: ({ input, id }: { input: EmployeeInput; id?: number }) =>
+      api.saveEmployee(input, id),
+    onSuccess: () => {
+      toast('Đã lưu hồ sơ', 'ok')
+      setDraft(null)
+      void queryClient.invalidateQueries({ queryKey: ['employees'] })
+      void queryClient.invalidateQueries({ queryKey: ['employee-candidates'] })
+    },
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+
+  const list = rows.data ?? []
+  const available = candidates.data ?? []
+
+  return (
+    <>
+      <PageHeader
+        title="Hồ sơ nhân viên"
+        subtitle="Vị trí, cách trả lương và đơn giá. Mỗi hồ sơ gắn với một tài khoản đăng nhập đã có."
+        action={
+          available.length > 0 ? (
+            <select
+              value=""
+              onChange={(e) =>
+                e.target.value && setDraft({ input: blank(branchId!, Number(e.target.value)) })
+              }
+              className="h-[var(--hit-target)] rounded-sm border border-line-3 bg-canvas px-3 text-[length:var(--fs-b2)] text-ink-hi"
+            >
+              <option value="">Thêm hồ sơ cho…</option>
+              {available.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.fullName} ({person.code})
+                </option>
+              ))}
+            </select>
+          ) : null
+        }
+      />
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
+        {rows.isError ? <ErrorState message={(rows.error as Error).message} /> : null}
+
+        {draft ? (
+          <EmployeeForm
+            draft={draft.input}
+            onChange={(input) => setDraft({ ...draft, input })}
+            onCancel={() => setDraft(null)}
+            onSave={() => save.mutate(draft)}
+            saving={save.isPending}
+          />
+        ) : null}
+
+        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
+          <div className="grid grid-cols-[1fr_150px_130px_160px_150px_110px_90px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
+            <span>Nhân viên</span>
+            <span>Vị trí</span>
+            <span>Trả lương</span>
+            <span className="text-right">Đơn giá / lương</span>
+            <span className="text-right">Phụ cấp</span>
+            <span>Vào từ</span>
+            <span />
+          </div>
+
+          {rows.isPending ? (
+            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
+          ) : list.length === 0 ? (
+            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
+              Chưa có hồ sơ nào. Chọn một tài khoản ở nút phía trên để bắt đầu.
+            </p>
+          ) : (
+            list.map((row) => (
+              <div
+                key={row.id}
+                className={`grid grid-cols-[1fr_150px_130px_160px_150px_110px_90px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
+                  row.active ? '' : 'opacity-60'
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                    {row.fullName}
+                  </span>
+                  <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.code}
+                  </span>
+                </span>
+                <span className="text-[length:var(--fs-c1)] text-ink-body">{row.position}</span>
+                <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                  {PAY_KIND_LABELS[row.payKind]}
+                </span>
+                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
+                  {row.payKind === 'hourly'
+                    ? `${formatVnd(row.hourlyRateVnd)}/giờ`
+                    : `${formatVnd(row.monthlySalaryVnd)}/tháng`}
+                </span>
+                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                  {row.fixedAllowanceVnd === 0 ? '—' : formatVnd(row.fixedAllowanceVnd)}
+                </span>
+                <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                  {formatDay(row.startedOn)}
+                </span>
+                <span className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setDraft({ input: toInput(row), id: row.id })}
+                    className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
+                  >
+                    Sửa
+                  </button>
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+          Chưa có trong bản dựng này: giấy tờ đính kèm, và luồng nghỉ việc có bàn giao. Hồ sơ ngừng
+          hoạt động thì không vào lưới xếp lịch và không vào kỳ lương mới.
+        </p>
+      </div>
+    </>
+  )
+}
+
+function toInput(row: EmployeeRow): EmployeeInput {
+  const { id: _id, fullName: _name, code: _code, ...input } = row
+  return input
+}
+
+function EmployeeForm({
+  draft,
+  onChange,
+  onCancel,
+  onSave,
+  saving,
+}: {
+  draft: EmployeeInput
+  onChange: (next: EmployeeInput) => void
+  onCancel: () => void
+  onSave: () => void
+  saving: boolean
+}) {
+  const set = <K extends keyof EmployeeInput>(key: K, value: EmployeeInput[K]) =>
+    onChange({ ...draft, [key]: value })
+
+  return (
+    <section className="rounded-md border border-accent bg-surface-1 p-5">
+      <div className="grid gap-4 lg:grid-cols-4">
+        <Field label="Vị trí">
+          <Input value={draft.position} onChange={(v) => set('position', v)} placeholder="Bếp chính" />
+        </Field>
+
+        <Field label="Cách trả lương">
+          <select
+            value={draft.payKind}
+            onChange={(e) => set('payKind', e.target.value as PayKind)}
+            className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
+          >
+            <option value="hourly">Theo giờ</option>
+            <option value="monthly">Theo tháng</option>
+          </select>
+        </Field>
+
+        {draft.payKind === 'hourly' ? (
+          <Field label="Đơn giá giờ (₫)">
+            <Input
+              type="number"
+              value={String(draft.hourlyRateVnd)}
+              onChange={(v) => set('hourlyRateVnd', Number(v) || 0)}
+            />
+          </Field>
+        ) : (
+          <Field label="Lương cơ bản tháng (₫)">
+            <Input
+              type="number"
+              value={String(draft.monthlySalaryVnd)}
+              onChange={(v) => set('monthlySalaryVnd', Number(v) || 0)}
+            />
+          </Field>
+        )}
+
+        <Field label="Phụ cấp cố định mỗi kỳ (₫)">
+          <Input
+            type="number"
+            value={String(draft.fixedAllowanceVnd)}
+            onChange={(v) => set('fixedAllowanceVnd', Number(v) || 0)}
+          />
+        </Field>
+
+        <Field label="Ngày vào làm">
+          <Input type="date" value={draft.startedOn} onChange={(v) => set('startedOn', v)} />
+        </Field>
+        <Field label="Tài khoản nhận lương">
+          <Input
+            value={draft.bankAccount ?? ''}
+            onChange={(v) => set('bankAccount', v || null)}
+            placeholder="0021000123456"
+          />
+        </Field>
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => set('active', !draft.active)}
+          className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
+            draft.active ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
+          }`}
+        >
+          {draft.active ? 'Đang làm việc' : 'Đã nghỉ'}
+        </button>
+        <div className="ml-auto flex gap-2">
+          <Button onClick={onCancel}>Bỏ</Button>
+          <Button variant="primary" onClick={onSave} disabled={saving}>
+            Lưu hồ sơ
+          </Button>
+        </div>
+      </div>
+
+      <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+        Trả theo tháng thì lương cơ bản vẫn đủ dù công thiếu, nhưng tăng ca tính theo đơn giá giờ
+        quy đổi từ số giờ chuẩn tháng (đặt ở Trung tâm tham số A6).
+      </p>
+    </section>
+  )
+}
+
+function Input({
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+}: {
+  value: string
+  onChange: (next: string) => void
+  placeholder?: string
+  type?: string
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
+    />
+  )
+}

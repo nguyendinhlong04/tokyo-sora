@@ -165,11 +165,23 @@ export function Field({ label, children }: { label: string; children: ReactNode 
  *
  * Kỳ trước bằng 0 thì hiện "mới" chứ không hiện "+∞%": phần trăm của một mẫu số
  * bằng 0 là con số vô nghĩa, in ra chỉ làm người đọc mất niềm tin vào cả bảng.
+ *
+ * `goodWhenUp` vì không phải chỉ số nào tăng cũng mừng: doanh thu tăng là matcha,
+ * còn food cost tăng là aka. Mũi tên vẫn chỉ đúng chiều, chỉ đổi màu.
  */
-export function DeltaChip({ delta, label }: { delta: Delta; label: string }) {
+export function DeltaChip({
+  delta,
+  label,
+  goodWhenUp = true,
+}: {
+  delta: Delta
+  label: string
+  goodWhenUp?: boolean
+}) {
   const up = delta.diff > 0
   const flat = delta.diff === 0
-  const tone = flat ? 'text-ink-mute' : up ? 'text-ok' : 'text-danger'
+  const good = up === goodWhenUp
+  const tone = flat ? 'text-ink-mute' : good ? 'text-ok' : 'text-danger'
 
   return (
     <span className="inline-flex items-baseline gap-1.5 text-[length:var(--fs-c1)]">

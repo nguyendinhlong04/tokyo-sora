@@ -141,6 +141,226 @@ export interface DishDetail {
   overrides: { branchId: string; price: number | null; active: boolean | null }[]
 }
 
+// ------------------------------------------- Kho & công thức M7 · M4 · S1 · S2
+
+/**
+ * Ô chưa có nguồn dữ liệu; `blockedBy` nói rõ màn nào mở khoá nó.
+ *
+ * Dùng chung cho cả nhóm kho lẫn nhóm báo cáo: cả hai đều có ô mà máy chủ cố ý
+ * trả về trống thay vì trả 0.
+ */
+export interface BlockedTile {
+  value: null
+  blockedBy: string
+}
+
+export interface IngredientRow {
+  id: string
+  code: string
+  name: string
+  groupName: string | null
+  /** ĐVT công thức và tồn kho đếm bằng: g · ml · cái */
+  baseUnit: string
+  /** ĐVT trên hoá đơn nhập: kg · keg 20L · thùng 24 lon */
+  purchaseUnit: string
+  basePerPurchase: number
+  /** Giá bình quân, phần nghìn đồng mỗi ĐVT cơ sở */
+  costPerBaseMilli: number
+  costPerPurchaseVnd: number
+  minLevelBase: number
+  lotRequired: boolean
+  active: boolean
+  sort: number
+  qtyBase: number
+  qtyPurchase: number
+  valueVnd: number
+  belowMin: boolean
+  /** Mức cạn trên thang than hồng (0 = đầy, 1 = hết); null = chưa khai định mức */
+  emberRatio: number | null
+  usedByDishes: number
+}
+
+export type IngredientInput = Omit<
+  IngredientRow,
+  | 'costPerBaseMilli'
+  | 'costPerPurchaseVnd'
+  | 'qtyBase'
+  | 'qtyPurchase'
+  | 'valueVnd'
+  | 'belowMin'
+  | 'emberRatio'
+  | 'usedByDishes'
+>
+
+export type FoodCostBand = 'tot' | 'canh-bao' | 'bao-dong' | 'chua-co'
+
+export interface RecipeLine {
+  ingredientId: string
+  code: string
+  name: string
+  baseUnit: string
+  costPerBaseMilli: number
+  qtyBase: number
+  /** Hao hụt, điểm cơ bản: 600 = 6% */
+  wasteBp: number
+  sort: number
+  effectiveQtyBase: number
+  costVnd: number
+  share: number
+}
+
+export interface RecipeView {
+  dish: { id: string; code: string; nameVi: string; kind: string; basePrice: number }
+  lines: RecipeLine[]
+  costVnd: number
+  priceVnd: number
+  /** null = món chưa khai công thức, khác hẳn với 0% */
+  percent: number | null
+  band: FoodCostBand
+  grossProfitVnd: number | null
+}
+
+export interface StockOverview {
+  branchId: string
+  totalValueVnd: number
+  ingredientCount: number
+  belowMin: IngredientRow[]
+  withoutCost: number
+  dishesWithoutRecipe: number
+  consumedThisMonthVnd: number
+  expiringLots: BlockedTile
+  wasteThisMonth: BlockedTile
+}
+
+export interface StockMove {
+  id: number
+  kind: 'receipt' | 'sale' | 'count_adjust'
+  qtyBase: number
+  costVnd: number
+  note: string | null
+  orderLineId: number | null
+  businessDate: string
+  createdAt: string
+}
+
+// --------------------------------------------- Nhân sự H1 · H2 · H7
+
+export type PayKind = 'hourly' | 'monthly'
+export type DayKind = 'thuong' | 'nghi' | 'le'
+
+export interface EmployeeRow {
+  id: number
+  staffId: number
+  branchId: string
+  position: string
+  payKind: PayKind
+  hourlyRateVnd: number
+  monthlySalaryVnd: number
+  fixedAllowanceVnd: number
+  startedOn: string
+  endedOn: string | null
+  bankAccount: string | null
+  active: boolean
+  fullName: string
+  code: string
+}
+
+export type EmployeeInput = Omit<EmployeeRow, 'id' | 'fullName' | 'code'>
+
+export interface ShiftTemplate {
+  id: number
+  branchId: string
+  name: string
+  startMinute: number
+  endMinute: number
+  breakMinutes: number
+  sort: number
+}
+
+export interface ScheduleCell {
+  id?: number
+  workDate: string
+  templateId: number | null
+  startMinute: number
+  endMinute: number
+  breakMinutes: number
+  dayKind: DayKind
+  state?: 'draft' | 'published'
+  note: string | null
+}
+
+export interface MinuteSplit {
+  worked: number
+  otNormal: number
+  otRest: number
+  otHoliday: number
+}
+
+export interface ScheduleWeek {
+  branchId: string
+  weekStart: string
+  weekEnd: string
+  days: string[]
+  templates: ShiftTemplate[]
+  /** Tuần nằm trong kỳ đã chốt công thì lưới chỉ đọc */
+  locked: boolean
+  lockedReason: string | null
+  employees: {
+    employeeId: number
+    fullName: string
+    position: string
+    payKind: PayKind
+    cells: ScheduleCell[]
+    minutes: MinuteSplit
+    totalMinutes: number
+  }[]
+}
+
+export type PeriodState = 'draft' | 'locked' | 'submitted' | 'checked' | 'approved' | 'paid'
+
+export interface PayrollPeriod {
+  id: number
+  branchId: string
+  periodStart: string
+  periodEnd: string
+  state: PeriodState
+  lockedAt: string | null
+  submittedAt: string | null
+  checkedAt: string | null
+  approvedAt: string | null
+  paidAt: string | null
+}
+
+export interface PayrollLine {
+  periodId: number
+  employeeId: number
+  nameSnapshot: string
+  positionSnapshot: string
+  payKind: PayKind
+  rateSnapshotVnd: number
+  workedMinutes: number
+  otNormalMinutes: number
+  otRestMinutes: number
+  otHolidayMinutes: number
+  basePayVnd: number
+  overtimePayVnd: number
+  allowanceVnd: number
+  bonusVnd: number
+  grossPayVnd: number
+  insuranceVnd: number
+  taxVnd: number
+  advanceVnd: number
+  /** Có thể ÂM khi tạm ứng vượt lương kỳ này */
+  netPayVnd: number
+  note: string | null
+}
+
+export interface PayrollDetail {
+  period: PayrollPeriod
+  lines: PayrollLine[]
+  totals: { gross: number; insurance: number; tax: number; net: number }
+}
+
 // ------------------------------------------------------- Báo cáo B1 · B3 · F1 · F7
 
 export type PeriodKind = 'ngay' | 'tuan' | 'thang' | 'quy' | 'tuy-chon'
@@ -176,10 +396,13 @@ export interface Tile {
   vsLastWeek: Delta
 }
 
-/** Ô chưa có nguồn dữ liệu; `blockedBy` nói rõ màn nào mở khoá nó */
-export interface BlockedTile {
-  value: null
-  blockedBy: string
+/** Food cost thật; `coverage` = tỉ trọng doanh thu đã phủ công thức */
+export interface FoodCostTile {
+  value: number
+  cogsVnd: number
+  coverage: number
+  vsYesterday: Delta
+  vsLastWeek: Delta
 }
 
 export interface TodayReport {
@@ -191,7 +414,7 @@ export interface TodayReport {
   guests: Tile
   perGuest: Tile
   orderCount: Tile
-  foodCost: BlockedTile
+  foodCost: FoodCostTile | BlockedTile
   hourly: { hour: number; revenue: number; orders: number; baselineRevenue: number }[]
   soldOut: { dishId: string; code: string; name: string; status: string; remaining: number | null }[]
   stockAlert: BlockedTile
@@ -202,8 +425,9 @@ export type Quadrant = 'ngoi-sao' | 'bo-sua' | 'cau-do' | 'bo-di'
 export interface MenuMatrixReport {
   branchId: string
   period: ResolvedPeriod
-  costBasis: 'gia-ban' | 'gia-von'
+  costBasis: 'gia-ban' | 'gia-von' | 'hon-hop'
   costNote: string | null
+  dishesWithoutRecipe: number
   popularityCut: number
   contributionCut: number
   totals: { dishes: number; qty: number; revenue: number; contribution: number }
@@ -215,6 +439,8 @@ export interface MenuMatrixReport {
     revenue: number
     qtyShare: number
     unitContribution: number
+    /** null = món chưa khai công thức; đóng góp đang lấy tạm bằng doanh thu */
+    unitCostVnd: number | null
     quadrant: Quadrant
     previousQuadrant: Quadrant | null
     previousQty: number
@@ -278,12 +504,21 @@ export interface PnlRow {
   note?: string
 }
 
+/** Chỉ số sống còn F&B: (giá vốn + nhân sự) / doanh thu thuần, báo động trên 60% */
+export interface PrimeCost {
+  value: number
+  amountVnd: number
+  cogsVnd: number
+  labourVnd: number
+  overThreshold: boolean
+}
+
 export interface PnlReport {
   branchId: string
   period: ResolvedPeriod
   rows: PnlRow[]
   orderCount: number
-  primeCost: BlockedTile
+  primeCost: PrimeCost | BlockedTile
 }
 
 function periodQuery(branchId: string, period: PeriodChoice): string {
@@ -452,4 +687,146 @@ export const api = {
 
   profitLoss: (branchId: string, period: PeriodChoice) =>
     apiFetch<PnlReport>(`/api/reports/pnl?${periodQuery(branchId, period)}`),
+
+  // --------------------------------------------- M7 · M4 · S1 · S2
+
+  ingredients: (branchId: string) =>
+    apiFetch<IngredientRow[]>(
+      `/api/inventory/ingredients?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  createIngredient: (input: IngredientInput, approval?: Approval | null) =>
+    apiFetch<IngredientRow>('/api/inventory/ingredients', {
+      method: 'POST',
+      body: { ...input, approval },
+    }),
+
+  updateIngredient: (
+    id: string,
+    patch: Partial<IngredientInput>,
+    approval?: Approval | null,
+  ) =>
+    apiFetch<IngredientRow>(`/api/inventory/ingredients/${id}`, {
+      method: 'PATCH',
+      body: { ...patch, approval },
+    }),
+
+  stockOverview: (branchId: string) =>
+    apiFetch<StockOverview>(`/api/inventory/overview?branch=${encodeURIComponent(branchId)}`),
+
+  stockMoves: (branchId: string, ingredientId: string) =>
+    apiFetch<StockMove[]>(
+      `/api/inventory/ingredients/${ingredientId}/moves?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  recipe: (dishId: string) => apiFetch<RecipeView>(`/api/inventory/recipes/${dishId}`),
+
+  setRecipe: (
+    dishId: string,
+    lines: { ingredientId: string; qtyBase: number; wasteBp: number }[],
+    approval?: Approval | null,
+  ) =>
+    apiFetch<{ dishId: string; lines: number; costBefore: number; costAfter: number }>(
+      `/api/inventory/recipes/${dishId}`,
+      { method: 'PUT', body: { lines, approval } },
+    ),
+
+  dishCosts: () =>
+    apiFetch<{ dishId: string; costVnd: number; lineCount: number }[]>(
+      '/api/inventory/dish-costs',
+    ),
+
+  receiveStock: (input: {
+    branchId: string
+    ingredientId: string
+    qtyPurchase: number
+    totalVnd: number
+    note?: string | null
+  }) => apiFetch<{ costPerBaseMilli: number }>('/api/inventory/receipts', {
+    method: 'POST',
+    body: input,
+  }),
+
+  adjustStock: (
+    input: { branchId: string; ingredientId: string; qtyBaseDelta: number; note: string },
+    approval?: Approval | null,
+  ) =>
+    apiFetch<{ delta: number }>('/api/inventory/adjustments', {
+      method: 'POST',
+      body: { ...input, approval },
+    }),
+
+  // ---------------------------------------------- H1 · H2 · H7
+
+  employees: (branchId: string) =>
+    apiFetch<EmployeeRow[]>(`/api/hr/employees?branch=${encodeURIComponent(branchId)}`),
+
+  employeeCandidates: (branchId: string) =>
+    apiFetch<{ id: number; code: string; fullName: string }[]>(
+      `/api/hr/employees/candidates?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  saveEmployee: (input: EmployeeInput, id?: number) =>
+    id
+      ? apiFetch<EmployeeRow>(`/api/hr/employees/${id}`, { method: 'PUT', body: input })
+      : apiFetch<EmployeeRow>('/api/hr/employees', { method: 'POST', body: input }),
+
+  scheduleWeek: (branchId: string, weekStart: string) =>
+    apiFetch<ScheduleWeek>(
+      `/api/hr/schedule?branch=${encodeURIComponent(branchId)}&week=${weekStart}`,
+    ),
+
+  setScheduleWeek: (
+    input: {
+      branchId: string
+      weekStart: string
+      employeeId: number
+      cells: Omit<ScheduleCell, 'id' | 'state'>[]
+    },
+    approval?: Approval | null,
+  ) => apiFetch<{ cells: number }>('/api/hr/schedule', { method: 'PUT', body: { ...input, approval } }),
+
+  publishSchedule: (branchId: string, weekStart: string) =>
+    apiFetch<{ published: number }>('/api/hr/schedule/publish', {
+      method: 'POST',
+      body: { branchId, weekStart, employeeId: 1, cells: [] },
+    }),
+
+  copyPreviousWeek: (branchId: string, weekStart: string) =>
+    apiFetch<{ copied: number }>('/api/hr/schedule/copy-previous', {
+      method: 'POST',
+      body: { branchId, weekStart, employeeId: 1, cells: [] },
+    }),
+
+  createShiftTemplate: (input: {
+    branchId: string
+    name: string
+    startMinute: number
+    endMinute: number
+    breakMinutes: number
+  }) => apiFetch<ShiftTemplate>('/api/hr/shift-templates', { method: 'POST', body: input }),
+
+  payrollPeriods: (branchId: string) =>
+    apiFetch<PayrollPeriod[]>(`/api/hr/payroll/periods?branch=${encodeURIComponent(branchId)}`),
+
+  payrollDetail: (periodId: number) =>
+    apiFetch<PayrollDetail>(`/api/hr/payroll/periods/${periodId}`),
+
+  openPayrollPeriod: (input: { branchId: string; periodStart: string; periodEnd: string }) =>
+    apiFetch<PayrollPeriod>('/api/hr/payroll/periods', { method: 'POST', body: input }),
+
+  computePayroll: (
+    periodId: number,
+    adjustments: { employeeId: number; bonusVnd?: number; advanceVnd?: number; note?: string }[],
+  ) =>
+    apiFetch<{ lines: number }>(`/api/hr/payroll/periods/${periodId}/compute`, {
+      method: 'POST',
+      body: { adjustments },
+    }),
+
+  /** Một cửa cho bốn bước cuối — quyền do máy chủ chặn theo từng bước */
+  advancePayroll: (periodId: number, step: 'lock' | 'submit' | 'check' | 'approve' | 'pay') =>
+    apiFetch<{ state: PeriodState }>(`/api/hr/payroll/periods/${periodId}/${step}`, {
+      method: 'POST',
+    }),
 }

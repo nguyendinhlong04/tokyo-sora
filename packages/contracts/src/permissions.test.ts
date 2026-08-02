@@ -56,12 +56,34 @@ const DOC_ROWS: [ActionKey, string][] = [
   ['audit.view-log', '.......xx.x.x'],
 ]
 
+/**
+ * Bảng §4.2b (Nhân sự) có BỘ CỘT KHÁC: `NV` gộp R1–R6, rồi R7 R8 R13 R11 R10.
+ * Chép riêng thay vì nhồi vào bảng trên, đúng như tài liệu trình bày.
+ */
+const HR_COLUMN_ORDER: (Role | 'NV')[] = ['NV', 'R7', 'R8', 'R13', 'R11', 'R10']
+const NV_ROLES: Role[] = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']
+
+const HR_ROWS: [ActionKey, string][] = [
+  ['staff.view-own-record', 'xxxxxx'],
+  ['schedule.publish', '.x.x.x'],
+  ['timesheet.edit-manual', '.a.x.x'],
+  ['timesheet.close-period', '...x.x'],
+  ['payroll.view-others', '..xx.x'],
+  ['payroll.configure', '...x.x'],
+  ['payroll.compute-draft', '...x.x'],
+  // Dòng "Duyệt & phát lương | – | – | kiểm | trình | – | ✓" tách làm ba bước
+  ['payroll.submit', '...x.x'],
+  ['payroll.check', '..x..x'],
+  ['payroll.approve-pay', '.....x'],
+]
+
 const SYMBOL: Record<string, Permission> = { '.': 'deny', x: 'allow', a: 'approve' }
 
 describe('Ma trận khớp 1:1 với bảng §4.2 trong tài liệu', () => {
-  it('mã hoá đủ 31 hành động của bảng', () => {
-    expect(Object.keys(ACTIONS)).toHaveLength(31)
+  it('mã hoá đủ 31 hành động của §4.2 và 10 của §4.2b', () => {
     expect(DOC_ROWS).toHaveLength(31)
+    expect(HR_ROWS).toHaveLength(10)
+    expect(Object.keys(ACTIONS)).toHaveLength(41)
   })
 
   it.each(DOC_ROWS)('%s khớp từng ô', (action, row) => {
@@ -71,10 +93,53 @@ describe('Ma trận khớp 1:1 với bảng §4.2 trong tài liệu', () => {
     })
   })
 
-  it('R13 (quản lý nhân sự) chưa có quyền vận hành nào — bảng §4.2b để GĐ5', () => {
-    for (const action of Object.keys(ACTIONS) as ActionKey[]) {
-      expect(checkPermission(action, ['R13'])).toBe('deny')
+  it('R13 (quản lý nhân sự) KHÔNG có quyền vận hành nào — chỉ nhân sự', () => {
+    const hrKeys = new Set(HR_ROWS.map(([action]) => action))
+    for (const [action] of DOC_ROWS) {
+      expect(checkPermission(action, ['R13']), action).toBe('deny')
     }
+    const allowed = (Object.keys(ACTIONS) as ActionKey[]).filter((a) => isPermitted(a, ['R13']))
+    expect(allowed.every((a) => hrKeys.has(a))).toBe(true)
+  })
+})
+
+describe('Ma trận khớp 1:1 với bảng §4.2b — Nhân sự', () => {
+  it.each(HR_ROWS)('%s khớp từng ô', (action, row) => {
+    expect(row).toHaveLength(HR_COLUMN_ORDER.length)
+    HR_COLUMN_ORDER.forEach((column, i) => {
+      const expected = SYMBOL[row[i]!]
+      if (column === 'NV') {
+        // Cột gộp: MỌI vai trò vận hành R1–R6 phải ra cùng một mức
+        for (const role of NV_ROLES) {
+          expect(checkPermission(action, [role]), `${action} × ${role}`).toBe(expected)
+        }
+      } else {
+        expect(checkPermission(action, [column]), `${action} × ${column}`).toBe(expected)
+      }
+    })
+  })
+
+  it('NGUYÊN TẮC CỨNG 4: quản lý ca thấy CÔNG nhưng không thấy LƯƠNG', () => {
+    // R7 xếp lịch được, sửa công được (có duyệt)…
+    expect(can('schedule.publish', ['R7'])).toBe(true)
+    expect(needsApproval('timesheet.edit-manual', ['R7'])).toBe(true)
+    // …nhưng không chạm được con số lương của bất kỳ ai
+    expect(isPermitted('payroll.view-others', ['R7'])).toBe(false)
+    expect(isPermitted('payroll.compute-draft', ['R7'])).toBe(false)
+    expect(isPermitted('payroll.approve-pay', ['R7'])).toBe(false)
+  })
+
+  it('chỉ R8, R13, R10 chạm được số lương cá nhân', () => {
+    const seers = ROLES.filter((r) => isPermitted('payroll.view-others', [r]))
+    expect(seers).toEqual(['R8', 'R10', 'R13'])
+  })
+
+  it('phát lương là việc của chủ: R13 trình, R8 kiểm, không ai trong hai người đó duyệt', () => {
+    expect(can('payroll.submit', ['R13'])).toBe(true)
+    expect(can('payroll.check', ['R8'])).toBe(true)
+    expect(isPermitted('payroll.approve-pay', ['R13'])).toBe(false)
+    expect(isPermitted('payroll.approve-pay', ['R8'])).toBe(false)
+    expect(can('payroll.approve-pay', ['R10'])).toBe(true)
   })
 })
 
@@ -180,9 +245,9 @@ describe('Duyệt △ — phân tách nhiệm vụ (PHẦN G)', () => {
 })
 
 describe('permissionMatrix — nguồn render màn A2', () => {
-  it('trả đủ 31 dòng × 14 vai trò', () => {
+  it('trả đủ 41 dòng (§4.2 và §4.2b Nhân sự) × 14 vai trò', () => {
     const matrix = permissionMatrix()
-    expect(matrix).toHaveLength(31)
+    expect(matrix).toHaveLength(41)
     for (const row of matrix) {
       expect(Object.keys(row.byRole)).toHaveLength(ROLES.length)
     }

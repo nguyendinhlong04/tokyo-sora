@@ -66,6 +66,19 @@ const PARAMETERS: {
   { key: 'reservation.horizonDays', value: 30, unit: 'ngày' },
   { key: 'reservation.maxGuestsOnline', value: 10, unit: 'khách' },
   { key: 'reservation.autoConfirm', value: true },
+
+  // Nhân sự (§26 H6 — H6 là cửa vào theo ngữ cảnh, giá trị sống ở đây)
+  { key: 'payroll.standardDailyMinutes', value: 8 * 60, unit: 'phút' },
+  { key: 'payroll.standardMonthlyMinutes', value: 26 * 8 * 60, unit: 'phút' },
+  // Hệ số theo luật lao động VN — kế toán xác nhận lại trước khi chạy kỳ thật
+  { key: 'payroll.otNormalRate', value: 1.5, unit: 'hệ số', sensitive: true },
+  { key: 'payroll.otRestRate', value: 2, unit: 'hệ số', sensitive: true },
+  { key: 'payroll.otHolidayRate', value: 3, unit: 'hệ số', sensitive: true },
+  // BHXH 8% + BHYT 1,5% + BHTN 1% phần người lao động
+  { key: 'payroll.insuranceEmployeeRate', value: 0.105, unit: 'tỉ lệ', sensitive: true },
+  // 0 = CHƯA CẤU HÌNH, không phải miễn thuế: biểu thuế luỹ tiến chưa cài, kế toán
+  // phải đặt tỉ lệ tạm khấu trừ hoặc tự tính ngoài cho tới khi có F4
+  { key: 'payroll.pitWithholdRate', value: 0, unit: 'tỉ lệ', sensitive: true },
 ]
 
 /**

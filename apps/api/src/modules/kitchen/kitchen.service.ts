@@ -9,6 +9,7 @@ import type { Db } from '../../db/client'
 import { branches, dishAvailability, orders, stations, ticketItems, tickets } from '../../db/schema'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
+import { InventoryService } from '../inventory/inventory.service'
 import { deriveStatusFromTickets, type TicketRollupState } from '../ordering/domain/order-state'
 
 /** Trạng thái vé mà bếp bấm được (K2) */
@@ -19,6 +20,7 @@ export class KitchenService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly inventory: InventoryService,
   ) {}
 
   /**
@@ -170,6 +172,13 @@ export class KitchenService {
         .update(ticketItems)
         .set({ state: target === 'ready' ? 'done' : target === 'cooking' ? 'cooking' : 'queued' })
         .where(and(eq(ticketItems.ticketId, ticketId), sql`${ticketItems.state} <> 'voided'`))
+
+      // Trừ kho khi bếp bấm Xong (§25, quyết định 2). Nằm TRONG cùng transaction
+      // với việc đổi trạng thái vé: hoặc vé xong và kho trừ, hoặc không có gì xảy
+      // ra — không có cửa nào để món ra khỏi bếp mà nguyên liệu vẫn còn trong sổ.
+      if (target === 'ready') {
+        await this.inventory.postSaleForTicket(tx, ticketId, actor)
+      }
 
       const orderStatus = await this.rollUpOrderStatus(tx, ticket.orderId)
 

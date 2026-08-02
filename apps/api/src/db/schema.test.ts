@@ -95,6 +95,8 @@ describe('Sổ bất biến — chỉ INSERT, sửa sai bằng bút toán ngư�
     ['approvals', 'reason'],
     ['journal_entries', 'memo'],
     ['parameter_history', 'key'],
+    // Sổ kho: sửa một dòng đã ghi là đổi giá vốn hàng bán của kỳ đã chốt
+    ['stock_moves', 'note'],
   ] as const
 
   beforeAll(async () => {
@@ -109,6 +111,10 @@ describe('Sổ bất biến — chỉ INSERT, sửa sai bằng bút toán ngư�
       INSERT INTO journal_entries (branch_id, kind, amount, business_date)
         VALUES ('cg', 'sale', 285000, '2026-08-01');
       INSERT INTO parameter_history (key, new_value) VALUES ('vat', '0'::jsonb);
+      INSERT INTO ingredients (id, code, name, base_unit, purchase_unit, base_per_purchase)
+        VALUES ('bo-test', 'NL-T-001', 'Bò kiểm thử', 'g', 'kg', 1000);
+      INSERT INTO stock_moves (branch_id, ingredient_id, kind, qty_base, cost_vnd, business_date)
+        VALUES ('cg', 'bo-test', 'receipt', 1000, 285000, '2026-08-01');
     `)
   })
 

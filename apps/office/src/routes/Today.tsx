@@ -2,9 +2,9 @@ import { formatVnd } from '@sora/contracts'
 import { EmptyState, ErrorState } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { api, type TodayReport } from '../api'
+import { api, type FoodCostTile, type TodayReport } from '../api'
 import { PageHeader } from '../components/PageHeader'
-import { BlockedStat, DateInput, StatTile, formatDay } from '../components/report'
+import { BlockedStat, DateInput, DeltaChip, StatTile, formatDay, formatPercent } from '../components/report'
 import { useSession } from '../session-context'
 
 /**
@@ -74,7 +74,11 @@ export function Today() {
                 vsYesterday={data.orderCount.vsYesterday}
                 vsLastWeek={data.orderCount.vsLastWeek}
               />
-              <BlockedStat label="Food cost" tile={data.foodCost} />
+              {data.foodCost.value === null ? (
+                <BlockedStat label="Food cost" tile={data.foodCost} />
+              ) : (
+                <FoodCostStat tile={data.foodCost} />
+              )}
             </div>
 
             <HourlyChart data={data} />
@@ -117,6 +121,42 @@ export function Today() {
         )}
       </div>
     </>
+  )
+}
+
+/**
+ * Food cost của ngày.
+ *
+ * Khác ba ô kia ở chỗ TĂNG LÀ XẤU, nên mũi tên phải đảo màu: food cost lên là lãi
+ * mỏng đi. Và nếu chưa phủ hết thực đơn thì phải nói ra ngay dưới con số — một
+ * food cost 18% đẹp long lanh nhưng mới tính được nửa thực đơn là con số nguy
+ * hiểm hơn cả không có số nào.
+ */
+function FoodCostStat({ tile }: { tile: FoodCostTile }) {
+  const band = tile.value < 0.3 ? 'text-ok' : tile.value <= 0.38 ? 'text-warn' : 'text-danger'
+
+  return (
+    <div className="rounded-md border border-line-1 bg-surface-1 px-5 py-4">
+      <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+        Food cost
+      </p>
+      <p className={`mt-2 font-mono text-[length:var(--fs-d3)] leading-none ${band}`}>
+        {formatPercent(tile.value).replace('+', '')}
+      </p>
+      <div className="mt-3 flex flex-col gap-1">
+        <DeltaChip delta={tile.vsYesterday} label="hôm qua" goodWhenUp={false} />
+        <DeltaChip delta={tile.vsLastWeek} label="cùng thứ tuần trước" goodWhenUp={false} />
+      </div>
+      <p className="mt-2 text-[length:var(--fs-c1)] text-ink-mute">
+        {formatVnd(tile.cogsVnd)} giá vốn
+        {tile.coverage < 1 ? (
+          <span className="text-warn">
+            {' '}
+            · mới phủ {Math.round(tile.coverage * 100)}% doanh thu
+          </span>
+        ) : null}
+      </p>
+    </div>
   )
 }
 

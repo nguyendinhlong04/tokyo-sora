@@ -1,5 +1,7 @@
 export * from './identity'
 export * from './catalog'
+export * from './hr'
+export * from './inventory'
 export * from './floorplan'
 export * from './ordering'
 export * from './reservations'

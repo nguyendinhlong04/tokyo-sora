@@ -108,19 +108,49 @@ export function ProfitLoss() {
             </div>
 
             <section className="mt-5 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-md border border-dashed border-line-3 bg-surface-1 p-5">
-                <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
-                  Prime cost
-                </p>
-                <p className="mt-2 font-mono text-[length:var(--fs-d3)] leading-none text-line-4">
-                  —
-                </p>
-                <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-                  {data.primeCost.blockedBy}. Đây là chỉ số sống còn của quán ăn — giá vốn cộng
-                  nhân sự vượt 60% doanh thu là báo động, nên nó sẽ là thứ bật lên đầu tiên khi
-                  kho và kỳ lương chạy.
-                </p>
-              </div>
+              {data.primeCost.value === null ? (
+                <div className="rounded-md border border-dashed border-line-3 bg-surface-1 p-5">
+                  <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+                    Prime cost
+                  </p>
+                  <p className="mt-2 font-mono text-[length:var(--fs-d3)] leading-none text-line-4">
+                    —
+                  </p>
+                  <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                    {data.primeCost.blockedBy}. Đây là chỉ số sống còn của quán ăn: giá vốn cộng
+                    nhân sự vượt 60% doanh thu là báo động.
+                  </p>
+                </div>
+              ) : (
+                <div
+                  className={`rounded-md border bg-surface-1 p-5 ${
+                    data.primeCost.overThreshold ? 'border-danger-line' : 'border-line-1'
+                  }`}
+                >
+                  <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+                    Prime cost
+                  </p>
+                  <p
+                    className={`mt-2 font-mono text-[length:var(--fs-d3)] leading-none ${
+                      data.primeCost.overThreshold ? 'text-danger' : 'text-ok'
+                    }`}
+                  >
+                    {formatPercent(data.primeCost.value).replace('+', '')}
+                  </p>
+                  <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                    {formatVnd(data.primeCost.cogsVnd)} giá vốn +{' '}
+                    {formatVnd(data.primeCost.labourVnd)} nhân sự ={' '}
+                    {formatVnd(data.primeCost.amountVnd)}.{' '}
+                    {data.primeCost.overThreshold ? (
+                      <span className="text-danger">
+                        Vượt ngưỡng 60% — đây là mức mà quán ăn bắt đầu lỗ dù doanh thu vẫn đẹp.
+                      </span>
+                    ) : (
+                      'Dưới ngưỡng báo động 60% của ngành.'
+                    )}
+                  </p>
+                </div>
+              )}
 
               <div className="rounded-md border border-line-1 bg-surface-1 p-5">
                 <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">

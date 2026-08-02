@@ -12,8 +12,9 @@
  *
  * Và quy tắc phân tách nhiệm vụ (PHẦN G): người duyệt phải KHÁC người xin.
  *
- * Chưa mã hoá: bảng §4.2b (Nhân sự & Chi phí) — sẽ thêm ở GĐ5 cùng lúc với các
- * module H/C/F, để không đặt tên hành động cho thứ chưa tồn tại.
+ * Đã mã hoá thêm phần NHÂN SỰ của bảng §4.2b (xem cuối `ACTIONS`). Phần CHI PHÍ &
+ * TÀI SẢN của bảng đó vẫn chưa — module C chưa tồn tại, và đặt tên hành động cho
+ * thứ chưa có là cách chắc chắn nhất để tên đó sai khi thứ đó ra đời.
  */
 
 export const ROLES = [
@@ -194,6 +195,59 @@ export const ACTIONS = {
   'audit.view-log': {
     label: 'Xem nhật ký thao tác',
     grants: { R7: A, R8: A, R11: A, R10: A },
+  },
+
+  // ===================================================== §4.2b — Nhân sự
+  //
+  // Cột `NV` của tài liệu = mọi nhân viên vận hành, tức R1–R6. R9 và R12 KHÔNG
+  // nằm trong nhóm đó và cũng không có cột riêng trong bảng, nên ở đây là `deny`
+  // — kể cả với dòng "xem của mình". Đó là điều bảng nói, và sửa nó là việc của
+  // bản thiết kế chứ không phải của lớp cài đặt.
+
+  'staff.view-own-record': {
+    label: 'Xem lịch làm, bảng công, phiếu lương của mình',
+    grants: { R1: A, R2: A, R3: A, R4: A, R5: A, R6: A, R7: A, R8: A, R13: A, R11: A, R10: A },
+  },
+  'schedule.publish': {
+    label: 'Xếp & công bố lịch chi nhánh',
+    grants: { R7: A, R13: A, R10: A },
+  },
+  'timesheet.edit-manual': {
+    label: 'Sửa công tay (kèm lý do, ghi nhật ký)',
+    grants: { R7: P, R13: A, R10: A },
+  },
+  'timesheet.close-period': {
+    label: 'Chốt công kỳ',
+    grants: { R13: A, R10: A },
+  },
+  'payroll.view-others': {
+    label: 'Xem lương người khác',
+    grants: { R8: A, R13: A, R10: A },
+    note: 'Nguyên tắc cứng thứ tư: R7 quản lý ca thấy CÔNG của nhân viên mình nhưng không bao giờ thấy LƯƠNG',
+  },
+  'payroll.configure': {
+    label: 'Cấu hình cơ chế lương & thưởng',
+    grants: { R13: A, R10: A },
+  },
+  'payroll.compute-draft': {
+    label: 'Tính kỳ lương nháp',
+    grants: { R13: A, R10: A },
+  },
+  // Ba khoá dưới đây cùng đến từ MỘT dòng của bảng — "Duyệt & phát lương | – | –
+  // | kiểm | trình | – | ✓". Dòng đó đặt ba vai khác nhau vào ba bước khác nhau
+  // của cùng một luồng, nên gộp thành một khoá sẽ cho R8 quyền duyệt và cho R13
+  // quyền phát tiền — cả hai đều sai so với tài liệu.
+  'payroll.submit': {
+    label: 'Trình kỳ lương để duyệt',
+    grants: { R13: A, R10: A },
+  },
+  'payroll.check': {
+    label: 'Kiểm kỳ lương trước khi duyệt',
+    grants: { R8: A, R10: A },
+  },
+  'payroll.approve-pay': {
+    label: 'Duyệt & phát lương',
+    grants: { R10: A },
   },
 } as const satisfies Record<string, ActionDef>
 

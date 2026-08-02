@@ -374,10 +374,11 @@ describe('B1 — Hôm nay', () => {
     expect(hour(20).revenue).toBe(245_000)
   })
 
-  it('food cost nhận là chưa tính được thay vì in số 0', async () => {
+  it('chưa khai công thức thì food cost nhận là chưa tính được, không in 0%', async () => {
     const body = await load()
-    expect(body.foodCost.value).toBeNull()
-    expect(body.foodCost.blockedBy).toContain('M4')
+    const tile = body.foodCost
+    expect(tile.value).toBeNull()
+    if (tile.value === null) expect(tile.blockedBy).toContain('M4')
     expect(body.stockAlert.value).toBeNull()
   })
 
@@ -535,7 +536,8 @@ describe('F7 — Lãi/Lỗ', () => {
   it('giá vốn, nhân sự và lãi gộp để trống kèm tên màn còn thiếu', async () => {
     const body = await load()
     expect(line(body, 'cogs').amount).toBeNull()
-    expect(line(body, 'cogs').blockedBy).toContain('S11')
+    // Kho đã dựng, nhưng kỳ này chưa món nào có công thức đi qua bếp
+    expect(line(body, 'cogs').blockedBy).toContain('M4')
     expect(line(body, 'labour').blockedBy).toContain('H7')
     expect(line(body, 'gross-profit').amount).toBeNull()
     expect(body.primeCost.value).toBeNull()

@@ -2,8 +2,10 @@ import { Controller, Get, Module } from '@nestjs/common'
 import { AdminModule } from './modules/admin/admin.module'
 import { CommonModule } from './common/common.module'
 import { ConfigBundleModule } from './modules/config-bundle/config-bundle.module'
+import { HrModule } from './modules/hr/hr.module'
 import { Public } from './modules/identity/auth.guard'
 import { IdentityModule } from './modules/identity/identity.module'
+import { InventoryModule } from './modules/inventory/inventory.module'
 import { KitchenModule } from './modules/kitchen/kitchen.module'
 import { OnlineModule } from './modules/online/online.module'
 import { OrderingModule } from './modules/ordering/ordering.module'
@@ -35,6 +37,8 @@ class HealthController {
     ReservationsModule,
     SiteModule,
     AdminModule,
+    InventoryModule,
+    HrModule,
     ReportsModule,
   ],
   controllers: [HealthController],

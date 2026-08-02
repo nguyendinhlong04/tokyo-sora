@@ -6,13 +6,19 @@ import { Branches } from './routes/Branches'
 import { CashBook } from './routes/CashBook'
 import { DeliveryZones } from './routes/DeliveryZones'
 import { Dishes } from './routes/Dishes'
+import { Employees } from './routes/Employees'
 import { Floorplan } from './routes/Floorplan'
+import { Ingredients } from './routes/Ingredients'
 import { Login } from './routes/Login'
 import { MenuMatrix } from './routes/MenuMatrix'
 import { OnlineMenu } from './routes/OnlineMenu'
 import { Parameters } from './routes/Parameters'
+import { Payroll } from './routes/Payroll'
 import { ProfitLoss } from './routes/ProfitLoss'
+import { RecipeEditor, RecipeList } from './routes/Recipes'
 import { ReservationConfig } from './routes/ReservationConfig'
+import { Schedule } from './routes/Schedule'
+import { StockLevels, StockOverview } from './routes/Stock'
 import { Today } from './routes/Today'
 import { SessionProvider, useSession } from './session-context'
 
@@ -39,6 +45,14 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
     ],
   },
   {
+    group: 'Nhân sự',
+    items: [
+      { to: '/xep-lich', label: 'H2 · Xếp lịch tuần', need: 'schedule.publish' },
+      { to: '/nhan-vien', label: 'H1 · Hồ sơ nhân viên', need: 'payroll.configure' },
+      { to: '/ky-luong', label: 'H7 · Kỳ lương', need: 'payroll.view-others' },
+    ],
+  },
+  {
     group: 'Tài chính',
     items: [
       { to: '/so-quy', label: 'F1 · Sổ quỹ & đối soát', need: 'accounting.ledger-close-period' },
@@ -47,7 +61,13 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
   },
   {
     group: 'Món & kho',
-    items: [{ to: '/mon', label: 'M1 · Món và set' }],
+    items: [
+      { to: '/mon', label: 'M1 · Món và set' },
+      { to: '/cong-thuc', label: 'M4 · Công thức & giá vốn', need: 'cost.view-recipe' },
+      { to: '/nguyen-lieu', label: 'M7 · Nguyên liệu', need: 'cost.view-recipe' },
+      { to: '/kho', label: 'S1 · Tổng quan kho', need: 'cost.view-recipe' },
+      { to: '/ton-kho', label: 'S2 · Tồn kho', need: 'cost.view-recipe' },
+    ],
   },
   {
     group: 'Quản trị',
@@ -80,6 +100,14 @@ export function App() {
                 <Route path="/so-quy" element={<CashBook />} />
                 <Route path="/lai-lo" element={<ProfitLoss />} />
                 <Route path="/mon" element={<Dishes />} />
+                <Route path="/cong-thuc" element={<RecipeList />} />
+                <Route path="/cong-thuc/:dishId" element={<RecipeEditor />} />
+                <Route path="/nguyen-lieu" element={<Ingredients />} />
+                <Route path="/kho" element={<StockOverview />} />
+                <Route path="/ton-kho" element={<StockLevels />} />
+                <Route path="/xep-lich" element={<Schedule />} />
+                <Route path="/nhan-vien" element={<Employees />} />
+                <Route path="/ky-luong" element={<Payroll />} />
                 <Route path="/tham-so" element={<Parameters />} />
                 <Route path="/so-do-ban" element={<Floorplan />} />
                 <Route path="/chi-nhanh" element={<Branches />} />

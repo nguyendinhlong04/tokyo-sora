@@ -64,6 +64,20 @@
       "when": 1785643477330,
       "tag": "0008_strange_rhino",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785650956759,
+      "tag": "0009_funny_captain_cross",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785659878707,
+      "tag": "0010_narrow_scream",
+      "breakpoints": true
     }
   ]
 }

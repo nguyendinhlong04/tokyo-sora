@@ -134,11 +134,12 @@ export function MenuMatrix() {
             </p>
 
             <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-              <div className="grid grid-cols-[1fr_100px_110px_150px_150px_190px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
+              <div className="grid grid-cols-[1fr_90px_100px_140px_140px_140px_180px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
                 <span>Món</span>
                 <span className="text-right">Số phần</span>
                 <span className="text-right">Tỉ trọng</span>
                 <span className="text-right">Doanh thu</span>
+                <span className="text-right">Giá vốn/phần</span>
                 <span className="text-right">Đóng góp/phần</span>
                 <span>Ô · dịch chuyển</span>
               </div>
@@ -146,7 +147,7 @@ export function MenuMatrix() {
               {data.rows.map((row) => (
                 <div
                   key={row.dishId}
-                  className="grid grid-cols-[1fr_100px_110px_150px_150px_190px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
+                  className="grid grid-cols-[1fr_90px_100px_140px_140px_140px_180px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-[length:var(--fs-b2)] text-ink-hi">{row.name}</p>
@@ -162,6 +163,13 @@ export function MenuMatrix() {
                   </span>
                   <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-body">
                     {formatVnd(row.revenue)}
+                  </span>
+                  <span className="text-right font-mono text-[length:var(--fs-b2)]">
+                    {row.unitCostVnd === null ? (
+                      <span className="text-[length:var(--fs-c1)] text-warn">chưa khai</span>
+                    ) : (
+                      <span className="text-ink-body">{formatVnd(row.unitCostVnd)}</span>
+                    )}
                   </span>
                   <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-body">
                     {formatVnd(row.unitContribution)}
