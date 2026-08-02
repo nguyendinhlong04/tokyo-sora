@@ -48,6 +48,8 @@ export interface DishInput {
   secondaryLabel: string | null
   prepSeconds: number
   basePrice: number
+  /** Giá riêng khi bán qua kênh online; null = bán bằng giá tại quán */
+  onlinePrice: number | null
   vatCode: string
   onlineVisible: boolean
   tableOrderable: boolean
@@ -97,11 +99,20 @@ export class CatalogAdminService {
       return {
         ...d,
         override: override
-          ? { price: override.price, active: override.active }
+          ? {
+              price: override.price,
+              active: override.active,
+              onlineVisible: override.onlineVisible,
+              onlinePrice: override.onlinePrice,
+            }
           : null,
         /** Giá và trạng thái mà chi nhánh này thật sự bán */
         effectivePrice: override?.price ?? d.basePrice,
         effectiveActive: override?.active ?? d.active,
+        /** Cùng thứ tự ưu tiên với thực đơn online mà khách nhìn thấy */
+        effectiveOnlineVisible: override?.onlineVisible ?? d.onlineVisible,
+        effectiveOnlinePrice:
+          override?.onlinePrice ?? override?.price ?? d.onlinePrice ?? d.basePrice,
       }
     })
   }
@@ -137,6 +148,8 @@ export class CatalogAdminService {
         branchId: o.branchId,
         price: o.price,
         active: o.active,
+        onlineVisible: o.onlineVisible,
+        onlinePrice: o.onlinePrice,
       })),
     }
   }
@@ -232,7 +245,12 @@ export class CatalogAdminService {
   async setBranchOverride(
     dishId: string,
     branchId: string,
-    input: { price: number | null; active: boolean | null },
+    input: {
+      price: number | null
+      active: boolean | null
+      onlineVisible?: boolean | null
+      onlinePrice?: number | null
+    },
     actor: Actor,
     approval?: ApprovalInput | null,
   ) {
@@ -240,12 +258,12 @@ export class CatalogAdminService {
     if (!dish) throw new NotFoundException('Không có món này')
     const [branch] = await this.db.select().from(branches).where(eq(branches.id, branchId))
     if (!branch) throw new NotFoundException('Không có chi nhánh này')
-    if (input.price !== null && input.price < 0) {
+    if ((input.price !== null && input.price < 0) || (input.onlinePrice ?? 0) < 0) {
       throw new BadRequestException('Giá không nhận số âm')
     }
 
     return this.db.transaction(async (tx) => {
-      if (input.price !== null) {
+      if (input.price !== null || input.onlinePrice != null) {
         await this.approvals.authorize(tx, {
           actor,
           action: 'menu.edit-price',
@@ -255,13 +273,25 @@ export class CatalogAdminService {
         })
       }
 
-      const row = { dishId, branchId, price: input.price, active: input.active }
+      const row = {
+        dishId,
+        branchId,
+        price: input.price,
+        active: input.active,
+        onlineVisible: input.onlineVisible ?? null,
+        onlinePrice: input.onlinePrice ?? null,
+      }
       await tx
         .insert(dishBranchOverrides)
         .values(row)
         .onConflictDoUpdate({
           target: [dishBranchOverrides.dishId, dishBranchOverrides.branchId],
-          set: { price: row.price, active: row.active },
+          set: {
+            price: row.price,
+            active: row.active,
+            onlineVisible: row.onlineVisible,
+            onlinePrice: row.onlinePrice,
+          },
         })
       await this.audit.write(tx, {
         actor,

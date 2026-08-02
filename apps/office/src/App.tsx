@@ -2,9 +2,11 @@ import { ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
 import { Branches } from './routes/Branches'
+import { DeliveryZones } from './routes/DeliveryZones'
 import { Dishes } from './routes/Dishes'
 import { Floorplan } from './routes/Floorplan'
 import { Login } from './routes/Login'
+import { OnlineMenu } from './routes/OnlineMenu'
 import { Parameters } from './routes/Parameters'
 import { ReservationConfig } from './routes/ReservationConfig'
 import { SessionProvider, useSession } from './session-context'
@@ -35,7 +37,11 @@ const NAV = [
   },
   {
     group: 'Kênh online & đặt bàn',
-    items: [{ to: '/nhan-dat', label: 'R3 · Cấu hình nhận đặt' }],
+    items: [
+      { to: '/vung-giao', label: 'O10 · Vùng giao & phí' },
+      { to: '/menu-online', label: 'O11 · Menu online' },
+      { to: '/nhan-dat', label: 'R3 · Cấu hình nhận đặt' },
+    ],
   },
 ]
 
@@ -51,6 +57,8 @@ export function App() {
                 <Route path="/tham-so" element={<Parameters />} />
                 <Route path="/so-do-ban" element={<Floorplan />} />
                 <Route path="/chi-nhanh" element={<Branches />} />
+                <Route path="/vung-giao" element={<DeliveryZones />} />
+                <Route path="/menu-online" element={<OnlineMenu />} />
                 <Route path="/nhan-dat" element={<ReservationConfig />} />
               </Route>
               <Route path="*" element={<Navigate to="/mon" replace />} />

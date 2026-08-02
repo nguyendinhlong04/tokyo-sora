@@ -101,10 +101,30 @@ export interface DishRow {
   signature: boolean
   active: boolean
   sort: number
-  override: { price: number | null; active: boolean | null } | null
+  onlinePrice: number | null
+  override: {
+    price: number | null
+    active: boolean | null
+    onlineVisible: boolean | null
+    onlinePrice: number | null
+  } | null
   /** Giá và trạng thái chi nhánh đang xem thật sự bán */
   effectivePrice: number
   effectiveActive: boolean
+  effectiveOnlineVisible: boolean
+  effectiveOnlinePrice: number
+}
+
+export interface DeliveryZone {
+  id: number
+  branchId: string
+  name: string
+  wards: string[]
+  feeVnd: number
+  minOrderVnd: number
+  etaMinutes: number
+  active: boolean
+  sort: number
 }
 
 export interface SetCourse {
@@ -208,12 +228,12 @@ export const api = {
 
   dishDetail: (id: string) => apiFetch<DishDetail>(`/api/admin/dishes/${id}`),
 
-  createDish: (input: Omit<DishRow, 'override' | 'effectivePrice' | 'effectiveActive'>) =>
+  createDish: (input: Omit<DishRow, 'override' | 'effectivePrice' | 'effectiveActive' | 'effectiveOnlineVisible' | 'effectiveOnlinePrice'>) =>
     apiFetch<DishRow>('/api/admin/dishes', { method: 'POST', body: input }),
 
   updateDish: (
     id: string,
-    patch: Partial<Omit<DishRow, 'override' | 'effectivePrice' | 'effectiveActive'>>,
+    patch: Partial<Omit<DishRow, 'override' | 'effectivePrice' | 'effectiveActive' | 'effectiveOnlineVisible' | 'effectiveOnlinePrice'>>,
     approval?: Approval | null,
   ) => apiFetch<DishRow>(`/api/admin/dishes/${id}`, { method: 'PATCH', body: { ...patch, approval } }),
 
@@ -226,7 +246,12 @@ export const api = {
   setDishOverride: (
     id: string,
     branchId: string,
-    input: { price: number | null; active: boolean | null },
+    input: {
+      price: number | null
+      active: boolean | null
+      onlineVisible?: boolean | null
+      onlinePrice?: number | null
+    },
     approval?: Approval | null,
   ) =>
     apiFetch<{ price: number | null }>(`/api/admin/dishes/${id}/branches/${branchId}`, {
@@ -238,4 +263,18 @@ export const api = {
     apiFetch<{ cleared: boolean }>(`/api/admin/dishes/${id}/branches/${branchId}`, {
       method: 'DELETE',
     }),
+
+  // -------------------------------------------------------------------- O10
+
+  deliveryZones: (branchId: string) =>
+    apiFetch<DeliveryZone[]>(`/api/admin/delivery-zones?branch=${encodeURIComponent(branchId)}`),
+
+  createZone: (input: Omit<DeliveryZone, 'id'>) =>
+    apiFetch<DeliveryZone>('/api/admin/delivery-zones', { method: 'POST', body: input }),
+
+  updateZone: (id: number, patch: Partial<Omit<DeliveryZone, 'id'>>) =>
+    apiFetch<DeliveryZone>(`/api/admin/delivery-zones/${id}`, { method: 'PATCH', body: patch }),
+
+  deleteZone: (id: number) =>
+    apiFetch<{ deleted: boolean }>(`/api/admin/delivery-zones/${id}`, { method: 'DELETE' }),
 }

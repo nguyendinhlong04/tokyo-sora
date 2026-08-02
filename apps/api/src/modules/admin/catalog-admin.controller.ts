@@ -36,6 +36,8 @@ const DishSchema = z.object({
   secondaryLabel: z.string().max(40).nullable(),
   prepSeconds: z.number().int().min(0).max(7200),
   basePrice: z.number().int().min(0),
+  // Bỏ trống = bán online bằng giá tại quán
+  onlinePrice: z.number().int().min(0).nullable().default(null),
   vatCode: z.string().max(20),
   onlineVisible: z.boolean(),
   tableOrderable: z.boolean(),
@@ -49,6 +51,9 @@ const UpdateSchema = DishSchema.partial().extend({ approval: ApprovalSchema })
 const OverrideSchema = z.object({
   price: z.number().int().min(0).nullable(),
   active: z.boolean().nullable(),
+  /** O11: bật/tắt kênh online cho riêng chi nhánh này; null = theo cấp chuỗi */
+  onlineVisible: z.boolean().nullable().optional(),
+  onlinePrice: z.number().int().min(0).nullable().optional(),
   approval: ApprovalSchema,
 })
 

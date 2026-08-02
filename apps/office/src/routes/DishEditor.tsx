@@ -6,7 +6,11 @@ import { useEffect, useState } from 'react'
 import { api, type DishRow, type SetCourse } from '../api'
 import { useSession } from '../session-context'
 
-type DishDraft = Omit<DishRow, 'override' | 'effectivePrice' | 'effectiveActive'>
+/** Bản ghi món thuần, bỏ các trường dẫn xuất theo chi nhánh */
+type DishDraft = Omit<
+  DishRow,
+  'override' | 'effectivePrice' | 'effectiveActive' | 'effectiveOnlineVisible' | 'effectiveOnlinePrice'
+>
 
 export const BLANK_DISH: DishDraft = {
   id: '',
@@ -32,6 +36,7 @@ export const BLANK_DISH: DishDraft = {
   secondaryLabel: null,
   prepSeconds: 300,
   basePrice: 0,
+  onlinePrice: null,
   vatCode: 'standard',
   onlineVisible: false,
   tableOrderable: true,
@@ -84,8 +89,15 @@ export function DishEditor({
 
   useEffect(() => {
     if (detail.data) {
-      // Ba trường dẫn xuất theo chi nhánh không thuộc bản ghi món — bỏ ra khỏi nháp
-      const { override: _o, effectivePrice: _p, effectiveActive: _a, ...rest } = detail.data.dish
+      // Các trường dẫn xuất theo chi nhánh không thuộc bản ghi món — bỏ khỏi nháp
+      const {
+        override: _o,
+        effectivePrice: _p,
+        effectiveActive: _a,
+        effectiveOnlineVisible: _ov,
+        effectiveOnlinePrice: _op,
+        ...rest
+      } = detail.data.dish
       setDraft(rest)
       setCourses(detail.data.courses)
     }

@@ -80,6 +80,12 @@ export const dishes = pgTable(
 
     /** Giá bán, VND nguyên */
     basePrice: bigint('base_price', { mode: 'number' }).notNull(),
+    /**
+     * Giá kênh online (§18 "giá riêng kênh online"). NULL = bán bằng giá tại quán.
+     * Tách khỏi `basePrice` vì đơn mang về gánh thêm hộp, túi và công đóng gói,
+     * còn đơn giao thì gánh cả phí sàn nếu bán qua kênh ngoài.
+     */
+    onlinePrice: bigint('online_price', { mode: 'number' }),
     vatCode: text('vat_code').notNull().default('standard'),
 
     onlineVisible: boolean('online_visible').notNull().default(false),
@@ -117,6 +123,13 @@ export const dishBranchOverrides = pgTable(
       .references(() => branches.id),
     price: bigint('price', { mode: 'number' }),
     active: boolean('active'),
+    /**
+     * Bán online hay không ở RIÊNG chi nhánh này (O11). Khác `active`: một món có
+     * thể vẫn bán tại bàn nhưng tắt trên kênh online vì bếp chi nhánh đó không
+     * kịp đóng gói giờ cao điểm. NULL = theo cờ cấp chuỗi.
+     */
+    onlineVisible: boolean('online_visible'),
+    onlinePrice: bigint('online_price', { mode: 'number' }),
     stationGrill: text('station_grill').references(() => stations.id),
     stationNoGrill: text('station_no_grill').references(() => stations.id),
   },

@@ -12,6 +12,7 @@ import { DB } from '../../common/db.module'
 import { nextDisplayCode } from '../../common/display-code'
 import { emit } from '../../common/outbox'
 import { ParamsService } from '../../common/params.service'
+import { wardMatches } from '../../common/ward'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
@@ -53,19 +54,6 @@ export interface CreateOnlineOrderInput {
   channel?: 'web' | 'grab' | 'shopee' | 'be'
 }
 
-/** Bỏ dấu và hạ chữ để "Phường Dịch Vọng" khớp "dich vong" trong bảng vùng giao */
-function foldWard(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replaceAll('đ', 'd')
-    .replaceAll('Đ', 'D')
-    .toLowerCase()
-    .replace(/\b(phuong|xa|thi tran|quan|huyen)\b/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
 @Injectable()
 export class OnlineService {
   constructor(
@@ -104,11 +92,13 @@ export class OnlineService {
 
     const [categoryRows, dishRows, overrideRows, soldOut] = await Promise.all([
       this.db.select().from(categories).orderBy(asc(categories.sort)),
-      this.db
-        .select()
-        .from(dishes)
-        .where(and(eq(dishes.onlineVisible, true), eq(dishes.active, true)))
-        .orderBy(asc(dishes.sort)),
+      /**
+       * Lấy mọi món đang bán rồi mới lọc kênh online trong mã, KHÔNG lọc
+       * `online_visible = true` ngay ở câu lệnh: chi nhánh có quyền bật riêng một
+       * món mà cấp chuỗi đang tắt (O11), và câu lọc ở SQL sẽ loại nó trước khi
+       * ai kịp xem tới ghi đè.
+       */
+      this.db.select().from(dishes).where(eq(dishes.active, true)).orderBy(asc(dishes.sort)),
       this.db
         .select()
         .from(dishBranchOverrides)
@@ -125,7 +115,12 @@ export class OnlineService {
     )
 
     const menu = dishRows
-      .filter((d) => overrideByDish.get(d.id)?.active !== false)
+      .filter((d) => {
+        const override = overrideByDish.get(d.id)
+        if (override?.active === false) return false
+        // Cờ của chi nhánh (O11) đè lên cờ cấp chuỗi, cả bật lẫn tắt
+        return override?.onlineVisible ?? d.onlineVisible
+      })
       .map((d) => ({
         id: d.id,
         categoryId: d.categoryId,
@@ -136,7 +131,15 @@ export class OnlineService {
         shortDesc: d.shortDesc,
         allergens: d.allergens,
         tags: d.tags,
-        price: overrideByDish.get(d.id)?.price ?? d.basePrice,
+        /**
+         * Thứ tự ưu tiên giá, hẹp trước rộng sau: giá online của chi nhánh → giá
+         * chung của chi nhánh → giá online cấp chuỗi → giá tại quán.
+         */
+        price:
+          overrideByDish.get(d.id)?.onlinePrice ??
+          overrideByDish.get(d.id)?.price ??
+          d.onlinePrice ??
+          d.basePrice,
         soldOut: soldOutIds.has(d.id),
         /**
          * Món nướng nguội nhanh — O3 nhắc khách chọn khung giờ gần nhất. Suy từ
@@ -186,7 +189,7 @@ export class OnlineService {
    */
   async quote(branchId: string, ward: string) {
     const matches = (await this.zones(branchId)).filter((z) =>
-      z.wards.some((w) => foldWard(w) === foldWard(ward)),
+      z.wards.some((w) => wardMatches(w, ward)),
     )
 
     if (matches.length > 1) {
@@ -215,10 +218,24 @@ export class OnlineService {
 
   // ------------------------------------------------------- O4 khung giờ
 
-  private async slotOptions(branchId: string): Promise<SlotOptions> {
+  /**
+   * Đơn GIAO ngừng nhận sớm hơn đơn mang về.
+   *
+   * Chuyến ship cuối phải về trước khi quán đóng, còn khách mang về thì chỉ cần
+   * bếp kịp nấu. Chung một mốc giờ nghĩa là hoặc chặn sớm đơn mang về, hoặc nhận
+   * đơn giao mà shipper không kịp quay lại.
+   */
+  private async slotOptions(
+    branchId: string,
+    type: OnlineOrderType = 'takeaway',
+  ): Promise<SlotOptions> {
+    const lastOrder = await this.params.getNumber('online.lastOrderMinute', 21 * 60, branchId)
     return {
       openMinute: await this.params.getNumber('online.openMinute', 10 * 60, branchId),
-      lastOrderMinute: await this.params.getNumber('online.lastOrderMinute', 21 * 60, branchId),
+      lastOrderMinute:
+        type === 'delivery'
+          ? await this.params.getNumber('online.lastOrderMinuteDelivery', lastOrder, branchId)
+          : lastOrder,
       leadMinutes: await this.params.getNumber('online.leadMinutes', 30, branchId),
       capacity: await this.params.getNumber('online.slotCapacity', 6, branchId),
     }
@@ -242,7 +259,7 @@ export class OnlineService {
     return new Map(rows.map((r) => [r.slotAt!.toISOString(), Number(r.count)]))
   }
 
-  async slots(branchId: string, at: Date = new Date()) {
+  async slots(branchId: string, type: OnlineOrderType = 'takeaway', at: Date = new Date()) {
     const branch = await this.branch(branchId)
     const businessDate = businessDateOf(at, branch.timezone)
     const dayStart = startOfBusinessDay(businessDate, branch.timezone)
@@ -251,7 +268,7 @@ export class OnlineService {
       now: at,
       dayStart,
       takenBySlot: await this.takenBySlot(this.db, branchId, businessDate),
-      options: await this.slotOptions(branchId),
+      options: await this.slotOptions(branchId, type),
     })
 
     return { businessDate, slots }
@@ -273,7 +290,7 @@ export class OnlineService {
     const now = new Date()
     const businessDate = businessDateOf(now, branch.timezone)
     const dayStart = startOfBusinessDay(businessDate, branch.timezone)
-    const options = await this.slotOptions(input.branchId)
+    const options = await this.slotOptions(input.branchId, input.type)
 
     await this.assertOnlineSellable(input.lines.map((l) => l.dishId))
 

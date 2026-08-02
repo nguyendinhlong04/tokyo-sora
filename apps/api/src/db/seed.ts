@@ -51,6 +51,8 @@ const PARAMETERS: {
   // Kênh online (§23): giờ nhận đơn, thời gian bếp cần, trần đơn mỗi khung 15 phút
   { key: 'online.openMinute', value: 10 * 60, unit: 'phút từ 00:00' },
   { key: 'online.lastOrderMinute', value: 21 * 60, unit: 'phút từ 00:00' },
+  // Chuyến ship cuối phải về trước khi quán đóng nên đơn giao chốt sớm hơn
+  { key: 'online.lastOrderMinuteDelivery', value: 20 * 60 + 30, unit: 'phút từ 00:00' },
   { key: 'online.leadMinutes', value: 30, unit: 'phút' },
   { key: 'online.slotCapacity', value: 6, unit: 'đơn' },
   { key: 'reservation.softHoldMinutes', value: 10, unit: 'phút' },

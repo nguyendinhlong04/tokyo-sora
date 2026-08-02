@@ -92,9 +92,10 @@ export class OnlineController {
   /** O4: khung giờ còn nhận được đơn */
   @Public()
   @Get('slots')
-  slots(@Query('branch') branch: string) {
+  slots(@Query('branch') branch: string, @Query('type') type?: string) {
     if (!branch) throw new BadRequestException('Thiếu mã chi nhánh')
-    return this.online.slots(branch)
+    // Đơn giao ngừng nhận sớm hơn đơn mang về nên khung giờ hỏi theo kiểu nhận
+    return this.online.slots(branch, type === 'delivery' ? 'delivery' : 'takeaway')
   }
 
   /** O6: đặt đơn */

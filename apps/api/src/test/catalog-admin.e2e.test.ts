@@ -53,6 +53,7 @@ const NEW_DISH = {
   secondaryLabel: null,
   prepSeconds: 600,
   basePrice: 195_000,
+  onlinePrice: null,
   vatCode: 'standard',
   onlineVisible: false,
   tableOrderable: true,
