@@ -21,6 +21,7 @@ import {
   shiftTemplates,
   staff,
 } from '../../db/schema'
+import { ExpensesService } from '../expenses/expenses.service'
 import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
@@ -88,6 +89,7 @@ export class HrService {
     private readonly params: ParamsService,
     private readonly approvals: ApprovalService,
     private readonly audit: AuditService,
+    private readonly expenses: ExpensesService,
   ) {}
 
   // ================================================= H1 · Hồ sơ nhân viên
@@ -530,17 +532,29 @@ export class HrService {
 
       await tx.delete(payrollLines).where(eq(payrollLines.periodId, periodId))
 
+      /**
+       * Tạm ứng lấy TỰ ĐỘNG từ phiếu chi loại tạm ứng (C2) trong kỳ. Số nhập tay
+       * ở `adjustments` chỉ dùng khi phiếu chi chưa có — một khoản ứng đã có phiếu
+       * mà còn gõ lại bằng tay là trừ hai lần vào lương của người ta.
+       */
+      const advances = await this.expenses.openAdvances(
+        period.branchId,
+        period.periodStart,
+        period.periodEnd,
+      )
+
       const rows = people.map(({ employee, fullName }) => {
         const mine = entries.filter((e) => e.employeeId === employee.id)
         const minutes: MinuteSplit = sumSplits(mine.map((e) => splitMinutes(e, rates)))
         const extra = adjustments.find((a) => a.employeeId === employee.id)
+        const fromVouchers = advances.get(employee.id) ?? 0
 
         const line = computePayrollLine({
           employee,
           minutes,
           rates,
           bonusVnd: extra?.bonusVnd ?? 0,
-          advanceVnd: extra?.advanceVnd ?? 0,
+          advanceVnd: fromVouchers > 0 ? fromVouchers : (extra?.advanceVnd ?? 0),
         })
 
         return {
@@ -622,6 +636,17 @@ export class HrService {
         .update(payrollPeriods)
         .set({ state: to, ...stamp })
         .where(eq(payrollPeriods.id, periodId))
+
+      // Duyệt xong thì đánh dấu tạm ứng đã khấu trừ — kỳ sau không trừ lại
+      if (to === 'approved') {
+        await this.expenses.settleAdvances(
+          tx,
+          period.branchId,
+          period.periodStart,
+          period.periodEnd,
+          periodId,
+        )
+      }
 
       await this.audit.write(tx, {
         actor,
@@ -721,6 +746,37 @@ export class HrService {
       people: Number(row?.people ?? 0),
       periods: Number(row?.periods ?? 0),
     }
+  }
+
+  /**
+   * Chi nhân sự TÁCH THEO TỪNG NGƯỜI — chỉ F7 ở chế độ đầy đủ gọi tới.
+   *
+   * Nguyên tắc cứng thứ tư (§4.2b) sống hay chết ở chỗ này: quản lý ca đọc được
+   * dòng tổng nhưng không bao giờ đi tới hàm này. Nên nó là hàm riêng chứ không
+   * phải một tham số của `labourCost` — một cờ boolean quên truyền là một lần rò
+   * lương, còn một hàm không gọi tới thì không rò được.
+   */
+  async labourByEmployee(branchId: string, range: { from: string; to: string }) {
+    const rows = await this.db
+      .select({
+        name: payrollLines.nameSnapshot,
+        position: payrollLines.positionSnapshot,
+        grossPayVnd: sql<number>`coalesce(sum(${payrollLines.grossPayVnd}), 0)::float8`,
+      })
+      .from(payrollLines)
+      .innerJoin(payrollPeriods, eq(payrollPeriods.id, payrollLines.periodId))
+      .where(
+        and(
+          eq(payrollPeriods.branchId, branchId),
+          inArray(payrollPeriods.state, ['approved', 'paid']),
+          gte(payrollPeriods.periodEnd, range.from),
+          lte(payrollPeriods.periodEnd, range.to),
+        ),
+      )
+      .groupBy(payrollLines.nameSnapshot, payrollLines.positionSnapshot)
+      .orderBy(sql`3 desc`)
+
+    return rows.map((r) => ({ ...r, grossPayVnd: Number(r.grossPayVnd) }))
   }
 
   // --------------------------------------------------------------- phụ trợ

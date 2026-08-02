@@ -75,15 +75,22 @@ const HR_ROWS: [ActionKey, string][] = [
   ['payroll.submit', '...x.x'],
   ['payroll.check', '..x..x'],
   ['payroll.approve-pay', '.....x'],
+  // Chi phí & tài sản
+  ['expense.record-petty', '.xx..x'],
+  ['expense.record-over-limit', '.ax..x'],
+  ['expense.approve', '..x..x'],
+  ['asset.ledger', '..x..x'],
+  ['report.pnl-full', '..x.xx'],
+  ['report.pnl-branch-summary', '.xx.xx'],
 ]
 
 const SYMBOL: Record<string, Permission> = { '.': 'deny', x: 'allow', a: 'approve' }
 
 describe('Ma trận khớp 1:1 với bảng §4.2 trong tài liệu', () => {
-  it('mã hoá đủ 31 hành động của §4.2 và 10 của §4.2b', () => {
+  it('mã hoá đủ 31 hành động của §4.2 và 16 của §4.2b', () => {
     expect(DOC_ROWS).toHaveLength(31)
-    expect(HR_ROWS).toHaveLength(10)
-    expect(Object.keys(ACTIONS)).toHaveLength(41)
+    expect(HR_ROWS).toHaveLength(16)
+    expect(Object.keys(ACTIONS)).toHaveLength(47)
   })
 
   it.each(DOC_ROWS)('%s khớp từng ô', (action, row) => {
@@ -103,7 +110,7 @@ describe('Ma trận khớp 1:1 với bảng §4.2 trong tài liệu', () => {
   })
 })
 
-describe('Ma trận khớp 1:1 với bảng §4.2b — Nhân sự', () => {
+describe('Ma trận khớp 1:1 với bảng §4.2b — Nhân sự & Chi phí', () => {
   it.each(HR_ROWS)('%s khớp từng ô', (action, row) => {
     expect(row).toHaveLength(HR_COLUMN_ORDER.length)
     HR_COLUMN_ORDER.forEach((column, i) => {
@@ -132,6 +139,13 @@ describe('Ma trận khớp 1:1 với bảng §4.2b — Nhân sự', () => {
   it('chỉ R8, R13, R10 chạm được số lương cá nhân', () => {
     const seers = ROLES.filter((r) => isPermitted('payroll.view-others', [r]))
     expect(seers).toEqual(['R8', 'R10', 'R13'])
+  })
+
+  it('quản lý ca đọc được Lãi/Lỗ chi nhánh nhưng KHÔNG có bản chi tiết lương', () => {
+    expect(can('report.pnl-branch-summary', ['R7'])).toBe(true)
+    expect(isPermitted('report.pnl-full', ['R7'])).toBe(false)
+    // Quản lý chuỗi thì ngược lại với dòng kế toán của §4.2: đọc được bản đầy đủ
+    expect(can('report.pnl-full', ['R11'])).toBe(true)
   })
 
   it('phát lương là việc của chủ: R13 trình, R8 kiểm, không ai trong hai người đó duyệt', () => {
@@ -245,9 +259,9 @@ describe('Duyệt △ — phân tách nhiệm vụ (PHẦN G)', () => {
 })
 
 describe('permissionMatrix — nguồn render màn A2', () => {
-  it('trả đủ 41 dòng (§4.2 và §4.2b Nhân sự) × 14 vai trò', () => {
+  it('trả đủ 47 dòng (§4.2 và §4.2b) × 14 vai trò', () => {
     const matrix = permissionMatrix()
-    expect(matrix).toHaveLength(41)
+    expect(matrix).toHaveLength(47)
     for (const row of matrix) {
       expect(Object.keys(row.byRole)).toHaveLength(ROLES.length)
     }

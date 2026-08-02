@@ -497,10 +497,14 @@ describe('F1 — Sổ quỹ & đối soát', () => {
     expect(body.adjustments[0]!.amount).toBe(-15_000)
   })
 
-  it('chi tiền mặt và phiếu thu khác nhận là chưa có cửa ghi', async () => {
+  it('chưa có phiếu chi tiền mặt nào thì cột chi bằng 0, không phải để trống', async () => {
     const body = await load()
-    expect(body.cashOut.value).toBeNull()
-    expect(body.cashOut.blockedBy).toContain('C2')
+    expect(body.cashVouchers).toEqual([])
+    expect(body.shifts[0]!.cashOut).toBe(0)
+  })
+
+  it('phiếu thu khác vẫn nhận là chưa có cửa ghi', async () => {
+    const body = await load()
     expect(body.otherIncome.value).toBeNull()
   })
 })
@@ -568,14 +572,49 @@ describe('Phân quyền theo ma trận §4.2', () => {
     expect(res.statusCode).toBe(200)
   })
 
-  it('quản lý ca KHÔNG mở được sổ quỹ và lãi/lỗ — hai màn kế toán', async () => {
-    for (const url of ['cashbook?date=' + TODAY, 'pnl?kind=ngay']) {
+  it('quản lý ca KHÔNG mở được sổ quỹ — đó là màn kế toán', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/reports/cashbook?date=${TODAY}&branch=${fx.branchId}`,
+      headers: asLead(),
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  /**
+   * §4.2b có HAI mức xem Lãi/Lỗ, và đây là nguyên tắc cứng thứ tư nhìn từ phía
+   * báo cáo: quản lý ca đọc được tình hình chi nhánh mình, nhưng con số lương thì
+   * dừng ở mức tổng.
+   */
+  it('quản lý ca mở được Lãi/Lỗ nhưng ở mức GỘP, không có chi tiết lương', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/reports/pnl?kind=ngay&branch=${fx.branchId}`,
+      headers: asLead(),
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.json().detailLevel).toBe('summary')
+    expect(res.json().labourDetail).toBeUndefined()
+  })
+
+  it('chủ quán mở được bản đầy đủ, có chi tiết lương', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/reports/pnl?kind=ngay&branch=${fx.branchId}`,
+      headers: asOwner(),
+    })
+    expect(res.json().detailLevel).toBe('full')
+    expect(Array.isArray(res.json().labourDetail)).toBe(true)
+  })
+
+  it('hai chế độ xem dồn tích và dòng tiền', async () => {
+    for (const basis of ['don-tich', 'dong-tien']) {
       const res = await inject({
         method: 'GET',
-        url: `/api/reports/${url}&branch=${fx.branchId}`,
-        headers: asLead(),
+        url: `/api/reports/pnl?kind=ngay&basis=${basis}&branch=${fx.branchId}`,
+        headers: asOwner(),
       })
-      expect(res.statusCode, url).toBe(403)
+      expect(res.json().basis, basis).toBe(basis)
     }
   })
 

@@ -243,6 +243,122 @@ export interface StockMove {
   createdAt: string
 }
 
+// ------------------------------------- Chi phí & tài sản C1 · C2 · C3 · C4 · C6
+
+/** Dòng của F7 mà một khoản mục cộng vào */
+export type PnlLine =
+  | 'cogs'
+  | 'labour'
+  | 'rent'
+  | 'utilities'
+  | 'depreciation'
+  | 'marketing'
+  | 'payment-fee'
+  | 'other-opex'
+  | 'tax'
+
+export interface ExpenseCategory {
+  id: string
+  parentId: string | null
+  name: string
+  pnlLine: PnlLine
+  /** Khoản mục máy tự ghi (giá vốn, nhân sự) — không nhập tay được */
+  automatic: boolean
+  active: boolean
+  sort: number
+}
+
+export type VoucherKind = 'expense' | 'advance'
+export type PayMethod = 'cash' | 'transfer'
+export type ApprovalTier = 'tu-ghi' | 'ke-toan-duyet' | 'chu-duyet'
+
+export interface VoucherRow {
+  id: number
+  branchId: string
+  categoryId: string
+  categoryName: string
+  pnlLine: PnlLine
+  kind: VoucherKind
+  supplier: string | null
+  memo: string | null
+  amountVnd: number
+  vatVnd: number
+  method: PayMethod
+  amortizeMonths: number
+  amortizeFrom: string
+  advanceEmployeeId: number | null
+  state: 'draft' | 'approved' | 'void'
+  paidOn: string
+  createdByName: string | null
+  tier: ApprovalTier
+}
+
+export interface VoucherInput {
+  branchId: string
+  categoryId: string
+  kind: VoucherKind
+  supplier: string | null
+  memo: string | null
+  amountVnd: number
+  vatVnd: number
+  method: PayMethod
+  amortizeMonths: number
+  amortizeFrom: string
+  advanceEmployeeId: number | null
+  paidOn: string
+}
+
+export interface RecurringExpense {
+  id: number
+  branchId: string
+  categoryId: string
+  name: string
+  supplier: string | null
+  expectedVnd: number
+  dayOfMonth: number
+  method: PayMethod
+  active: boolean
+}
+
+export interface AssetRow {
+  id: number
+  branchId: string
+  categoryId: string
+  name: string
+  costVnd: number
+  inServiceFrom: string
+  depreciationMonths: number
+  retiredOn: string | null
+  note: string | null
+  monthlyVnd: number
+  accumulatedVnd: number
+  remainingVnd: number
+}
+
+export interface ExpenseThresholds {
+  pettyCashVnd: number
+  ownerApprovalVnd: number
+  assetVnd: number
+}
+
+export interface ExpenseOverview {
+  branchId: string
+  month: string
+  totalVnd: number
+  previousTotalVnd: number
+  lines: {
+    categoryId: string
+    name: string
+    pnlLine: string
+    amountVnd: number
+    previousVnd: number
+    budgetVnd: number | null
+    overBudget: boolean
+  }[]
+  draftVouchers: number
+  thresholds: ExpenseThresholds
+}
+
 // --------------------------------------------- Nhân sự H1 · H2 · H7
 
 export type PayKind = 'hourly' | 'monthly'
@@ -458,6 +574,8 @@ export interface CashbookReport {
     closedAt: string | null
     openingCash: number
     cashIn: number
+    /** Phiếu chi tiền mặt của NGÀY (phiếu chi không gắn ca) */
+    cashOut: number
     expected: number | null
     counted: number | null
     variance: number | null
@@ -490,7 +608,15 @@ export interface CashbookReport {
     receivedAt: string
   }[]
   adjustments: { id: number; amount: number; memo: string | null; createdAt: string }[]
-  cashOut: BlockedTile
+  /** Phiếu chi tiền mặt trong ngày, từ sổ phiếu chi C2 */
+  cashVouchers: {
+    id: number
+    categoryName: string
+    supplier: string | null
+    memo: string | null
+    amountVnd: number
+    state: string
+  }[]
   otherIncome: BlockedTile
 }
 
@@ -513,12 +639,19 @@ export interface PrimeCost {
   overThreshold: boolean
 }
 
+/** Dồn tích = chi phí theo kỳ phân bổ · Dòng tiền = theo tiền ra thực */
+export type PnlBasis = 'don-tich' | 'dong-tien'
+
 export interface PnlReport {
   branchId: string
   period: ResolvedPeriod
+  basis: PnlBasis
+  detailLevel: 'full' | 'summary'
   rows: PnlRow[]
   orderCount: number
   primeCost: PrimeCost | BlockedTile
+  /** Chỉ có với vai trò được xem chi tiết lương (§4.2b) */
+  labourDetail?: { name: string; position: string; grossPayVnd: number }[]
 }
 
 function periodQuery(branchId: string, period: PeriodChoice): string {
@@ -685,8 +818,8 @@ export const api = {
       `/api/reports/cashbook?branch=${encodeURIComponent(branchId)}${date ? `&date=${date}` : ''}`,
     ),
 
-  profitLoss: (branchId: string, period: PeriodChoice) =>
-    apiFetch<PnlReport>(`/api/reports/pnl?${periodQuery(branchId, period)}`),
+  profitLoss: (branchId: string, period: PeriodChoice, basis: PnlBasis = 'don-tich') =>
+    apiFetch<PnlReport>(`/api/reports/pnl?${periodQuery(branchId, period)}&basis=${basis}`),
 
   // --------------------------------------------- M7 · M4 · S1 · S2
 
@@ -829,4 +962,78 @@ export const api = {
     apiFetch<{ state: PeriodState }>(`/api/hr/payroll/periods/${periodId}/${step}`, {
       method: 'POST',
     }),
+
+  // ------------------------------------- C1 · C2 · C3 · C4 · C6
+
+  expenseCategories: () => apiFetch<ExpenseCategory[]>('/api/expenses/categories'),
+
+  vouchers: (branchId: string, from: string, to: string) =>
+    apiFetch<VoucherRow[]>(
+      `/api/expenses/vouchers?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
+    ),
+
+  createVoucher: (input: VoucherInput, approval?: Approval | null) =>
+    apiFetch<VoucherRow>('/api/expenses/vouchers', {
+      method: 'POST',
+      body: { ...input, approval },
+    }),
+
+  approveVoucher: (id: number) =>
+    apiFetch<VoucherRow>(`/api/expenses/vouchers/${id}/approve`, { method: 'POST' }),
+
+  advanceTargets: (branchId: string) =>
+    apiFetch<{ id: number; fullName: string }[]>(
+      `/api/expenses/advance-targets?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  recurringExpenses: (branchId: string) =>
+    apiFetch<{ recurring: RecurringExpense; categoryName: string }[]>(
+      `/api/expenses/recurring?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  createRecurring: (input: Omit<RecurringExpense, 'id' | 'active'>) =>
+    apiFetch<RecurringExpense>('/api/expenses/recurring', { method: 'POST', body: input }),
+
+  generateRecurring: (branchId: string, month: string) =>
+    apiFetch<{ created: number }>('/api/expenses/recurring/generate', {
+      method: 'POST',
+      body: { branchId, month },
+    }),
+
+  assets: (branchId: string) =>
+    apiFetch<AssetRow[]>(`/api/expenses/assets?branch=${encodeURIComponent(branchId)}`),
+
+  createAsset: (input: {
+    branchId: string
+    categoryId: string
+    name: string
+    costVnd: number
+    inServiceFrom: string
+    depreciationMonths: number
+    note: string | null
+  }) => apiFetch<AssetRow>('/api/expenses/assets', { method: 'POST', body: input }),
+
+  retireAsset: (id: number, retiredOn: string) =>
+    apiFetch<AssetRow>(`/api/expenses/assets/${id}/retire`, {
+      method: 'POST',
+      body: { retiredOn },
+    }),
+
+  generateDepreciation: (branchId: string, month: string) =>
+    apiFetch<{ posted: number }>('/api/expenses/assets/depreciation', {
+      method: 'POST',
+      body: { branchId, month },
+    }),
+
+  expenseOverview: (branchId: string, month: string) =>
+    apiFetch<ExpenseOverview>(
+      `/api/expenses/overview?branch=${encodeURIComponent(branchId)}&month=${month}`,
+    ),
+
+  setExpenseBudget: (input: {
+    branchId: string
+    categoryId: string
+    month: string
+    amountVnd: number
+  }) => apiFetch<{ amountVnd: number }>('/api/expenses/budgets', { method: 'PUT', body: input }),
 }

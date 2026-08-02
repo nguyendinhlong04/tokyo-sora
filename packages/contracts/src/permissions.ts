@@ -12,9 +12,7 @@
  *
  * Và quy tắc phân tách nhiệm vụ (PHẦN G): người duyệt phải KHÁC người xin.
  *
- * Đã mã hoá thêm phần NHÂN SỰ của bảng §4.2b (xem cuối `ACTIONS`). Phần CHI PHÍ &
- * TÀI SẢN của bảng đó vẫn chưa — module C chưa tồn tại, và đặt tên hành động cho
- * thứ chưa có là cách chắc chắn nhất để tên đó sai khi thứ đó ra đời.
+ * Bảng §4.2b (Nhân sự & Chi phí) đã mã hoá đủ ở cuối `ACTIONS`.
  */
 
 export const ROLES = [
@@ -248,6 +246,39 @@ export const ACTIONS = {
   'payroll.approve-pay': {
     label: 'Duyệt & phát lương',
     grants: { R10: A },
+  },
+
+  // ================================================ §4.2b — Chi phí & tài sản
+
+  'expense.record-petty': {
+    label: 'Ghi phiếu chi ≤ hạn mức chi vặt',
+    grants: { R7: A, R8: A, R10: A },
+    note: 'Hạn mức nằm ở Trung tâm tham số A6; kế toán hậu kiểm những phiếu dưới mức',
+  },
+  'expense.record-over-limit': {
+    label: 'Ghi phiếu chi trên hạn mức',
+    grants: { R7: P, R8: A, R10: A },
+  },
+  'expense.approve': {
+    label: 'Duyệt phiếu chi / ghi nhận tài sản',
+    grants: { R8: A, R10: A },
+  },
+  'asset.ledger': {
+    label: 'Sổ tài sản & khấu hao',
+    grants: { R8: A, R10: A },
+  },
+  /**
+   * Hai mức xem Lãi/Lỗ. Đây là nguyên tắc cứng thứ tư nhìn từ phía báo cáo: quản
+   * lý ca đọc được tình hình chi nhánh mình, nhưng con số lương thì dừng ở mức
+   * TỔNG — không xuống được từng người.
+   */
+  'report.pnl-full': {
+    label: 'Xem Lãi/Lỗ đầy đủ (có chi tiết lương)',
+    grants: { R8: A, R11: A, R10: A },
+  },
+  'report.pnl-branch-summary': {
+    label: 'Xem Lãi/Lỗ chi nhánh dạng gộp (không chi tiết lương)',
+    grants: { R7: A, R8: A, R11: A, R10: A },
   },
 } as const satisfies Record<string, ActionDef>
 

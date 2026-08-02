@@ -119,7 +119,11 @@ export function CashBook() {
                           <Money amount={shift.cashIn} className="text-ink-body" />
                         </Td>
                         <Td right>
-                          <span className="text-line-4">—</span>
+                          {shift.cashOut === 0 ? (
+                            <span className="text-line-4">—</span>
+                          ) : (
+                            <Money amount={-shift.cashOut} className="text-danger" />
+                          )}
                         </Td>
                         <Td right>
                           {shift.expected === null ? (
@@ -151,10 +155,40 @@ export function CashBook() {
                 </table>
               )}
               <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-                {data.cashOut.blockedBy} — nên cột chi tiền mặt để trống, và “dự kiến cuối ca” hiện
-                chỉ gồm đầu ca cộng tiền thu.
+                Cột chi tiền mặt là tổng phiếu chi tiền mặt ĐÃ DUYỆT của cả NGÀY: phiếu chi không
+                gắn ca thu ngân, nên nó chỉ đúng ở mức ngày. “Dự kiến cuối ca” vẫn do lúc đóng ca
+                chốt, chưa trừ phần chi này.
               </p>
             </Section>
+
+            {data.cashVouchers.length > 0 ? (
+              <Section title="Phiếu chi tiền mặt trong ngày">
+                <ul className="flex flex-col gap-2">
+                  {data.cashVouchers.map((row) => (
+                    <li
+                      key={row.id}
+                      className="flex items-baseline gap-3 border-b border-line-1 pb-2 text-[length:var(--fs-c1)] last:border-b-0"
+                    >
+                      <span className="w-44 text-ink-body">{row.categoryName}</span>
+                      <span className="min-w-0 flex-1 truncate text-ink-mute">
+                        {row.supplier ?? row.memo ?? ''}
+                      </span>
+                      <span className={row.state === 'approved' ? 'text-ok' : 'text-warn'}>
+                        {row.state === 'approved' ? 'đã duyệt' : 'chờ duyệt'}
+                      </span>
+                      <Money
+                        amount={-row.amountVnd}
+                        className={row.state === 'approved' ? 'text-danger' : 'text-ink-mute'}
+                      />
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                  Phiếu chờ duyệt hiện ở đây để đối soát quỹ nhưng CHƯA trừ vào cột chi và chưa vào
+                  Lãi/Lỗ.
+                </p>
+              </Section>
+            ) : null}
 
             <Section title="Chuyển khoản & thẻ">
               {data.transfers.length === 0 ? (

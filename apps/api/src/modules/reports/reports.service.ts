@@ -9,6 +9,8 @@ import {
   dishAvailability,
   dishRecipes,
   dishes,
+  expenseCategories,
+  expenseVouchers,
   journalEntries,
   orderLines,
   orders,
@@ -18,6 +20,7 @@ import {
   stockMoves,
   tableSessions,
 } from '../../db/schema'
+import { ExpensesService } from '../expenses/expenses.service'
 import { HrService } from '../hr/hr.service'
 import { InventoryService } from '../inventory/inventory.service'
 import { classifyMenu, quadrantShift, type MenuItemStat, type Quadrant } from './domain/menu-matrix'
@@ -79,6 +82,54 @@ function setUnitCost(
     total += cost.costVnd * Number(child.qty)
   }
   return Math.round(total / setQty)
+}
+
+/**
+ * Sáu dòng chi phí của F7 lấy từ khoản mục C6, theo đúng thứ tự công thức §28.
+ * `key` khớp `expense_categories.pnl_line` nên thêm khoản mục mới không phải sửa
+ * báo cáo — chỉ cần khai nó thuộc dòng nào.
+ */
+const EXPENSE_LINES = [
+  { key: 'rent', label: 'Mặt bằng' },
+  { key: 'utilities', label: 'Tiện ích' },
+  { key: 'depreciation', label: 'Khấu hao' },
+  { key: 'marketing', label: 'Marketing' },
+  { key: 'payment-fee', label: 'Phí thanh toán' },
+  { key: 'other-opex', label: 'Vận hành khác' },
+] as const
+
+/**
+ * Vì sao một dòng chi phí đang trống.
+ *
+ * Khấu hao ở chế độ DÒNG TIỀN không phải "chưa có dữ liệu" mà là "theo định nghĩa
+ * thì không có": khấu hao là chi phí không kèm tiền ra. Nói nhầm hai thứ đó sẽ làm
+ * người đọc đi tìm phiếu chi khấu hao — thứ không tồn tại và không nên tồn tại.
+ */
+function blockedReason(key: string, basis: PnlBasis): string {
+  if (key === 'depreciation' && basis === 'dong-tien') {
+    return 'Khấu hao là chi phí KHÔNG có tiền ra, nên nó chỉ xuất hiện ở chế độ dồn tích'
+  }
+  if (key === 'payment-fee') {
+    return 'Phí thanh toán chưa có phiếu chi nào — biểu phí nhà cung cấp cũng chưa có ở A6'
+  }
+  return 'Chưa có phiếu chi (C2) nào thuộc khoản mục này trong kỳ'
+}
+
+/**
+ * Lợi nhuận hoạt động = doanh thu thuần − giá vốn − nhân sự − các dòng chi phí.
+ *
+ * Trả `null` khi chưa có GIÁ VỐN: thiếu nó thì con số ra bao giờ cũng đẹp hơn thực
+ * tế rất nhiều, và một dòng "lợi nhuận" đẹp giả là thứ nguy hiểm nhất trên bảng
+ * này. Thiếu các dòng chi phí nhỏ thì vẫn tính — chúng chỉ làm sai vài phần trăm,
+ * và bảng đã nói rõ dòng nào đang trống.
+ */
+function operatingProfit(
+  netRevenue: number,
+  side: { cogs: number; labour: number; expenses: Map<string, number> },
+): number | null {
+  if (side.cogs === 0) return null
+  const expenses = [...side.expenses.values()].reduce((sum, n) => sum + n, 0)
+  return netRevenue - side.cogs - side.labour - expenses
 }
 
 const COST_NOTES: Record<'gia-von' | 'hon-hop' | 'gia-ban', (missing: number) => string | null> = {
@@ -178,6 +229,9 @@ export interface CashbookReport {
     closedAt: string | null
     openingCash: number
     cashIn: number
+    /** Phiếu chi tiền mặt trong ngày (C2) — chia đều cho các ca vì phiếu chi
+     *  không gắn ca; xem chú thích ở `cashbook` */
+    cashOut: number
     expected: number | null
     counted: number | null
     variance: number | null
@@ -206,7 +260,15 @@ export interface CashbookReport {
     receivedAt: string
   }[]
   adjustments: { id: number; amount: number; memo: string | null; createdAt: string }[]
-  cashOut: BlockedTile
+  /** Phiếu chi tiền mặt trong ngày, từ sổ phiếu chi C2 */
+  cashVouchers: {
+    id: number
+    categoryName: string
+    supplier: string | null
+    memo: string | null
+    amountVnd: number
+    state: string
+  }[]
   otherIncome: BlockedTile
 }
 
@@ -230,12 +292,31 @@ export interface PrimeCost {
   overThreshold: boolean
 }
 
+/**
+ * Hai chế độ xem của F7 (§28).
+ *
+ *   · `don-tich` — chi phí theo KỲ PHÂN BỔ. Mặc định, và đúng cho câu hỏi "tháng
+ *     này quán lãi hay lỗ": trả trước sáu tháng tiền nhà chỉ tính một phần sáu,
+ *     và khấu hao có mặt dù không đồng nào rời két.
+ *   · `dong-tien` — theo TIỀN RA THỰC, đối chiếu sổ quỹ F1: cả sáu tháng tiền nhà
+ *     nằm ở tháng chi, khấu hao biến mất, tạm ứng xuất hiện.
+ *
+ * "Tháng nào lãi trên giấy mà két rỗng, hay két đầy mà thực ra đang lỗ, đều lộ ra
+ * ngay" — đó là lý do có hai chế độ chứ không phải một.
+ */
+export type PnlBasis = 'don-tich' | 'dong-tien'
+
 export interface PnlReport {
   branchId: string
   period: ResolvedPeriod
+  basis: PnlBasis
+  /** 'full' khi người xem có quyền chi tiết lương; 'summary' thì dừng ở dòng tổng */
+  detailLevel: 'full' | 'summary'
   rows: PnlRow[]
   orderCount: number
   primeCost: PrimeCost | BlockedTile
+  /** Chỉ có ở `detailLevel = 'full'` — nguyên tắc cứng thứ tư của §4.2b */
+  labourDetail?: { name: string; position: string; grossPayVnd: number }[]
 }
 
 /**
@@ -253,6 +334,7 @@ export class ReportsService {
     @Inject(DB) private readonly db: Db,
     private readonly inventory: InventoryService,
     private readonly hr: HrService,
+    private readonly expenses: ExpensesService,
   ) {}
 
   // =========================================================== B1 · Hôm nay
@@ -738,6 +820,37 @@ export class ReportsService {
       )
       .orderBy(asc(journalEntries.createdAt))
 
+    /**
+     * Phiếu chi tiền mặt trong ngày (C2). Phiếu chi KHÔNG gắn ca thu ngân — người
+     * ghi phiếu chi không nhất thiết là người đang đứng quầy — nên cột "chi tiền
+     * mặt" chỉ đúng ở mức NGÀY. Ca nào cũng hiện tổng chi của ngày, và dòng chú
+     * thích dưới bảng nói rõ điều đó thay vì chia bừa cho từng ca.
+     */
+    const cashVouchers = await this.db
+      .select({
+        id: expenseVouchers.id,
+        categoryName: expenseCategories.name,
+        supplier: expenseVouchers.supplier,
+        memo: expenseVouchers.memo,
+        amountVnd: expenseVouchers.amountVnd,
+        state: expenseVouchers.state,
+      })
+      .from(expenseVouchers)
+      .innerJoin(expenseCategories, eq(expenseCategories.id, expenseVouchers.categoryId))
+      .where(
+        and(
+          eq(expenseVouchers.branchId, branchId),
+          eq(expenseVouchers.paidOn, date),
+          eq(expenseVouchers.method, 'cash'),
+          ne(expenseVouchers.state, 'void'),
+        ),
+      )
+      .orderBy(asc(expenseVouchers.id))
+
+    const cashOutTotal = cashVouchers
+      .filter((v) => v.state === 'approved')
+      .reduce((sum, v) => sum + v.amountVnd, 0)
+
     return {
       branchId,
       date,
@@ -751,6 +864,7 @@ export class ReportsService {
           closedAt: s.closedAt?.toISOString() ?? null,
           openingCash: s.openingCash,
           cashIn,
+          cashOut: cashOutTotal,
           expected: s.expected,
           counted: s.counted,
           variance: s.counted === null || s.expected === null ? null : s.counted - s.expected,
@@ -770,7 +884,7 @@ export class ReportsService {
         receivedAt: e.receivedAt.toISOString(),
       })),
       adjustments: adjustments.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() })),
-      cashOut: { value: null, blockedBy: 'Chi tiền mặt cần Sổ phiếu chi (C2) — chưa dựng' },
+      cashVouchers,
       otherIncome: {
         value: null,
         blockedBy: 'Phiếu thu khác ghi tại chính F1, cần thêm bảng và cửa ghi — chưa dựng',
@@ -780,12 +894,19 @@ export class ReportsService {
 
   // ============================================================= F7 · P&L
 
-  async profitLoss(branchId: string, input: PeriodQuery): Promise<PnlReport> {
+  async profitLoss(
+    branchId: string,
+    input: PeriodQuery,
+    view: { basis: PnlBasis; detailLevel: 'full' | 'summary' } = {
+      basis: 'don-tich',
+      detailLevel: 'summary',
+    },
+  ): Promise<PnlReport> {
     const period = await this.resolveFor(branchId, input)
 
     const [now, before] = await Promise.all([
-      this.revenueOf(branchId, period.current),
-      this.revenueOf(branchId, period.baseline),
+      this.revenueOf(branchId, period.current, view.basis),
+      this.revenueOf(branchId, period.baseline, view.basis),
     ])
 
     const netRevenue = now.sub + now.service + now.ship + now.round - now.discount - now.refund
@@ -890,61 +1011,36 @@ export class ReportsService {
               note: 'Tổng chi phí trước khấu trừ của các kỳ lương đã duyệt kết thúc trong kỳ — ghi nhận theo lần chốt, không cắt nhỏ theo ngày',
             }),
       },
-      {
-        key: 'rent',
-        label: 'Mặt bằng',
-        amount: null,
-        baseline: null,
+      ...EXPENSE_LINES.map<PnlRow>(({ key, label }) => ({
+        key,
+        label,
+        amount: now.expenses.get(key) ? -now.expenses.get(key)! : null,
+        baseline: before.expenses.get(key) ? -before.expenses.get(key)! : null,
         kind: 'cost',
-        blockedBy: 'Sổ phiếu chi (C2) + chi phí định kỳ (C3) — chưa dựng',
-      },
-      {
-        key: 'utilities',
-        label: 'Tiện ích',
-        amount: null,
-        baseline: null,
-        kind: 'cost',
-        blockedBy: 'Sổ phiếu chi (C2) + chi phí định kỳ (C3) — chưa dựng',
-      },
-      {
-        key: 'depreciation',
-        label: 'Khấu hao',
-        amount: null,
-        baseline: null,
-        kind: 'cost',
-        blockedBy: 'Tài sản & khấu hao (C4) — chưa dựng',
-      },
-      {
-        key: 'marketing',
-        label: 'Marketing',
-        amount: null,
-        baseline: null,
-        kind: 'cost',
-        blockedBy: 'Sổ phiếu chi (C2) — chưa dựng',
-      },
-      {
-        key: 'payment-fee',
-        label: 'Phí thanh toán',
-        amount: null,
-        baseline: null,
-        kind: 'cost',
-        blockedBy: 'Chưa có biểu phí nhà cung cấp trong Trung tâm tham số (A6)',
-      },
-      {
-        key: 'other-opex',
-        label: 'Vận hành khác',
-        amount: null,
-        baseline: null,
-        kind: 'cost',
-        blockedBy: 'Sổ phiếu chi (C2) — chưa dựng',
-      },
+        ...(now.expenses.get(key) ? {} : { blockedBy: blockedReason(key, view.basis) }),
+      })),
       {
         key: 'operating-profit',
         label: 'Lợi nhuận hoạt động',
+        amount: operatingProfit(netRevenue, now),
+        baseline: operatingProfit(baseNet, before),
+        kind: 'subtotal',
+        ...(operatingProfit(netRevenue, now) === null
+          ? { blockedBy: 'Chờ giá vốn hàng bán — không có nó thì mọi con số dưới đây đều thiếu' }
+          : {
+              note:
+                view.basis === 'don-tich'
+                  ? 'Chế độ dồn tích: chi phí tính theo kỳ phân bổ, khấu hao có mặt dù không có tiền ra'
+                  : 'Chế độ dòng tiền: theo tiền thực ra khỏi quán, khấu hao không tính, tạm ứng có tính',
+            }),
+      },
+      {
+        key: 'chain-allocation',
+        label: 'Phân bổ chi phí chuỗi',
         amount: null,
         baseline: null,
-        kind: 'subtotal',
-        blockedBy: 'Chờ đủ các dòng chi phí',
+        kind: 'cost',
+        blockedBy: 'Phiếu chi cấp chuỗi và quy tắc phân bổ về chi nhánh (C6) — chưa dựng',
       },
       {
         key: 'vat-out',
@@ -966,9 +1062,14 @@ export class ReportsService {
     return {
       branchId,
       period,
+      basis: view.basis,
+      detailLevel: view.detailLevel,
       rows,
       orderCount: now.orders,
       primeCost: this.primeCostOf(now, netRevenue),
+      ...(view.detailLevel === 'full'
+        ? { labourDetail: await this.hr.labourByEmployee(branchId, period.current) }
+        : {}),
     }
   }
 
@@ -1008,7 +1109,41 @@ export class ReportsService {
     }
   }
 
-  private async revenueOf(branchId: string, range: DateRange) {
+  /**
+   * Chi phí của kỳ, gom về sáu dòng của F7.
+   *
+   *   · Dồn tích — đọc SỔ CHI PHÍ theo tháng. Khoảng ngày quy về khoảng tháng mà
+   *     nó chạm tới: một kỳ 15/08–20/08 vẫn nhận cả tháng 8, vì chi phí phân bổ
+   *     theo tháng chứ không theo ngày và cắt nhỏ nó ra là bịa số.
+   *   · Dòng tiền — đọc PHIẾU CHI theo ngày trả. Khấu hao biến mất (không có tiền
+   *     ra), tạm ứng xuất hiện (có tiền ra dù không phải chi phí).
+   */
+  private async expenseLines(
+    branchId: string,
+    range: DateRange,
+    basis: PnlBasis,
+  ): Promise<Map<string, number>> {
+    const out = new Map<string, number>()
+
+    if (basis === 'don-tich') {
+      const rows = await this.expenses.byCategory(branchId, range.from, range.to)
+      for (const row of rows) {
+        out.set(row.pnlLine, (out.get(row.pnlLine) ?? 0) + row.total)
+      }
+      return out
+    }
+
+    const rows = await this.expenses.cashOut(branchId, range.from, range.to)
+    for (const row of rows) {
+      // Tạm ứng là tiền ra nhưng không phải chi phí của khoản mục nào — dồn vào
+      // Vận hành khác để mặt dòng tiền cộng đúng tổng tiền đã rời két
+      const line = row.kind === 'advance' ? 'other-opex' : row.pnlLine
+      out.set(line, (out.get(line) ?? 0) + row.total)
+    }
+    return out
+  }
+
+  private async revenueOf(branchId: string, range: DateRange, basis: PnlBasis = 'don-tich') {
     const within = and(
       eq(orders.branchId, branchId),
       gte(orders.businessDate, range.from),
@@ -1075,6 +1210,7 @@ export class ReportsService {
       orders: Number(row?.orders ?? 0),
       cogs: Number(cogs?.cogs ?? 0),
       labour: labour.grossVnd,
+      expenses: await this.expenseLines(branchId, range, basis),
       coverage: await this.recipeCoverageOver(branchId, range),
       sub: Number(row?.sub ?? 0),
       discount: Number(row?.discount ?? 0),

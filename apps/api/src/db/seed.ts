@@ -79,6 +79,46 @@ const PARAMETERS: {
   // 0 = CHƯA CẤU HÌNH, không phải miễn thuế: biểu thuế luỹ tiến chưa cài, kế toán
   // phải đặt tỉ lệ tạm khấu trừ hoặc tự tính ngoài cho tới khi có F4
   { key: 'payroll.pitWithholdRate', value: 0, unit: 'tỉ lệ', sensitive: true },
+
+  // Chi phí (§27 — ba ngưỡng quyết định ai được ghi và ai phải duyệt)
+  { key: 'expense.pettyCashVnd', value: 2_000_000, unit: 'đồng', sensitive: true },
+  { key: 'expense.ownerApprovalVnd', value: 20_000_000, unit: 'đồng', sensitive: true },
+  { key: 'expense.assetThresholdVnd', value: 5_000_000, unit: 'đồng', sensitive: true },
+]
+
+/**
+ * Cây khoản mục mặc định chuẩn F&B (§27 C6).
+ *
+ * `automatic` = khoản mục do MÁY tự ghi: giá vốn từ kho, nhân sự từ kỳ lương,
+ * khấu hao từ sổ tài sản. Người không nhập tay được vào ba khoản đó — nếu nhập
+ * được thì mỗi khoản sẽ vào Lãi/Lỗ hai lần.
+ */
+const EXPENSE_CATEGORIES: {
+  id: string
+  parentId?: string
+  name: string
+  pnlLine: string
+  automatic?: boolean
+}[] = [
+  { id: 'gia-von', name: 'Giá vốn hàng bán', pnlLine: 'cogs', automatic: true },
+  { id: 'nhan-su', name: 'Nhân sự', pnlLine: 'labour', automatic: true },
+  { id: 'mat-bang', name: 'Mặt bằng', pnlLine: 'rent' },
+  { id: 'tien-ich', name: 'Tiện ích', pnlLine: 'utilities' },
+  { id: 'tien-ich-dien', parentId: 'tien-ich', name: 'Điện', pnlLine: 'utilities' },
+  { id: 'tien-ich-nuoc', parentId: 'tien-ich', name: 'Nước', pnlLine: 'utilities' },
+  { id: 'tien-ich-gas', parentId: 'tien-ich', name: 'Gas', pnlLine: 'utilities' },
+  { id: 'tien-ich-internet', parentId: 'tien-ich', name: 'Internet & phần mềm', pnlLine: 'utilities' },
+  // KHÔNG `automatic`: mua thiết bị DƯỚI ngưỡng tài sản vẫn ghi thẳng ở C2
+  // ("sửa chữa nhỏ dưới ngưỡng vào chi phí ngay" §27 C4). Từ ngưỡng trở lên thì
+  // `needsAssetRecord` chặn lại và đẩy sang sổ tài sản.
+  { id: 'thiet-bi', name: 'Thiết bị & khấu hao', pnlLine: 'depreciation' },
+  { id: 'marketing', name: 'Marketing', pnlLine: 'marketing' },
+  { id: 'phi-thanh-toan', name: 'Phí thanh toán', pnlLine: 'payment-fee' },
+  { id: 'van-hanh-khac', name: 'Vận hành khác', pnlLine: 'other-opex' },
+  { id: 'van-hanh-sua-chua', parentId: 'van-hanh-khac', name: 'Sửa chữa & bảo trì', pnlLine: 'other-opex' },
+  { id: 'van-hanh-chi-vat', parentId: 'van-hanh-khac', name: 'Chi vặt', pnlLine: 'other-opex' },
+  { id: 'van-hanh-tam-ung', parentId: 'van-hanh-khac', name: 'Tạm ứng nhân viên', pnlLine: 'other-opex' },
+  { id: 'thue-phi', name: 'Thuế & phí', pnlLine: 'tax' },
 ]
 
 /**
@@ -132,9 +172,19 @@ const ROLE_BY_TITLE: Record<string, string> = {
  * gán ở phạm vi TOÀN CHUỖI (branch_id NULL) đúng như §5.
  */
 const DEV_OFFICE_PASSWORD = 'sora-dev-2026'
+/**
+ * Tài khoản Office cho máy dev.
+ *
+ * Có kế toán và quản lý nhân sự vì hai luồng mới ĐÒI HỎI nhiều người: phiếu chi
+ * trên hạn mức phải người khác duyệt (§4.3.1 không ai tự duyệt việc của mình), và
+ * kỳ lương đi qua ba vai — R13 trình, R8 kiểm, R10 duyệt. Chỉ có một tài khoản
+ * chủ thì hai luồng đó không chạy thử được trên máy dev.
+ */
 const OFFICE_ACCOUNTS: { code: string; fullName: string; email: string; roles: string[] }[] = [
   { code: 'CHU01', fullName: 'Chủ quán', email: 'chu@tokyosora.vn', roles: ['R10'] },
   { code: 'CHUOI01', fullName: 'Quản lý chuỗi', email: 'chuoi@tokyosora.vn', roles: ['R11'] },
+  { code: 'KETOAN01', fullName: 'Kế toán', email: 'ketoan@tokyosora.vn', roles: ['R8'] },
+  { code: 'NHANSU01', fullName: 'Quản lý nhân sự', email: 'nhansu@tokyosora.vn', roles: ['R13'] },
 ]
 
 /** PIN dev — mọi nhân viên dùng 4 số khác nhau, chỉ dành cho môi trường phát triển */
@@ -544,6 +594,21 @@ async function seed(db: Db) {
     await db
       .insert(s.parameters)
       .values({ key: p.key, branchId: null, value: p.value, unit: p.unit, sensitive: p.sensitive ?? false })
+      .onConflictDoNothing()
+  }
+
+  // ---- Cây khoản mục C6 ----
+  for (const c of EXPENSE_CATEGORIES) {
+    await db
+      .insert(s.expenseCategories)
+      .values({
+        id: c.id,
+        parentId: c.parentId ?? null,
+        name: c.name,
+        pnlLine: c.pnlLine,
+        automatic: c.automatic ?? false,
+        sort: EXPENSE_CATEGORIES.indexOf(c),
+      })
       .onConflictDoNothing()
   }
 

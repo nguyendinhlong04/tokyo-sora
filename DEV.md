@@ -159,9 +159,17 @@ ghép — Office chạy trên máy tính của quản lý, không phải máy c�
 |---|---|---|
 | chu@tokyosora.vn | R10 Chủ / Admin | `sora-dev-2026` |
 | chuoi@tokyosora.vn | R11 Quản lý chuỗi | `sora-dev-2026` |
+| ketoan@tokyosora.vn | R8 Kế toán | `sora-dev-2026` |
+| nhansu@tokyosora.vn | R13 Quản lý nhân sự | `sora-dev-2026` |
 
 > Màn cấu hình (A6, A3, A10, R3) gắn quyền `admin.manage-accounts-roles` — theo ma trận
 > §4.2 chỉ R10 có. Đăng nhập bằng `chuoi@` sẽ vào được Office nhưng các nút sửa mờ đi.
+
+> **Vì sao cần bốn tài khoản:** hai luồng đòi nhiều người. Phiếu chi trên hạn mức chi
+> vặt phải do NGƯỜI KHÁC duyệt (§4.3.1 — không ai tự duyệt việc của mình), nên ghi
+> bằng `chu@` thì phải duyệt bằng `ketoan@`. Kỳ lương đi qua ba vai: `nhansu@` trình,
+> `ketoan@` kiểm, `chu@` duyệt và phát. Chỉ đăng nhập một tài khoản thì cả hai luồng
+> tắc ở giữa — và đó là hành vi ĐÚNG, không phải lỗi.
 
 > Trên máy dev, cookie phiên dùng chung theo `localhost` bất kể cổng, nên đăng nhập
 > Office xong thì POS coi như đang là người đó. Ngoài đời hai app ở hai tên miền nên

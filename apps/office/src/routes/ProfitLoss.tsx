@@ -2,7 +2,7 @@ import { formatVnd } from '@sora/contracts'
 import { ErrorState } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { api, type PeriodChoice, type PnlRow } from '../api'
+import { api, type PeriodChoice, type PnlBasis, type PnlRow } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { PeriodComparator, formatPercent } from '../components/report'
 import { useSession } from '../session-context'
@@ -29,13 +29,25 @@ const KIND_STYLE: Record<PnlRow['kind'], string> = {
   memo: 'text-ink-mute',
 }
 
+const BASIS_LABELS: Record<PnlBasis, { label: string; hint: string }> = {
+  'don-tich': {
+    label: 'Dồn tích',
+    hint: 'Chi phí theo kỳ phân bổ — đúng cho câu hỏi tháng này lãi hay lỗ',
+  },
+  'dong-tien': {
+    label: 'Dòng tiền',
+    hint: 'Theo tiền ra thực — đối chiếu sổ quỹ F1, khấu hao không tính',
+  },
+}
+
 export function ProfitLoss() {
   const { branchId } = useSession()
   const [period, setPeriod] = useState<PeriodChoice>({ kind: 'thang', compare: 'ky-truoc' })
+  const [basis, setBasis] = useState<PnlBasis>('don-tich')
 
   const report = useQuery({
-    queryKey: ['report-pnl', branchId, period],
-    queryFn: () => api.profitLoss(branchId!, period),
+    queryKey: ['report-pnl', branchId, period, basis],
+    queryFn: () => api.profitLoss(branchId!, period, basis),
     enabled: Boolean(branchId) && (period.kind !== 'tuy-chon' || Boolean(period.from && period.to)),
   })
 
@@ -47,10 +59,37 @@ export function ProfitLoss() {
       <PageHeader
         title="Lãi / Lỗ"
         subtitle="Bảng tài chính hợp nhất — không dòng nào nhập tay. Dòng để trống là dòng chưa có nguồn, không phải dòng bằng không."
+        action={
+          <div className="flex overflow-hidden rounded-sm border border-line-1">
+            {(Object.keys(BASIS_LABELS) as PnlBasis[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setBasis(mode)}
+                title={BASIS_LABELS[mode].hint}
+                className={`h-[var(--hit-target)] border-r border-line-1 px-4 text-[length:var(--fs-b2)] last:border-r-0 ${
+                  basis === mode ? 'bg-surface-3 text-ink-hi' : 'text-ink-mute hover:text-ink-hi'
+                }`}
+              >
+                {BASIS_LABELS[mode].label}
+              </button>
+            ))}
+          </div>
+        }
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
         <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period} />
+
+        <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+          {BASIS_LABELS[basis].hint}.
+          {data?.detailLevel === 'summary' ? (
+            <span className="text-warn">
+              {' '}
+              Vai trò của bạn xem bản GỘP — dòng nhân sự dừng ở mức tổng, không xuống từng người.
+            </span>
+          ) : null}
+        </p>
 
         {report.isError ? (
           <ErrorState message={(report.error as Error).message} />

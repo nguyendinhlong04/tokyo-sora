@@ -2,6 +2,7 @@ import { Controller, Get, Module } from '@nestjs/common'
 import { AdminModule } from './modules/admin/admin.module'
 import { CommonModule } from './common/common.module'
 import { ConfigBundleModule } from './modules/config-bundle/config-bundle.module'
+import { ExpensesModule } from './modules/expenses/expenses.module'
 import { HrModule } from './modules/hr/hr.module'
 import { Public } from './modules/identity/auth.guard'
 import { IdentityModule } from './modules/identity/identity.module'
@@ -38,6 +39,7 @@ class HealthController {
     SiteModule,
     AdminModule,
     InventoryModule,
+    ExpensesModule,
     HrModule,
     ReportsModule,
   ],

@@ -4,9 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
 import { Branches } from './routes/Branches'
 import { CashBook } from './routes/CashBook'
+import { Assets, ExpenseOverview, RecurringExpenses } from './routes/CostCenter'
 import { DeliveryZones } from './routes/DeliveryZones'
 import { Dishes } from './routes/Dishes'
 import { Employees } from './routes/Employees'
+import { Expenses } from './routes/Expenses'
 import { Floorplan } from './routes/Floorplan'
 import { Ingredients } from './routes/Ingredients'
 import { Login } from './routes/Login'
@@ -53,10 +55,19 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
     ],
   },
   {
+    group: 'Chi phí & tài sản',
+    items: [
+      { to: '/chi-phi-tong-quan', label: 'C1 · Tổng quan chi phí', need: 'expense.record-petty' },
+      { to: '/chi-phi', label: 'C2 · Sổ phiếu chi', need: 'expense.record-petty' },
+      { to: '/dinh-ky', label: 'C3 · Chi phí định kỳ', need: 'expense.record-petty' },
+      { to: '/tai-san', label: 'C4 · Tài sản & khấu hao', need: 'asset.ledger' },
+    ],
+  },
+  {
     group: 'Tài chính',
     items: [
       { to: '/so-quy', label: 'F1 · Sổ quỹ & đối soát', need: 'accounting.ledger-close-period' },
-      { to: '/lai-lo', label: 'F7 · Lãi / Lỗ', need: 'accounting.ledger-close-period' },
+      { to: '/lai-lo', label: 'F7 · Lãi / Lỗ', need: 'report.pnl-branch-summary' },
     ],
   },
   {
@@ -108,6 +119,10 @@ export function App() {
                 <Route path="/xep-lich" element={<Schedule />} />
                 <Route path="/nhan-vien" element={<Employees />} />
                 <Route path="/ky-luong" element={<Payroll />} />
+                <Route path="/chi-phi-tong-quan" element={<ExpenseOverview />} />
+                <Route path="/chi-phi" element={<Expenses />} />
+                <Route path="/dinh-ky" element={<RecurringExpenses />} />
+                <Route path="/tai-san" element={<Assets />} />
                 <Route path="/tham-so" element={<Parameters />} />
                 <Route path="/so-do-ban" element={<Floorplan />} />
                 <Route path="/chi-nhanh" element={<Branches />} />
