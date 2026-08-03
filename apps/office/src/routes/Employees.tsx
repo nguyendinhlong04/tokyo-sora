@@ -1,5 +1,5 @@
 import { formatVnd } from '@sora/contracts'
-import { Button, ErrorState, useToast } from '@sora/ui'
+import { Button, ErrorState, Modal, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type EmployeeInput, type EmployeeRow, type PayKind } from '../api'
@@ -44,6 +44,7 @@ export function Employees() {
   const toast = useToast()
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<{ input: EmployeeInput; id?: number } | null>(null)
+  const [issued, setIssued] = useState<{ fullName: string; url: string } | null>(null)
 
   const rows = useQuery({
     queryKey: ['employees', branchId],
@@ -54,6 +55,18 @@ export function Employees() {
     queryKey: ['employee-candidates', branchId],
     queryFn: () => api.employeeCandidates(branchId!),
     enabled: Boolean(branchId),
+  })
+
+  /**
+   * Cấp link Kênh nhân viên (H8 · H9).
+   *
+   * Token chỉ trả về một lần nên nó phải hiện ra ngay và hiện đủ lâu để chép đi
+   * gửi. Máy chủ chỉ giữ bản băm — không có màn nào xem lại được, mất thì cấp lại.
+   */
+  const link = useMutation({
+    mutationFn: (row: EmployeeRow) => api.issueChannelLink(row.id),
+    onSuccess: ({ token, fullName }) => setIssued({ fullName, url: channelUrl(token) }),
+    onError: (err: Error) => toast(err.message, 'danger'),
   })
 
   const save = useMutation({
@@ -157,7 +170,16 @@ export function Employees() {
                 <span className="text-[length:var(--fs-c1)] text-ink-mute">
                   {formatDay(row.startedOn)}
                 </span>
-                <span className="flex justify-end">
+                <span className="flex justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => link.mutate(row)}
+                    disabled={link.isPending || !row.active}
+                    title="Cấp link Kênh nhân viên (H8 · H9) — link cũ ngừng hoạt động ngay"
+                    className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3 disabled:opacity-40"
+                  >
+                    Link
+                  </button>
                   <button
                     type="button"
                     onClick={() => setDraft({ input: toInput(row), id: row.id })}
@@ -176,7 +198,69 @@ export function Employees() {
           hoạt động thì không vào lưới xếp lịch và không vào kỳ lương mới.
         </p>
       </div>
+
+      <ChannelLinkDialog issued={issued} onClose={() => setIssued(null)} />
     </>
+  )
+}
+
+/**
+ * Sora Staff nằm ở tên miền khác Office nên gốc lấy từ `VITE_STAFF_ORIGIN`; máy
+ * dev không đặt biến này thì lấy chính gốc của Office — link vẫn đọc được để thử,
+ * chỉ là chưa mở đúng app.
+ */
+function channelUrl(token: string): string {
+  const origin = import.meta.env.VITE_STAFF_ORIGIN ?? window.location.origin
+  return `${origin}/nv/${token}`
+}
+
+function ChannelLinkDialog({
+  issued,
+  onClose,
+}: {
+  issued: { fullName: string; url: string } | null
+  onClose: () => void
+}) {
+  const toast = useToast()
+
+  return (
+    <Modal
+      open={issued !== null}
+      title={issued ? `Link cá nhân của ${issued.fullName}` : ''}
+      onClose={onClose}
+      footer={
+        <>
+          <Button
+            onClick={() => {
+              if (!issued) return
+              void navigator.clipboard
+                .writeText(issued.url)
+                .then(() => toast('Đã chép link', 'ok'))
+                .catch(() => toast('Không chép được — chọn tay rồi copy', 'danger'))
+            }}
+          >
+            Chép link
+          </Button>
+          <Button variant="primary" onClick={onClose}>
+            Xong
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <p className="text-[length:var(--fs-b2)] text-ink-body">
+          Gửi cho nhân viên qua Zalo. Mở link một lần trên điện thoại của họ là máy nhớ, sau đó
+          chỉ cần PIN.
+        </p>
+        <code className="rounded-sm border border-line-2 bg-canvas px-3 py-2 font-mono text-[length:var(--fs-c1)] break-all text-ink-hi">
+          {issued?.url}
+        </code>
+        <p className="text-[length:var(--fs-c1)] text-ink-mute">
+          Link chỉ hiện đúng một lần — đóng hộp này là không xem lại được, mất thì cấp lại. Cấp lại
+          làm link cũ ngừng hoạt động ngay, kể cả khi nó đang mở trên một máy khác.
+        </p>
+      </div>
+    </Modal>
   )
 }
 

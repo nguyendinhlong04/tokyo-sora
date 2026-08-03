@@ -83,7 +83,8 @@ export interface MinuteTotal {
 export interface MyTimesheet {
   from: string
   to: string
-  locked: boolean
+  /** Kỳ lương đã chốt công phủ lên khoảng đang xem — null nghĩa là còn sửa được */
+  locked: { periodStart: string; periodEnd: string } | null
   days: WorkedDay[]
   total: MinuteTotal
   missingDays: string[]

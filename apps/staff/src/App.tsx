@@ -83,6 +83,19 @@ function Shell() {
             ? 'Mất mạng. Mở lại khi có sóng nhé.'
             : (profile.error as Error).message
         }
+        action={
+          // Không để ai kẹt ở màn báo lỗi: máy đang giữ phiên của người khác, hay
+          // hồ sơ vừa bị ngưng, thì vẫn phải có đường vào lại bằng link của mình.
+          <Button
+            onClick={async () => {
+              await api.logout().catch(() => undefined)
+              clearChannelLink()
+              await queryClient.invalidateQueries()
+            }}
+          >
+            Vào bằng link khác
+          </Button>
+        }
       />
     )
   }
@@ -199,11 +212,12 @@ function Gate({ onDone }: { onDone: () => void }) {
   )
 }
 
-function Splash({ text }: { text: string }) {
+function Splash({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-canvas px-8 text-center">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-canvas px-8 text-center">
       <span className="font-jp text-[length:var(--fs-d3)] text-accent-ink">空</span>
       <p className="text-[length:var(--fs-b1)] text-ink-mute">{text}</p>
+      {action}
     </main>
   )
 }

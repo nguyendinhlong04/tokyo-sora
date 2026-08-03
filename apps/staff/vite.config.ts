@@ -5,7 +5,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    port: 5177,
+    port: 5178,
     // Cookie phiên là httpOnly + SameSite=Strict nên API buộc phải cùng gốc với
     // app. Trên Vercel do rewrite trong vercel.json lo; máy dev thì proxy.
     proxy: {

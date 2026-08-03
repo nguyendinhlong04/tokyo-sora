@@ -16,6 +16,8 @@
     "dev:pos": "pnpm --filter @sora/pos dev",
     "dev:kitchen": "pnpm --filter @sora/kitchen dev",
     "dev:office": "pnpm --filter @sora/office dev",
+    "dev:staff": "pnpm --filter @sora/staff dev",
+    "dev:kiosk": "pnpm --filter @sora/kiosk dev",
     "dev:lab": "pnpm --filter @sora/ui dev",
     "extract-seed": "pnpm --filter @sora/extract-seed start"
   },

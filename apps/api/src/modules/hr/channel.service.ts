@@ -97,8 +97,14 @@ export class ChannelService {
     return {
       from,
       to,
-      /** Kỳ đã chốt công thì con số này không đổi nữa — nói ra để khỏi ai chờ */
-      locked: board.locked !== null,
+      /**
+       * Kỳ đã chốt công phủ lên khoảng này, nếu có. Trả về CẢ MỐC chứ không phải
+       * một cờ đúng/sai: kỳ lương hiếm khi trùng khít tháng dương lịch, và câu
+       * "tháng này đã chốt" nói khi mới chốt hai ngày đầu tháng là nói sai.
+       */
+      locked: board.locked
+        ? { periodStart: board.locked.periodStart, periodEnd: board.locked.periodEnd }
+        : null,
       days: mine?.days ?? [],
       total: mine?.total ?? { worked: 0, otNormal: 0, otRest: 0, otHoliday: 0 },
       missingDays: mine?.missingDays ?? [],

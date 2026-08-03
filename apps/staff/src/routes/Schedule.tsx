@@ -161,7 +161,9 @@ export function Schedule() {
 
           {sheet.data?.locked ? (
             <p className="text-[length:var(--fs-c1)] text-ink-mute">
-              Kỳ lương đã chốt công — con số của tháng này không đổi nữa.
+              Kỳ lương {dayLabel(sheet.data.locked.periodStart).slice(3)} –{' '}
+              {dayLabel(sheet.data.locked.periodEnd).slice(3)} đã chốt công — giờ công trong
+              khoảng đó không đổi nữa.
             </p>
           ) : null}
           {sheet.data && sheet.data.openShifts > 0 ? (

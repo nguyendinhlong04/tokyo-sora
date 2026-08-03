@@ -74,6 +74,35 @@ mép thì vé hàng dưới biến mất mà không ai biết — nên bước n
 
 ---
 
+## Kiosk chấm công — tablet 10″ gắn cố định
+
+Máy này đứng ở lối vào khu nhân viên, cắm điện liên tục, **không cầm đi đâu**: chi
+nhánh được xác định bằng chính cái máy, nên một cái kiosk mang về nhà là một cái
+kiosk chấm công hộ.
+
+1. Mở Chrome, vào `https://chamcong.tokyosora.vn`.
+2. Menu ⋮ → **Thêm vào màn hình chính**, rồi mở app từ biểu tượng đó — mở từ biểu
+   tượng mới chạy toàn màn hình.
+3. Nhập mã ghép 6 số loại **Kiosk chấm công** (quản lý sinh ở Office → A4 Thiết bị).
+4. Cài đặt Android:
+   - Màn hình → Thời gian chờ: **Không bao giờ**
+   - Màn hình → Tự xoay: **Tắt**, khoá ngang
+   - Nếu có giá đỡ khoá được: bật **Ghim ứng dụng** (Cài đặt → Bảo mật → Ghim ứng
+     dụng) để không ai thoát ra trình duyệt
+5. Treo hoặc bắt vít giá đỡ. Máy phải ở nơi có người qua lại nhìn thấy — camera
+   giám sát của quán nên phủ được góc này.
+
+**Không cần mạng dự phòng cho máy này.** Mất mạng thì kiosk báo "Mất mạng — gọi
+quản lý, đừng bỏ ca chưa chấm" và quản lý ghi công tay ở H4 kèm lý do. Một lượt
+chấm không tới được máy chủ thì không phải là một lượt chấm; cache lại để bấm cho
+có sẽ khiến người ta yên tâm ra về với ca chưa được ghi.
+
+**Ảnh chụp lúc chấm** (§26 nêu là tuỳ chọn bật ở A6) **chưa có trong bản dựng này**
+— chưa có kho ảnh. Chống chấm hộ hiện dựa vào ba lớp còn lại: PIN riêng từng người,
+máy gắn cứng chi nhánh, và đối chiếu chéo với phiên đăng nhập POS/KDS ở H3.
+
+---
+
 ## Sau khi cài xong: bài kiểm 5 phút
 
 Chạy đủ năm bước này trước khi bàn giao cho quán:

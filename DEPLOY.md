@@ -73,8 +73,11 @@ psql "<direct-url>" -v app_password="<mật khẩu role app>" -f deploy/db-roles
 
 ## Bước 2 — Vercel
 
-Năm project, mỗi project một thư mục gốc. Tách origin là có chủ ý: giao diện quản
+Tám project, mỗi project một thư mục gốc. Tách origin là có chủ ý: giao diện quản
 trị nằm khác tên miền với ứng dụng khách nên lỗ hổng bên này không với sang bên kia.
+Cùng lý do đó, **Kênh nhân viên tách khỏi kiosk chấm công**: một bên là trang mở
+trên điện thoại riêng bằng link chuyển tiếp được, một bên là máy gắn cứng trong quán
+— hai vùng tin cậy khác nhau thì không dùng chung một gốc.
 
 | Project | Root Directory | Tên miền |
 |---|---|---|
@@ -84,8 +87,10 @@ trị nằm khác tên miền với ứng dụng khách nên lỗ hổng bên n�
 | `sora-kitchen` | `apps/kitchen` | `kds.tokyosora.vn` |
 | `sora-office` | `apps/office` | `admin.tokyosora.vn` |
 | `sora-table` | `apps/table` | `ban.tokyosora.vn` |
+| `sora-staff` | `apps/staff` | `nv.tokyosora.vn` — Kênh nhân viên (H8 · H9) |
+| `sora-kiosk` | `apps/kiosk` | `chamcong.tokyosora.vn` — kiosk chấm công (H10) |
 
-**Một giá trị bắt buộc phải sửa:** trong `vercel.json` của bốn SPA có dòng
+**Một giá trị bắt buộc phải sửa:** trong `vercel.json` của mọi SPA có dòng
 
 ```json
 { "source": "/api/:path*", "destination": "https://sora-api.vercel.app/api/:path*" }
@@ -99,12 +104,18 @@ thấy `/api` cùng origin với trang. Nếu gọi chéo thì buộc phải h�
 `SameSite=None`, yếu hơn hẳn.
 
 **Biến môi trường** — project `sora-api` cần: `DATABASE_URL`, `DATABASE_MIGRATION_URL`,
-`SUPABASE_JWT_SECRET`, `BANK_WEBHOOK_SECRET`. Bốn SPA cần: `VITE_SUPABASE_URL`,
-`VITE_SUPABASE_ANON_KEY`.
+`SUPABASE_JWT_SECRET`, `BANK_WEBHOOK_SECRET`. Các SPA nghe Realtime (`sora-pos`,
+`sora-kitchen`, `sora-office`, `sora-table`) cần: `VITE_SUPABASE_URL`,
+`VITE_SUPABASE_ANON_KEY`. `sora-staff` và `sora-kiosk` không nghe Realtime nên không
+cần hai biến đó — CSP của chúng cũng đã chặn `*.supabase.co`.
 
 Riêng `sora-pos` cần thêm `VITE_TABLE_ORIGIN=https://ban.tokyosora.vn` — mã QR dán bàn
 in từ POS phải trỏ sang tên miền của Sora Table. Bỏ trống thì mã trỏ về chính POS và
 khách quét xong không mở được gì.
+
+`sora-office` cần `VITE_STAFF_ORIGIN=https://nv.tokyosora.vn` — link cá nhân cấp ở H1
+phải trỏ sang Kênh nhân viên. Bỏ trống thì link trỏ về chính Office và nhân viên bấm
+vào sẽ rơi vào màn đăng nhập quản trị.
 
 ## Bước 3 — Kiểm chứng sau khi deploy
 

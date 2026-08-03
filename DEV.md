@@ -50,6 +50,8 @@ pnpm dev:kitchen  # KDS   :5175
 pnpm dev:table    # Table :5173
 pnpm dev:office   # Office:5176
 pnpm dev:web      # Web   :3001
+pnpm dev:staff    # Kênh nhân viên :5178 — H8 · H9
+pnpm dev:kiosk    # Kiosk chấm công:5179 — H10
 pnpm dev:lab      # UI-lab:5177 — trang đối chiếu design token
 ```
 
@@ -178,3 +180,41 @@ ghép — Office chạy trên máy tính của quản lý, không phải máy c�
 > Trên máy dev, cookie phiên dùng chung theo `localhost` bất kể cổng, nên đăng nhập
 > Office xong thì POS coi như đang là người đó. Ngoài đời hai app ở hai tên miền nên
 > không đụng nhau; ở dev cứ đăng nhập lại app nào mình đang thử.
+
+## Chạy thử Kênh nhân viên và kiosk chấm công (H8 · H9 · H10)
+
+**Kênh nhân viên (`:5178`)** — nhân viên xem lịch, công, phiếu lương của chính mình:
+
+1. Office → **Nhân sự → Hồ sơ nhân viên**, bấm **Link** ở hàng của người cần cấp.
+   Hộp thoại hiện link đúng một lần; token chỉ có bản băm trong CSDL nên đóng hộp
+   là không xem lại được.
+2. Mở link trong **cửa sổ ẩn danh** (tránh va cookie với phiên Office ở `localhost`),
+   nhập PIN của chính người đó — cùng PIN dùng ở quán.
+3. Máy dev không đặt `VITE_STAFF_ORIGIN` thì link trỏ về chính Office; đổi cổng
+   trong thanh địa chỉ sang `5178`, hoặc chạy Office với
+   `VITE_STAFF_ORIGIN=http://localhost:5178`.
+
+Phiên mở bằng link có phạm vi `self`: mọi route ngoài nhóm "của chính mình" đều trả
+403, kể cả với thu ngân vốn có quyền mở bàn. Đó là hành vi ĐÚNG — xem
+`PermissionGuard`.
+
+**Kiosk chấm công (`:5179`)** — máy gắn cứng ở chi nhánh:
+
+1. Office → **Quản trị → Thiết bị**, sinh mã ghép loại **Kiosk chấm công**.
+2. Mở `localhost:5179`, nhập mã 6 số. Ghép xong màn này không hiện lại nữa.
+3. Chạm tên → nhập PIN → màn chào "Chào Hoa · Vào ca 15:02 · lịch 15:00". Bấm lần
+   hai trong ngày là chấm ra; lần ba bị chặn.
+
+> Chấm công đòi **cả hai**: PIN của chính mình VÀ thiết bị đã ghép. Thử chấm từ
+> Kênh nhân viên sẽ bị từ chối — đó là "thiết bị gắn chi nhánh, không chấm từ
+> ngoài" (§26 H10) đang chạy.
+>
+> **Va chạm cookie ở dev:** cookie `sora_staff` dùng chung theo `localhost` bất kể
+> cổng, mà AuthGuard ưu tiên phiên nhân viên hơn token thiết bị. Đang mở Kênh nhân
+> viên (`:5178`) rồi chấm công ở kiosk (`:5179`) sẽ báo *"chỉ thực hiện được trên
+> kiosk đã ghép"* — vì phiên đang dùng là phiên không có thiết bị. Bấm **Thoát** ở
+> Kênh nhân viên, hoặc mở kiosk ở cửa sổ ẩn danh. Ngoài đời hai app ở hai tên miền
+> nên không gặp.
+>
+> Chưa làm trong bản dựng này: **ảnh chụp lúc chấm** (tuỳ chọn ở A6). Cột
+> `time_entries.photo_url` đã có nhưng chưa có kho ảnh để đẩy lên.

@@ -365,6 +365,10 @@ describe('H8 — lịch và công của tôi', () => {
       headers: bearer(shiftLead),
     })
 
+    // `locked` mang MỐC của kỳ đã chốt chứ không phải cờ đúng/sai: kỳ lương hiếm
+    // khi trùng khít tháng, nên màn hình phải nói được nó khoá tới đâu
+    expect(mine.json<{ locked: unknown }>().locked).toBeNull()
+
     const mineTotal = mine.json<{ total: { worked: number } }>().total
     const boardRow = board
       .json<{ rows: { employeeId: number; total: { worked: number } }[] }>()
