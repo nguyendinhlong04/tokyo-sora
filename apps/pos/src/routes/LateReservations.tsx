@@ -2,7 +2,13 @@ import { Button, Card, EmptyState, SectionLabel, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { api, type LateReservation } from '../api'
+import {
+  api,
+  type LateReservation,
+  type ReminderChannel,
+  type ReminderOutcome,
+  type ReminderRow,
+} from '../api'
 import { useSession } from '../session-context'
 import { hhmm, ReservationDrawer } from './ReservationDrawer'
 
@@ -12,13 +18,19 @@ const SOURCE_LABEL: Record<string, string> = {
   walkin: 'Khách vãng lai',
 }
 
+const STAGE_LABEL: Record<string, string> = {
+  h24: 'Nhắc trước một ngày',
+  h2: 'Nhắc trước hai tiếng',
+}
+
 /**
- * R4 — quá giờ &amp; no-show.
+ * R4 — nhắc hẹn &amp; no-show.
  *
- * Bản thiết kế còn một nửa nữa: hàng đợi nhắc hẹn 24h/2h qua Messenger/Zalo. Nửa
- * đó cần kênh gửi tin ở Mục 30.3 — chưa dựng, mà một bảng "đã nhắc" không có ai
- * gửi thì tệ hơn là không có. Nửa làm được là nửa quan trọng hơn với ca đang
- * chạy: ai đã quá giờ, gọi số nào, và khi nào thì được buông bàn.
+ * Hai hàng đợi của cùng một câu chuyện, xếp theo thứ tự thời gian của nó: trước
+ * giờ hẹn thì gọi nhắc, sau giờ hẹn mà chưa thấy người thì gọi hỏi rồi mới buông
+ * bàn. Kênh gửi tin tự động (Mục 30.3) chưa dựng nên lượt nhắc hôm nay là người
+ * gọi điện — màn này ghi lại việc đã gọi, ai gọi và gọi có được không, để không
+ * ai bị gọi hai lần và không suất nào bị bỏ quên.
  */
 export function LateReservations() {
   const { branchId } = useSession()
@@ -34,11 +46,47 @@ export function LateReservations() {
     refetchInterval: 30_000,
   })
 
+  const queue = useQuery({
+    queryKey: ['remind-queue', branchId],
+    queryFn: () => api.remindQueue(branchId!),
+    enabled: Boolean(branchId),
+    refetchInterval: 60_000,
+  })
+
   const stats = useQuery({
     queryKey: ['no-show-stats', branchId],
     queryFn: () => api.noShowStats(branchId!),
     enabled: Boolean(branchId),
   })
+
+  const remind = useMutation({
+    mutationFn: (input: { row: ReminderRow; channel: ReminderChannel; outcome: ReminderOutcome }) =>
+      api.logReminder(input.row.id, {
+        stage: input.row.stage,
+        channel: input.channel,
+        outcome: input.outcome,
+      }),
+    onSuccess: (_result, input) => {
+      toast(
+        input.outcome === 'reached'
+          ? `${input.row.customerName} · đã nhắc xong`
+          : `${input.row.customerName} · không nghe máy, vẫn nằm trong hàng đợi`,
+        input.outcome === 'reached' ? 'ok' : 'warn',
+      )
+      void queryClient.invalidateQueries({ queryKey: ['remind-queue', branchId] })
+    },
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+
+  const copyLink = async (row: ReminderRow) => {
+    if (!row.confirmUrl) return
+    try {
+      await navigator.clipboard.writeText(row.confirmUrl)
+      toast('Đã chép liên kết — dán vào Zalo gửi khách', 'ok')
+    } catch {
+      toast('Máy này không cho chép tự động — mở chi tiết để đọc liên kết', 'warn')
+    }
+  }
 
   const noShow = useMutation({
     mutationFn: (row: LateReservation) => api.noShowReservation(row.id),
@@ -58,11 +106,12 @@ export function LateReservations() {
       <header className="flex flex-none items-start gap-4 px-6 pt-5 pb-4">
         <div>
           <h1 className="text-[length:var(--fs-t1)] font-semibold text-ink-hi">
-            Quá giờ &amp; no-show
+            Nhắc hẹn &amp; no-show
           </h1>
           <p className="mt-1.5 text-[length:var(--fs-c1)] text-ink-mute">
-            Giữ bàn {late.data?.holdMinutes ?? 15} phút sau giờ hẹn. Gọi khách trước khi buông bàn —
-            phần lớn người tới muộn vẫn tới.
+            Nhắc trước {queue.data?.aheadHours ?? 24} giờ và {queue.data?.soonHours ?? 2} giờ. Giữ
+            bàn {late.data?.holdMinutes ?? 15} phút sau giờ hẹn — gọi khách trước khi buông bàn, phần
+            lớn người tới muộn vẫn tới.
           </p>
         </div>
         <Button variant="ghost" className="ml-auto" onClick={() => void navigate('/dat-cho')}>
@@ -72,6 +121,60 @@ export function LateReservations() {
 
       <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-6 pb-6 xl:grid-cols-[1fr_380px]">
         <div>
+          <SectionLabel>Cần nhắc</SectionLabel>
+          <div className="mt-3 mb-7">
+            {queue.isPending ? (
+              <p className="text-ink-mute">Đang tải…</p>
+            ) : (queue.data?.rows ?? []).length === 0 ? (
+              <EmptyState title="Không còn ai cần nhắc. Suất tới cữ nhắc sẽ tự hiện ở đây; khách tự bấm xác nhận thì suất rời khỏi danh sách." />
+            ) : (
+              <div className="grid gap-2.5">
+                {queue.data!.rows.map((row) => (
+                  <Card key={`${row.id}-${row.stage}`} className="flex flex-wrap items-center gap-4 p-4">
+                    <span className="w-16 flex-none font-mono text-[length:var(--fs-t1)] text-accent-ink">
+                      {hhmm(row.slotAt)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[length:var(--fs-t2)] font-semibold text-ink-hi">
+                        {row.customerName}
+                      </span>
+                      <span className="mt-1 block text-[length:var(--fs-c1)] text-ink-mute">
+                        {row.guestCount} khách · {STAGE_LABEL[row.stage] ?? row.stage}
+                        {row.attempts > 0 ? ` · đã gọi ${row.attempts} lần chưa gặp` : ''}
+                      </span>
+                    </span>
+                    <a
+                      href={`tel:${row.customerPhone.replace(/\s/g, '')}`}
+                      className="inline-flex h-[var(--hit-target)] flex-none items-center rounded-sm border border-accent px-4 font-mono text-[length:var(--fs-b2)] text-accent-ink"
+                    >
+                      {row.customerPhone}
+                    </a>
+                    {row.confirmUrl ? (
+                      <Button variant="ghost" onClick={() => void copyLink(row)}>
+                        Chép liên kết
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant="secondary"
+                      disabled={remind.isPending}
+                      onClick={() => remind.mutate({ row, channel: 'phone', outcome: 'no_answer' })}
+                    >
+                      Không nghe máy
+                    </Button>
+                    <Button
+                      disabled={remind.isPending}
+                      onClick={() => remind.mutate({ row, channel: 'phone', outcome: 'reached' })}
+                    >
+                      Đã nhắc
+                    </Button>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <SectionLabel>Quá giờ</SectionLabel>
+          <div className="mt-3">
           {late.isPending ? (
             <p className="text-ink-mute">Đang tải…</p>
           ) : rows.length === 0 ? (
@@ -117,6 +220,7 @@ export function LateReservations() {
               ))}
             </div>
           )}
+          </div>
         </div>
 
         <Card className="h-fit p-5">

@@ -80,6 +80,9 @@ async function seedReservation(input: {
   guestCount?: number
   status?: string
   code: string
+  /** Lúc khách đặt — hàng đợi nhắc bỏ qua suất đặt sau cữ nhắc */
+  createdAt?: Date
+  guestToken?: string
 }) {
   const [row] = await db
     .insert(reservations)
@@ -96,6 +99,8 @@ async function seedReservation(input: {
       tableId: input.tableId ?? null,
       source: 'phone',
       businessDate: businessDateOf(input.slotAt, HANOI),
+      ...(input.createdAt ? { createdAt: input.createdAt } : {}),
+      ...(input.guestToken ? { guestToken: input.guestToken } : {}),
     })
     .returning()
   return row!
@@ -428,6 +433,110 @@ describe('R4 — quá giờ và no-show', () => {
     const phone = res.json().sources.find((s: { source: string }) => s.source === 'phone')
     expect(phone.noShow).toBe(1)
     expect(phone.rate).toBeGreaterThan(0)
+  })
+})
+
+describe('R4 — hàng đợi nhắc hẹn 24h/2h', () => {
+  let soonId: number
+  let aheadId: number
+  const LONG_AGO = new Date(Date.now() - 3 * 86_400_000)
+
+  const queue = async () => {
+    const res = await inject({
+      method: 'GET',
+      url: '/api/desk/reservations/remind-queue',
+      headers: auth(waiter),
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    return res.json().rows as { id: number; stage: string; attempts: number; confirmUrl: string | null }[]
+  }
+
+  beforeAll(async () => {
+    soonId = (
+      await seedReservation({
+        slotAt: new Date(Date.now() + 90 * 60_000),
+        code: 'DB-9101',
+        createdAt: LONG_AGO,
+      })
+    ).id
+    aheadId = (
+      await seedReservation({
+        slotAt: new Date(Date.now() + 20 * 3_600_000),
+        code: 'DB-9102',
+        createdAt: LONG_AGO,
+        guestToken: 'chia-cua-chi-vy',
+      })
+    ).id
+    // Vừa đặt xong cho tối nay — không ai cần gọi nhắc rằng họ vừa đặt
+    await seedReservation({
+      slotAt: new Date(Date.now() + 80 * 60_000),
+      code: 'DB-9103',
+    })
+  })
+
+  it('mỗi suất vào đúng cữ của nó, suất vừa đặt thì không vào hàng đợi', async () => {
+    const rows = await queue()
+    expect(rows.find((r) => r.id === soonId)?.stage).toBe('h2')
+    expect(rows.find((r) => r.id === aheadId)?.stage).toBe('h24')
+    expect(rows.find((r) => r.stage === 'h2' && r.attempts === 0)).toBeTruthy()
+    expect(rows.map((r) => r.id)).not.toContain(
+      (await db.select().from(reservations).where(eq(reservations.displayCode, 'DB-9103')))[0]!.id,
+    )
+  })
+
+  it('liên kết một chạm dựng từ chìa của khách', async () => {
+    const rows = await queue()
+    expect(rows.find((r) => r.id === aheadId)?.confirmUrl).toBe(
+      'https://tokyosora.vn/dat-ban/xac-nhan/chia-cua-chi-vy',
+    )
+  })
+
+  it('gọi không nghe máy thì suất vẫn nằm đó, chỉ đếm thêm một lần gọi', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: `/api/desk/reservations/${soonId}/remind`,
+      headers: auth(waiter),
+      payload: { stage: 'h2', channel: 'phone', outcome: 'no_answer' },
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+
+    const row = (await queue()).find((r) => r.id === soonId)
+    expect(row?.attempts).toBe(1)
+  })
+
+  it('gọi được khách thì cữ đó đóng lại', async () => {
+    await inject({
+      method: 'POST',
+      url: `/api/desk/reservations/${soonId}/remind`,
+      headers: auth(waiter),
+      payload: { stage: 'h2', channel: 'phone', outcome: 'reached' },
+    })
+    expect((await queue()).find((r) => r.id === soonId)).toBeUndefined()
+  })
+
+  it('khách tự bấm xác nhận lại thì nhân viên khỏi phải gọi', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/reservations/track/chia-cua-chi-vy/confirm',
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+    expect((await queue()).find((r) => r.id === aheadId)).toBeUndefined()
+  })
+
+  it('suất đã huỷ thì không ghi lượt nhắc nào nữa', async () => {
+    const cancelled = await seedReservation({
+      slotAt: new Date(Date.now() + 90 * 60_000),
+      code: 'DB-9104',
+      status: 'cancelled',
+      createdAt: LONG_AGO,
+    })
+    const res = await inject({
+      method: 'POST',
+      url: `/api/desk/reservations/${cancelled.id}/remind`,
+      headers: auth(waiter),
+      payload: { stage: 'h2', channel: 'zalo', outcome: 'reached' },
+    })
+    expect(res.statusCode).toBe(409)
   })
 })
 

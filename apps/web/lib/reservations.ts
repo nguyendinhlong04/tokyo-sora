@@ -20,6 +20,10 @@ export interface Availability {
   holdMinutes: number
   tableHoldMinutes: number
   autoConfirm: boolean
+  /** Tiền cọc của kiểu chỗ đang chọn — 0 là không thu (R3) */
+  depositVnd: number
+  /** Ngày quán không nhận đặt, kèm lý do (R3) */
+  blocked: { reason: string } | null
   slots: AvailabilitySlot[]
 }
 
@@ -35,6 +39,25 @@ export interface Reservation {
   status: 'pending' | 'confirmed'
   slotAt: string
   businessDate: string
+  /** Chìa mở lại suất — nằm trong liên kết nhắc hẹn của R4 */
+  guestToken: string
+  /** Khác 0 thì suất chờ nhà hàng gọi thu cọc (R3) */
+  depositVnd: number
+  tableHoldMinutes: number
+}
+
+export interface MyReservation {
+  displayCode: string
+  branchName: string
+  branchAddress: string | null
+  branchPhone: string | null
+  seatKind: SeatKindId
+  guestCount: number
+  customerName: string
+  slotAt: string
+  status: 'pending' | 'confirmed' | 'seated' | 'done' | 'cancelled' | 'no_show'
+  note: string | null
+  guestConfirmedAt: string | null
   tableHoldMinutes: number
 }
 
@@ -71,4 +94,14 @@ export function confirmReservation(
   input: SlotRef & { name: string; phone: string; note?: string; holdToken?: string },
 ): Promise<Reservation> {
   return apiPost<Reservation>('/api/reservations', input)
+}
+
+/** Suất của chính khách, mở bằng chìa trong liên kết nhắc hẹn (R4) */
+export function fetchMyReservation(token: string): Promise<MyReservation> {
+  return apiGet<MyReservation>(`/api/reservations/track/${encodeURIComponent(token)}`)
+}
+
+/** Một chạm xác nhận lại — đổ thẳng về hàng đợi nhắc của R4 */
+export function reconfirmReservation(token: string): Promise<MyReservation> {
+  return apiPost<MyReservation>(`/api/reservations/track/${encodeURIComponent(token)}/confirm`, {})
 }

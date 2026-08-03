@@ -9,8 +9,9 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { businessDateOf } from '../common/business-date'
+import { ParamsService } from '../common/params.service'
 import type { Db } from '../db/client'
-import { branches, outboxEvents } from '../db/schema'
+import { branches, outboxEvents, reservationBlockedDays } from '../db/schema'
 import { bootTestApp, type Fixtures } from './harness'
 
 let app: NestFastifyApplication
@@ -21,6 +22,8 @@ let close: () => Promise<void>
 const HANOI = 'Asia/Ho_Chi_Minh'
 /** Ngày mai: tránh mọi khung bị đóng vì "đã qua" hay "quá gần" khi test chạy buổi tối */
 const TOMORROW = businessDateOf(new Date(Date.now() + 86_400_000), HANOI)
+const DAY_AFTER = businessDateOf(new Date(Date.now() + 2 * 86_400_000), HANOI)
+const IN_THREE_DAYS = businessDateOf(new Date(Date.now() + 3 * 86_400_000), HANOI)
 const AT_1700 = 17 * 60
 
 const inject = (opts: Parameters<NestFastifyApplication['inject']>[0]) => app.inject(opts)
@@ -227,5 +230,150 @@ describe('W6 — những gì phải chặn ở máy chủ', () => {
   it('số điện thoại phải là số', async () => {
     const res = await confirm({ phone: 'gọi cho tôi nhé' })
     expect(res.statusCode).toBe(400)
+  })
+})
+
+describe('R3 — cấu hình nhận đặt có hệ quả thật', () => {
+  const params = () => app.get(ParamsService)
+
+  afterAll(async () => {
+    await params().set('reservation.slotCapGrill', 0, { branchId: fx.branchId })
+    await params().set('reservation.depositGrillVnd', 0, { branchId: fx.branchId })
+    await db.delete(reservationBlockedDays)
+  })
+
+  it('ngày bị chặn thì cả lưới xám kèm lý do, và API vẫn chặn nếu gọi thẳng', async () => {
+    await db
+      .insert(reservationBlockedDays)
+      .values({ branchId: fx.branchId, day: IN_THREE_DAYS, reason: 'Tiệc công ty bao trọn quán' })
+
+    const { body } = await availability(2, 'grill', IN_THREE_DAYS)
+    expect(body.blocked.reason).toBe('Tiệc công ty bao trọn quán')
+    expect(body.slots.every((s: { open: boolean }) => !s.open)).toBe(true)
+    expect(body.slots[0].closedReason).toBe('blocked')
+
+    const res = await inject({
+      method: 'POST',
+      url: '/api/reservations/holds',
+      payload: {
+        branchId: fx.branchId,
+        date: IN_THREE_DAYS,
+        guestCount: 2,
+        seatKind: 'grill',
+        minute: AT_1700,
+      },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('blocked_day')
+
+    await db.delete(reservationBlockedDays)
+  })
+
+  it('trần suất mỗi khung cắt bớt sức chứa dù bàn còn trống', async () => {
+    // Fixture có hai bàn nướng; trần 1 nghĩa là mỗi khung chỉ nhận một suất
+    await params().set('reservation.slotCapGrill', 1, { branchId: fx.branchId })
+    const { body } = await availability(2, 'grill', IN_THREE_DAYS)
+    expect(body.capacity).toBe(1)
+
+    await params().set('reservation.slotCapGrill', 0, { branchId: fx.branchId })
+    expect((await availability(2, 'grill', IN_THREE_DAYS)).body.capacity).toBe(2)
+  })
+
+  it('kiểu chỗ có cọc thì suất nằm chờ, dù chi nhánh đang tự động xác nhận', async () => {
+    await params().set('reservation.depositGrillVnd', 300_000, { branchId: fx.branchId })
+    expect((await availability(2, 'grill', IN_THREE_DAYS)).body.depositVnd).toBe(300_000)
+
+    const res = await confirm({
+      date: IN_THREE_DAYS,
+      minute: AT_1700,
+      guestCount: 2,
+      name: 'Anh Vũ',
+      phone: '0977 444 555',
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+    expect(res.json().status).toBe('pending')
+    expect(res.json().depositVnd).toBe(300_000)
+  })
+})
+
+describe('Mã đặt chỗ — hai suất khác ngày ăn không được trùng mã', () => {
+  /**
+   * Ngày làm việc của một suất là ngày khách ĐẾN ĂN, không phải ngày đặt. Đếm số
+   * theo ngày ăn mà in `yyMM` lên mã thì hai người cùng đặt hôm nay cho hai tối
+   * khác nhau đều nhận `DB-2608-0001` — người thứ hai đâm vào ràng buộc duy nhất
+   * và W6 trả 500 ngay lúc khách bấm xác nhận.
+   */
+  it('cùng ngày đặt, khác ngày ăn, vẫn ra hai mã khác nhau', async () => {
+    const first = await confirm({
+      minute: 11 * 60,
+      guestCount: 2,
+      name: 'Anh Đức',
+      phone: '0906 222 333',
+    })
+    const second = await confirm({
+      date: DAY_AFTER,
+      minute: 11 * 60,
+      guestCount: 2,
+      name: 'Anh Đức',
+      phone: '0906 222 333',
+    })
+
+    expect(first.statusCode, first.payload).toBe(201)
+    expect(second.statusCode, second.payload).toBe(201)
+    expect(second.json().displayCode).not.toBe(first.json().displayCode)
+  })
+})
+
+describe('R4 — khách mở lại suất bằng liên kết nhắc hẹn', () => {
+  let token: string
+  let code: string
+
+  it('chốt xong thì khách cầm luôn chìa mở lại suất của mình', async () => {
+    const res = await confirm({
+      minute: 11 * 60,
+      guestCount: 2,
+      seatKind: 'standard',
+      name: 'Chị Lan',
+      phone: '0906 111 222',
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+    token = res.json().guestToken
+    code = res.json().displayCode
+    expect(token).toHaveLength(22)
+  })
+
+  it('liên kết mở đúng suất đó mà không cần đăng nhập', async () => {
+    const res = await inject({ method: 'GET', url: `/api/reservations/track/${token}` })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.displayCode).toBe(code)
+    expect(body.customerName).toBe('Chị Lan')
+    expect(body.branchName).toBeTruthy()
+    expect(body.guestConfirmedAt).toBeNull()
+  })
+
+  it('một chạm là xác nhận lại — bấm lần nữa chỉ dời dấu thời gian, không báo lỗi', async () => {
+    const first = await inject({
+      method: 'POST',
+      url: `/api/reservations/track/${token}/confirm`,
+    })
+    expect(first.statusCode).toBe(201)
+    expect(first.json().guestConfirmedAt).toBeTruthy()
+    // Quyền nhận hay không vẫn là của quán: một chạm không tự duyệt suất
+    expect(first.json().status).toBe('confirmed')
+
+    const again = await inject({
+      method: 'POST',
+      url: `/api/reservations/track/${token}/confirm`,
+    })
+    expect(again.statusCode).toBe(201)
+    expect(new Date(again.json().guestConfirmedAt).getTime()).toBeGreaterThanOrEqual(
+      new Date(first.json().guestConfirmedAt).getTime(),
+    )
+  })
+
+  it('chìa sai thì không mở suất nào', async () => {
+    const res = await inject({ method: 'GET', url: '/api/reservations/track/khong-co-that' })
+    expect(res.statusCode).toBe(404)
   })
 })

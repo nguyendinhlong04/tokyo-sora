@@ -23,6 +23,12 @@ const NoteBody = z.object({ note: z.string().max(300).nullable() })
 const ArriveBody = z.object({ tableId: z.number().int().positive().nullish() })
 const CancelBody = z.object({ reason: z.string().min(1).max(300) })
 
+const RemindBody = z.object({
+  stage: z.enum(['h24', 'h2']),
+  channel: z.enum(['phone', 'zalo', 'sms', 'messenger']),
+  outcome: z.enum(['reached', 'no_answer']),
+})
+
 const StaffCreateBody = z.object({
   branchId: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -76,6 +82,12 @@ export class ReservationDeskController {
     return this.desk.noShowStats(this.branchOf(req, branch), parsed)
   }
 
+  /** R4 — suất tới cữ nhắc mà chưa gọi được khách. Khai TRƯỚC `:id` để không bị nuốt */
+  @Get('remind-queue')
+  remindQueue(@Req() req: RequestWithActor, @Query('branch') branch?: string) {
+    return this.desk.remindQueue(this.branchOf(req, branch))
+  }
+
   /** R2 chi tiết */
   @Get(':id')
   detail(@Param('id', ParseIntPipe) id: number) {
@@ -106,6 +118,12 @@ export class ReservationDeskController {
   @RequirePermission('reservation.confirm-or-noshow')
   arrive(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @Req() req: RequestWithActor) {
     return this.desk.arrive(id, ArriveBody.parse(body ?? {}), req.actor!)
+  }
+
+  /** R4 — ghi lại một lượt nhắc vừa gửi cho khách */
+  @Post(':id/remind')
+  remind(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @Req() req: RequestWithActor) {
+    return this.desk.logReminder(id, RemindBody.parse(body), req.actor!)
   }
 
   /** R4 · R2 đánh no-show */

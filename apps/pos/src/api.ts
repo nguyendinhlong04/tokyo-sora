@@ -94,6 +94,22 @@ export interface LateReservation extends ReservationRow {
   canNoShow: boolean
 }
 
+/** Hai cữ nhắc của R4: trước một ngày và trước hai tiếng */
+export type ReminderStage = 'h24' | 'h2'
+export type ReminderChannel = 'phone' | 'zalo' | 'sms' | 'messenger'
+export type ReminderOutcome = 'reached' | 'no_answer'
+
+export interface ReminderRow extends ReservationRow {
+  stage: ReminderStage
+  dueAt: string
+  /** Số lần đã gọi mà không nghe máy */
+  attempts: number
+  lastAttemptAt: string | null
+  guestConfirmedAt: string | null
+  /** Liên kết một chạm để dán vào Zalo — rỗng với suất đặt trước khi có chìa */
+  confirmUrl: string | null
+}
+
 export interface OrderLineRow {
   id: number
   parentLineId: number | null
@@ -219,22 +235,6 @@ export interface TableRequest {
   urgent: boolean
 }
 
-export const api = {
-  staffList: (branchId: string) =>
-    apiFetch<StaffOption[]>(`/api/auth/staff?branchId=${encodeURIComponent(branchId)}`),
-
-  login: (input: { branchId: string; staffId: number; pin: string }) =>
-    apiFetch<{ token: string; staff: { id: number; fullName: string; roles: string[] } }>(
-      '/api/auth/login',
-      { method: 'POST', body: input },
-    ),
-
-  me: () => apiFetch<{ kind: string; branchId: string; fullName?: string; roles?: string[] }>('/api/auth/me'),
-
-  logout: () => apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
-
-  config: (branchId: string) => apiFetch<ConfigBundle>(`/api/config?branch=${branchId}`),
-
 /** P14 — bảng số liệu trước khi đếm két */
 export interface ShiftSummary {
   shift: {
@@ -305,6 +305,22 @@ export interface CodBook {
   total: number
 }
 
+export const api = {
+  staffList: (branchId: string) =>
+    apiFetch<StaffOption[]>(`/api/auth/staff?branchId=${encodeURIComponent(branchId)}`),
+
+  login: (input: { branchId: string; staffId: number; pin: string }) =>
+    apiFetch<{ token: string; staff: { id: number; fullName: string; roles: string[] } }>(
+      '/api/auth/login',
+      { method: 'POST', body: input },
+    ),
+
+  me: () => apiFetch<{ kind: string; branchId: string; fullName?: string; roles?: string[] }>('/api/auth/me'),
+
+  logout: () => apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
+
+  config: (branchId: string) => apiFetch<ConfigBundle>(`/api/config?branch=${branchId}`),
+
   availability: (branchId: string) =>
     apiFetch<AvailabilityRow[]>(`/api/availability?branch=${branchId}`),
 
@@ -321,22 +337,6 @@ export interface CodBook {
 
   bill: (sessionId: number) => apiFetch<Bill>(`/api/table-sessions/${sessionId}/bill`),
 
-  // --- O8 · O9 · O12 điều phối đơn online ---
-
-  dispatchBoard: (branchId: string) =>
-    apiFetch<{ serverTime: string; orders: DispatchCard[] }>(
-      `/api/orders?branch=${encodeURIComponent(branchId)}`,
-    ),
-
-  orderDetail: (orderId: number) => apiFetch<DispatchDetail>(`/api/orders/${orderId}`),
-
-  setOrderStatus: (orderId: number, to: DispatchCard['status']) =>
-    apiFetch<{ status: string; changed: boolean; tickets?: number }>(
-      `/api/orders/${orderId}/status`,
-      { method: 'POST', body: { to } },
-    ),
-
-  cancelOrder: (orderId: number, reason: string) =>
   /** P5 — thứ tự 20 ô bàn phím nhanh; tên và giá vẫn lấy từ config bundle */
   quickKeys: (branchId: string) =>
     apiFetch<{ dishIds: string[]; days: number; since: string }>(
@@ -429,6 +429,22 @@ export interface CodBook {
       { method: 'POST', body: { targetSessionId } },
     ),
 
+  // --- O8 · O9 · O12 điều phối đơn online ---
+
+  dispatchBoard: (branchId: string) =>
+    apiFetch<{ serverTime: string; orders: DispatchCard[] }>(
+      `/api/orders?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  orderDetail: (orderId: number) => apiFetch<DispatchDetail>(`/api/orders/${orderId}`),
+
+  setOrderStatus: (orderId: number, to: DispatchCard['status']) =>
+    apiFetch<{ status: string; changed: boolean; tickets?: number }>(
+      `/api/orders/${orderId}/status`,
+      { method: 'POST', body: { to } },
+    ),
+
+  cancelOrder: (orderId: number, reason: string) =>
     apiFetch<{ changed: boolean }>(`/api/orders/${orderId}/cancel`, {
       method: 'POST',
       body: { reason },
@@ -474,6 +490,20 @@ export interface CodBook {
   noShowStats: (branchId: string) =>
     apiFetch<{ days: number; sources: { source: string; total: number; noShow: number; rate: number }[] }>(
       `/api/desk/reservations/no-show-stats?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  remindQueue: (branchId: string) =>
+    apiFetch<{ serverNow: string; aheadHours: number; soonHours: number; rows: ReminderRow[] }>(
+      `/api/desk/reservations/remind-queue?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  logReminder: (
+    id: number,
+    input: { stage: ReminderStage; channel: ReminderChannel; outcome: ReminderOutcome },
+  ) =>
+    apiFetch<{ reservationId: number; stage: ReminderStage; outcome: ReminderOutcome; sentAt: string }>(
+      `/api/desk/reservations/${id}/remind`,
+      { method: 'POST', body: input },
     ),
 
   assignReservationTable: (id: number, tableId: number | null) =>

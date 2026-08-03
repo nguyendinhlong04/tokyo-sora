@@ -1,5 +1,6 @@
 'use client'
 
+import { formatVnd } from '@sora/contracts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../lib/api'
 import {
@@ -486,6 +487,16 @@ export function BookingFlow({ branches, initial }: Props) {
                     />
                   ))}
                 </div>
+              ) : availability?.blocked ? (
+                /* Ngày quán đóng cửa nhận đặt (R3) — nói lý do, đừng để lưới xám câm lặng */
+                <div className="mt-6 rounded-md border border-warn bg-warn/8 p-8">
+                  <p className="text-[length:var(--fs-b1)] font-medium text-ink-hi">
+                    {longDate(date)} chi nhánh không nhận đặt bàn.
+                  </p>
+                  <p className="mt-2.5 text-[length:var(--fs-b1)] text-ink-body">
+                    {availability.blocked.reason}. Chọn giúp bạn một ngày khác.
+                  </p>
+                </div>
               ) : seatUnavailable ? (
                 <div className="mt-6 rounded-md border border-warn bg-warn/8 p-8">
                   <p className="text-[length:var(--fs-b1)] font-medium text-ink-hi">
@@ -630,6 +641,13 @@ export function BookingFlow({ branches, initial }: Props) {
                 <SummaryRow label="Số khách" value={String(guestCount)} mono />
                 <SummaryRow label="Kiểu chỗ" value={seatLabel(seatKind)} />
               </dl>
+              {availability?.depositVnd ? (
+                /* Cọc phải nói TRƯỚC khi khách điền, không phải sau khi bấm xác nhận */
+                <p className="mt-5 rounded-sm border border-warn bg-warn/8 px-4 py-3 text-[length:var(--fs-c1)] leading-relaxed text-gold-200">
+                  {seatLabel(seatKind)} cần đặt cọc {formatVnd(availability.depositVnd)}. Nhà hàng
+                  sẽ gọi để thu cọc và xác nhận suất này.
+                </p>
+              ) : null}
               <p className="mt-6 border-t border-line-1 pt-5 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
                 Chúng tôi giữ bàn {availability?.tableHoldMinutes ?? 15} phút sau giờ hẹn. Đến muộn
                 hơn, nhắn giúp chúng tôi.
@@ -680,7 +698,7 @@ function DoneScreen({
 
         {manual ? (
           <span className="mt-7 inline-flex h-7 items-center rounded-pill border border-warn px-3 text-[length:var(--fs-c1)] font-medium text-warn">
-            Chờ nhà hàng xác nhận
+            {reservation.depositVnd > 0 ? 'Chờ nhà hàng gọi thu cọc' : 'Chờ nhà hàng xác nhận'}
           </span>
         ) : null}
 
@@ -701,6 +719,9 @@ function DoneScreen({
             />
             <SummaryRow label="Số khách" value={String(summary.guestCount)} mono />
             <SummaryRow label="Kiểu chỗ" value={summary.seatLabel} />
+            {reservation.depositVnd > 0 ? (
+              <SummaryRow label="Tiền cọc" value={formatVnd(reservation.depositVnd)} mono />
+            ) : null}
           </dl>
         </div>
 
@@ -724,6 +745,14 @@ function DoneScreen({
             className="flex h-14 items-center justify-center rounded-sm border border-line-3 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
           >
             Thêm vào lịch
+          </a>
+          {/* Cùng liên kết mà lời nhắc 24h/2h sẽ gửi (R4) — lưu lại thì khách xem
+              và xác nhận lại được kể cả khi không bấm Messenger */}
+          <a
+            href={`/dat-ban/xac-nhan/${reservation.guestToken}`}
+            className="flex h-14 items-center justify-center rounded-sm border border-line-3 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
+          >
+            Xem lại &amp; xác nhận đặt chỗ
           </a>
           <button
             type="button"

@@ -18,6 +18,13 @@ export interface BranchRow {
   active: boolean
 }
 
+/** R3 — một ngày quán không nhận đặt, kèm lý do để người trực trả lời khách */
+export interface BlockedDay {
+  id: number
+  day: string
+  reason: string
+}
+
 export interface ParameterRow {
   key: string
   unit: string | null
@@ -874,13 +881,6 @@ export interface DishDetail {
 
 // ------------------------------------------------ M10 · Cây danh mục
 
-export interface CategoryNode {
-  id: string
-  parentId: string | null
-  nameVi: string
-  nameEn: string | null
-  nameJa: string | null
-  kanji: string | null
 /** M5 — một lựa chọn trong nhóm tuỳ chọn */
 export interface ModifierOptionRow {
   id: string
@@ -922,6 +922,13 @@ export interface ModifierGroupInput {
   }[]
 }
 
+export interface CategoryNode {
+  id: string
+  parentId: string | null
+  nameVi: string
+  nameEn: string | null
+  nameJa: string | null
+  kanji: string | null
   imageUrl: string | null
   onlineVisible: boolean
   tableVisible: boolean
@@ -1979,6 +1986,22 @@ export const api = {
       { method: 'DELETE' },
     ),
 
+  blockedDays: (branchId: string) =>
+    apiFetch<BlockedDay[]>(
+      `/api/admin/reservations/blocked-days?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  blockDay: (branchId: string, day: string, reason: string) =>
+    apiFetch<BlockedDay & { existingReservations: number }>(
+      `/api/admin/reservations/blocked-days?branch=${encodeURIComponent(branchId)}`,
+      { method: 'POST', body: { day, reason } },
+    ),
+
+  unblockDay: (id: number) =>
+    apiFetch<{ id: number; day: string }>(`/api/admin/reservations/blocked-days/${id}`, {
+      method: 'DELETE',
+    }),
+
   // ------------------------------------------------------------------- A10
 
   branches: () => apiFetch<BranchRow[]>('/api/admin/branches'),
@@ -2218,29 +2241,6 @@ export const api = {
   deleteCategory: (id: string) =>
     apiFetch<{ deleted: boolean }>(`/api/admin/categories/${id}`, { method: 'DELETE' }),
 
-  // -------------------------------------------------------------------- M11
-
-  sets: (branchId: string) =>
-    apiFetch<SetOverviewRow[]>(`/api/admin/sets?branch=${encodeURIComponent(branchId)}`),
-
-  // -------------------------------------------------------------------- O10
-
-  deliveryZones: (branchId: string) =>
-    apiFetch<DeliveryZone[]>(`/api/admin/delivery-zones?branch=${encodeURIComponent(branchId)}`),
-
-  createZone: (input: Omit<DeliveryZone, 'id'>) =>
-    apiFetch<DeliveryZone>('/api/admin/delivery-zones', { method: 'POST', body: input }),
-
-  updateZone: (id: number, patch: Partial<Omit<DeliveryZone, 'id'>>) =>
-    apiFetch<DeliveryZone>(`/api/admin/delivery-zones/${id}`, { method: 'PATCH', body: patch }),
-
-  deleteZone: (id: number) =>
-    apiFetch<{ deleted: boolean }>(`/api/admin/delivery-zones/${id}`, { method: 'DELETE' }),
-
-  // ------------------------------------------------- B1 · B3 · F1 · F7
-
-  today: (branchId: string, date: string | null) =>
-    apiFetch<TodayReport>(
   // --------------------------------------------------------------------- M5
 
   modifierGroups: () => apiFetch<ModifierGroupRow[]>('/api/admin/modifier-groups'),
@@ -2266,6 +2266,29 @@ export const api = {
       { method: 'PUT', body: { groupIds } },
     ),
 
+  // -------------------------------------------------------------------- M11
+
+  sets: (branchId: string) =>
+    apiFetch<SetOverviewRow[]>(`/api/admin/sets?branch=${encodeURIComponent(branchId)}`),
+
+  // -------------------------------------------------------------------- O10
+
+  deliveryZones: (branchId: string) =>
+    apiFetch<DeliveryZone[]>(`/api/admin/delivery-zones?branch=${encodeURIComponent(branchId)}`),
+
+  createZone: (input: Omit<DeliveryZone, 'id'>) =>
+    apiFetch<DeliveryZone>('/api/admin/delivery-zones', { method: 'POST', body: input }),
+
+  updateZone: (id: number, patch: Partial<Omit<DeliveryZone, 'id'>>) =>
+    apiFetch<DeliveryZone>(`/api/admin/delivery-zones/${id}`, { method: 'PATCH', body: patch }),
+
+  deleteZone: (id: number) =>
+    apiFetch<{ deleted: boolean }>(`/api/admin/delivery-zones/${id}`, { method: 'DELETE' }),
+
+  // ------------------------------------------------- B1 · B3 · F1 · F7
+
+  today: (branchId: string, date: string | null) =>
+    apiFetch<TodayReport>(
       `/api/reports/today?branch=${encodeURIComponent(branchId)}${date ? `&date=${date}` : ''}`,
     ),
 
@@ -2639,6 +2662,12 @@ export const api = {
     id
       ? apiFetch<EmployeeRow>(`/api/hr/employees/${id}`, { method: 'PUT', body: input })
       : apiFetch<EmployeeRow>('/api/hr/employees', { method: 'POST', body: input }),
+
+  /** Link Kênh nhân viên (H8 · H9) — token trả về đúng một lần, cấp lại giết link cũ */
+  issueChannelLink: (employeeId: number) =>
+    apiFetch<{ token: string; fullName: string }>(`/api/hr/employees/${employeeId}/channel-link`, {
+      method: 'POST',
+    }),
 
   scheduleWeek: (branchId: string, weekStart: string) =>
     apiFetch<ScheduleWeek>(

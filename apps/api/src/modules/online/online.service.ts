@@ -358,8 +358,6 @@ export class OnlineService {
         branchId: input.branchId,
         kind: 'order',
         businessDate,
-        at: now,
-        timezone: branch.timezone,
       })
 
       const trackToken = newToken()

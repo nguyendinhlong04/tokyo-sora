@@ -6,13 +6,20 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { rooms, WS_TOPICS } from '@sora/contracts'
-import { and, asc, eq, gte, inArray, lt, lte, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm'
 import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
 import { ParamsService } from '../../common/params.service'
 import type { Db } from '../../db/client'
-import { areas, branches, reservations, tables, tableSessions } from '../../db/schema'
+import {
+  areas,
+  branches,
+  reservationReminders,
+  reservations,
+  tables,
+  tableSessions,
+} from '../../db/schema'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 import { FloorplanService } from '../ordering/floorplan.service'
@@ -27,6 +34,11 @@ export type ReservationStatus =
   | 'done'
   | 'cancelled'
   | 'no_show'
+
+/** Hai cữ nhắc của R4: trước một ngày và trước hai tiếng */
+export type ReminderStage = 'h24' | 'h2'
+export type ReminderChannel = 'phone' | 'zalo' | 'sms' | 'messenger'
+export type ReminderOutcome = 'reached' | 'no_answer'
 
 /**
  * Quầy đặt bàn trên POS — R1 bảng trục giờ · R2 chi tiết · R4 quá giờ · P13 hôm nay.
@@ -318,6 +330,131 @@ export class ReservationDeskService {
     }
   }
 
+  /**
+   * Hàng đợi nhắc hẹn — "nhắc trước 24h và 2h" (§23.4 R4).
+   *
+   * Hàng đợi là một CÂU HỎI chứ không phải một bảng dựng sẵn: suất còn hiệu lực,
+   * đã qua cữ nhắc, chưa gọi được khách và khách cũng chưa tự xác nhận lại. Nhờ
+   * vậy khách huỷ hay đổi giờ thì lời nhắc tự rơi khỏi hàng đợi, không cần ai
+   * đi dọn — và không có ngày nào nhân viên gọi cho người đã huỷ từ hôm qua.
+   *
+   * Suất ĐẶT SÁT giờ không sinh lượt nhắc của cữ đã trôi qua: người vừa đặt cách
+   * đây mười phút không cần ai gọi nhắc rằng họ vừa đặt.
+   */
+  async remindQueue(branchId: string) {
+    const p = await this.params.bundle(
+      { 'reservation.remindAheadHours': 24, 'reservation.remindSoonHours': 2 },
+      branchId,
+    )
+    const aheadMs = p['reservation.remindAheadHours'] * 3_600_000
+    const soonMs = p['reservation.remindSoonHours'] * 3_600_000
+    const now = new Date()
+
+    const rows = await this.db
+      .select()
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.branchId, branchId),
+          inArray(reservations.status, ['pending', 'confirmed']),
+          gt(reservations.slotAt, now),
+          lte(reservations.slotAt, new Date(now.getTime() + aheadMs)),
+        ),
+      )
+      .orderBy(asc(reservations.slotAt))
+
+    const logs = rows.length
+      ? await this.db
+          .select()
+          .from(reservationReminders)
+          .where(
+            inArray(
+              reservationReminders.reservationId,
+              rows.map((r) => r.id),
+            ),
+          )
+          .orderBy(desc(reservationReminders.sentAt))
+      : []
+
+    const linkBase = await this.confirmLinkBase()
+    const due = []
+
+    for (const row of rows) {
+      const soon = row.slotAt.getTime() - now.getTime() <= soonMs
+      const stage: ReminderStage = soon ? 'h2' : 'h24'
+      const dueAt = new Date(row.slotAt.getTime() - (soon ? soonMs : aheadMs))
+
+      // Đặt sau cữ nhắc thì cữ đó vô nghĩa — khách vừa tự tay chọn giờ này
+      if (row.createdAt >= dueAt) continue
+      // Khách đã bấm xác nhận lại SAU khi cữ này mở ra thì khỏi gọi
+      if (row.guestConfirmedAt && row.guestConfirmedAt >= dueAt) continue
+
+      const mine = logs.filter((l) => l.reservationId === row.id && l.stage === stage)
+      if (mine.some((l) => l.outcome === 'reached')) continue
+
+      due.push({
+        ...this.view(row),
+        stage,
+        dueAt: dueAt.toISOString(),
+        /** Số lần đã gọi mà không nghe máy — gọi lần thứ ba thì nên nghĩ khác */
+        attempts: mine.length,
+        lastAttemptAt: mine[0]?.sentAt.toISOString() ?? null,
+        guestConfirmedAt: row.guestConfirmedAt?.toISOString() ?? null,
+        /** Liên kết một chạm để dán vào Zalo/tin nhắn — rỗng với suất cũ chưa có chìa */
+        confirmUrl: row.guestToken ? `${linkBase}/dat-ban/xac-nhan/${row.guestToken}` : null,
+      })
+    }
+
+    return {
+      serverNow: now.toISOString(),
+      aheadHours: p['reservation.remindAheadHours'],
+      soonHours: p['reservation.remindSoonHours'],
+      rows: due,
+    }
+  }
+
+  /**
+   * Ghi lại một lượt nhắc đã gửi.
+   *
+   * Không gắn quyền riêng, cùng lý do với ghi chú R2: gọi điện nhắc khách là
+   * việc của cả ca, còn thứ đáng gắn quyền là đánh no-show — con số đi vào quyết
+   * định bắt cọc.
+   */
+  async logReminder(
+    id: number,
+    input: { stage: ReminderStage; channel: ReminderChannel; outcome: ReminderOutcome },
+    actor: Actor,
+  ) {
+    const row = await this.byId(id)
+    if (row.status !== 'pending' && row.status !== 'confirmed') {
+      throw new ConflictException(`Suất này đang ở trạng thái ${statusName(row.status)}`)
+    }
+
+    const [saved] = await this.db
+      .insert(reservationReminders)
+      .values({
+        reservationId: id,
+        stage: input.stage,
+        channel: input.channel,
+        outcome: input.outcome,
+        sentBy: actor.kind === 'staff' ? actor.staffId : null,
+      })
+      .returning()
+
+    await this.write(actor, 'reservation.reminded', id, {
+      stage: input.stage,
+      channel: input.channel,
+      outcome: input.outcome,
+    })
+
+    return {
+      reservationId: id,
+      stage: saved!.stage as ReminderStage,
+      outcome: saved!.outcome as ReminderOutcome,
+      sentAt: saved!.sentAt.toISOString(),
+    }
+  }
+
   /** Tỉ lệ no-show theo nguồn đặt — dữ liệu để quyết có bắt đặt cọc hay không */
   async noShowStats(branchId: string, days = 30) {
     const from = new Date(Date.now() - days * 86_400_000)
@@ -456,6 +593,18 @@ export class ReservationDeskService {
       })
     }
     return out
+  }
+
+  /**
+   * Gốc của liên kết khách bấm xác nhận lại.
+   *
+   * Máy POS không biết tên miền của website — nó chạy trên máy quán, còn liên
+   * kết thì phải mở được trên điện thoại khách. Nên gốc nằm ở sổ tham số A6,
+   * cùng chỗ với mọi thứ đổi theo chi nhánh.
+   */
+  private async confirmLinkBase(): Promise<string> {
+    const raw = await this.params.get<string>('site.publicUrl')
+    return (raw?.trim() || 'https://tokyosora.vn').replace(/\/+$/, '')
   }
 
   private async broadcast(branchId: string, id: number, status: string) {

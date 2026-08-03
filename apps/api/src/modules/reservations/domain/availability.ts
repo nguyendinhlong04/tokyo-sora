@@ -22,7 +22,7 @@ export interface Booking {
   endMinute: number
 }
 
-export type SlotClosedReason = 'full' | 'too-soon' | 'past'
+export type SlotClosedReason = 'full' | 'too-soon' | 'past' | 'blocked'
 
 export interface SeatSlot {
   /** Phút kể từ đầu ngày làm việc */

@@ -53,16 +53,31 @@ const FIELDS: { key: string; label: string; hint: string }[] = [
     label: 'Nhóm tối đa đặt qua web',
     hint: 'Đông hơn thì W6 mời khách gọi điện để nhân viên ghép bàn.',
   },
+  {
+    key: 'reservation.remindAheadHours',
+    label: 'Cữ nhắc sớm (giờ trước hẹn)',
+    hint: 'Suất tới cữ này hiện trong hàng đợi nhắc của R4.',
+  },
+  {
+    key: 'reservation.remindSoonHours',
+    label: 'Cữ nhắc gần (giờ trước hẹn)',
+    hint: 'Cữ chốt lại trước giờ ăn; khách xác nhận lại ở cữ này là chắc nhất.',
+  },
+]
+
+/** Trần suất và tiền cọc khai theo KIỂU CHỖ — suất đặt theo kiểu chỗ, không theo khu sàn */
+const SEAT_KINDS: { id: string; label: string }[] = [
+  { id: 'Standard', label: 'Bàn thường' },
+  { id: 'Grill', label: 'Bàn nướng có bếp' },
+  { id: 'Private', label: 'Phòng riêng' },
 ]
 
 /**
  * R3 — Cấu hình nhận đặt.
  *
- * Màn này cố tình chỉ hiện những thứ engine THẬT SỰ đọc. Bản thiết kế còn vẽ
- * khung giờ nhận đặt theo từng ngày trong tuần và trần sức chứa theo khu — hai
- * thứ đó miền đặt bàn hiện chưa có (giờ mở là một chuỗi chung ở A10, sức chứa
- * đếm từ bàn thật ở A3). Vẽ ô nhập cho chúng lúc này là dựng một bảng điều khiển
- * không nối vào đâu.
+ * Màn này cố tình chỉ hiện những thứ engine THẬT SỰ đọc. Giờ nhận đặt vẫn là
+ * chuỗi giờ mở cửa ở A10 chứ không phải một bảng khung giờ theo thứ: hai nguồn
+ * cho cùng một câu trả lời thì sớm muộn cũng lệch nhau.
  */
 export function ReservationConfig() {
   const { branchId, can } = useSession()
@@ -92,6 +107,39 @@ export function ReservationConfig() {
     },
     onError: (err: Error) => toast(err.message, 'danger'),
   })
+
+  const blocked = useQuery({
+    queryKey: ['reservation-blocked-days', branchId],
+    queryFn: () => api.blockedDays(branchId!),
+    enabled: Boolean(branchId),
+  })
+
+  const blockDay = useMutation({
+    mutationFn: (input: { day: string; reason: string }) =>
+      api.blockDay(branchId!, input.day, input.reason),
+    onSuccess: (row) => {
+      toast(
+        row.existingReservations > 0
+          ? `Đã chặn ${row.day} — ngày này đang có ${row.existingReservations} suất, nhớ gọi từng khách`
+          : `Đã chặn ${row.day}`,
+        row.existingReservations > 0 ? 'warn' : 'ok',
+      )
+      void queryClient.invalidateQueries({ queryKey: ['reservation-blocked-days', branchId] })
+    },
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+
+  const unblockDay = useMutation({
+    mutationFn: (id: number) => api.unblockDay(id),
+    onSuccess: () => {
+      toast('Đã mở lại ngày này', 'ok')
+      void queryClient.invalidateQueries({ queryKey: ['reservation-blocked-days', branchId] })
+    },
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+
+  const [newDay, setNewDay] = useState('')
+  const [newReason, setNewReason] = useState('')
 
   const byKey = new Map((params.data ?? []).map((row) => [row.key, row]))
   const branch = branches.data?.find((b) => b.id === branchId)
@@ -136,7 +184,8 @@ export function ReservationConfig() {
             </dl>
             <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
               Lưới khung giờ dựng từ giờ mở cửa của chi nhánh; còn chỗ hay hết thì đếm từ bàn thật.
-              Không có bảng sức chứa riêng để gõ tay — con số gõ tay sẽ lệch khỏi sàn ngay tuần đầu.
+              Trần bên dưới chỉ HẠ con số đó xuống khi bếp kham không nổi, không thay nó — đặt trần
+              cao hơn số bàn thì cũng chỉ có ngần ấy bàn.
             </p>
           </section>
 
@@ -181,6 +230,126 @@ export function ReservationConfig() {
                 />
               ))}
             </div>
+          </section>
+
+          <section className="mt-5 rounded-md border border-line-1 bg-surface-1 p-6">
+            <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+              Trần suất mỗi khung
+            </p>
+            <div className="mt-4 grid gap-5 lg:grid-cols-3">
+              {SEAT_KINDS.map((seat) => (
+                <NumberField
+                  key={seat.id}
+                  row={byKey.get(`reservation.slotCap${seat.id}`)}
+                  label={seat.label}
+                  hint="0 là không đặt trần — nhận tới khi hết bàn."
+                  disabled={!mayEdit || save.isPending}
+                  onSave={(value) => save.mutate({ key: `reservation.slotCap${seat.id}`, value })}
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-5 rounded-md border border-line-1 bg-surface-1 p-6">
+            <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+              Đặt cọc
+            </p>
+            <div className="mt-4 grid gap-5 lg:grid-cols-3">
+              {SEAT_KINDS.map((seat) => (
+                <NumberField
+                  key={seat.id}
+                  row={byKey.get(`reservation.deposit${seat.id}Vnd`)}
+                  label={`${seat.label} (đồng)`}
+                  hint="Khác 0 thì suất nằm chờ tới khi thu được cọc, dù đang bật xác nhận tự động."
+                  disabled={!mayEdit || save.isPending}
+                  onSave={(value) => save.mutate({ key: `reservation.deposit${seat.id}Vnd`, value })}
+                />
+              ))}
+            </div>
+            <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+              Hệ chưa thu cọc trực tuyến: bật số ở đây là để W6 nói trước với khách và để suất
+              không tự xác nhận. Thu tiền vẫn là nhân viên gọi điện, rồi bấm xác nhận ở R2.
+            </p>
+          </section>
+
+          <section className="mt-5 rounded-md border border-line-1 bg-surface-1 p-6">
+            <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+              Ngày không nhận đặt
+            </p>
+
+            <div className="mt-4 grid gap-2">
+              {blocked.isPending ? (
+                <p className="text-[length:var(--fs-c1)] text-ink-mute">Đang tải…</p>
+              ) : (blocked.data ?? []).length === 0 ? (
+                <p className="text-[length:var(--fs-c1)] text-ink-mute">
+                  Chưa chặn ngày nào. Lịch nghỉ lễ và tiệc bao trọn quán khai ở đây.
+                </p>
+              ) : (
+                blocked.data!.map((row) => (
+                  <div
+                    key={row.id}
+                    className="flex items-center gap-4 rounded-sm border border-line-1 bg-canvas px-4 py-3"
+                  >
+                    <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">{row.day}</span>
+                    <span className="min-w-0 flex-1 text-[length:var(--fs-b2)] text-ink-body">
+                      {row.reason}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      disabled={!mayEdit || unblockDay.isPending}
+                      onClick={() => unblockDay.mutate(row.id)}
+                    >
+                      Mở lại
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <label className="block">
+                <span className="mb-1.5 block text-[length:var(--fs-c1)] text-ink-mute">Ngày</span>
+                <input
+                  type="date"
+                  value={newDay}
+                  disabled={!mayEdit}
+                  onChange={(e) => setNewDay(e.target.value)}
+                  className="h-10 rounded-sm border border-line-1 bg-canvas px-3 font-mono text-[length:var(--fs-b2)] text-ink-hi"
+                />
+              </label>
+              <label className="block min-w-[240px] flex-1">
+                <span className="mb-1.5 block text-[length:var(--fs-c1)] text-ink-mute">Lý do</span>
+                <input
+                  value={newReason}
+                  disabled={!mayEdit}
+                  placeholder="Nghỉ Tết · tiệc bao trọn quán"
+                  onChange={(e) => setNewReason(e.target.value)}
+                  className="h-10 w-full rounded-sm border border-line-1 bg-canvas px-3 text-[length:var(--fs-b2)] text-ink-hi"
+                />
+              </label>
+              <Button
+                variant="primary"
+                disabled={!mayEdit || !newDay || !newReason.trim() || blockDay.isPending}
+                onClick={() =>
+                  blockDay.mutate(
+                    { day: newDay, reason: newReason.trim() },
+                    {
+                      onSuccess: () => {
+                        setNewDay('')
+                        setNewReason('')
+                      },
+                    },
+                  )
+                }
+              >
+                Chặn ngày
+              </Button>
+            </div>
+
+            <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+              Chặn ngày KHÔNG huỷ suất đã nhận — quán đổi ý thì phải gọi từng khách. Số suất đang
+              có hiện ngay lúc bấm chặn.
+            </p>
           </section>
         </div>
       </div>

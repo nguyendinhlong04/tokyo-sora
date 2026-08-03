@@ -66,6 +66,19 @@ const PARAMETERS: {
   { key: 'reservation.horizonDays', value: 30, unit: 'ngày' },
   { key: 'reservation.maxGuestsOnline', value: 10, unit: 'khách' },
   { key: 'reservation.autoConfirm', value: true },
+  // Hai cữ nhắc hẹn của R4 — đúng con số bản thiết kế: trước một ngày và trước hai tiếng
+  { key: 'reservation.remindAheadHours', value: 24, unit: 'giờ' },
+  { key: 'reservation.remindSoonHours', value: 2, unit: 'giờ' },
+  // Trần suất mỗi khung theo kiểu chỗ (R3) — 0 là không đặt trần, sức chứa là số bàn thật
+  { key: 'reservation.slotCapStandard', value: 0, unit: 'suất/khung' },
+  { key: 'reservation.slotCapGrill', value: 0, unit: 'suất/khung' },
+  { key: 'reservation.slotCapPrivate', value: 0, unit: 'suất/khung' },
+  // Tiền cọc theo kiểu chỗ (R3) — 0 là không thu; khác 0 thì suất nằm chờ tới lúc thu được
+  { key: 'reservation.depositStandardVnd', value: 0, unit: 'đồng' },
+  { key: 'reservation.depositGrillVnd', value: 0, unit: 'đồng' },
+  { key: 'reservation.depositPrivateVnd', value: 0, unit: 'đồng' },
+  // Gốc liên kết khách bấm — máy POS không tự biết tên miền của website
+  { key: 'site.publicUrl', value: 'https://tokyosora.vn' },
 
   // Nhân sự (§26 H6 — H6 là cửa vào theo ngữ cảnh, giá trị sống ở đây)
   { key: 'payroll.standardDailyMinutes', value: 8 * 60, unit: 'phút' },

@@ -134,6 +134,20 @@
       "when": 1785685055871,
       "tag": "0018_glamorous_roughhouse",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785685992344,
+      "tag": "0019_steady_red_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785687646305,
+      "tag": "0020_bouncy_mephisto",
+      "breakpoints": true
     }
   ]
 }

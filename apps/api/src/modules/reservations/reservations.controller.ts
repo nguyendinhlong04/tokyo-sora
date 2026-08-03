@@ -76,4 +76,18 @@ export class ReservationsController {
   confirm(@Body() body: unknown) {
     return this.reservations.confirm(ConfirmBody.parse(body))
   }
+
+  /** Khách mở lại suất của mình từ liên kết nhắc hẹn (R4) — cùng lối `online/track/:token` */
+  @Public()
+  @Get('track/:token')
+  track(@Param('token') token: string) {
+    return this.reservations.byGuestToken(token)
+  }
+
+  /** R4 — khách xác nhận lại bằng một chạm */
+  @Public()
+  @Post('track/:token/confirm')
+  reconfirm(@Param('token') token: string) {
+    return this.reservations.reconfirm(token)
+  }
 }

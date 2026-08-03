@@ -1,7 +1,7 @@
 import { calibrate, serverNow } from '@sora/core'
-import { Button, EmptyState, SectionLabel } from '@sora/ui'
-import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { Button, EmptyState, SectionLabel, useToast } from '@sora/ui'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { api, type ReservationBoard, type ReservationRow } from '../api'
 import { useSession } from '../session-context'
@@ -205,8 +205,24 @@ function TimelineMode({
   rows: ReservationRow[]
   onOpen: (id: number) => void
 }) {
+  const toast = useToast()
+  const queryClient = useQueryClient()
   const assigned = rows.filter((r) => r.tableId !== null)
   const unassigned = rows.filter((r) => r.tableId === null)
+
+  const assign = useMutation({
+    mutationFn: (input: { row: ReservationRow; tableId: number }) =>
+      api.assignReservationTable(input.row.id, input.tableId),
+    onSuccess: (_result, input) => {
+      const code = board.tables.find((t) => t.id === input.tableId)?.code
+      toast(`${input.row.customerName} · bàn ${code}`, 'ok')
+      void queryClient.invalidateQueries({ queryKey: ['reservations'] })
+    },
+    // Máy chủ đã nói rõ vì sao (sai kiểu chỗ, bàn nhỏ, bàn đã có người) — đọc lại nguyên văn
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+
+  const drag = useCardDrag((row, tableId) => assign.mutate({ row, tableId }), onOpen)
 
   // Trục giờ ôm trọn mọi suất trong ngày, tối thiểu 17:00–23:00
   const minutes = assigned.concat(unassigned).flatMap((r) => [minuteOf(r.slotAt), minuteOf(r.endAt)])
@@ -230,14 +246,18 @@ function TimelineMode({
     <div className="min-h-0 flex-1 overflow-auto px-6 pb-6">
       {unassigned.length > 0 ? (
         <div className="mb-4 rounded-md border border-warn bg-warn/8 p-4">
-          <SectionLabel>Chưa gán bàn · {unassigned.length}</SectionLabel>
+          <SectionLabel>
+            Chưa gán bàn · {unassigned.length} — kéo thẻ thả vào hàng bàn bên dưới
+          </SectionLabel>
           <div className="mt-3 flex flex-wrap gap-2">
             {unassigned.map((row) => (
               <button
                 key={row.id}
                 type="button"
-                onClick={() => onOpen(row.id)}
-                className="rounded-sm border border-warn px-3 py-2 text-left hover:border-accent"
+                onPointerDown={(e) => drag.start(e, row)}
+                className={`touch-none rounded-sm border border-warn px-3 py-2 text-left hover:border-accent ${
+                  drag.row?.id === row.id ? 'opacity-40' : ''
+                }`}
               >
                 <span className="font-mono text-[length:var(--fs-b2)] text-accent-ink">
                   {hhmm(row.slotAt)}
@@ -253,6 +273,8 @@ function TimelineMode({
           </div>
         </div>
       ) : null}
+
+      {drag.ghost}
 
       <div
         className="overflow-hidden rounded-md border border-line-1 bg-surface-4"
@@ -279,7 +301,13 @@ function TimelineMode({
               {area}
             </div>
             {tables.map((table) => (
-              <div key={table.id} className="relative flex h-14 border-b border-line-1">
+              <div
+                key={table.id}
+                data-table-id={table.id}
+                className={`relative flex h-14 border-b border-line-1 ${
+                  drag.overTableId === table.id ? 'bg-accent/12 outline outline-accent' : ''
+                }`}
+              >
                 <div className="sticky left-0 z-5 flex w-[130px] flex-none flex-col justify-center border-r border-line-1 bg-surface-4 px-3.5">
                   <span className="text-[length:var(--fs-b2)] font-semibold text-ink-hi">
                     Bàn {table.code}
@@ -312,10 +340,10 @@ function TimelineMode({
                         <button
                           key={row.id}
                           type="button"
-                          onClick={() => onOpen(row.id)}
-                          className={`absolute top-1.5 bottom-1.5 overflow-hidden rounded-sm px-2 py-1.5 text-left ${
+                          onPointerDown={(e) => drag.start(e, row)}
+                          className={`absolute top-1.5 bottom-1.5 touch-none overflow-hidden rounded-sm px-2 py-1.5 text-left ${
                             STATUS_BLOCK[row.status]
-                          }`}
+                          } ${drag.row?.id === row.id ? 'opacity-40' : ''}`}
                           style={{
                             left: ((start - from) / SLOT_MINUTES) * SLOT_WIDTH + 4,
                             width: Math.max(
@@ -341,6 +369,98 @@ function TimelineMode({
       </div>
     </div>
   )
+}
+
+// -------------------------------------------------------------- kéo thả gán bàn
+
+/** Kéo quá ngần này pixel mới tính là kéo — dưới nó là một cú chạm mở chi tiết */
+const DRAG_THRESHOLD = 8
+
+/**
+ * "Kéo thẻ để gán bàn" (§23.4 R1).
+ *
+ * Dùng pointer event chứ không dùng drag-and-drop của HTML: máy POS là màn cảm
+ * ứng, mà API drag-and-drop không bắn sự kiện nào khi kéo bằng ngón tay. Pointer
+ * event chạy cho cả chuột lẫn ngón, nên một cách viết phục vụ được cả hai.
+ *
+ * Chạm nhẹ vẫn là chạm: chưa vượt ngưỡng kéo thì nhả tay ra mở ngăn kéo chi tiết
+ * như trước — nhân viên không phải học lại thao tác cũ.
+ */
+function useCardDrag(
+  onDrop: (row: ReservationRow, tableId: number) => void,
+  onTap: (id: number) => void,
+) {
+  const [row, setRow] = useState<ReservationRow | null>(null)
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  const [overTableId, setOverTableId] = useState<number | null>(null)
+
+  const start = (event: ReactPointerEvent<HTMLElement>, card: ReservationRow) => {
+    const element = event.currentTarget
+    const origin = { x: event.clientX, y: event.clientY }
+    let dragging = false
+    element.setPointerCapture(event.pointerId)
+
+    const tableUnder = (x: number, y: number): number | null => {
+      // Thẻ ma đang bám theo ngón tay nên phải bỏ qua nó khi hỏi "dưới đây là gì"
+      const hit = document.elementFromPoint(x, y)?.closest('[data-table-id]')
+      const id = hit?.getAttribute('data-table-id')
+      return id ? Number(id) : null
+    }
+
+    const move = (e: PointerEvent) => {
+      if (!dragging && Math.hypot(e.clientX - origin.x, e.clientY - origin.y) < DRAG_THRESHOLD) {
+        return
+      }
+      dragging = true
+      setRow(card)
+      setAt({ x: e.clientX, y: e.clientY })
+      setOverTableId(tableUnder(e.clientX, e.clientY))
+    }
+
+    const finish = (e: PointerEvent) => {
+      element.removeEventListener('pointermove', move)
+      element.removeEventListener('pointerup', finish)
+      element.removeEventListener('pointercancel', cancel)
+      const target = dragging ? tableUnder(e.clientX, e.clientY) : null
+      setRow(null)
+      setAt(null)
+      setOverTableId(null)
+      if (!dragging) onTap(card.id)
+      else if (target !== null && target !== card.tableId) onDrop(card, target)
+    }
+
+    const cancel = () => {
+      element.removeEventListener('pointermove', move)
+      element.removeEventListener('pointerup', finish)
+      element.removeEventListener('pointercancel', cancel)
+      setRow(null)
+      setAt(null)
+      setOverTableId(null)
+    }
+
+    element.addEventListener('pointermove', move)
+    element.addEventListener('pointerup', finish)
+    element.addEventListener('pointercancel', cancel)
+  }
+
+  const ghost =
+    row && at ? (
+      <div
+        aria-hidden
+        className="pointer-events-none fixed z-50 rounded-sm border border-accent bg-surface-2 px-3 py-2 shadow-lg"
+        style={{ left: at.x + 12, top: at.y + 12 }}
+      >
+        <span className="font-mono text-[length:var(--fs-b2)] text-accent-ink">
+          {hhmm(row.slotAt)}
+        </span>
+        <span className="ml-2 text-[length:var(--fs-b2)] text-ink-hi">{row.customerName}</span>
+        <span className="ml-2 text-[length:var(--fs-c1)] text-ink-mute">
+          {row.guestCount} khách
+        </span>
+      </div>
+    ) : null
+
+  return { start, row, overTableId, ghost }
 }
 
 // ------------------------------------------------------------------- tiện ích

@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { rooms, WS_TOPICS } from '@sora/contracts'
-import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { businessDateOf, startOfBusinessDay } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { nextDisplayCode } from '../../common/display-code'
@@ -15,8 +15,15 @@ import { ParamsService } from '../../common/params.service'
 import { CustomersService } from '../crm/customers.service'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
-import { branches, reservationHolds, reservations, tables } from '../../db/schema'
+import {
+  branches,
+  reservationBlockedDays,
+  reservationHolds,
+  reservations,
+  tables,
+} from '../../db/schema'
 import type { Actor } from '../identity/actor'
+import { AuditService } from '../identity/audit.service'
 import { hashToken, newToken } from '../identity/tokens'
 import {
   buildReservationSlots,
@@ -62,12 +69,26 @@ export interface ConfirmInput extends HoldInput {
 /** Trạng thái coi là còn chiếm chỗ — huỷ và no-show thì trả suất về lưới */
 const LIVE_STATUSES = ['pending', 'confirmed', 'seated', 'done']
 
+/** Khoá tham số R3 theo kiểu chỗ — khai ở đây để A6 và engine đọc cùng một tên */
+const SLOT_CAP_KEYS: Record<SeatKind, string> = {
+  standard: 'reservation.slotCapStandard',
+  grill: 'reservation.slotCapGrill',
+  private: 'reservation.slotCapPrivate',
+}
+
+const DEPOSIT_KEYS: Record<SeatKind, string> = {
+  standard: 'reservation.depositStandardVnd',
+  grill: 'reservation.depositGrillVnd',
+  private: 'reservation.depositPrivateVnd',
+}
+
 @Injectable()
 export class ReservationsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly params: ParamsService,
     private readonly customers: CustomersService,
+    private readonly audit: AuditService,
   ) {}
 
   // ------------------------------------------------------------ tham số
@@ -97,6 +118,40 @@ export class ReservationsService {
     return (await this.params.get<boolean>('reservation.autoConfirm', branchId)) !== false
   }
 
+  /**
+   * Trần suất mỗi khung của một kiểu chỗ (R3 "sức chứa mỗi khung theo khu").
+   *
+   * "Khu" ở đây là KIỂU CHỖ chứ không phải khu vực trên sơ đồ sàn: suất đặt theo
+   * kiểu chỗ, nên trần đặt ở chỗ khác thì không có gì để chặn.
+   *
+   * Để trống là không đặt trần — sức chứa khi đó là số bàn thật. Trần dùng khi
+   * bếp hoặc phục vụ vỡ trước khi hết bàn: sáu bàn nướng nhưng chỉ kham nổi bốn
+   * lượt cùng khung.
+   */
+  private async slotCapFor(branchId: string, seatKind: SeatKind): Promise<number | null> {
+    const cap = await this.params.getNumber(SLOT_CAP_KEYS[seatKind], 0, branchId)
+    return cap > 0 ? cap : null
+  }
+
+  /**
+   * Tiền cọc của một kiểu chỗ (R3 "bật/tắt đặt cọc"). 0 là tắt.
+   *
+   * Suất có cọc KHÔNG tự xác nhận dù chi nhánh đang bật chế độ tự động: cọc chưa
+   * thu thì bàn chưa chắc, và người phải gọi thu là nhân viên chứ không phải máy.
+   */
+  private async depositVnd(branchId: string, seatKind: SeatKind): Promise<number> {
+    return this.params.getNumber(DEPOSIT_KEYS[seatKind], 0, branchId)
+  }
+
+  /** Ngày quán không nhận đặt (R3 "chặn ngày") — kèm lý do để người trực trả lời khách */
+  private async blockedDay(branchId: string, date: string) {
+    const [row] = await this.db
+      .select()
+      .from(reservationBlockedDays)
+      .where(and(eq(reservationBlockedDays.branchId, branchId), eq(reservationBlockedDays.day, date)))
+    return row ?? null
+  }
+
   // ------------------------------------------------------- W6 bước 2
 
   /**
@@ -117,9 +172,10 @@ export class ReservationsService {
     const today = businessDateOf(now, branch.timezone)
 
     const rules = await this.rules(query.branchId)
-    const [capacity, existing] = await Promise.all([
+    const [capacity, existing, blocked] = await Promise.all([
       this.capacityFor(query.branchId, query.seatKind, query.guestCount),
       this.liveBookings(this.db, query, businessDate, dayStart),
+      this.blockedDay(query.branchId, businessDate),
     ])
 
     const slots = buildReservationSlots({
@@ -140,12 +196,16 @@ export class ReservationsService {
       holdMinutes: await this.params.getNumber('reservation.softHoldMinutes', 10, branch.id),
       tableHoldMinutes: await this.params.getNumber('reservation.tableHoldMinutes', 15, branch.id),
       autoConfirm: await this.autoConfirm(branch.id),
+      /** Tiền cọc của kiểu chỗ này — 0 là không thu; W6 phải nói trước khi khách điền */
+      depositVnd: await this.depositVnd(branch.id, query.seatKind),
+      /** Ngày bị chặn: nói thẳng lý do thay vì để khách đoán vì sao lưới xám hết */
+      blocked: blocked ? { reason: blocked.reason } : null,
       slots: slots.map((s) => ({
         minute: s.minute,
         label: s.label,
         at: dateOfMinute(s.minute, dayStart).toISOString(),
-        open: s.open,
-        closedReason: s.closedReason,
+        open: blocked ? false : s.open,
+        closedReason: blocked ? ('blocked' as const) : s.closedReason,
       })),
     }
   }
@@ -217,7 +277,9 @@ export class ReservationsService {
     const businessDate = await this.assertDateInHorizon(input.date, branch.timezone)
     const dayStart = startOfBusinessDay(businessDate, branch.timezone)
     const rules = await this.rules(input.branchId)
-    const auto = await this.autoConfirm(branch.id)
+    const deposit = await this.depositVnd(branch.id, input.seatKind)
+    // Có cọc thì suất nằm chờ dù chi nhánh bật tự động — bàn chắc khi tiền đã về
+    const auto = (await this.autoConfirm(branch.id)) && deposit === 0
     const now = new Date()
 
     return this.db.transaction(async (tx) => {
@@ -234,8 +296,6 @@ export class ReservationsService {
         branchId: input.branchId,
         kind: 'reservation',
         businessDate,
-        at: now,
-        timezone: branch.timezone,
       })
 
       const [created] = await tx
@@ -255,6 +315,7 @@ export class ReservationsService {
           source: input.source ?? 'web',
           createdBy: actor?.kind === 'staff' ? actor.staffId : null,
           businessDate,
+          guestToken: newToken(16),
         })
         .returning()
 
@@ -302,6 +363,10 @@ export class ReservationsService {
         status: created!.status as 'pending' | 'confirmed',
         slotAt: slotAt.toISOString(),
         businessDate,
+        /** Chìa để khách mở lại suất của mình — W6 dựng liên kết nhắc hẹn từ đây */
+        guestToken: created!.guestToken!,
+        /** Khác 0 thì màn xong phải nói rõ nhà hàng sẽ gọi thu cọc */
+        depositVnd: deposit,
         tableHoldMinutes: await this.params.getNumber(
           'reservation.tableHoldMinutes',
           15,
@@ -309,6 +374,168 @@ export class ReservationsService {
         ),
       }
     })
+  }
+
+  // ----------------------------------------------------- R4 phía khách
+
+  /**
+   * Suất của chính khách, mở bằng chìa trong liên kết nhắc hẹn.
+   *
+   * `@Public` nên chỉ trả đúng những gì đã in trên màn thành công W6: khách biết
+   * hết rồi. Không trả bàn đã gán — bàn nào là việc xếp trong bếp và nó còn đổi
+   * tới lúc khách bước vào cửa.
+   */
+  async byGuestToken(token: string) {
+    const [row] = await this.db
+      .select()
+      .from(reservations)
+      .where(eq(reservations.guestToken, token))
+    if (!row) throw new NotFoundException('Liên kết này không mở suất nào')
+
+    const branch = await this.branch(row.branchId)
+    return {
+      displayCode: row.displayCode,
+      branchName: branch.name,
+      branchAddress: branch.address,
+      branchPhone: branch.phone,
+      seatKind: row.seatKind as SeatKind,
+      guestCount: row.guestCount,
+      customerName: row.customerName,
+      slotAt: row.slotAt.toISOString(),
+      status: row.status as 'pending' | 'confirmed' | 'seated' | 'done' | 'cancelled' | 'no_show',
+      note: row.note,
+      guestConfirmedAt: row.guestConfirmedAt?.toISOString() ?? null,
+      tableHoldMinutes: await this.params.getNumber('reservation.tableHoldMinutes', 15, branch.id),
+    }
+  }
+
+  /**
+   * "Khách xác nhận lại bằng một chạm" (§23.4 R4).
+   *
+   * Ghi đúng một dấu thời gian, KHÔNG đụng tới `status`: suất đang chờ nhà hàng
+   * duyệt thì khách bấm mấy lần cũng vẫn là đang chờ — quyền nhận hay không là
+   * của quán. Cái mà một chạm đổi được là nhân viên khỏi phải gọi lượt nhắc đó.
+   *
+   * Bấm lại lần nữa chỉ dời dấu thời gian lên: khách bấm hai lần không phải lỗi
+   * cần báo, và cữ nhắc 2 tiếng cần một xác nhận mới hơn cữ 24 tiếng.
+   */
+  async reconfirm(token: string) {
+    const [row] = await this.db
+      .select()
+      .from(reservations)
+      .where(eq(reservations.guestToken, token))
+    if (!row) throw new NotFoundException('Liên kết này không mở suất nào')
+
+    if (row.status === 'cancelled' || row.status === 'no_show') {
+      throw new ConflictException({
+        code: 'reservation_closed',
+        message: 'Suất này đã đóng — nhờ bạn đặt lại hoặc gọi trực tiếp chi nhánh',
+      })
+    }
+
+    const now = new Date()
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(reservations)
+        .set({ guestConfirmedAt: now })
+        .where(eq(reservations.id, row.id))
+
+      // R1 phải thấy ngay: một suất khách vừa xác nhận là một suất khỏi phải gọi
+      await emit(tx, {
+        branchId: row.branchId,
+        topic: WS_TOPICS.reservationCreated,
+        rooms: [rooms.tables(row.branchId)],
+        payload: { reservationId: row.id, guestConfirmedAt: now.toISOString() },
+      })
+    })
+
+    return this.byGuestToken(token)
+  }
+
+  // ------------------------------------------------------ R3 chặn ngày
+
+  /** Danh sách ngày chặn còn hiệu lực — quá khứ không ai cần nhìn nữa */
+  async listBlockedDays(branchId: string) {
+    const today = businessDateOf(new Date(), (await this.branch(branchId)).timezone)
+    const rows = await this.db
+      .select()
+      .from(reservationBlockedDays)
+      .where(
+        and(
+          eq(reservationBlockedDays.branchId, branchId),
+          gte(reservationBlockedDays.day, today),
+        ),
+      )
+      .orderBy(asc(reservationBlockedDays.day))
+    return rows.map((r) => ({ id: r.id, day: r.day, reason: r.reason }))
+  }
+
+  /**
+   * Chặn một ngày.
+   *
+   * Suất đã nhận cho ngày đó KHÔNG bị đụng tới: quán đổi ý thì phải gọi từng
+   * người: xoá lặng lẽ là để khách tới nơi mới biết. Nên hàm trả về số suất đang
+   * có để màn R3 nói thẳng "ngày này đã có 4 suất, gọi họ trước".
+   */
+  async blockDay(branchId: string, day: string, reason: string, actor: Actor) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new BadRequestException('Ngày không hợp lệ')
+
+    const [row] = await this.db
+      .insert(reservationBlockedDays)
+      .values({
+        branchId,
+        day,
+        reason: reason.trim(),
+        createdBy: actor.kind === 'staff' ? actor.staffId : null,
+      })
+      .onConflictDoUpdate({
+        target: [reservationBlockedDays.branchId, reservationBlockedDays.day],
+        set: { reason: reason.trim() },
+      })
+      .returning()
+
+    const [existing] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.branchId, branchId),
+          eq(reservations.businessDate, day),
+          inArray(reservations.status, LIVE_STATUSES),
+        ),
+      )
+
+    await this.db.transaction(async (tx) => {
+      await this.audit.write(tx, {
+        actor,
+        action: 'reservation.day.blocked',
+        entity: 'branch',
+        entityId: branchId,
+        payload: { day, reason },
+      })
+    })
+
+    return { id: row!.id, day: row!.day, reason: row!.reason, existingReservations: Number(existing?.count ?? 0) }
+  }
+
+  /** Mở lại một ngày đã chặn */
+  async unblockDay(id: number, actor: Actor) {
+    const [row] = await this.db
+      .delete(reservationBlockedDays)
+      .where(eq(reservationBlockedDays.id, id))
+      .returning()
+    if (!row) throw new NotFoundException('Ngày này không nằm trong danh sách chặn')
+
+    await this.db.transaction(async (tx) => {
+      await this.audit.write(tx, {
+        actor,
+        action: 'reservation.day.unblocked',
+        entity: 'branch',
+        entityId: row.branchId,
+        payload: { day: row.day },
+      })
+    })
+    return { id: row.id, day: row.day }
   }
 
   // ------------------------------------------------------------- phụ trợ
@@ -337,6 +564,15 @@ export class ReservationsService {
   ) {
     const branch = await this.branch(query.branchId)
     const now = new Date()
+
+    // Lưới đã tô xám cả ngày bị chặn, nhưng không gì ngăn ai gọi thẳng API
+    const blocked = await this.blockedDay(query.branchId, businessDate)
+    if (blocked) {
+      throw new ConflictException({
+        code: 'blocked_day',
+        message: `Ngày này chi nhánh không nhận đặt bàn — ${blocked.reason}`,
+      })
+    }
     const capacity = await this.capacityFor(query.branchId, query.seatKind, query.guestCount)
     const existing = await this.liveBookings(tx, query, businessDate, dayStart, ignoreHoldId)
 
@@ -353,7 +589,12 @@ export class ReservationsService {
     if (!verdict.ok) throw new ConflictException({ code: verdict.code, message: verdict.message })
   }
 
-  /** Số chỗ đúng kiểu và đủ lớn cho nhóm — bàn nhỏ hơn nhóm thì không tính */
+  /**
+   * Số chỗ đúng kiểu và đủ lớn cho nhóm — bàn nhỏ hơn nhóm thì không tính.
+   *
+   * Trần của R3 cắt bớt con số này chứ không thay nó: có trần mà không có bàn thì
+   * vẫn là không có bàn.
+   */
   private async capacityFor(branchId: string, seatKind: SeatKind, guestCount: number) {
     const [row] = await this.db
       .select({ count: sql<number>`count(*)::int` })
@@ -366,7 +607,9 @@ export class ReservationsService {
           sql`${tables.seatMax} >= ${guestCount}`,
         ),
       )
-    return Number(row?.count ?? 0)
+    const seats = Number(row?.count ?? 0)
+    const cap = await this.slotCapFor(branchId, seatKind)
+    return cap === null ? seats : Math.min(seats, cap)
   }
 
   /** Đặt chỗ còn hiệu lực + suất đang giữ mềm, quy về phút kể từ đầu ngày */
