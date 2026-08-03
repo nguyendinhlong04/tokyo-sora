@@ -26,6 +26,8 @@ export interface Ticket {
   prepSeconds: number
   openedAt: string
   queuedAt: string | null
+  /** Mốc bấm Xong — gốc tính cửa sổ hoàn tác, và là lúc đồng hồ vé dừng lại */
+  readyAt: string | null
   /** Đơn hẹn giờ: mốc phải bắt đầu nấu — KDS đếm NGƯỢC tới đây */
   startBy: string | null
   items: TicketItem[]
@@ -41,6 +43,8 @@ export interface Station {
 export interface Queue {
   /** Giờ máy chủ — client hiệu chỉnh đồng hồ theo cái này, không tin đồng hồ TV box */
   serverTime: string
+  /** Vé bấm Xong còn hoàn tác được trong ngần này giây (tham số `kitchen.undoSeconds`) */
+  undoSeconds: number
   station: Station
   tickets: Ticket[]
 }

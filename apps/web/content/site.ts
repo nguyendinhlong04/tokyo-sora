@@ -7,7 +7,9 @@
  * dung đổi hằng tuần.
  *
  * **Tin tức (W8) và danh sách vị trí tuyển dụng (W9) đã chuyển sang A8** và về
- * đây qua `/api/site/posts` · `/api/site/jobs`. Đừng thêm lại vào file này: hai
+ * đây qua `/api/site/posts` · `/api/site/jobs`. **Nội dung trang chi tiết món
+ * (W3) — chuyện nguyên liệu, độ cắt, gia vị, món dùng kèm — đã chuyển sang
+ * Office M1** và về đây trong `/api/site/menu`. Đừng thêm lại vào file này: hai
  * nguồn cho một dữ liệu là hai nguồn sẽ lệch nhau.
  */
 
@@ -87,28 +89,6 @@ export const CATEGORY_NOTES: Record<string, string> = {
   bia: 'Bia lạnh sâu, rót hai lần cho lớp bọt mịn — bạn đồng hành của mỡ bò.',
   ruou: 'Sake và shochu chọn theo phần thịt, phục vụ ở ba mức nhiệt.',
   tra: 'Trà nóng miễn phí châm lại, hoặc trà lạnh pha lạnh mười hai giờ.',
-}
-
-/**
- * Món dùng kèm do bếp chọn (W3).
- *
- * Cố ý chọn tay chứ không suy từ "cùng nhóm": thứ hợp với thăn bò là chai sake
- * lạnh, không phải một miếng bò khác.
- */
-export const PAIRINGS: Record<string, string[]> = {
-  bachi: ['duamuoi', 'asahi', 'milanh'],
-  nambo: ['bingoi', 'muchacha', 'miso'],
-  thanbo: ['junmai', 'namdui', 'duoibo'],
-  misuji: ['junmai', 'duamuoi', 'miso'],
-  sodiep: ['junmai', 'bingoi', 'asahi'],
-  carbi: ['duamuoi', 'asahi', 'namdui'],
-  sagari: ['bingoi', 'asahi', 'miso'],
-  bachiheo: ['duamuoi', 'asahi', 'milanh'],
-  suonheo: ['duamuoi', 'miso', 'junmai'],
-  tomsu: ['bingoi', 'asahi', 'junmai'],
-  muctrung: ['asahi', 'duamuoi', 'junmai'],
-  namdui: ['bachi', 'asahi', 'miso'],
-  bingoi: ['bachi', 'nambo', 'milanh'],
 }
 
 /** Gợi ý gọi món in trên panel kraft cuối W2 */

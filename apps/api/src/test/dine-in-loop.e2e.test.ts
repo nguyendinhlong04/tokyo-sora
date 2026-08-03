@@ -6,9 +6,18 @@
  */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { IDEMPOTENCY_HEADER } from '@sora/contracts'
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
-import { auditLog, devices, journalEntries, outboxEvents, ticketItems, tickets } from '../db/schema'
+import {
+  auditLog,
+  devices,
+  journalEntries,
+  outboxEvents,
+  stockMoves,
+  ticketItems,
+  tickets,
+} from '../db/schema'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
 import { bootTestApp, type Fixtures } from './harness'
@@ -404,6 +413,98 @@ describe('3. Bếp nhận vé và nấu (K2 · K4)', () => {
       .json<{ orders: { orderId: number; ready: boolean; waitingFor: string[] }[] }>()
       .orders.filter((o) => o.orderId === order.order.id)
     expect(mineInExpo.every((o) => o.ready && o.waitingFor.length === 0)).toBe(true)
+  })
+
+  /**
+   * Cửa sổ hoàn tác (§22 K2 "Xong + *Hoàn tác* 30s", tham số `kitchen.undoSeconds`).
+   *
+   * Vé `ready` trước đây bị loại hẳn khỏi hàng vé, nên nút Hoàn tác không có chỗ
+   * nào để hiện. Ba phép thử dưới đây khoá đúng ba điều: vé còn nán lại, hoàn tác
+   * trong hạn không trừ kho lần hai, và quá hạn thì chặn.
+   */
+  const kdsTokenFor = async (stationId: string) => {
+    const pairing = await inject({
+      method: 'POST',
+      url: '/api/auth/pairing-codes',
+      headers: auth(await login(fx.managerId)),
+      payload: { branchId: fx.branchId, kind: 'kds', stationId },
+    })
+    const paired = await inject({
+      method: 'POST',
+      url: '/api/auth/pair',
+      payload: { code: pairing.json<{ code: string }>().code, name: `Màn ${stationId}` },
+    })
+    return paired.json<{ token: string }>().token
+  }
+
+  it('vé vừa bấm Xong còn nán lại hàng vé để bếp kịp hoàn tác', async () => {
+    const done = (await db.select().from(tickets)).find((t) => t.state === 'ready')!
+    const queue = await inject({
+      method: 'GET',
+      url: '/api/tickets',
+      headers: { [DEVICE_HEADER]: await kdsTokenFor(done.stationId) },
+    })
+
+    const body = queue.json<{ tickets: { id: number }[]; undoSeconds: number }>()
+    expect(body.tickets.some((t) => t.id === done.id)).toBe(true)
+    // Màn bếp phải biết cửa sổ dài bao nhiêu, không được đoán 30
+    expect(body.undoSeconds).toBe(30)
+  })
+
+  it('hoàn tác trong hạn → vé về hàng; bấm Xong lại KHÔNG trừ kho lần hai', async () => {
+    const done = (await db.select().from(tickets)).find((t) => t.state === 'ready')!
+    const movesBefore = (await db.select().from(stockMoves)).length
+
+    const undo = await inject({
+      method: 'POST',
+      url: `/api/tickets/${done.id}/state`,
+      headers: auth(chef),
+      payload: { action: 'undo' },
+    })
+    expect(undo.statusCode).toBe(201)
+    expect(undo.json<{ state: string }>().state).toBe('queued')
+
+    // Kéo lùi trạng thái KHÔNG hoàn kho — nguyên liệu đã nấu mất rồi
+    expect((await db.select().from(stockMoves)).length).toBe(movesBefore)
+
+    const redo = await inject({
+      method: 'POST',
+      url: `/api/tickets/${done.id}/state`,
+      headers: auth(chef),
+      payload: { action: 'done' },
+    })
+    expect(redo.statusCode).toBe(201)
+    // Chỉ số `stock_moves_one_sale_per_line` chặn bút toán thứ hai cho cùng dòng đơn
+    expect((await db.select().from(stockMoves)).length).toBe(movesBefore)
+
+    const [after] = await db.select().from(tickets).where(eq(tickets.id, done.id))
+    expect(after!.state).toBe('ready')
+  })
+
+  it('quá cửa sổ thì hoàn tác bị chặn, và vé rời hàng vé', async () => {
+    const done = (await db.select().from(tickets)).find((t) => t.state === 'ready')!
+    // Lùi mốc Xong thay vì chờ thật — phép thử không được phụ thuộc đồng hồ
+    await db
+      .update(tickets)
+      .set({ readyAt: new Date(Date.now() - 3600_000) })
+      .where(eq(tickets.id, done.id))
+
+    const res = await inject({
+      method: 'POST',
+      url: `/api/tickets/${done.id}/state`,
+      headers: auth(chef),
+      payload: { action: 'undo' },
+    })
+    expect(res.statusCode).toBe(400)
+
+    const queue = await inject({
+      method: 'GET',
+      url: '/api/tickets',
+      headers: { [DEVICE_HEADER]: await kdsTokenFor(done.stationId) },
+    })
+    expect(queue.json<{ tickets: { id: number }[] }>().tickets.some((t) => t.id === done.id)).toBe(
+      false,
+    )
   })
 })
 

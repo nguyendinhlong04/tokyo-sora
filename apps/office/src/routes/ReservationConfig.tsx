@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, type ParameterRow } from '../api'
+import { ConfigBranchPicker, useConfigBranch } from '../components/config-branch'
 import { PageHeader } from '../components/PageHeader'
 import { useSession } from '../session-context'
 
@@ -80,7 +81,8 @@ const SEAT_KINDS: { id: string; label: string }[] = [
  * cho cùng một câu trả lời thì sớm muộn cũng lệch nhau.
  */
 export function ReservationConfig() {
-  const { branchId, can } = useSession()
+  const { can } = useSession()
+  const { branchId } = useConfigBranch()
   const toast = useToast()
   const queryClient = useQueryClient()
   const mayEdit = can('admin.manage-accounts-roles')
@@ -151,6 +153,7 @@ export function ReservationConfig() {
       <PageHeader
         title="Cấu hình nhận đặt"
         subtitle={`Áp cho chi nhánh ${branch?.name ?? branchId}. Mỗi ô dưới đây là một con số miền đặt bàn đọc lúc dựng lưới khung giờ của W6.`}
+        action={<ConfigBranchPicker />}
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
@@ -173,8 +176,8 @@ export function ReservationConfig() {
                 <dt className="text-ink-mute">Sức chứa</dt>
                 <dd className="m-0 text-right">
                   <span className="text-ink-hi">
-                    {tables.length} bàn · {tables.filter((t) => t.kind === 'grill').length} bàn nướng ·{' '}
-                    {tables.filter((t) => t.kind === 'private').length} phòng riêng
+                    {tables.length} bàn · {tables.filter((t) => t.kind === 'grill').length} bàn
+                    nướng · {tables.filter((t) => t.kind === 'private').length} phòng riêng
                   </span>
                   <Link to="/so-do-ban" className="ml-3 text-accent-ink">
                     Sửa ở A3 →
@@ -262,13 +265,15 @@ export function ReservationConfig() {
                   label={`${seat.label} (đồng)`}
                   hint="Khác 0 thì suất nằm chờ tới khi thu được cọc, dù đang bật xác nhận tự động."
                   disabled={!mayEdit || save.isPending}
-                  onSave={(value) => save.mutate({ key: `reservation.deposit${seat.id}Vnd`, value })}
+                  onSave={(value) =>
+                    save.mutate({ key: `reservation.deposit${seat.id}Vnd`, value })
+                  }
                 />
               ))}
             </div>
             <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-              Hệ chưa thu cọc trực tuyến: bật số ở đây là để W6 nói trước với khách và để suất
-              không tự xác nhận. Thu tiền vẫn là nhân viên gọi điện, rồi bấm xác nhận ở R2.
+              Hệ chưa thu cọc trực tuyến: bật số ở đây là để W6 nói trước với khách và để suất không
+              tự xác nhận. Thu tiền vẫn là nhân viên gọi điện, rồi bấm xác nhận ở R2.
             </p>
           </section>
 
@@ -290,7 +295,9 @@ export function ReservationConfig() {
                     key={row.id}
                     className="flex items-center gap-4 rounded-sm border border-line-1 bg-canvas px-4 py-3"
                   >
-                    <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">{row.day}</span>
+                    <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.day}
+                    </span>
                     <span className="min-w-0 flex-1 text-[length:var(--fs-b2)] text-ink-body">
                       {row.reason}
                     </span>
@@ -347,8 +354,8 @@ export function ReservationConfig() {
             </div>
 
             <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-              Chặn ngày KHÔNG huỷ suất đã nhận — quán đổi ý thì phải gọi từng khách. Số suất đang
-              có hiện ngay lúc bấm chặn.
+              Chặn ngày KHÔNG huỷ suất đã nhận — quán đổi ý thì phải gọi từng khách. Số suất đang có
+              hiện ngay lúc bấm chặn.
             </p>
           </section>
         </div>

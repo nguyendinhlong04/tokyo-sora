@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, type DeliveryZone, type ParameterRow } from '../api'
+import { ConfigBranchPicker, useConfigBranch } from '../components/config-branch'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { useSession } from '../session-context'
@@ -28,7 +29,8 @@ const BLANK = (branchId: string, sort: number): Omit<DeliveryZone, 'id'> => ({
  * đặt món hiện chưa hỏi toạ độ.
  */
 export function DeliveryZones() {
-  const { branchId, can } = useSession()
+  const { can } = useSession()
+  const { branchId } = useConfigBranch()
   const toast = useToast()
   const queryClient = useQueryClient()
   const mayEdit = can('admin.manage-accounts-roles')
@@ -88,11 +90,14 @@ export function DeliveryZones() {
         title="Vùng giao & phí"
         subtitle="Khớp theo tên phường — đúng thứ khách gõ ở bước chọn kiểu nhận. Một phường chỉ thuộc một vùng, nếu không khách nhập địa chỉ đó sẽ bị chặn."
         action={
-          mayEdit ? (
-            <Button variant="primary" onClick={() => setDraft(BLANK(branchId!, rows.length + 1))}>
-              Thêm vùng
-            </Button>
-          ) : null
+          <div className="flex items-end gap-4">
+            <ConfigBranchPicker />
+            {mayEdit ? (
+              <Button variant="primary" onClick={() => setDraft(BLANK(branchId!, rows.length + 1))}>
+                Thêm vùng
+              </Button>
+            ) : null}
+          </div>
         }
       />
 

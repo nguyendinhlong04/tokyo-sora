@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import { Pool } from 'pg'
 import { createDb, type Db } from './client'
 import { PREP_SECONDS_BY_STATION, routingForSeedDish } from './seed-routing'
+import { DISH_STORIES } from './seed-stories'
 import * as s from './schema'
 
 const SEED_DIR = join(__dirname, '..', '..', '..', '..', 'scripts', 'extract-seed', 'out')
@@ -39,7 +40,22 @@ const PARAMETERS: {
   { key: 'sales.vatRate', value: 0, unit: 'tỉ lệ', sensitive: true },
   { key: 'sales.serviceFeeRate', value: 0, unit: 'tỉ lệ', sensitive: true },
   { key: 'sales.roundingUnit', value: 1000, unit: 'đồng' },
+  /**
+   * Thời gian chuẩn khi MÓN chưa khai của riêng nó (§29.1 "Bếp & SLA: thời gian
+   * chuẩn mặc định theo trạm"). Khoá gốc là mức của cả chuỗi, sáu khoá theo trạm
+   * bên dưới ghi đè cho từng bếp — số lấy giữa khoảng §16.
+   *
+   * Để 720 (mức trạm nướng, lâu nhất) ở khoá gốc là cố ý: một trạm mới chưa khai
+   * mà lấy nhầm mức nhanh thì mọi vé của nó đỏ ngay từ giây đầu.
+   */
   { key: 'kitchen.slaSeconds', value: 720, unit: 'giây' },
+  // Suy thẳng từ bảng §16 mà seeder dùng để khai thời gian cho từng món — chép
+  // tay sáu con số ra đây là tạo một bản sao sẽ lệch ngay lần đầu ai đó sửa bảng
+  ...Object.entries(PREP_SECONDS_BY_STATION).map(([stationId, seconds]) => ({
+    key: `kitchen.slaSeconds.${stationId}`,
+    value: seconds,
+    unit: 'giây',
+  })),
   { key: 'kitchen.undoSeconds', value: 30, unit: 'giây' },
   { key: 'kitchen.grillServiceExtraSeconds', value: 480, unit: 'giây' },
   { key: 'kitchen.packBufferSeconds', value: 300, unit: 'giây' },
@@ -83,6 +99,8 @@ const PARAMETERS: {
   // Nhân sự (§26 H6 — H6 là cửa vào theo ngữ cảnh, giá trị sống ở đây)
   { key: 'payroll.standardDailyMinutes', value: 8 * 60, unit: 'phút' },
   { key: 'payroll.standardMonthlyMinutes', value: 26 * 8 * 60, unit: 'phút' },
+  // Châm chước đi muộn: chỉ đổi cách H3 gắn nhãn muộn, KHÔNG đụng tới tiền
+  { key: 'payroll.lateGraceMinutes', value: 5, unit: 'phút' },
   // Hệ số theo luật lao động VN — kế toán xác nhận lại trước khi chạy kỳ thật
   { key: 'payroll.otNormalRate', value: 1.5, unit: 'hệ số', sensitive: true },
   { key: 'payroll.otRestRate', value: 2, unit: 'hệ số', sensitive: true },
@@ -134,6 +152,10 @@ const PARAMETERS: {
   // nên nó có nhà ở đây chứ không nằm rải trong mã nguồn.
   { key: 'feedback.complaintStars', value: 3, unit: 'sao' },
   { key: 'feedback.responseHours', value: 24, unit: 'giờ' },
+
+  // Báo cáo (§28 F2) — mốc food cost mà màn giá vốn & lãi gộp so vào. Chỉ là
+  // MỤC TIÊU để tô màu lệch, không phải một con số kế toán tính ra từ sổ.
+  { key: 'report.foodCostTarget', value: 0.35, unit: 'tỉ lệ' },
 ]
 
 /**
@@ -654,6 +676,18 @@ async function seed(db: Db) {
           .onConflictDoUpdate({ target: [s.setGroupItems.groupId, s.setGroupItems.dishId], set: row })
       }
     }
+  }
+
+  // ---- Nội dung trang chi tiết món (W3) ----
+  // Chỉ nạp cho món ĐÃ CÓ trong danh mục: bộ chữ nghĩa này gắn với món chủ lực,
+  // còn danh mục thì thay đổi theo mùa.
+  for (const story of DISH_STORIES) {
+    if (!knownDishIds.has(story.dishId)) continue
+    const { dishId: _dishId, ...rest } = story
+    await db
+      .insert(s.dishStories)
+      .values(story)
+      .onConflictDoUpdate({ target: s.dishStories.dishId, set: rest })
   }
 
   // ---- Nhóm tuỳ chọn (modifier) ----

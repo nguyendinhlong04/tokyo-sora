@@ -457,9 +457,29 @@ export class OrderingService {
     )
     const prefixes = await this.catalog.stationPrefixes(tx)
     const params = await this.params.bundle(
-      { grillServiceExtraSeconds: 480, packBufferSeconds: 300, deliveryBufferSeconds: 1200 },
+      {
+        'kitchen.grillServiceExtraSeconds': 480,
+        'kitchen.packBufferSeconds': 300,
+        'kitchen.deliveryBufferSeconds': 1200,
+        'kitchen.slaSeconds': 720,
+      },
       branchId,
     )
+
+    /**
+     * Thời gian chuẩn của từng trạm, cho món chưa khai của riêng nó (§29.1 "Bếp
+     * & SLA"). Trạm chưa đặt riêng thì rơi về mức chung của chuỗi ngay ở đây, nên
+     * tầng định tuyến chỉ còn phải hỏi một câu: món này có số của nó chưa.
+     */
+    const defaultPrepSeconds = params['kitchen.slaSeconds']
+    const stationPrepSeconds: Record<string, number> = {}
+    for (const stationId of Object.keys(prefixes)) {
+      stationPrepSeconds[stationId] = await this.params.getNumber(
+        `kitchen.slaSeconds.${stationId}`,
+        defaultPrepSeconds,
+        branchId,
+      )
+    }
 
     const drafted = buildTickets({
       order: {
@@ -477,9 +497,11 @@ export class OrderingService {
       stationPrefixes: prefixes,
       now: new Date(),
       params: {
-        grillServiceExtraSeconds: params.grillServiceExtraSeconds,
-        packBufferSeconds: params.packBufferSeconds,
-        deliveryBufferSeconds: params.deliveryBufferSeconds,
+        grillServiceExtraSeconds: params['kitchen.grillServiceExtraSeconds'],
+        packBufferSeconds: params['kitchen.packBufferSeconds'],
+        deliveryBufferSeconds: params['kitchen.deliveryBufferSeconds'],
+        defaultPrepSeconds,
+        stationPrepSeconds,
       },
     })
 

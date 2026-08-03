@@ -13,25 +13,42 @@ export function TicketQueue({ queue, loading }: { queue: Queue | undefined; load
   const toast = useToast()
   const qc = useQueryClient()
 
+  const ACTION_LABEL = { start: 'Bắt đầu', done: 'Xong', undo: 'Hoàn tác' } as const
+
   const setState = useMutation({
-    mutationFn: ({ ticket, action }: { ticket: Ticket; action: 'start' | 'done' }) =>
-      api.setState(
-        ticket.id,
-        action,
-        `${action === 'start' ? 'Bắt đầu' : 'Xong'} ${ticket.displayCode}`,
-      ),
+    mutationFn: ({ ticket, action }: { ticket: Ticket; action: 'start' | 'done' | 'undo' }) =>
+      api.setState(ticket.id, action, `${ACTION_LABEL[action]} ${ticket.displayCode}`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['queue'] }),
     onError: (err: Error) => toast(err.message, 'danger'),
   })
 
   const live = (queue?.tickets ?? []).filter((t) => t.state !== 'waiting')
 
-  // Quá giờ nhảy lên đầu — vé trễ phải đập vào mắt trước
+  /**
+   * Đồng hồ vé DỪNG lúc bấm Xong. Để nó chạy tiếp thì vé vừa xong đúng giờ vẫn
+   * đỏ dần lên trong lúc nằm chờ hoàn tác, và bếp đọc thành làm trễ.
+   */
+  const cookSeconds = (t: Ticket) =>
+    t.state === 'ready' && t.readyAt && t.queuedAt
+      ? Math.max(0, Math.round((Date.parse(t.readyAt) - Date.parse(t.queuedAt)) / 1000))
+      : elapsedSeconds(t.queuedAt)
+
+  // Quá giờ nhảy lên đầu — vé trễ phải đập vào mắt trước. Vé đã xong thì xuống
+  // cuối dù đồng hồ có cao: chỗ trên cùng để dành cho việc CÒN PHẢI LÀM.
   const sorted = [...live].sort((a, b) => {
-    const ratioOf = (t: Ticket) =>
-      t.prepSeconds > 0 ? elapsedSeconds(t.queuedAt) / t.prepSeconds : 0
+    if ((a.state === 'ready') !== (b.state === 'ready')) return a.state === 'ready' ? 1 : -1
+    const ratioOf = (t: Ticket) => (t.prepSeconds > 0 ? cookSeconds(t) / t.prepSeconds : 0)
     return ratioOf(b) - ratioOf(a)
   })
+
+  /**
+   * Cửa sổ hoàn tác tính theo giờ máy chủ đã hiệu chỉnh, cùng mốc mà máy chủ dùng
+   * để chặn. Máy chủ vẫn là bên quyết định — cái này chỉ để nút biến mất đúng lúc
+   * thay vì để bếp bấm vào một thứ chắc chắn bị từ chối.
+   */
+  const undoSeconds = queue?.undoSeconds ?? 30
+  const stillUndoable = (t: Ticket) =>
+    t.state === 'ready' && t.readyAt !== null && elapsedSeconds(t.readyAt) <= undoSeconds
 
   // Lưới cố định theo số cột của TRẠM (§22): ST-02 sáu cột vé thấp, ST-06 bốn cột
   // vé cao. Hai hàng là vừa tầm mắt trên TV treo tường.
@@ -57,7 +74,7 @@ export function TicketQueue({ queue, loading }: { queue: Queue | undefined; load
             tableCode={ticket.tableCode}
             batchNo={ticket.batchNo}
             state={ticket.state}
-            elapsedSeconds={elapsedSeconds(ticket.queuedAt)}
+            elapsedSeconds={cookSeconds(ticket)}
             prepSeconds={ticket.prepSeconds}
             grillServiceNote={ticket.grillServiceNote}
             showGrams={ticket.stationId === 'ST-02'}
@@ -73,6 +90,11 @@ export function TicketQueue({ queue, loading }: { queue: Queue | undefined; load
             }))}
             onStart={() => setState.mutate({ ticket, action: 'start' })}
             onDone={() => setState.mutate({ ticket, action: 'done' })}
+            onUndo={
+              stillUndoable(ticket)
+                ? () => setState.mutate({ ticket, action: 'undo' })
+                : undefined
+            }
           />
         ))}
       </div>

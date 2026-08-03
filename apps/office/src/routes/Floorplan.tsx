@@ -2,6 +2,7 @@ import { Button, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type AreaRow, type TableInput, type TableRow } from '../api'
+import { ConfigBranchPicker, useConfigBranch } from '../components/config-branch'
 import { PageHeader } from '../components/PageHeader'
 import { useSession } from '../session-context'
 
@@ -33,7 +34,8 @@ const BLANK = (branchId: string, areaId: number | null): TableInput => ({
  * nào (§16), và sức chứa quyết định lưới khung giờ còn nhận hay không.
  */
 export function Floorplan() {
-  const { branchId, can } = useSession()
+  const { can } = useSession()
+  const { branchId } = useConfigBranch()
   const toast = useToast()
   const queryClient = useQueryClient()
   const mayEdit = can('admin.manage-accounts-roles')
@@ -100,11 +102,14 @@ export function Floorplan() {
         title="Khu vực & bàn"
         subtitle={`${active.length} bàn đang dùng · ${active.filter((t) => t.hasGrill).length} bàn có bếp · ${active.filter((t) => t.kind === 'private').length} phòng riêng. Sức chứa đặt bàn của W6 đếm từ đúng bảng này.`}
         action={
-          mayEdit && areas.length > 0 ? (
-            <Button variant="primary" onClick={() => setEditing(BLANK(branchId!, areas[0]!.id))}>
-              Thêm bàn
-            </Button>
-          ) : null
+          <div className="flex items-end gap-4">
+            <ConfigBranchPicker />
+            {mayEdit && areas.length > 0 ? (
+              <Button variant="primary" onClick={() => setEditing(BLANK(branchId!, areas[0]!.id))}>
+                Thêm bàn
+              </Button>
+            ) : null}
+          </div>
         }
       />
 

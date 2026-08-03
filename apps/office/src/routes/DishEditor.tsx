@@ -3,13 +3,18 @@ import { ApiError } from '@sora/core'
 import { Button, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { api, type DishRow, type SetCourse } from '../api'
+import { api, type DishRow, type DishStory, type SetCourse } from '../api'
 import { useSession } from '../session-context'
+import { BLANK_STORY, StoryEditor } from './DishStoryEditor'
 
 /** Bản ghi món thuần, bỏ các trường dẫn xuất theo chi nhánh */
 type DishDraft = Omit<
   DishRow,
-  'override' | 'effectivePrice' | 'effectiveActive' | 'effectiveOnlineVisible' | 'effectiveOnlinePrice'
+  | 'override'
+  | 'effectivePrice'
+  | 'effectiveActive'
+  | 'effectiveOnlineVisible'
+  | 'effectiveOnlinePrice'
 >
 
 export const BLANK_DISH: DishDraft = {
@@ -24,6 +29,7 @@ export const BLANK_DISH: DishDraft = {
   kana: null,
   shortDesc: null,
   longDesc: null,
+  imageUrl: null,
   allergens: null,
   tags: null,
   routingMethod: 'fixed',
@@ -80,6 +86,7 @@ export function DishEditor({
   const mayEdit = can('menu.edit-price')
   const [draft, setDraft] = useState<DishDraft>(blank)
   const [courses, setCourses] = useState<SetCourse[]>([])
+  const [story, setStory] = useState<DishStory>(BLANK_STORY)
 
   const detail = useQuery({
     queryKey: ['dish', dishId],
@@ -124,6 +131,9 @@ export function DishEditor({
       } = detail.data.dish
       setDraft(rest)
       setCourses(detail.data.courses)
+      // Món chưa được kể thì form mở ra rỗng, không phải mở ra chữ của món trước
+      const { dishId: _d, ...storyRest } = detail.data.story ?? { dishId: '', ...BLANK_STORY }
+      setStory(storyRest)
     }
   }, [detail.data])
 
@@ -133,9 +143,10 @@ export function DishEditor({
   }
 
   const fail = (err: Error) => {
-    const message = err instanceof ApiError && err.body && typeof err.body === 'object'
-      ? ((err.body as { message?: string }).message ?? err.message)
-      : err.message
+    const message =
+      err instanceof ApiError && err.body && typeof err.body === 'object'
+        ? ((err.body as { message?: string }).message ?? err.message)
+        : err.message
     toast(message, 'danger')
   }
 
@@ -156,6 +167,25 @@ export function DishEditor({
     mutationFn: () => api.setDishCourses(dishId!, courses),
     onSuccess: () => {
       toast('Đã lưu các chặng của set', 'ok')
+      refresh()
+    },
+    onError: fail,
+  })
+
+  const saveStory = useMutation({
+    mutationFn: () => api.setDishStory(dishId!, story),
+    onSuccess: () => {
+      toast('Đã lưu nội dung trang web — trang chi tiết đổi theo trong vòng một phút', 'ok')
+      refresh()
+    },
+    onError: fail,
+  })
+
+  const clearStory = useMutation({
+    mutationFn: () => api.clearDishStory(dishId!),
+    onSuccess: () => {
+      toast('Đã xoá nội dung giới thiệu — trang chi tiết quay về bản gọn', 'ok')
+      setStory(BLANK_STORY)
       refresh()
     },
     onError: fail,
@@ -212,7 +242,12 @@ export function DishEditor({
               </p>
             ) : null}
           </div>
-          <button type="button" onClick={onClose} aria-label="Đóng" className="size-10 text-[22px] text-ink-mute">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng"
+            className="size-10 text-[22px] text-ink-mute"
+          >
             ×
           </button>
         </header>
@@ -239,7 +274,11 @@ export function DishEditor({
                 />
               </Field>
               <Field label="Tên tiếng Việt">
-                <input value={draft.nameVi} onChange={(e) => set({ nameVi: e.target.value })} className={inputClass} />
+                <input
+                  value={draft.nameVi}
+                  onChange={(e) => set({ nameVi: e.target.value })}
+                  className={inputClass}
+                />
               </Field>
               <Field label="Tên tiếng Nhật">
                 <input
@@ -296,7 +335,11 @@ export function DishEditor({
                 <input
                   value={(draft.tags ?? []).join(', ')}
                   onChange={(e) =>
-                    set({ tags: e.target.value.trim() ? e.target.value.split(',').map((t) => t.trim()) : null })
+                    set({
+                      tags: e.target.value.trim()
+                        ? e.target.value.split(',').map((t) => t.trim())
+                        : null,
+                    })
                   }
                   className={inputClass}
                 />
@@ -347,7 +390,10 @@ export function DishEditor({
                     placeholder={String(draft.basePrice)}
                     onBlur={(e) =>
                       e.target.value !== ''
-                        ? setOverride.mutate({ price: Number(e.target.value), active: override?.active ?? null })
+                        ? setOverride.mutate({
+                            price: Number(e.target.value),
+                            active: override?.active ?? null,
+                          })
                         : undefined
                     }
                     className="h-10 w-[180px] rounded-sm border border-line-1 bg-canvas px-3 font-mono text-[length:var(--fs-b2)] text-ink-hi"
@@ -361,7 +407,9 @@ export function DishEditor({
                       })
                     }
                   >
-                    {override?.active === false ? 'Đang tắt ở chi nhánh này' : 'Tắt ở chi nhánh này'}
+                    {override?.active === false
+                      ? 'Đang tắt ở chi nhánh này'
+                      : 'Tắt ở chi nhánh này'}
                   </Button>
                   {override ? (
                     <Button disabled={!mayEdit} onClick={() => clearOverride.mutate()}>
@@ -383,7 +431,9 @@ export function DishEditor({
                 <Field label="Phương thức">
                   <select
                     value={draft.routingMethod ?? 'fixed'}
-                    onChange={(e) => set({ routingMethod: e.target.value as DishDraft['routingMethod'] })}
+                    onChange={(e) =>
+                      set({ routingMethod: e.target.value as DishDraft['routingMethod'] })
+                    }
                     className={inputClass}
                   >
                     {Object.entries(ROUTING_LABEL).map(([id, label]) => (
@@ -533,6 +583,17 @@ export function DishEditor({
           </Section>
 
           <Section title="Trình bày">
+            <Field
+              label="Ảnh món"
+              hint="Dùng chung mọi kênh: web, thực đơn online, thẻ món tại bàn. Bỏ trống thì các kênh vẽ ô chữ kana."
+            >
+              <input
+                value={draft.imageUrl ?? ''}
+                onChange={(e) => set({ imageUrl: e.target.value || null })}
+                placeholder="/anh/mon-ba-chi-bo.jpg"
+                className={inputClass}
+              />
+            </Field>
             <Field label="Mô tả ngắn" hint="Dòng dưới tên món trên thực đơn — dưới 80 ký tự là vừa">
               <input
                 value={draft.shortDesc ?? ''}
@@ -561,6 +622,50 @@ export function DishEditor({
                 className={inputClass}
               />
             </Field>
+          </Section>
+
+          <Section title="Trang giới thiệu trên web">
+            {dishId === null ? (
+              <p className="text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                Lưu món trước đã — nội dung trang gắn vào món đã có mã.
+              </p>
+            ) : (
+              <>
+                <p className="mb-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                  Đây là những gì khách đọc ở <span className="font-mono">/thuc-don/{draft.id}</span>.
+                  Bỏ trống ô nào thì trang bỏ qua khối đó; bỏ trống hết thì trang dựng bản gọn từ
+                  tên, giá và mô tả.
+                </p>
+
+                <StoryEditor
+                  story={story}
+                  kind={draft.kind}
+                  dishId={draft.id}
+                  dishes={all.data ?? []}
+                  disabled={!mayEdit}
+                  onChange={setStory}
+                />
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Button
+                    variant="primary"
+                    disabled={!mayEdit || saveStory.isPending}
+                    onClick={() => saveStory.mutate()}
+                  >
+                    Lưu nội dung trang web
+                  </Button>
+                  {detail.data?.story ? (
+                    <Button
+                      variant="danger"
+                      disabled={!mayEdit || clearStory.isPending}
+                      onClick={() => clearStory.mutate()}
+                    >
+                      Xoá nội dung giới thiệu
+                    </Button>
+                  ) : null}
+                </div>
+              </>
+            )}
           </Section>
 
           <Section title="Trạng thái">
@@ -617,7 +722,9 @@ function Field({
     <label className="mb-3 block">
       <span className="mb-1.5 block text-[length:var(--fs-c1)] text-ink-mute">{label}</span>
       {children}
-      {hint ? <span className="mt-1 block text-[length:var(--fs-c2)] text-ink-mute">{hint}</span> : null}
+      {hint ? (
+        <span className="mt-1 block text-[length:var(--fs-c2)] text-ink-mute">{hint}</span>
+      ) : null}
     </label>
   )
 }
@@ -632,7 +739,11 @@ function StationPicker({
   onChange: (value: string | null) => void
 }) {
   return (
-    <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)} className={inputClass}>
+    <select
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value || null)}
+      className={inputClass}
+    >
       <option value="">— chưa chọn —</option>
       {stations.map((station) => (
         <option key={station.id} value={station.id}>
@@ -694,14 +805,15 @@ function CourseEditor({
                 className="h-9 w-[64px] rounded-sm border border-line-1 bg-canvas px-2 text-center font-mono text-[length:var(--fs-b2)] text-ink-hi"
               />
             </label>
-            <button
-              type="button"
+            <Button
               disabled={disabled}
               onClick={() => onChange(courses.filter((_, i) => i !== index))}
-              className="ml-auto text-[length:var(--fs-c1)] text-danger"
+              size="sm"
+              variant="danger"
+              className="ml-auto"
             >
               Xoá chặng
-            </button>
+            </Button>
           </div>
 
           <div className="mt-3 grid gap-2">
@@ -740,33 +852,38 @@ function CourseEditor({
                   placeholder="100g"
                   className="h-9 w-[100px] rounded-sm border border-line-1 bg-canvas px-2.5 font-mono text-[length:var(--fs-b2)] text-ink-hi"
                 />
-                <button
-                  type="button"
+                <Button
                   disabled={disabled}
                   onClick={() =>
                     patch(index, { items: course.items.filter((_, i) => i !== itemIndex) })
                   }
-                  className="text-[length:var(--fs-c1)] text-ink-mute"
+                  size="sm"
+                  variant="ghost"
                 >
                   Bỏ
-                </button>
+                </Button>
               </div>
             ))}
-            <button
-              type="button"
+            <Button
               disabled={disabled || dishes.length === 0}
               onClick={() =>
                 patch(index, {
                   items: [
                     ...course.items,
-                    { dishId: dishes.find((d) => d.kind !== 'set')!.id, qty: 1, portionLabel: null },
+                    {
+                      dishId: dishes.find((d) => d.kind !== 'set')!.id,
+                      qty: 1,
+                      portionLabel: null,
+                    },
                   ],
                 })
               }
-              className="justify-self-start text-[length:var(--fs-c1)] text-accent-ink"
+              size="sm"
+              variant="ghost"
+              className="justify-self-start text-accent-ink"
             >
               + Thêm món vào chặng
-            </button>
+            </Button>
           </div>
         </div>
       ))}

@@ -26,6 +26,11 @@ export interface OrderTicketProps {
   showGrams?: boolean
   onStart?: () => void
   onDone?: () => void
+  /**
+   * Chỉ truyền khi vé CÒN trong cửa sổ hoàn tác. Hết cửa sổ thì bỏ trống và ô vé
+   * quay về nhãn "Đã xong" — nút biến mất là tín hiệu cho bếp biết đã chốt.
+   */
+  onUndo?: () => void
 }
 
 /**
@@ -48,6 +53,7 @@ export function OrderTicket({
   showGrams = false,
   onStart,
   onDone,
+  onUndo,
 }: OrderTicketProps) {
   const ratio = prepSeconds > 0 ? elapsedSeconds / prepSeconds : 0
   const overdue = isOverdue(ratio) && state !== 'waiting'
@@ -114,7 +120,7 @@ export function OrderTicket({
         ))}
       </ul>
 
-      {!waiting && (onStart || onDone) ? (
+      {!waiting && (onStart || onDone || onUndo) ? (
         <footer className="flex gap-px border-t border-line-1">
           {state === 'queued' && onStart ? (
             <button
@@ -134,7 +140,16 @@ export function OrderTicket({
               Xong
             </button>
           ) : null}
-          {state === 'ready' ? (
+          {state === 'ready' && onUndo ? (
+            <button
+              type="button"
+              onClick={onUndo}
+              className="h-[72px] flex-1 rounded-b-md bg-surface-3 text-[length:var(--fs-t2)] font-semibold text-warn active:bg-surface-4"
+            >
+              Hoàn tác
+            </button>
+          ) : null}
+          {state === 'ready' && !onUndo ? (
             <div className="flex h-[72px] flex-1 items-center justify-center text-[length:var(--fs-t2)] text-ok">
               Đã xong
             </div>

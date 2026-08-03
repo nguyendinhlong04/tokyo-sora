@@ -69,9 +69,29 @@ export interface ResolvedRouting {
 export interface RoutingParams {
   /** Tham số A6 "Thêm khi bếp nướng sẵn" — mặc định 8 phút */
   grillServiceExtraSeconds: number
+  /**
+   * Thời gian chuẩn của TRẠM, cho món chưa khai của riêng nó (`kitchen.slaSeconds.<trạm>`).
+   * Thiếu trạm nào thì rơi về `defaultPrepSeconds`.
+   */
+  stationPrepSeconds?: Record<string, number>
+  /** Mức chuẩn của cả chuỗi (`kitchen.slaSeconds`) — lưới cuối cùng */
+  defaultPrepSeconds?: number
 }
 
 export const DEFAULT_ROUTING_PARAMS: RoutingParams = { grillServiceExtraSeconds: 8 * 60 }
+
+/**
+ * Thời gian chuẩn thực tế của một nhánh: của MÓN nếu đã khai, ngược lại của TRẠM
+ * mà nhánh đó rơi vào.
+ *
+ * Món để 0 nghĩa là "chưa khai", không phải "nấu xong tức thì" — mà vé bắt buộc
+ * `prep_seconds > 0` ở tầng bảng, nên không có lưới này thì một món chưa khai làm
+ * đổ cả lượt gửi bếp chứ không chỉ hiện sai đồng hồ.
+ */
+function prepFor(routing: DishRouting, station: string, params: RoutingParams): number {
+  if (routing.prepSeconds > 0) return routing.prepSeconds
+  return params.stationPrepSeconds?.[station] ?? params.defaultPrepSeconds ?? 300
+}
 
 /** Nhánh trạm ứng với ngữ cảnh, trước khi tính nướng hộ */
 function branchStation(routing: DishRouting, ctx: ServiceContext): string {
@@ -98,9 +118,8 @@ export function resolveRouting(
   const station = branchStation(routing, ctx)
   const grillService = isSelfGrillDish(routing) && station !== routing.stationGrill
 
-  const prepSeconds = grillService
-    ? routing.prepSeconds + params.grillServiceExtraSeconds
-    : routing.prepSeconds
+  const basePrep = prepFor(routing, station, params)
+  const prepSeconds = grillService ? basePrep + params.grillServiceExtraSeconds : basePrep
 
   const grillServiceNote =
     grillService && ctx.kind === 'dinein' ? `Bàn ${ctx.tableCode} không có bếp` : null
@@ -115,7 +134,8 @@ export function resolveRouting(
     ? {
         station: routing.secondaryStation,
         componentLabel: routing.secondaryLabel ?? null,
-        prepSeconds: routing.prepSeconds,
+        // Vé thứ hai nằm ở TRẠM KHÁC nên lấy chuẩn của trạm đó, không mượn của nhánh chính
+        prepSeconds: prepFor(routing, routing.secondaryStation, params),
       }
     : null
 

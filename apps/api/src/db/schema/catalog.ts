@@ -6,6 +6,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -92,6 +93,12 @@ export const dishes = pgTable(
     kana: text('kana'),
     shortDesc: text('short_desc'),
     longDesc: text('long_desc'),
+    /**
+     * Ảnh món — MỘT ảnh dùng chung cho mọi kênh (web, thực đơn online, thẻ món
+     * Table). Cùng lối với `categories.imageUrl`: lưu đường dẫn, không lưu tệp.
+     * Bỏ trống thì các kênh vẽ ô chữ kana như trước.
+     */
+    imageUrl: text('image_url'),
     allergens: text('allergens').array(),
     tags: text('tags').array(),
 
@@ -196,6 +203,87 @@ export const dishBranchOverrides = pgTable(
   },
   (t) => [primaryKey({ columns: [t.dishId, t.branchId] })],
 )
+
+/** Một cột "độ cắt" trên trang chi tiết món: tên · quy cách · mô tả · thanh đo độ mềm */
+export interface DishStoryCut {
+  name: string
+  size: string
+  desc: string
+  /** Độ mềm 1–4, vẽ thành thanh đo bốn ô */
+  soft: number
+  imageUrl: string | null
+}
+
+/** Một gợi ý gia vị: chữ Nhật trong vòng tròn, tên, một dòng giải thích */
+export interface DishStoryCondiment {
+  kanji: string
+  name: string
+  desc: string
+}
+
+/**
+ * Phần biên tập của trang chi tiết món trên web (W3).
+ *
+ * Tách khỏi `dishes` chứ không nhồi thêm cột: bảng món đi theo mọi payload của
+ * POS và màn bếp, không việc gì phải cõng mười lăm đoạn văn quảng cáo mỗi lần
+ * dựng phiếu order. Ở đây chỉ món nào ĐƯỢC KỂ mới có bản ghi — món còn lại trang
+ * web tự dựng bản gọn từ tên, giá, mô tả.
+ *
+ * Trước bản này chỗ đó nằm cứng trong `apps/web/content/stories.ts`: sửa một chữ
+ * phải build lại web. Giờ nhập ở Office M1 và về web trong ≤ 60 giây, đúng cam
+ * kết lan truyền của mọi thay đổi thực đơn.
+ */
+export const dishStories = pgTable('dish_stories', {
+  dishId: text('dish_id')
+    .primaryKey()
+    .references(() => dishes.id, { onDelete: 'cascade' }),
+
+  // ---- Dùng chung cho món lẻ và set ----
+  /** Số chương in trong ô kim cương vàng: '01' cho món, 'I' cho set */
+  chapterNo: text('chapter_no'),
+  /** Quy cách một phần: '100g' · '3 con' · '8 món' */
+  portionLabel: text('portion_label'),
+  /** Tên tiếng Nhật ĐẦY ĐỦ, khác `dishes.nameJa` ngắn gọn: 牛バラ（三枚肉） */
+  nameJaFull: text('name_ja_full'),
+  /** Lời dẫn riêng của trang chi tiết; bỏ trống thì trang dùng mô tả dài của món */
+  intro: text('intro'),
+  note: text('note'),
+  /** Dải chân trang: 'Sơ chế kỹ lưỡng · Thái máy chuyên dụng · Giữ lạnh 0–2°C' */
+  craft: text('craft'),
+  footerImageUrl: text('footer_image_url'),
+  /** Khẩu hiệu chân trang, chữ Nhật rồi chữ Việt: 焼いてうまい！ */
+  bannerJa: text('banner_ja'),
+  bannerVi: text('banner_vi'),
+  /** Câu kết in nghiêng cuối dải chân trang */
+  closing: text('closing'),
+  /** Món dùng kèm do bếp chọn tay — trống thì trang tự bù bằng đồ uống và món lạnh */
+  pairingDishIds: text('pairing_dish_ids').array(),
+
+  // ---- Món lẻ ----
+  /** Vị trí phần thịt: 'Bụng dưới, giữa sườn và da' */
+  origin: text('origin'),
+  /** Chữ Nhật ngắn của phần thịt, viết dọc cạnh ảnh: 三枚肉 */
+  originKanji: text('origin_kanji'),
+  originImageUrl: text('origin_image_url'),
+  flavours: text('flavours').array(),
+  /** Nhãn khối độ cắt — thịt thì 'Lựa chọn độ cắt', hải sản và rau thì 'Cách sơ chế' */
+  cutsLabel: text('cuts_label'),
+  cuts: jsonb('cuts').$type<DishStoryCut[]>(),
+  fire: text('fire'),
+  fireImageUrl: text('fire_image_url'),
+  dip: text('dip'),
+  dipImageUrl: text('dip_image_url'),
+  condiments: jsonb('condiments').$type<DishStoryCondiment[]>(),
+
+  // ---- Set ----
+  /** 'Dành cho 2 người' — chữ tự do vì set nào cũng có cách nói riêng */
+  serves: text('serves'),
+  duration: text('duration'),
+  /** Bữa diễn ra theo thứ tự nào — set nấu theo nhịp, mang từng chặng */
+  flow: text('flow').array(),
+  /** Món gợi ý gọi thêm cho vừa miệng */
+  extraDishIds: text('extra_dish_ids').array(),
+})
 
 export const modifierGroups = pgTable(
   'modifier_groups',

@@ -336,6 +336,126 @@ describe('Chặng của set', () => {
   })
 })
 
+/**
+ * Nội dung trang chi tiết món trên web (W3).
+ *
+ * Trước đây phần này nằm cứng trong mã nguồn web nên "sửa mô tả món" và "sửa
+ * trang giới thiệu món" là hai việc ở hai nơi, làm bằng hai cách. Bài kiểm ở đây
+ * là: nhập một lần ở M1 thì trang web đọc thấy đúng thứ đó, và mã món gõ sai bị
+ * chặn ngay lúc lưu chứ không thành ô trống trên trang.
+ */
+describe('Nội dung trang giới thiệu món', () => {
+  const STORY = {
+    chapterNo: '07',
+    portionLabel: '250g',
+    nameJaFull: '塩焼き鶏（もも）',
+    intro: 'Đùi gà ướp muối ớt, nướng than hoa cho da giòn mà thịt còn mọng.',
+    note: 'Da cháy nhanh hơn thịt chín — để ở mép vỉ và trở đều tay.',
+    craft: 'Gà tươi trong ngày · Ướp muối ớt 3 giờ',
+    bannerJa: '焼いてうまい！',
+    bannerVi: 'NƯỚNG ĐÚNG CÁCH — NGON HẾT Ý',
+    closing: 'Ăn nóng ngay khi rời vỉ.',
+    pairingDishIds: ['duamuoi'],
+    origin: 'Đùi gà rút xương',
+    originKanji: 'もも',
+    flavours: ['Da giòn, thịt mọng', 'Mặn ngọt hậu cay'],
+    cutsLabel: 'Lựa chọn độ cắt',
+    cuts: [{ name: 'Miếng vuông', size: '6 miếng', desc: 'Cắn ngập miếng.', soft: 3 }],
+    fire: 'Nướng 3 phút mỗi mặt',
+    dip: 'Chấm muối tiêu chanh',
+    condiments: [{ kanji: '塩', name: 'Muối tiêu chanh', desc: 'Thanh nhẹ' }],
+  }
+
+  it('món chưa được kể thì trang web nhận story rỗng chứ không phải lỗi', async () => {
+    const site = await inject({ method: 'GET', url: '/api/site/menu' })
+    const dish = site.json().dishes.find((d: { id: string }) => d.id === NEW_DISH.id)
+    expect(dish.story).toBeNull()
+  })
+
+  it('nhập ở M1 thì trang chi tiết trên web đọc thấy đúng nội dung đó', async () => {
+    const res = await inject({
+      method: 'PUT',
+      url: `/api/admin/dishes/${NEW_DISH.id}/story`,
+      headers: asOwner(),
+      payload: STORY,
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+
+    const site = await inject({ method: 'GET', url: '/api/site/menu' })
+    const story = site.json().dishes.find((d: { id: string }) => d.id === NEW_DISH.id).story
+    expect(story.chapterNo).toBe('07')
+    expect(story.nameJaFull).toBe('塩焼き鶏（もも）')
+    expect(story.flavours).toEqual(['Da giòn, thịt mọng', 'Mặn ngọt hậu cay'])
+    expect(story.cuts[0]).toMatchObject({ name: 'Miếng vuông', soft: 3, imageUrl: null })
+    expect(story.condiments[0].kanji).toBe('塩')
+    expect(story.pairingDishIds).toEqual(['duamuoi'])
+  })
+
+  it('lưu lần hai thay cả cụm — ô bỏ trống thành trống chứ không giữ chữ cũ', async () => {
+    const res = await inject({
+      method: 'PUT',
+      url: `/api/admin/dishes/${NEW_DISH.id}/story`,
+      headers: asOwner(),
+      payload: { ...STORY, note: null, flavours: [] },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+
+    const site = await inject({ method: 'GET', url: '/api/site/menu' })
+    const story = site.json().dishes.find((d: { id: string }) => d.id === NEW_DISH.id).story
+    expect(story.note).toBeNull()
+    expect(story.flavours).toBeNull()
+    expect(story.chapterNo).toBe('07')
+  })
+
+  it('mã món dùng kèm gõ sai bị chặn lúc lưu, không thành ô trống trên trang', async () => {
+    const res = await inject({
+      method: 'PUT',
+      url: `/api/admin/dishes/${NEW_DISH.id}/story`,
+      headers: asOwner(),
+      payload: { ...STORY, pairingDishIds: ['mon-khong-co'] },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toContain('mon-khong-co')
+  })
+
+  it('món không dùng kèm với chính nó', async () => {
+    const res = await inject({
+      method: 'PUT',
+      url: `/api/admin/dishes/${NEW_DISH.id}/story`,
+      headers: asOwner(),
+      payload: { ...STORY, pairingDishIds: [NEW_DISH.id] },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toContain('chính nó')
+  })
+
+  it('ảnh món khai ở M1 đi thẳng ra thực đơn web', async () => {
+    const res = await inject({
+      method: 'PATCH',
+      url: `/api/admin/dishes/${NEW_DISH.id}`,
+      headers: asOwner(),
+      payload: { imageUrl: '/anh/ga-nuong-muoi.jpg' },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+
+    const site = await inject({ method: 'GET', url: '/api/site/menu' })
+    const dish = site.json().dishes.find((d: { id: string }) => d.id === NEW_DISH.id)
+    expect(dish.imageUrl).toBe('/anh/ga-nuong-muoi.jpg')
+  })
+
+  it('xoá nội dung giới thiệu thì trang chi tiết quay về bản gọn', async () => {
+    const res = await inject({
+      method: 'DELETE',
+      url: `/api/admin/dishes/${NEW_DISH.id}/story`,
+      headers: asOwner(),
+    })
+    expect(res.statusCode).toBe(200)
+
+    const site = await inject({ method: 'GET', url: '/api/site/menu' })
+    expect(site.json().dishes.find((d: { id: string }) => d.id === NEW_DISH.id).story).toBeNull()
+  })
+})
+
 describe('Sự kiện lan truyền', () => {
   it('mỗi lần sửa món đều bắn mon.cap-nhat cho các kênh làm mới cache', async () => {
     const [row] = await db.select().from(dishes).where(eq(dishes.id, NEW_DISH.id))

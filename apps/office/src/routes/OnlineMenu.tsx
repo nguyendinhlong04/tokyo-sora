@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, type DishRow, type ParameterRow } from '../api'
+import { ConfigBranchPicker, useConfigBranch } from '../components/config-branch'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { useSession } from '../session-context'
@@ -27,7 +28,8 @@ const CAPACITY_KEYS = [
  * phải cấu hình; còn lịch bán theo giờ thì danh mục chưa có cột nào để lưu.
  */
 export function OnlineMenu() {
-  const { branchId, can } = useSession()
+  const { can } = useSession()
+  const { branchId } = useConfigBranch()
   const toast = useToast()
   const queryClient = useQueryClient()
   const mayEdit = can('menu.edit-price')
@@ -97,9 +99,12 @@ export function OnlineMenu() {
         title="Menu online"
         subtitle={`${rows.length} món đang bán online ở chi nhánh này. Bật tắt và giá ở đây chỉ đổi kênh mang về · giao hàng — thực đơn tại quán giữ nguyên.`}
         action={
-          <Button onClick={() => setOnlyOnline((v) => !v)}>
-            {onlyOnline ? 'Xem cả món chưa bán online' : 'Chỉ xem món đang bán online'}
-          </Button>
+          <div className="flex items-end gap-4">
+            <ConfigBranchPicker />
+            <Button onClick={() => setOnlyOnline((v) => !v)}>
+              {onlyOnline ? 'Xem cả món chưa bán online' : 'Chỉ xem món đang bán online'}
+            </Button>
+          </div>
         }
       />
 
@@ -130,7 +135,11 @@ export function OnlineMenu() {
         </section>
 
         <div className="mt-5">
+          {/* Ô giá online là input uncontrolled (defaultValue) — đổi chi nhánh
+              phải remount cả bảng, không thì ô còn hiện giá ghi đè của chi
+              nhánh vừa rời đi. */}
           <DataTable
+            key={branchId ?? ''}
             rows={rows}
             rowKey={(dish) => dish.id}
             loading={dishes.isPending}

@@ -160,7 +160,7 @@ export default async function MenuPage() {
                       className="flex min-w-0 flex-col border border-accent/22 bg-surface-1 transition-colors hover:border-accent hover:bg-surface-3"
                     >
                       <div className="relative aspect-[4/3]">
-                        <DishGlyph glyph={dishGlyph(dish)} className="size-full" />
+                        <DishGlyph glyph={dishGlyph(dish)} src={dish.imageUrl} alt={dish.nameVi} className="size-full" />
                         {dish.signature ? (
                           <span className="absolute top-2.5 right-2.5">
                             <SignatureBadge compact />

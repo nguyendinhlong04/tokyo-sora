@@ -815,6 +815,8 @@ export interface DishRow {
   kana: string | null
   shortDesc: string | null
   longDesc: string | null
+  /** Ảnh món dùng chung mọi kênh — đường dẫn ảnh, không phải tệp tải lên */
+  imageUrl: string | null
   allergens: string[] | null
   tags: string[] | null
   routingMethod: 'fixed' | 'song' | 'nuong' | 'linh_hoat' | null
@@ -873,10 +875,62 @@ export interface SetCourse {
   items: { dishId: string; qty: number; portionLabel: string | null }[]
 }
 
+/** Một cột "độ cắt" trên trang chi tiết món của web */
+export interface DishStoryCut {
+  name: string
+  size: string
+  desc: string
+  /** Độ mềm 1–4, vẽ thành thanh đo bốn ô */
+  soft: number
+  imageUrl: string | null
+}
+
+/** Một gợi ý gia vị: chữ Nhật trong vòng tròn, tên, một dòng giải thích */
+export interface DishStoryCondiment {
+  kanji: string
+  name: string
+  desc: string
+}
+
+/**
+ * Nội dung trang chi tiết món trên web (W3) — phần chữ nghĩa và ảnh của trang
+ * /thuc-don/{mã}. Mọi trường bỏ trống được; trống thì trang tự lùi về bản gọn.
+ */
+export interface DishStory {
+  chapterNo: string | null
+  portionLabel: string | null
+  nameJaFull: string | null
+  intro: string | null
+  note: string | null
+  craft: string | null
+  footerImageUrl: string | null
+  bannerJa: string | null
+  bannerVi: string | null
+  closing: string | null
+  pairingDishIds: string[] | null
+  origin: string | null
+  originKanji: string | null
+  originImageUrl: string | null
+  flavours: string[] | null
+  cutsLabel: string | null
+  cuts: DishStoryCut[] | null
+  fire: string | null
+  fireImageUrl: string | null
+  dip: string | null
+  dipImageUrl: string | null
+  condiments: DishStoryCondiment[] | null
+  serves: string | null
+  duration: string | null
+  flow: string[] | null
+  extraDishIds: string[] | null
+}
+
 export interface DishDetail {
   dish: DishRow
   courses: SetCourse[]
   overrides: { branchId: string; price: number | null; active: boolean | null }[]
+  /** `null` = món chưa được kể trên web */
+  story: (DishStory & { dishId: string }) | null
 }
 
 // ------------------------------------------------ M10 · Cây danh mục
@@ -2200,6 +2254,12 @@ export const api = {
       method: 'PUT',
       body: { courses },
     }),
+
+  setDishStory: (id: string, story: DishStory) =>
+    apiFetch<DishStory>(`/api/admin/dishes/${id}/story`, { method: 'PUT', body: story }),
+
+  clearDishStory: (id: string) =>
+    apiFetch<{ cleared: boolean }>(`/api/admin/dishes/${id}/story`, { method: 'DELETE' }),
 
   setDishOverride: (
     id: string,

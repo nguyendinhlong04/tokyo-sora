@@ -3,7 +3,6 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { DishGlyph } from '../../../components/visuals'
 import { OFFERS } from '../../../content/site'
-import { SET_STORIES } from '../../../content/stories'
 import { dishGlyph, getMenu } from '../../../lib/site'
 
 export const metadata: Metadata = {
@@ -66,13 +65,13 @@ export default async function OffersPage() {
 
         <div className="grid gap-6 lg:grid-cols-3 lg:gap-8">
           {sets.map((set) => {
-            const story = SET_STORIES[set.id]
+            const story = set.story
             return (
               <article
                 key={set.id}
                 className="flex flex-col overflow-hidden rounded-md border border-accent/16 bg-surface-2"
               >
-                <DishGlyph glyph={dishGlyph(set)} className="aspect-[4/3] w-full" />
+                <DishGlyph glyph={dishGlyph(set)} src={set.imageUrl} alt={set.nameVi} className="aspect-[4/3] w-full" />
                 <div className="flex flex-1 flex-col p-7">
                   <h3 className="font-display text-[26px] font-light text-ink-hi lg:text-[length:var(--fs-d3)]">
                     {set.nameVi}
@@ -82,9 +81,11 @@ export default async function OffersPage() {
                       {set.nameJa}
                     </p>
                   ) : null}
-                  {story ? (
+                  {story?.serves || story?.duration ? (
                     <p className="mt-4 text-[length:var(--fs-b2)] text-ink-mute">
-                      Dành cho {story.people} · {story.duration}
+                      {[story.serves ? `Dành cho ${story.serves}` : null, story.duration]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </p>
                   ) : null}
                   <p className="mt-3.5 flex-1 text-[length:var(--fs-b1)] leading-relaxed text-ink-body">

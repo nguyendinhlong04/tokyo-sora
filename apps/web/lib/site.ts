@@ -1,4 +1,3 @@
-import { PAIRINGS } from '../content/site'
 import { apiUrl } from './api'
 
 /**
@@ -23,6 +22,58 @@ export interface SiteBranch {
   seats: { total: number; grill: number; standard: number; private: number }
 }
 
+/** Một cột "độ cắt" trên W3 */
+export interface SiteDishCut {
+  name: string
+  size: string
+  desc: string
+  /** Độ mềm 1–4, vẽ thành thanh đo bốn ô */
+  soft: number
+  imageUrl: string | null
+}
+
+export interface SiteDishCondiment {
+  kanji: string
+  name: string
+  desc: string
+}
+
+/**
+ * Phần biên tập của trang chi tiết món, nhập ở Office M1 · Món và set.
+ *
+ * Mọi trường rỗng được và W3 lùi dần theo đúng thứ tự đó: thiếu một khối thì bỏ
+ * khối, thiếu cả bản ghi thì dựng bản gọn. Nhờ vậy thêm một món mới vào danh mục
+ * không bao giờ làm trang web gãy — chỉ là trang gọn hơn cho tới khi bếp kể.
+ */
+export interface SiteDishStory {
+  chapterNo: string | null
+  portionLabel: string | null
+  nameJaFull: string | null
+  intro: string | null
+  note: string | null
+  craft: string | null
+  footerImageUrl: string | null
+  bannerJa: string | null
+  bannerVi: string | null
+  closing: string | null
+  pairingDishIds: string[] | null
+  origin: string | null
+  originKanji: string | null
+  originImageUrl: string | null
+  flavours: string[] | null
+  cutsLabel: string | null
+  cuts: SiteDishCut[] | null
+  fire: string | null
+  fireImageUrl: string | null
+  dip: string | null
+  dipImageUrl: string | null
+  condiments: SiteDishCondiment[] | null
+  serves: string | null
+  duration: string | null
+  flow: string[] | null
+  extraDishIds: string[] | null
+}
+
 export interface SiteDish {
   id: string
   kind: 'dish' | 'set' | 'drink'
@@ -38,6 +89,9 @@ export interface SiteDish {
   price: number
   signature: boolean
   onlineVisible: boolean
+  /** Ảnh món; null thì mọi chỗ vẽ ô chữ kana như trước khi có bộ ảnh */
+  imageUrl: string | null
+  story: SiteDishStory | null
 }
 
 export interface SiteCategory {
@@ -158,11 +212,11 @@ export function findDish(menu: SiteMenu, id: string): SiteDish | undefined {
 }
 
 /**
- * Món dùng kèm: ưu tiên bộ do bếp chọn tay, món nào không có thì bù bằng đồ uống
- * và món lạnh — vẫn ra đủ ba gợi ý thay vì để trống một khối.
+ * Món dùng kèm: ưu tiên bộ do bếp chọn tay ở Office M1, món nào không có thì bù
+ * bằng đồ uống và món lạnh — vẫn ra đủ ba gợi ý thay vì để trống một khối.
  */
 export function pairingsFor(menu: SiteMenu, dish: SiteDish, count = 3): SiteDish[] {
-  const curated = (PAIRINGS[dish.id] ?? [])
+  const curated = (dish.story?.pairingDishIds ?? [])
     .map((id) => findDish(menu, id))
     .filter((d): d is SiteDish => d !== undefined)
 

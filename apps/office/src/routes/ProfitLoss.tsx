@@ -6,8 +6,12 @@ import { useState } from 'react'
 import { api, type PeriodChoice, type PnlBasis, type PnlRow } from '../api'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
-import { PeriodComparator, formatPercent } from '../components/report'
-import { useSession } from '../session-context'
+import {
+  BranchPicker,
+  PeriodComparator,
+  formatPercent,
+  useReportBranch,
+} from '../components/report'
 
 /**
  * F7 — Báo cáo Lãi/Lỗ.
@@ -43,7 +47,9 @@ const BASIS_LABELS: Record<PnlBasis, { label: string; hint: string }> = {
 }
 
 export function ProfitLoss() {
-  const { branchId } = useSession()
+  // F7 là màn ĐỌC nên đi theo bộ chọn của nhóm báo cáo (không phải ConfigBranch):
+  // đảo chi nhánh ở B2 rồi mở Lãi/Lỗ là xem tiếp đúng chi nhánh đang so.
+  const { branchId } = useReportBranch()
   const [period, setPeriod] = useState<PeriodChoice>({ kind: 'thang', compare: 'ky-truoc' })
   const [basis, setBasis] = useState<PnlBasis>('don-tich')
 
@@ -76,7 +82,9 @@ export function ProfitLoss() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period} />
+        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period}>
+          <BranchPicker />
+        </PeriodComparator>
 
         <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           {BASIS_LABELS[basis].hint}.

@@ -67,7 +67,12 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
   useScreenWakeLock()
 
   const waitingCount = (queue.data?.tickets ?? []).filter((t) => t.state === 'waiting').length
-  const liveCount = (queue.data?.tickets ?? []).filter((t) => t.state !== 'waiting').length
+  // Vé `ready` còn nằm trên màn cho tới hết cửa sổ hoàn tác, nhưng nó KHÔNG còn
+  // là việc đang chạy: đếm nó vào đây là vừa sai nhãn ở đầu màn, vừa hoãn bản
+  // PWA mới thêm một cửa sổ nữa mỗi lần bếp bấm Xong.
+  const liveCount = (queue.data?.tickets ?? []).filter(
+    (t) => t.state === 'queued' || t.state === 'cooking',
+  ).length
 
   // Bản mới chỉ được áp dụng khi màn không còn vé nào đang chạy
   const { needRefresh } = usePwaUpdate(liveCount === 0)

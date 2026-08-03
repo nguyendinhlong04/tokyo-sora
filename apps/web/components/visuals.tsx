@@ -1,20 +1,27 @@
 import type { ReactNode } from 'react'
 
 /**
- * Khối hình của website khi CHƯA có ảnh thật.
+ * Ô ảnh món.
  *
- * Bản thiết kế đặt `<image-slot>` ở mọi vị trí ảnh và bàn giao kèm ghi chú "thay
- * bằng ảnh CDN khi dựng". Trong lúc chờ bộ ảnh, chỗ ảnh được dựng bằng đúng ngôn
- * ngữ đồ hoạ của thiết kế — nền than gradient, chữ kanji vàng đồng — thay vì ô
- * xám hay ảnh mượn. Bố cục giữ nguyên khung, nên thay ảnh thật sau này chỉ là đổi
- * ruột component.
+ * Có ảnh thì hiện ảnh; CHƯA có thì dựng bằng đúng ngôn ngữ đồ hoạ của thiết kế —
+ * nền than gradient, chữ kanji vàng đồng — thay vì ô xám hay ảnh mượn. Đường dẫn
+ * ảnh nhập ở Office M1, nên một món được bổ sung ảnh là mọi trang đang vẽ ô chữ
+ * đổi sang ảnh thật, không phải sửa chỗ nào trong mã.
+ *
+ * Khung giữ nguyên trong cả hai trường hợp: `object-cover` để ảnh tỉ lệ nào cũng
+ * lấp đầy ô mà không kéo méo, và bố cục quanh nó không nhảy.
  */
 export function DishGlyph({
   glyph,
+  src,
+  alt,
   size = 'md',
   className = '',
 }: {
   glyph: string
+  src?: string | null
+  /** Chỉ cần khi có ảnh thật — ô chữ là trang trí nên vẫn `aria-hidden` */
+  alt?: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }) {
@@ -24,6 +31,16 @@ export function DishGlyph({
     lg: 'text-[120px]',
     xl: 'text-[200px]',
   }[size]
+
+  if (src) {
+    return (
+      <div className={`overflow-hidden bg-surface-4 ${className}`}>
+        {/* `<img>` chứ không `next/image`: đường dẫn do người nhập khai ở Office nên
+            không biết trước miền, mà `next/image` đòi khai miền sẵn trong cấu hình */}
+        <img src={src} alt={alt ?? ''} className="size-full object-cover" loading="lazy" />
+      </div>
+    )
+  }
 
   return (
     <div
@@ -42,19 +59,33 @@ export function DishGlyph({
 /** Ô ảnh không phải món: không gian, chân dung, bản đồ, ảnh bài viết */
 export function PhotoFrame({
   glyph,
+  src,
+  alt,
   className = '',
   rounded = true,
 }: {
   glyph?: string
+  src?: string | null
+  alt?: string
   className?: string
   rounded?: boolean
 }) {
+  const frame = `overflow-hidden border border-accent/16 ${rounded ? 'rounded-md' : ''} ${className}`
+
+  if (src) {
+    return (
+      <div className={frame}>
+        {/* `<img>` chứ không `next/image`: đường dẫn do người nhập khai ở Office nên
+            không biết trước miền, mà `next/image` đòi khai miền sẵn trong cấu hình */}
+        <img src={src} alt={alt ?? ''} className="size-full object-cover" loading="lazy" />
+      </div>
+    )
+  }
+
   return (
     <div
       aria-hidden
-      className={`grid place-items-center overflow-hidden border border-accent/16 bg-[radial-gradient(110%_100%_at_50%_18%,var(--sora-line-1)_0%,var(--sora-bg-base)_78%)] ${
-        rounded ? 'rounded-md' : ''
-      } ${className}`}
+      className={`grid place-items-center bg-[radial-gradient(110%_100%_at_50%_18%,var(--sora-line-1)_0%,var(--sora-bg-base)_78%)] ${frame}`}
     >
       {glyph ? (
         <span className="font-jp text-[56px] leading-none text-gold-900 opacity-70">{glyph}</span>

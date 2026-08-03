@@ -106,6 +106,8 @@ export default async function HomePage() {
             <div className="order-1 flex justify-center lg:order-2">
               <DishGlyph
                 glyph={dishGlyph(hero)}
+                src={hero.imageUrl}
+                alt={hero.nameVi}
                 size="xl"
                 className="size-[250px] rounded-md drop-shadow-[0_12px_24px_rgba(0,0,0,0.45)] lg:size-[420px]"
               />
@@ -150,7 +152,7 @@ export default async function HomePage() {
               {signatures.map((dish) => (
                 <Link key={dish.id} href={`/thuc-don/${dish.id}`} className="group">
                   <div className="relative aspect-[4/3] overflow-hidden rounded-md border border-accent/16">
-                    <DishGlyph glyph={dishGlyph(dish)} className="size-full" />
+                    <DishGlyph glyph={dishGlyph(dish)} src={dish.imageUrl} alt={dish.nameVi} className="size-full" />
                     <span className="absolute top-3 left-3 hidden lg:block">
                       <SignatureBadge />
                     </span>

@@ -3,6 +3,7 @@ import { Button, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type ParameterRow } from '../api'
+import { ConfigBranchPicker, useConfigBranch } from '../components/config-branch'
 import { PageHeader } from '../components/PageHeader'
 import { useSession } from '../session-context'
 
@@ -150,7 +151,8 @@ const NOTE: Record<string, string> = {
  * nhánh mà không ai để ý.
  */
 export function Parameters() {
-  const { branchId, can } = useSession()
+  const { can } = useSession()
+  const { branchId } = useConfigBranch()
   const toast = useToast()
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
@@ -192,7 +194,8 @@ export function Parameters() {
     <>
       <PageHeader
         title="Trung tâm tham số"
-        subtitle="Mọi con số điều khiển hệ thống nằm ở đây. Engine đọc lúc chạy — sửa xong là có hiệu lực ngay, không cần triển khai lại."
+        subtitle="Mọi con số điều khiển hệ thống nằm ở đây. Engine đọc lúc chạy — sửa xong là có hiệu lực ngay, không cần triển khai lại. Cột phạm vi và nút ghi đè áp theo chi nhánh đang cấu hình."
+        action={<ConfigBranchPicker />}
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
@@ -220,7 +223,10 @@ export function Parameters() {
                 .filter((row) => row.key.startsWith(`${group}.`))
                 .map((row) => (
                   <ParameterLine
-                    key={row.key}
+                    /* Khoá kèm chi nhánh: draft trong dòng không tự đồng bộ khi
+                       dữ liệu đổi — đổi chi nhánh phải remount để ô không giữ
+                       số đang gõ dở cho chi nhánh cũ. */
+                    key={`${branchId}:${row.key}`}
                     row={row}
                     disabled={!mayEdit || save.isPending}
                     onSave={(value, scope) => save.mutate({ key: row.key, value, scope })}

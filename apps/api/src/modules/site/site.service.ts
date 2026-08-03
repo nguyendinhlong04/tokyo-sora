@@ -6,6 +6,7 @@ import {
   areas,
   branches,
   categories,
+  dishStories,
   dishes,
   setGroupItems,
   setGroups,
@@ -139,13 +140,14 @@ export class SiteService {
    * cả ba mảnh (W3 phải biết món dùng kèm, W7 phải biết món trong set).
    */
   async menu() {
-    const [categoryRows, dishRows, groupRows, itemRows] = await Promise.all([
+    const [categoryRows, dishRows, storyRows, groupRows, itemRows] = await Promise.all([
       this.db.select().from(categories).orderBy(asc(categories.sort)),
       this.db
         .select()
         .from(dishes)
         .where(eq(dishes.active, true))
         .orderBy(asc(dishes.sort), asc(dishes.nameVi)),
+      this.db.select().from(dishStories),
       this.db.select().from(setGroups).orderBy(asc(setGroups.sort)),
       this.db.select().from(setGroupItems).orderBy(asc(setGroupItems.sort)),
     ])
@@ -173,6 +175,12 @@ export class SiteService {
         signature: d.signature,
         /** Món không bật bán online thì W3 không mời "Đặt mang về" */
         onlineVisible: d.onlineVisible,
+        imageUrl: d.imageUrl,
+        /**
+         * Phần biên tập của trang chi tiết (W3), nhập ở Office M1. `null` là món
+         * chưa được kể — trang tự dựng bản gọn từ tên, giá, mô tả.
+         */
+        story: storyRows.find((s) => s.dishId === d.id) ?? null,
       })),
       sets: groupRows.reduce<
         {

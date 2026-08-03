@@ -1,9 +1,10 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { rooms } from '@sora/contracts'
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, or, sql } from 'drizzle-orm'
 import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
+import { ParamsService } from '../../common/params.service'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import { branches, dishAvailability, orders, stations, ticketItems, tickets } from '../../db/schema'
@@ -21,6 +22,7 @@ export class KitchenService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly inventory: InventoryService,
+    private readonly params: ParamsService,
   ) {}
 
   /**
@@ -31,6 +33,15 @@ export class KitchenService {
     const [station] = await this.db.select().from(stations).where(eq(stations.id, stationId))
     if (!station) throw new NotFoundException(`Không có trạm ${stationId}`)
 
+    /**
+     * Vé đã Xong nán lại đúng cửa sổ hoàn tác rồi tự rời màn (§22 K2: "Xong +
+     * *Hoàn tác* 30s"). Cắt theo giờ MÁY CHỦ chứ không theo đồng hồ thiết bị —
+     * cùng lý do `serverTime` tồn tại: TV box giá rẻ sai giờ thì cửa sổ hoàn tác
+     * dài ngắn tuỳ từng cái màn.
+     */
+    const undoSeconds = await this.params.getNumber('kitchen.undoSeconds', 30, branchId)
+    const undoFrom = new Date(Date.now() - undoSeconds * 1000)
+
     const rows = await this.db
       .select()
       .from(tickets)
@@ -38,7 +49,10 @@ export class KitchenService {
         and(
           eq(tickets.branchId, branchId),
           eq(tickets.stationId, stationId),
-          inArray(tickets.state, ['waiting', 'queued', 'cooking']),
+          or(
+            inArray(tickets.state, ['waiting', 'queued', 'cooking']),
+            and(eq(tickets.state, 'ready'), gte(tickets.readyAt, undoFrom)),
+          ),
         ),
       )
       .orderBy(asc(tickets.openedAt))
@@ -53,6 +67,9 @@ export class KitchenService {
         columns: station.columns,
       },
       serverTime: new Date(),
+      // Màn bếp cần biết cửa sổ dài bao nhiêu để giấu nút đúng lúc vé hết hạn,
+      // thay vì đoán 30 rồi lệch với máy chủ mỗi khi ai đó sửa tham số ở A6.
+      undoSeconds,
     }
 
     if (rows.length === 0) return { ...meta, tickets: [] }
@@ -158,6 +175,25 @@ export class KitchenService {
       }[action] as 'cooking' | 'ready' | 'queued'
 
       if (ticket.state === target) return { ticketId, state: target, changed: false }
+
+      /**
+       * Cửa sổ hoàn tác chỉ tính cho lượt kéo lùi từ "Xong" — bỏ "Bắt đầu" thì
+       * món còn nằm trong bếp, muốn lúc nào cũng được.
+       *
+       * Quá hạn phải chặn Ở ĐÂY chứ không chỉ giấu nút: hàng đợi offline của màn
+       * bếp có thể gửi lại một lượt hoàn tác của nửa tiếng trước. Mà "Xong" đã
+       * trừ kho và hoàn tác KHÔNG hoàn kho (xem `postSaleForTicket`), nên kéo lùi
+       * muộn chỉ làm màn hình đẹp lại chứ không làm miếng thịt hiện về trong tủ.
+       */
+      if (action === 'undo' && ticket.state === 'ready') {
+        const undoSeconds = await this.params.getNumber('kitchen.undoSeconds', 30, ticket.branchId)
+        const elapsed = ticket.readyAt
+          ? (now.getTime() - ticket.readyAt.getTime()) / 1000
+          : Number.POSITIVE_INFINITY
+        if (elapsed > undoSeconds) {
+          throw new BadRequestException(`Quá ${undoSeconds} giây rồi — không hoàn tác được nữa`)
+        }
+      }
 
       await tx
         .update(tickets)

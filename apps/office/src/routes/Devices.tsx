@@ -1,11 +1,11 @@
 import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, type DeviceRow } from '../api'
+import { ConfigBranchPicker, useConfigBranch } from '../components/config-branch'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field, formatTime } from '../components/report'
-import { useSession } from '../session-context'
 
 /**
  * A4 — Thiết bị.
@@ -29,11 +29,15 @@ const KIND_LABELS: Record<DeviceRow['kind'], string> = {
 }
 
 export function Devices() {
-  const { branchId } = useSession()
+  const { branchId } = useConfigBranch()
   const toast = useToast()
   const queryClient = useQueryClient()
   const [kind, setKind] = useState<DeviceRow['kind']>('pos')
   const [stationId, setStationId] = useState('')
+
+  // Trạm là của từng chi nhánh — đổi chi nhánh mà giữ trạm cũ thì mã ghép KDS
+  // sinh ra sẽ trỏ vào một trạm không tồn tại ở nơi mới.
+  useEffect(() => setStationId(''), [branchId])
 
   const data = useQuery({
     queryKey: ['devices', branchId],
@@ -82,6 +86,7 @@ export function Devices() {
       <PageHeader
         title="Thiết bị"
         subtitle="Máy nào của chi nhánh này đang được phép nói chuyện với hệ thống. Màn bếp ghim cứng một trạm ngay từ lúc ghép."
+        action={<ConfigBranchPicker />}
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">

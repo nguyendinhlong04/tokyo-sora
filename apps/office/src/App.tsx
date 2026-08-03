@@ -3,6 +3,7 @@ import { ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router'
+import { ConfigBranchProvider } from './components/config-branch'
 import { ReportBranchProvider } from './components/report'
 import { Debts, InvoiceBook, PeriodClose, RevenueJournal, TaxReport } from './routes/Accounting'
 import { Accounts } from './routes/Accounts'
@@ -449,10 +450,14 @@ function Shell() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Bộ lọc chi nhánh của nhóm báo cáo sống theo phiên đăng nhập: đăng
-            xuất là Shell rơi về <Login /> và lựa chọn tự reset theo provider. */}
+        {/* Bộ lọc chi nhánh của nhóm báo cáo và chi nhánh đang cấu hình của
+            nhóm cài đặt đều sống theo phiên đăng nhập: đăng xuất là Shell rơi
+            về <Login /> và cả hai lựa chọn tự reset theo provider. Hai context
+            cố ý tách nhau — xem chú thích ở components/config-branch.tsx. */}
         <ReportBranchProvider>
-          <Outlet />
+          <ConfigBranchProvider>
+            <Outlet />
+          </ConfigBranchProvider>
         </ReportBranchProvider>
       </div>
     </div>

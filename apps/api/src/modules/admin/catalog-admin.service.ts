@@ -15,10 +15,13 @@ import {
   branches,
   categories,
   dishBranchOverrides,
+  dishStories,
   dishes,
   setGroupItems,
   setGroups,
   stations,
+  type DishStoryCondiment,
+  type DishStoryCut,
 } from '../../db/schema'
 import { describeSchedule, scheduleOf } from '../catalog/domain/sale-window'
 import { setCostRange } from '../catalog/domain/set-cost'
@@ -41,6 +44,8 @@ export interface DishInput {
   kana: string | null
   shortDesc: string | null
   longDesc: string | null
+  /** Ảnh món dùng chung mọi kênh; đường dẫn, không phải tệp tải lên */
+  imageUrl: string | null
   allergens: string[] | null
   tags: string[] | null
   routingMethod: 'fixed' | 'song' | 'nuong' | 'linh_hoat' | null
@@ -101,6 +106,41 @@ export interface SetCourseInput {
 }
 
 /**
+ * Phần biên tập của trang chi tiết món trên web (W3), nhập ở M1.
+ *
+ * Mọi trường đều bỏ trống được: trang web tự lùi về bản gọn cho món chưa kể, và
+ * người nhập không phải điền cho đủ hai mươi ô mới lưu được một dòng lưu ý.
+ */
+export interface DishStoryInput {
+  chapterNo: string | null
+  portionLabel: string | null
+  nameJaFull: string | null
+  intro: string | null
+  note: string | null
+  craft: string | null
+  footerImageUrl: string | null
+  bannerJa: string | null
+  bannerVi: string | null
+  closing: string | null
+  pairingDishIds: string[] | null
+  origin: string | null
+  originKanji: string | null
+  originImageUrl: string | null
+  flavours: string[] | null
+  cutsLabel: string | null
+  cuts: DishStoryCut[] | null
+  fire: string | null
+  fireImageUrl: string | null
+  dip: string | null
+  dipImageUrl: string | null
+  condiments: DishStoryCondiment[] | null
+  serves: string | null
+  duration: string | null
+  flow: string[] | null
+  extraDishIds: string[] | null
+}
+
+/**
  * M1 — Món và set. Cửa GHI duy nhất của trung tâm sản phẩm.
  *
  * "Chỉ một nơi ghi dữ liệu món… Web, Table, POS, KDS, Online, kho, kế toán đều là
@@ -158,9 +198,10 @@ export class CatalogAdminService {
     const [dish] = await this.db.select().from(dishes).where(eq(dishes.id, id))
     if (!dish) throw new NotFoundException('Không có món này')
 
-    const [groups, overrides] = await Promise.all([
+    const [groups, overrides, storyRows] = await Promise.all([
       this.db.select().from(setGroups).where(eq(setGroups.setDishId, id)).orderBy(asc(setGroups.sort)),
       this.db.select().from(dishBranchOverrides).where(eq(dishBranchOverrides.dishId, id)),
+      this.db.select().from(dishStories).where(eq(dishStories.dishId, id)),
     ])
     const items = groups.length
       ? await this.db
@@ -188,6 +229,8 @@ export class CatalogAdminService {
         onlineVisible: o.onlineVisible,
         onlinePrice: o.onlinePrice,
       })),
+      /** `null` = món chưa được kể; trang chi tiết dựng bản gọn */
+      story: storyRows[0] ?? null,
     }
   }
 
@@ -430,6 +473,65 @@ export class CatalogAdminService {
       await this.emitUpdate(tx, setDishId)
       return { setDishId, courses: courses.length }
     })
+  }
+
+  /**
+   * Thay toàn bộ phần biên tập của trang chi tiết món (W3).
+   *
+   * Ghi cả cụm giống `setCourses`: form ở M1 gửi lên nguyên trạng những gì người
+   * nhập đang nhìn, nên PATCH từng trường chỉ đẻ ra câu hỏi "bỏ trống nghĩa là
+   * xoá hay nghĩa là không đụng tới".
+   *
+   * Mã món dùng kèm và món gọi thêm được kiểm có thật: một mã gõ sai ở đây thành
+   * một ô trống lặng lẽ trên trang web, không ai nhận ra cho tới khi khách hỏi.
+   */
+  async setStory(dishId: string, input: DishStoryInput, actor: Actor) {
+    const [dish] = await this.db.select().from(dishes).where(eq(dishes.id, dishId))
+    if (!dish) throw new NotFoundException('Không có món này')
+
+    const linked = [...new Set([...(input.pairingDishIds ?? []), ...(input.extraDishIds ?? [])])]
+    if (linked.length > 0) {
+      const found = await this.db
+        .select({ id: dishes.id })
+        .from(dishes)
+        .where(inArray(dishes.id, linked))
+      const missing = linked.filter((id) => !found.some((f) => f.id === id))
+      if (missing.length > 0) {
+        throw new BadRequestException(`Chưa có món trong danh mục: ${missing.join(', ')}`)
+      }
+      if (linked.includes(dishId)) {
+        throw new BadRequestException('Món không dùng kèm với chính nó')
+      }
+    }
+
+    const row = { dishId, ...input }
+    return this.db.transaction(async (tx) => {
+      await tx
+        .insert(dishStories)
+        .values(row)
+        .onConflictDoUpdate({ target: dishStories.dishId, set: input })
+      await this.audit.write(tx, {
+        actor,
+        action: 'dish.story.saved',
+        entity: 'dish',
+        entityId: dishId,
+        payload: { dishId },
+      })
+      await this.emitUpdate(tx, dishId)
+      return row
+    })
+  }
+
+  /** Bỏ hẳn phần kể chuyện — trang chi tiết quay về bản gọn */
+  async clearStory(dishId: string, actor: Actor) {
+    const deleted = await this.db
+      .delete(dishStories)
+      .where(eq(dishStories.dishId, dishId))
+      .returning({ dishId: dishStories.dishId })
+    if (deleted.length === 0) throw new NotFoundException('Món này chưa có nội dung giới thiệu')
+    await this.write(actor, 'dish.story.cleared', dishId, {})
+    await this.announce(dishId)
+    return { dishId, cleared: true }
   }
 
   // ============================================== M10 · Cây danh mục
@@ -833,9 +935,9 @@ function assertDish(input: DishInput) {
   }
 
   /**
-   * "Món bật bán online phải có ảnh + mô tả" (§18.1). Ảnh chưa kiểm được vì danh
-   * mục chưa có cột ảnh — ảnh đang theo quy ước `dish-<mã>-main` ở CDN. Nửa kiểm
-   * được thì kiểm.
+   * "Món bật bán online phải có ảnh + mô tả" (§18.1). Chỉ kiểm mô tả: cột ảnh mới
+   * có nên phần lớn món đang bán vẫn để trống, và chặn ở đây là khoá luôn nút lưu
+   * của những món đó. Bật kiểm ảnh khi bộ ảnh đã nhập xong.
    */
   if (input.onlineVisible && !input.shortDesc?.trim()) {
     throw new BadRequestException(

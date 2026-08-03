@@ -24,6 +24,7 @@ const DishSchema = z.object({
   kana: z.string().max(40).nullable(),
   shortDesc: z.string().max(200).nullable(),
   longDesc: z.string().max(2000).nullable(),
+  imageUrl: z.string().max(500).nullable().default(null),
   allergens: z.array(z.string().max(60)).nullable(),
   tags: z.array(z.string().max(40)).nullable(),
   routingMethod: z.enum(['fixed', 'song', 'nuong', 'linh_hoat']).nullable(),
@@ -70,6 +71,75 @@ const MoveSchema = z.object({
 })
 
 const UpdateSchema = DishSchema.partial().extend({ approval: ApprovalSchema })
+
+/**
+ * Nội dung trang chi tiết món trên web (W3).
+ *
+ * Mọi trường `.nullish()` rồi quy về `null`: form gửi lên nguyên cụm, ô nào người
+ * nhập bỏ trống thì trường đó về null chứ không giữ lại giá trị cũ — cùng ý với
+ * `setStory` bên dịch vụ. Giới hạn độ dài đặt rộng tay vì đây là chữ nghĩa biên
+ * tập, nhưng vẫn có trần để một lần dán nhầm cả trang HTML không lọt xuống CSDL.
+ */
+const nullableText = (max: number) =>
+  z.string().max(max).nullish().transform((v) => v || null)
+const nullableList = (max: number, itemMax: number) =>
+  z
+    .array(z.string().max(itemMax))
+    .max(max)
+    .nullish()
+    .transform((v) => (v && v.length > 0 ? v : null))
+
+const StorySchema = z.object({
+  chapterNo: nullableText(8),
+  portionLabel: nullableText(40),
+  nameJaFull: nullableText(160),
+  intro: nullableText(2000),
+  note: nullableText(600),
+  craft: nullableText(400),
+  footerImageUrl: nullableText(500),
+  bannerJa: nullableText(60),
+  bannerVi: nullableText(120),
+  closing: nullableText(300),
+  pairingDishIds: nullableList(6, 40),
+  origin: nullableText(200),
+  originKanji: nullableText(8),
+  originImageUrl: nullableText(500),
+  flavours: nullableList(8, 200),
+  cutsLabel: nullableText(60),
+  cuts: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(60),
+        size: z.string().max(60).default(''),
+        desc: z.string().max(300).default(''),
+        /** Thanh đo bốn ô trên trang, nên 1–4 chứ không phải thang mở */
+        soft: z.number().int().min(1).max(4).default(3),
+        imageUrl: z.string().max(500).nullish().transform((v) => v || null),
+      }),
+    )
+    .max(6)
+    .nullish()
+    .transform((v) => (v && v.length > 0 ? v : null)),
+  fire: nullableText(300),
+  fireImageUrl: nullableText(500),
+  dip: nullableText(300),
+  dipImageUrl: nullableText(500),
+  condiments: z
+    .array(
+      z.object({
+        kanji: z.string().max(4).default(''),
+        name: z.string().min(1).max(60),
+        desc: z.string().max(200).default(''),
+      }),
+    )
+    .max(8)
+    .nullish()
+    .transform((v) => (v && v.length > 0 ? v : null)),
+  serves: nullableText(60),
+  duration: nullableText(60),
+  flow: nullableList(8, 300),
+  extraDishIds: nullableList(6, 40),
+})
 
 const OverrideSchema = z.object({
   price: z.number().int().min(0).nullable(),
@@ -149,6 +219,18 @@ export class CatalogAdminController {
   @RequirePermission('menu.edit-price')
   setCourses(@Param('id') id: string, @Body() body: unknown, @Req() req: RequestWithActor) {
     return this.catalog.setCourses(id, CoursesSchema.parse(body).courses, req.actor!)
+  }
+
+  @Put(':id/story')
+  @RequirePermission('menu.edit-price')
+  setStory(@Param('id') id: string, @Body() body: unknown, @Req() req: RequestWithActor) {
+    return this.catalog.setStory(id, StorySchema.parse(body), req.actor!)
+  }
+
+  @Delete(':id/story')
+  @RequirePermission('menu.edit-price')
+  clearStory(@Param('id') id: string, @Req() req: RequestWithActor) {
+    return this.catalog.clearStory(id, req.actor!)
   }
 
   @Patch(':id/branches/:branchId')

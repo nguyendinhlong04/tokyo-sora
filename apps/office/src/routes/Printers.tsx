@@ -1,12 +1,12 @@
 import { Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, type PrinterInput, type PrinterRow } from '../api'
+import { ConfigBranchPicker, useConfigBranch } from '../components/config-branch'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field } from '../components/report'
 import { TextInput as Input, Toggle } from '../components/form'
-import { useSession } from '../session-context'
 
 /**
  * A5 — Máy in.
@@ -37,10 +37,14 @@ const blank = (branchId: string): PrinterInput => ({
 })
 
 export function Printers() {
-  const { branchId } = useSession()
+  const { branchId } = useConfigBranch()
   const toast = useToast()
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<{ input: PrinterInput; id?: number } | null>(null)
+
+  // Form soạn nằm inline nên không che ô chọn chi nhánh — đổi chi nhánh giữa
+  // chừng thì bỏ nháp, không thì bấm lưu là máy in rơi vào chi nhánh vừa rời.
+  useEffect(() => setDraft(null), [branchId])
 
   const data = useQuery({
     queryKey: ['printers', branchId],
@@ -77,11 +81,14 @@ export function Printers() {
         title="Máy in"
         subtitle="Máy in bill ở quầy và máy in tem tại trạm. Cấu hình ở đây đi theo bundle xuống cầu in — không phải sửa tay trên máy đặt trong bếp."
         action={
-          draft || !branchId ? null : (
-            <Button variant="primary" onClick={() => setDraft({ input: blank(branchId) })}>
-              Thêm máy in
-            </Button>
-          )
+          <div className="flex items-end gap-4">
+            <ConfigBranchPicker />
+            {draft || !branchId ? null : (
+              <Button variant="primary" onClick={() => setDraft({ input: blank(branchId) })}>
+                Thêm máy in
+              </Button>
+            )}
+          </div>
         }
       />
 

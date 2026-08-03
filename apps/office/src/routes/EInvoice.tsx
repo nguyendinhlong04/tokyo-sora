@@ -2,10 +2,10 @@ import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { api, type EinvoiceConfig } from '../api'
+import { ConfigBranchPicker, useConfigBranch } from '../components/config-branch'
 import { PageHeader } from '../components/PageHeader'
 import { TextInput as Input } from '../components/form'
 import { Field } from '../components/report'
-import { useSession } from '../session-context'
 
 /**
  * A9 — Hoá đơn điện tử.
@@ -38,7 +38,7 @@ const toDraft = (config: EinvoiceConfig): Draft => ({
 })
 
 export function EInvoice() {
-  const { branchId } = useSession()
+  const { branchId } = useConfigBranch()
   const toast = useToast()
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -66,7 +66,7 @@ export function EInvoice() {
   if (config.isError) {
     return (
       <>
-        <PageHeader title="Hoá đơn điện tử" />
+        <PageHeader title="Hoá đơn điện tử" action={<ConfigBranchPicker />} />
         <div className="px-8">
           <ErrorState message={(config.error as Error).message} />
         </div>
@@ -76,7 +76,7 @@ export function EInvoice() {
   if (!config.data || !draft) {
     return (
       <>
-        <PageHeader title="Hoá đơn điện tử" />
+        <PageHeader title="Hoá đơn điện tử" action={<ConfigBranchPicker />} />
         <p className="px-8 text-ink-mute">Đang tải…</p>
       </>
     )
@@ -100,11 +100,14 @@ export function EInvoice() {
         title="Hoá đơn điện tử"
         subtitle="Khai ở đây, phát hành ở F3. Một mã số thuế cho cả chuỗi; mỗi địa điểm kinh doanh một ký hiệu riêng."
         action={
-          current.branch.enabled ? (
-            <Badge tone="ok">Đang bật cho {current.branchId}</Badge>
-          ) : (
-            <Badge tone="warn">Đang tắt cho {current.branchId}</Badge>
-          )
+          <div className="flex items-end gap-4">
+            <ConfigBranchPicker />
+            {current.branch.enabled ? (
+              <Badge tone="ok">Đang bật cho {current.branchId}</Badge>
+            ) : (
+              <Badge tone="warn">Đang tắt cho {current.branchId}</Badge>
+            )}
+          </div>
         }
       />
 

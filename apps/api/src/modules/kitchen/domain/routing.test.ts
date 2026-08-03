@@ -130,6 +130,58 @@ describe('Tham số nướng hộ đọc từ Trung tâm tham số A6', () => {
   })
 })
 
+/**
+ * §29.1 "Bếp & SLA: thời gian chuẩn mặc định theo trạm" — `kitchen.slaSeconds`
+ * và các khoá `kitchen.slaSeconds.<trạm>`.
+ *
+ * Món để 0 nghĩa là CHƯA KHAI. Vé bắt buộc `prep_seconds > 0` ở tầng bảng, nên
+ * không có lưới này thì một món chưa khai làm đổ cả lượt gửi bếp.
+ */
+describe('Thời gian chuẩn mặc định theo trạm', () => {
+  const CHUA_KHAI = { ...routingOf(SONG_DISHES[0]!), prepSeconds: 0 }
+  const THEO_TRAM = {
+    grillServiceExtraSeconds: 0,
+    stationPrepSeconds: { [ST.RAW]: 180, [ST.GRILL]: 720, [ST.HOT2]: 510 },
+    defaultPrepSeconds: 999,
+  }
+
+  it('món đã khai thì giữ số của MÓN, không đụng tới chuẩn của trạm', () => {
+    const r = resolveRouting(routingOf(SONG_DISHES[0]!), GRILL_TABLE, THEO_TRAM)
+    expect(r.primary.prepSeconds).toBe(180)
+  })
+
+  it('món chưa khai lấy chuẩn của TRẠM mà nó rơi vào', () => {
+    expect(resolveRouting(CHUA_KHAI, GRILL_TABLE, THEO_TRAM).primary.prepSeconds).toBe(180)
+    // Cùng món, bàn không bếp ⇒ sang ST-06 ⇒ lấy chuẩn của ST-06
+    expect(resolveRouting(CHUA_KHAI, PLAIN_TABLE, THEO_TRAM).primary.prepSeconds).toBe(720)
+  })
+
+  it('trạm chưa đặt riêng thì rơi về mức chung của chuỗi', () => {
+    const r = resolveRouting(CHUA_KHAI, GRILL_TABLE, {
+      ...THEO_TRAM,
+      stationPrepSeconds: {},
+    })
+    expect(r.primary.prepSeconds).toBe(999)
+  })
+
+  it('vé thứ hai của món đa trạm lấy chuẩn của TRẠM NÓ, không mượn nhánh chính', () => {
+    const r = resolveRouting({ ...SUKIYAKI, prepSeconds: 0 }, GRILL_TABLE, THEO_TRAM)
+    expect(r.primary).toMatchObject({ station: ST.HOT2, prepSeconds: 510 })
+    expect(r.secondary).toMatchObject({ station: ST.RAW, prepSeconds: 180 })
+  })
+
+  it('nướng hộ vẫn cộng thêm trên nền chuẩn của trạm', () => {
+    const r = resolveRouting(CHUA_KHAI, PLAIN_TABLE, { ...THEO_TRAM, grillServiceExtraSeconds: 480 })
+    expect(r.grillService).toBe(true)
+    expect(r.primary.prepSeconds).toBe(720 + 480)
+  })
+
+  it('không cấu hình gì thì vẫn ra số dương — vé không bao giờ vi phạm ràng buộc bảng', () => {
+    const r = resolveRouting(CHUA_KHAI, GRILL_TABLE)
+    expect(r.primary.prepSeconds).toBeGreaterThan(0)
+  })
+})
+
 describe('possibleStations — nguồn cho màn xem trước định tuyến M6', () => {
   it('món SỐNG có thể rơi vào ST-02 hoặc ST-06', () => {
     expect(possibleStations(routingOf(SONG_DISHES[0]!)).sort()).toEqual([ST.RAW, ST.GRILL].sort())
