@@ -5,9 +5,14 @@ import { useState } from 'react'
 import { api, type PeriodChoice } from '../api'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
-import { PeriodComparator, formatDay, formatPercent } from '../components/report'
+import {
+  BranchPicker,
+  PeriodComparator,
+  formatDay,
+  formatPercent,
+  useReportBranch,
+} from '../components/report'
 import { DailyBars, MetricTile, SliceTable } from '../components/slices'
-import { useSession } from '../session-context'
 
 /**
  * B2 Doanh thu · B4 Giá vốn & lãi gộp · B8 Set & giảm giá.
@@ -25,7 +30,7 @@ const enabled = (branchId: string | null, period: PeriodChoice) =>
 // ===================================================================== B2
 
 export function Revenue() {
-  const { branchId } = useSession()
+  const { branchId } = useReportBranch()
   const [period, setPeriod] = useState<PeriodChoice>(defaultPeriod)
 
   const report = useQuery({
@@ -44,7 +49,9 @@ export function Revenue() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period} />
+        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period}>
+          <BranchPicker />
+        </PeriodComparator>
 
         {report.isError ? (
           <div className="mt-5">
@@ -104,7 +111,7 @@ export function Revenue() {
 // ===================================================================== B4
 
 export function CostMargin() {
-  const { branchId } = useSession()
+  const { branchId } = useReportBranch()
   const [period, setPeriod] = useState<PeriodChoice>(defaultPeriod)
 
   const report = useQuery({
@@ -130,7 +137,9 @@ export function CostMargin() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period} />
+        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period}>
+          <BranchPicker />
+        </PeriodComparator>
 
         {report.isError ? (
           <div className="mt-5">
@@ -319,7 +328,7 @@ export function CostMargin() {
 // ===================================================================== B8
 
 export function SetsReport() {
-  const { branchId } = useSession()
+  const { branchId } = useReportBranch()
   const [period, setPeriod] = useState<PeriodChoice>(defaultPeriod)
 
   const report = useQuery({
@@ -338,7 +347,9 @@ export function SetsReport() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period} />
+        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period}>
+          <BranchPicker />
+        </PeriodComparator>
 
         {report.isError ? (
           <div className="mt-5">

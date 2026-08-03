@@ -5,9 +5,13 @@ import { useState } from 'react'
 import { api, type PeriodChoice } from '../api'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
-import { PeriodComparator, formatPercent } from '../components/report'
+import {
+  BranchPicker,
+  PeriodComparator,
+  formatPercent,
+  useReportBranch,
+} from '../components/report'
 import { MetricTile, RateTile, SliceTable, formatDuration } from '../components/slices'
-import { useSession } from '../session-context'
 
 /**
  * B5 Hiệu suất bếp · B6 Vòng quay bàn · B7 Nhân sự · B9 Online & đặt bàn.
@@ -24,7 +28,7 @@ const enabled = (branchId: string | null, period: PeriodChoice) =>
 // ===================================================================== B5
 
 export function KitchenReport() {
-  const { branchId } = useSession()
+  const { branchId } = useReportBranch()
   const [period, setPeriod] = useState<PeriodChoice>(defaultPeriod)
 
   const report = useQuery({
@@ -43,7 +47,9 @@ export function KitchenReport() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period} />
+        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period}>
+          <BranchPicker />
+        </PeriodComparator>
 
         {report.isError ? (
           <div className="mt-5">
@@ -236,7 +242,7 @@ export function KitchenReport() {
 // ===================================================================== B6
 
 export function TableTurnover() {
-  const { branchId } = useSession()
+  const { branchId } = useReportBranch()
   const [period, setPeriod] = useState<PeriodChoice>(defaultPeriod)
 
   const report = useQuery({
@@ -255,7 +261,9 @@ export function TableTurnover() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period} />
+        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period}>
+          <BranchPicker />
+        </PeriodComparator>
 
         {report.isError ? (
           <div className="mt-5">
@@ -389,7 +397,7 @@ export function TableTurnover() {
 // ===================================================================== B7
 
 export function StaffReport() {
-  const { branchId } = useSession()
+  const { branchId } = useReportBranch()
   const [period, setPeriod] = useState<PeriodChoice>(defaultPeriod)
 
   const report = useQuery({
@@ -408,7 +416,9 @@ export function StaffReport() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period} />
+        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period}>
+          <BranchPicker />
+        </PeriodComparator>
 
         {report.isError ? (
           <div className="mt-5">
@@ -513,7 +523,7 @@ export function StaffReport() {
 // ===================================================================== B9
 
 export function OnlineReport() {
-  const { branchId } = useSession()
+  const { branchId } = useReportBranch()
   const [period, setPeriod] = useState<PeriodChoice>(defaultPeriod)
 
   const report = useQuery({
@@ -532,7 +542,9 @@ export function OnlineReport() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period} />
+        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period}>
+          <BranchPicker />
+        </PeriodComparator>
 
         {report.isError ? (
           <div className="mt-5">

@@ -1,12 +1,16 @@
 import { formatVnd } from '@sora/contracts'
-import type {
-  BlockedTile,
-  CompareKind,
-  Delta,
-  PeriodChoice,
-  PeriodKind,
-  ResolvedPeriod,
+import { useQuery } from '@tanstack/react-query'
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import {
+  api,
+  type BlockedTile,
+  type CompareKind,
+  type Delta,
+  type PeriodChoice,
+  type PeriodKind,
+  type ResolvedPeriod,
 } from '../api'
+import { useSession } from '../session-context'
 import { DateInput, Field, SegmentedControl, Select } from './form'
 
 /**
@@ -60,13 +64,17 @@ export function PeriodComparator({
   value,
   onChange,
   resolved,
+  children,
 }: {
   value: PeriodChoice
   onChange: (next: PeriodChoice) => void
   resolved?: ResolvedPeriod
+  /** Bộ lọc đứng TRƯỚC "Kỳ" — chọn phạm vi rồi mới chọn thời gian. Nhóm B nhét ô chi nhánh vào đây. */
+  children?: ReactNode
 }) {
   return (
     <section className="flex flex-wrap items-end gap-x-6 gap-y-4 rounded-md border border-line-1 bg-surface-1 px-5 py-4">
+      {children}
       <Field label="Kỳ">
         <SegmentedControl
           value={value.kind}
@@ -125,6 +133,69 @@ export function PeriodComparator({
  * đổi hết import chỉ để dời một dòng là churn không đọc được trong diff.
  */
 export { DateInput, Field } from './form'
+
+// ---------------------------------------------------------------------------
+
+interface ReportBranchValue {
+  branchId: string | null
+  setBranchId: (next: string) => void
+}
+
+const ReportBranchCtx = createContext<ReportBranchValue | null>(null)
+
+/**
+ * Chi nhánh đang xem của nhóm báo cáo B1–B10.
+ *
+ * Khác các màn vận hành (nơi đổi chi nhánh nghĩa là đăng nhập lại đúng phạm vi —
+ * xem session-context), màn báo cáo là màn ĐỌC để so sánh: người quản lý chuỗi
+ * đảo giữa các chi nhánh nhiều lần trong một phiên. Lựa chọn nằm ở context nên
+ * đổi một lần là cả nhóm B đổi theo, chuyển trang không phải chọn lại; mặc định
+ * vẫn là chi nhánh của phiên đăng nhập, và đăng xuất là lựa chọn tự mất theo
+ * provider. Quyền đọc báo cáo vẫn do guard máy chủ cưỡng chế theo từng route.
+ */
+export function ReportBranchProvider({ children }: { children: ReactNode }) {
+  const { branchId: sessionBranch } = useSession()
+  const [choice, setChoice] = useState<string | null>(null)
+
+  const value = useMemo(
+    () => ({ branchId: choice ?? sessionBranch, setBranchId: setChoice }),
+    [choice, sessionBranch],
+  )
+  return <ReportBranchCtx.Provider value={value}>{children}</ReportBranchCtx.Provider>
+}
+
+export function useReportBranch(): ReportBranchValue {
+  const value = useContext(ReportBranchCtx)
+  if (!value) throw new Error('useReportBranch phải nằm trong <ReportBranchProvider>')
+  return value
+}
+
+/**
+ * Ô chọn chi nhánh của nhóm báo cáo — B1 đặt cạnh ô ngày trên đầu trang, các màn
+ * còn lại nhét vào PeriodComparator. Nguồn là /api/site/branches (chỉ chi nhánh
+ * đang hoạt động) — cùng danh sách màn đăng nhập dùng nên trúng cache sẵn.
+ */
+export function BranchPicker() {
+  const { branchId, setBranchId } = useReportBranch()
+  const branches = useQuery({ queryKey: ['public-branches'], queryFn: api.publicBranches })
+
+  // Chưa tải xong thì tạm hiện mã chi nhánh — ô không nhảy bề rộng khi data về
+  const options =
+    branches.data?.map((b) => ({ value: b.id, label: b.name })) ??
+    (branchId ? [{ value: branchId, label: branchId }] : [])
+
+  return (
+    <Field label="Chi nhánh">
+      <Select
+        value={branchId ?? ''}
+        onChange={setBranchId}
+        options={options}
+        disabled={!branches.data}
+        width={200}
+      />
+    </Field>
+  )
+}
 
 // ---------------------------------------------------------------------------
 

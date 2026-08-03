@@ -4,8 +4,17 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type FoodCostTile, type TodayReport } from '../api'
 import { PageHeader } from '../components/PageHeader'
-import { BlockedStat, DateInput, DeltaChip, StatTile, formatDay, formatPercent } from '../components/report'
-import { useSession } from '../session-context'
+import {
+  BlockedStat,
+  BranchPicker,
+  DateInput,
+  DeltaChip,
+  Field,
+  StatTile,
+  formatDay,
+  formatPercent,
+  useReportBranch,
+} from '../components/report'
 
 /**
  * B1 — Hôm nay.
@@ -18,7 +27,7 @@ import { useSession } from '../session-context'
  * một mốc thì tuần nào cũng tưởng đang tụt.
  */
 export function Today() {
-  const { branchId } = useSession()
+  const { branchId } = useReportBranch()
   const [date, setDate] = useState<string | null>(null)
 
   const report = useQuery({
@@ -39,7 +48,14 @@ export function Today() {
             ? `Ngày làm việc ${formatDay(data.date)} · so với ${formatDay(data.yesterday)} và ${formatDay(data.lastWeek)}`
             : 'Doanh thu, khách và cảnh báo của ngày làm việc đang chạy.'
         }
-        action={<DateInput value={date ?? data?.date ?? ''} onChange={setDate} />}
+        action={
+          <div className="flex items-end gap-4">
+            <BranchPicker />
+            <Field label="Ngày">
+              <DateInput value={date ?? data?.date ?? ''} onChange={setDate} />
+            </Field>
+          </div>
+        }
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
@@ -150,10 +166,7 @@ function FoodCostStat({ tile }: { tile: FoodCostTile }) {
       <p className="mt-2 text-[length:var(--fs-c1)] text-ink-mute">
         {formatVnd(tile.cogsVnd)} giá vốn
         {tile.coverage < 1 ? (
-          <span className="text-warn">
-            {' '}
-            · mới phủ {Math.round(tile.coverage * 100)}% doanh thu
-          </span>
+          <span className="text-warn"> · mới phủ {Math.round(tile.coverage * 100)}% doanh thu</span>
         ) : null}
       </p>
     </div>

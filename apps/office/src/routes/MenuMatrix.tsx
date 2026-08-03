@@ -4,8 +4,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type PeriodChoice, type Quadrant } from '../api'
 import { PageHeader } from '../components/PageHeader'
-import { PeriodComparator, formatPercent } from '../components/report'
-import { useSession } from '../session-context'
+import {
+  BranchPicker,
+  PeriodComparator,
+  formatPercent,
+  useReportBranch,
+} from '../components/report'
 
 /**
  * B3 — Phân tích món.
@@ -21,39 +25,40 @@ import { useSession } from '../session-context'
  * sẽ nhảy ô — nhất là món nướng, thứ có giá bán cao mà nguyên liệu cũng đắt.
  */
 
-const QUADRANTS: Record<Quadrant, { label: string; kanji: string; action: string; ring: string }> = {
-  'ngoi-sao': {
-    label: 'Ngôi sao',
-    kanji: '星',
-    action: 'Bán chạy, đóng góp cao. Giữ nguyên giá và định lượng, đặt ở chỗ dễ thấy nhất.',
-    ring: 'border-accent',
-  },
-  'bo-sua': {
-    label: 'Bò sữa',
-    kanji: '牛',
-    action:
-      'Bán chạy nhưng đóng góp thấp. Tăng giá từng bước nhỏ, hoặc hạ giá vốn — đừng bỏ, đây là món kéo khách.',
-    ring: 'border-info',
-  },
-  'cau-do': {
-    label: 'Câu đố',
-    kanji: '謎',
-    action: 'Đóng góp cao mà ít người gọi. Đổi tên và ảnh, gợi ý bán thêm, thử đưa vào set.',
-    ring: 'border-warn',
-  },
-  'bo-di': {
-    label: 'Bỏ đi',
-    kanji: '去',
-    action:
-      'Ít người gọi, đóng góp thấp. Cân nhắc rút khỏi thực đơn; giữ lại thì phải vì lý do khác doanh thu.',
-    ring: 'border-danger-line',
-  },
-}
+const QUADRANTS: Record<Quadrant, { label: string; kanji: string; action: string; ring: string }> =
+  {
+    'ngoi-sao': {
+      label: 'Ngôi sao',
+      kanji: '星',
+      action: 'Bán chạy, đóng góp cao. Giữ nguyên giá và định lượng, đặt ở chỗ dễ thấy nhất.',
+      ring: 'border-accent',
+    },
+    'bo-sua': {
+      label: 'Bò sữa',
+      kanji: '牛',
+      action:
+        'Bán chạy nhưng đóng góp thấp. Tăng giá từng bước nhỏ, hoặc hạ giá vốn — đừng bỏ, đây là món kéo khách.',
+      ring: 'border-info',
+    },
+    'cau-do': {
+      label: 'Câu đố',
+      kanji: '謎',
+      action: 'Đóng góp cao mà ít người gọi. Đổi tên và ảnh, gợi ý bán thêm, thử đưa vào set.',
+      ring: 'border-warn',
+    },
+    'bo-di': {
+      label: 'Bỏ đi',
+      kanji: '去',
+      action:
+        'Ít người gọi, đóng góp thấp. Cân nhắc rút khỏi thực đơn; giữ lại thì phải vì lý do khác doanh thu.',
+      ring: 'border-danger-line',
+    },
+  }
 
 const ORDER: Quadrant[] = ['ngoi-sao', 'bo-sua', 'cau-do', 'bo-di']
 
 export function MenuMatrix() {
-  const { branchId } = useSession()
+  const { branchId } = useReportBranch()
   const [period, setPeriod] = useState<PeriodChoice>({ kind: 'thang', compare: 'ky-truoc' })
 
   const report = useQuery({
@@ -72,7 +77,9 @@ export function MenuMatrix() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period} />
+        <PeriodComparator value={period} onChange={setPeriod} resolved={data?.period}>
+          <BranchPicker />
+        </PeriodComparator>
 
         {data?.costNote ? (
           <p className="mt-4 rounded-md border border-warn bg-surface-1 px-5 py-3.5 text-[length:var(--fs-c1)] leading-relaxed text-ink-body">
@@ -129,8 +136,8 @@ export function MenuMatrix() {
             <p className="mt-5 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
               Vạch bán chạy: tỉ trọng ≥ {formatPercent(data.popularityCut).replace('+', '')} số phần
               (quy tắc 70% chia đều {data.totals.dishes} món). Vạch đóng góp:{' '}
-              {formatVnd(data.contributionCut)} mỗi phần — bình quân có trọng số của cả
-              thực đơn. Tổng kỳ: {data.totals.qty} phần · {formatVnd(data.totals.revenue)}.
+              {formatVnd(data.contributionCut)} mỗi phần — bình quân có trọng số của cả thực đơn.
+              Tổng kỳ: {data.totals.qty} phần · {formatVnd(data.totals.revenue)}.
             </p>
 
             <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
@@ -195,9 +202,9 @@ export function MenuMatrix() {
             </div>
 
             <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-              Đơn vị của ma trận là thứ khách chọn và trả tiền, nên món nằm bên trong set không
-              đứng riêng ở đây — set tính theo dòng set. Tiêu hao từng món thành phần là câu hỏi
-              của kho, trả lời ở S11 khi có công thức.
+              Đơn vị của ma trận là thứ khách chọn và trả tiền, nên món nằm bên trong set không đứng
+              riêng ở đây — set tính theo dòng set. Tiêu hao từng món thành phần là câu hỏi của kho,
+              trả lời ở S11 khi có công thức.
             </p>
           </>
         )}

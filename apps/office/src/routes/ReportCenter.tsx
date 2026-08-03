@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { api, type PeriodChoice } from '../api'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
-import { PeriodComparator, formatRange } from '../components/report'
+import { BranchPicker, PeriodComparator, formatRange, useReportBranch } from '../components/report'
 import { useSession } from '../session-context'
 
 /**
@@ -211,7 +211,8 @@ const REPORTS: ReportDef[] = [
 ]
 
 export function ReportCenter() {
-  const { branchId, can } = useSession()
+  const { can } = useSession()
+  const { branchId } = useReportBranch()
   const toast = useToast()
   const [period, setPeriod] = useState<PeriodChoice>({ kind: 'thang', compare: 'ky-truoc' })
   const [busy, setBusy] = useState<string | null>(null)
@@ -243,7 +244,9 @@ export function ReportCenter() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <PeriodComparator value={period} onChange={setPeriod} />
+        <PeriodComparator value={period} onChange={setPeriod}>
+          <BranchPicker />
+        </PeriodComparator>
 
         <div className="mt-5">
           {/* Danh mục báo cáo cố định — không phân trang, đây là mục lục chứ không phải dữ liệu */}
