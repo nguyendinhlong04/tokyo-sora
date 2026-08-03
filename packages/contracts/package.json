@@ -10,11 +10,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "development": "./src/index.ts",
+      "require": "./dist/cjs/index.js",
       "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.cjs.json && node emit-cjs-marker.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

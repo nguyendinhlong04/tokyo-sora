@@ -1,0 +1,19 @@
+// Bản CommonJS song song với bản ESM ở tsconfig.build.json.
+//
+// API build ra CommonJS (apps/api/tsconfig.json đặt module: "commonjs") nên nó
+// `require()` package này. Bản ESM không require() được — Node ném ERR_REQUIRE_ESM.
+// Bảy app frontend vẫn dùng bản ESM; trường `exports` trong package.json chọn bản
+// nào theo cách người gọi nạp.
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    // Cú pháp ESM trong nguồn phải được biên dịch xuống require(), không giữ nguyên
+    "verbatimModuleSyntax": false,
+    "outDir": "dist/cjs",
+    // Khai báo kiểu đã có ở bản ESM, dùng chung
+    "declaration": false,
+    "declarationMap": false
+  }
+}
