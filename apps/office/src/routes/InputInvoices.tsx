@@ -3,8 +3,10 @@ import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type InputInvoiceInput, type MissingInvoiceVoucher } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Field, formatDay } from '../components/report'
+import { TextInput as Input, Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 /**
@@ -210,13 +212,9 @@ export function InputInvoices() {
                   </span>
                   <span className="flex justify-end">
                     {mayEdit ? (
-                      <button
-                        type="button"
-                        onClick={() => setDraft(blank(branchId!, voucher))}
-                        className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                      >
+                      <Button onClick={() => setDraft(blank(branchId!, voucher))} size="sm">
                         Gắn hoá đơn
-                      </button>
+                      </Button>
                     ) : null}
                   </span>
                 </div>
@@ -229,35 +227,28 @@ export function InputInvoices() {
           <h2 className="mb-2 text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
             Sổ hoá đơn ({rows.length})
           </h2>
-          <div className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
-            <div className="grid grid-cols-[110px_1fr_130px_150px_130px_120px_130px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-              <span>Ngày HĐ</span>
-              <span>Người bán</span>
-              <span>Số HĐ</span>
-              <span className="text-right">Trước thuế</span>
-              <span className="text-right">VAT</span>
-              <span>Khấu trừ</span>
-              <span />
-            </div>
-
-            {book.isPending ? (
-              <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-            ) : rows.length === 0 ? (
-              <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-                Chưa ghi hoá đơn đầu vào nào trong khoảng này.
-              </p>
-            ) : (
-              rows.map((row) => (
-                <div
-                  key={row.id}
-                  className={`grid grid-cols-[110px_1fr_130px_150px_130px_120px_130px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                    row.deductible ? '' : 'opacity-60'
-                  }`}
-                >
+          <DataTable
+            rows={rows}
+            rowKey={(row) => row.id}
+            loading={book.isPending}
+            empty="Chưa ghi hoá đơn đầu vào nào trong khoảng này."
+            columns={[
+              {
+                key: 'issuedOn',
+                header: 'Ngày HĐ',
+                width: '110px',
+                cell: (row) => (
                   <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
                     {formatDay(row.issuedOn)}
                   </span>
-                  <span className="min-w-0">
+                ),
+              },
+              {
+                key: 'seller',
+                header: 'Người bán',
+                width: 'minmax(200px, 1fr)',
+                cell: (row) => (
+                  <span className={row.deductible ? '' : 'opacity-60'}>
                     <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
                       {row.sellerName}
                     </span>
@@ -266,47 +257,76 @@ export function InputInvoices() {
                       {row.voucherId ? ` · phiếu #${row.voucherId}` : ' · chưa gắn phiếu chi'}
                     </span>
                   </span>
+                ),
+              },
+              {
+                key: 'invoiceNo',
+                header: 'Số HĐ',
+                width: '140px',
+                cell: (row) => (
                   <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
                     {row.serial ? `${row.serial}/` : ''}
                     {row.invoiceNo}
                   </span>
-                  <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-body">
+                ),
+              },
+              {
+                key: 'net',
+                header: 'Trước thuế',
+                width: '150px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-b2)] text-ink-body">
                     {formatVnd(row.netVnd)}
                   </span>
-                  <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
+                ),
+              },
+              {
+                key: 'vat',
+                header: 'VAT',
+                width: '130px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-b2)] text-ink-hi">
                     {formatVnd(row.vatVnd)}
                   </span>
-                  <span>
-                    {row.deductible ? (
-                      <Badge tone="ok">Được khấu trừ</Badge>
-                    ) : (
-                      <Badge>Không khấu trừ</Badge>
-                    )}
-                  </span>
+                ),
+              },
+              {
+                key: 'deductible',
+                header: 'Khấu trừ',
+                width: '140px',
+                cell: (row) =>
+                  row.deductible ? (
+                    <Badge tone="ok">Được khấu trừ</Badge>
+                  ) : (
+                    <Badge>Không khấu trừ</Badge>
+                  ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                width: '150px',
+                cell: (row) => (
                   <span className="flex justify-end gap-2">
                     {mayEdit ? (
                       <>
-                        <button
-                          type="button"
+                        <Button
                           onClick={() => toggle.mutate({ id: row.id, deductible: !row.deductible })}
-                          className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
+                          size="sm"
                         >
                           {row.deductible ? 'Loại' : 'Nhận'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => remove.mutate(row.id)}
-                          className="h-8 rounded-sm border border-danger-line px-2 text-[length:var(--fs-c1)] text-danger hover:bg-danger/8"
-                        >
+                        </Button>
+                        <Button onClick={() => remove.mutate(row.id)} size="sm" variant="danger">
                           Xoá
-                        </button>
+                        </Button>
                       </>
                     ) : null}
                   </span>
-                </div>
-              ))
-            )}
-          </div>
+                ),
+              },
+            ]}
+          />
         </section>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
@@ -370,7 +390,12 @@ function InvoiceForm({
           />
         </Field>
         <Field label="Số hoá đơn">
-          <Input value={draft.invoiceNo} onChange={(v) => set('invoiceNo', v)} placeholder="00012345" mono />
+          <Input
+            value={draft.invoiceNo}
+            onChange={(v) => set('invoiceNo', v)}
+            placeholder="00012345"
+            mono
+          />
         </Field>
 
         <Field label="Ngày hoá đơn">
@@ -404,15 +429,13 @@ function InvoiceForm({
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => set('deductible', !draft.deductible)}
-          className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-            draft.deductible ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
-          }`}
+        <Toggle
+          onChange={() => set('deductible', !draft.deductible)}
+          on={draft.deductible}
+          tone="ok"
         >
           {draft.deductible ? 'Được khấu trừ' : 'Không khấu trừ'}
-        </button>
+        </Toggle>
         <p className="max-w-[480px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Gắn phiếu chi là tuỳ chọn — hoá đơn và tiền ra đến theo hai nhịp khác nhau. Gắn sau cũng
           được.
@@ -425,31 +448,5 @@ function InvoiceForm({
         </div>
       </div>
     </section>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  mono = false,
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-  mono?: boolean
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi ${
-        mono ? 'font-mono' : ''
-      }`}
-    />
   )
 }

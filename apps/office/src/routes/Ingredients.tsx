@@ -3,8 +3,10 @@ import { Button, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type IngredientInput, type IngredientRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field } from '../components/report'
+import { TextInput as Input, Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 /**
@@ -103,55 +105,63 @@ export function Ingredients() {
           />
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[110px_1fr_150px_130px_140px_110px_90px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Mã</span>
-            <span>Tên</span>
-            <span>Quy đổi</span>
-            <span className="text-right">Giá bình quân</span>
-            <span className="text-right">Tồn</span>
-            <span className="text-right">Món dùng</span>
-            <span />
-          </div>
-
-          {rows.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : list.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa có nguyên liệu nào. Khai nguyên liệu trước, rồi mới khai được công thức món.
-            </p>
-          ) : (
-            list.map((row) => (
-              <div
-                key={row.id}
-                className={`grid grid-cols-[110px_1fr_150px_130px_140px_110px_90px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                  row.active ? '' : 'opacity-60'
-                }`}
-              >
-                <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                  {row.code}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                    {row.name}
-                    {row.lotRequired ? (
-                      <span className="ml-2 rounded-sm border border-line-3 px-1.5 py-0.5 text-[length:var(--fs-c2)] text-ink-mute">
-                        theo lô
+        <div className="mt-5">
+          <DataTable
+            rows={list}
+            rowKey={(row) => row.id}
+            loading={rows.isPending}
+            empty="Chưa có nguyên liệu nào. Khai nguyên liệu trước, rồi mới khai được công thức món."
+            columns={[
+              {
+                key: 'code',
+                header: 'Mã',
+                width: '110px',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.code}
+                  </span>
+                ),
+              },
+              {
+                key: 'name',
+                header: 'Tên',
+                width: 'minmax(200px, 1fr)',
+                cell: (row) => (
+                  <span className={row.active ? '' : 'opacity-60'}>
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.name}
+                      {row.lotRequired ? (
+                        <span className="ml-2 rounded-sm border border-line-3 px-1.5 py-0.5 text-[length:var(--fs-c2)] text-ink-mute">
+                          theo lô
+                        </span>
+                      ) : null}
+                    </span>
+                    {row.groupName ? (
+                      <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                        {row.groupName}
                       </span>
                     ) : null}
                   </span>
-                  {row.groupName ? (
-                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
-                      {row.groupName}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                  1 {row.purchaseUnit} = {row.basePerPurchase.toLocaleString('vi-VN')}{' '}
-                  {row.baseUnit}
-                </span>
-                <span className="text-right">
-                  {row.costPerBaseMilli === 0 ? (
+                ),
+              },
+              {
+                key: 'convert',
+                header: 'Quy đổi',
+                width: '150px',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    1 {row.purchaseUnit} = {row.basePerPurchase.toLocaleString('vi-VN')}{' '}
+                    {row.baseUnit}
+                  </span>
+                ),
+              },
+              {
+                key: 'cost',
+                header: 'Giá bình quân',
+                width: '140px',
+                align: 'right',
+                cell: (row) =>
+                  row.costPerBaseMilli === 0 ? (
                     <span className="text-[length:var(--fs-c1)] text-warn">chưa có giá</span>
                   ) : (
                     <>
@@ -162,52 +172,62 @@ export function Ingredients() {
                         mỗi {row.purchaseUnit}
                       </span>
                     </>
-                  )}
-                </span>
-                <span className="text-right">
-                  <span
-                    className={`block font-mono text-[length:var(--fs-b2)] ${
-                      row.belowMin ? 'text-danger' : 'text-ink-body'
-                    }`}
-                  >
-                    {row.qtyBase.toLocaleString('vi-VN')} {row.baseUnit}
-                  </span>
-                  <span className="block text-[length:var(--fs-c2)] text-ink-mute">
-                    {formatVnd(row.valueVnd)}
-                  </span>
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                  {row.usedByDishes}
-                </span>
-                <span className="flex justify-end gap-1.5">
-                  {mayReceive ? (
-                    <button
-                      type="button"
-                      onClick={() => setReceiving(row)}
-                      className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
+                  ),
+              },
+              {
+                key: 'onhand',
+                header: 'Tồn',
+                width: '140px',
+                align: 'right',
+                cell: (row) => (
+                  <>
+                    <span
+                      className={`block font-mono text-[length:var(--fs-b2)] ${
+                        row.belowMin ? 'text-danger' : 'text-ink-body'
+                      }`}
                     >
-                      Nhập
-                    </button>
-                  ) : null}
-                  {mayEdit ? (
-                    <button
-                      type="button"
-                      onClick={() => setDraft({ ...row })}
-                      className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                    >
-                      Sửa
-                    </button>
-                  ) : null}
-                </span>
-              </div>
-            ))
-          )}
+                      {row.qtyBase.toLocaleString('vi-VN')} {row.baseUnit}
+                    </span>
+                    <span className="block text-[length:var(--fs-c2)] text-ink-mute">
+                      {formatVnd(row.valueVnd)}
+                    </span>
+                  </>
+                ),
+              },
+              {
+                key: 'used',
+                header: 'Món dùng',
+                width: '110px',
+                numeric: true,
+                cell: (row) => <span className="text-ink-mute">{row.usedByDishes}</span>,
+              },
+              {
+                key: 'actions',
+                header: '',
+                width: '150px',
+                cell: (row) => (
+                  <span className="flex justify-end gap-1.5">
+                    {mayReceive ? (
+                      <Button onClick={() => setReceiving(row)} size="sm">
+                        Nhập
+                      </Button>
+                    ) : null}
+                    {mayEdit ? (
+                      <Button onClick={() => setDraft({ ...row })} size="sm">
+                        Sửa
+                      </Button>
+                    ) : null}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Cờ <span className="text-ink-body">theo lô</span> đã khai được nhưng chưa có tác dụng:
-          bảng lô và hạn dùng FEFO (S9) chưa dựng, nên hiện chưa ai bắt buộc khai số lô lúc nhập
-          hải sản, thịt bò hay keg. Nhà cung cấp (S3) và đơn đặt hàng (S4) cũng chưa có.
+          bảng lô và hạn dùng FEFO (S9) chưa dựng, nên hiện chưa ai bắt buộc khai số lô lúc nhập hải
+          sản, thịt bò hay keg. Nhà cung cấp (S3) và đơn đặt hàng (S4) cũng chưa có.
         </p>
       </div>
     </>
@@ -290,19 +310,21 @@ function IngredientForm({
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <Toggle
           on={draft.lotRequired}
-          onToggle={() => set('lotRequired', !draft.lotRequired)}
-          label="Bắt buộc khai lô khi nhập"
-        />
+          onChange={() => set('lotRequired', !draft.lotRequired)}
+          tone="ok"
+        >
+          Bắt buộc khai lô khi nhập
+        </Toggle>
         <Toggle
           on={draft.isSemiFinished}
-          onToggle={() => set('isSemiFinished', !draft.isSemiFinished)}
-          label="Bán thành phẩm (pha ở bếp)"
-        />
-        <Toggle
-          on={draft.active}
-          onToggle={() => set('active', !draft.active)}
-          label="Đang dùng"
-        />
+          onChange={() => set('isSemiFinished', !draft.isSemiFinished)}
+          tone="ok"
+        >
+          Bán thành phẩm (pha ở bếp)
+        </Toggle>
+        <Toggle on={draft.active} onChange={() => set('active', !draft.active)} tone="ok">
+          Đang dùng
+        </Toggle>
         <div className="ml-auto flex gap-2">
           <Button onClick={onCancel}>Bỏ</Button>
           <Button variant="primary" onClick={onSave} disabled={saving}>
@@ -312,8 +334,8 @@ function IngredientForm({
       </div>
 
       <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-        Chọn đơn vị cơ sở đủ nhỏ để định lượng công thức luôn là số nguyên: gam cho thịt rau, ml
-        cho chất lỏng, cái cho đồ đếm được. Đơn vị mua là thứ ghi trên hoá đơn nhà cung cấp.{' '}
+        Chọn đơn vị cơ sở đủ nhỏ để định lượng công thức luôn là số nguyên: gam cho thịt rau, ml cho
+        chất lỏng, cái cho đồ đếm được. Đơn vị mua là thứ ghi trên hoá đơn nhà cung cấp.{' '}
         <span className="text-ink-body">Bán thành phẩm</span> là thứ pha ở bếp chứ không mua ngoài
         (sốt, nước dùng, kim chi) — bật cờ đó rồi khai công thức mẻ ở M8.
       </p>
@@ -364,8 +386,7 @@ function ReceiveForm({
 
   const qtyNumber = Number(qty)
   const totalNumber = Number(total)
-  const unitPreview =
-    qtyNumber > 0 && totalNumber >= 0 ? Math.round(totalNumber / qtyNumber) : null
+  const unitPreview = qtyNumber > 0 && totalNumber >= 0 ? Math.round(totalNumber / qtyNumber) : null
 
   return (
     <section className="mt-5 rounded-md border border-accent bg-surface-1 p-5">
@@ -408,44 +429,5 @@ function ReceiveForm({
         </p>
       ) : null}
     </section>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  disabled = false,
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-  disabled?: boolean
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      disabled={disabled}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi disabled:text-ink-mute"
-    />
-  )
-}
-
-function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-        on ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
-      }`}
-    >
-      {label}
-    </button>
   )
 }

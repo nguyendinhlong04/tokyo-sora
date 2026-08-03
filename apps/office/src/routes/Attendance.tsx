@@ -2,6 +2,7 @@ import { Badge, ErrorState } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type AttendanceRow, type AttendanceStatus } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Field, formatTime } from '../components/report'
 import { useSession } from '../session-context'
@@ -19,7 +20,10 @@ import { useSession } from '../session-context'
  * màn này chỉ nói ra, không chặn gì cả.
  */
 
-const STATUS: Record<AttendanceStatus, { label: string; tone: 'ok' | 'warn' | 'danger' | 'neutral' | 'info' }> = {
+const STATUS: Record<
+  AttendanceStatus,
+  { label: string; tone: 'ok' | 'warn' | 'danger' | 'neutral' | 'info' }
+> = {
   'dang-lam': { label: 'Đang làm', tone: 'ok' },
   'xong-ca': { label: 'Xong ca', tone: 'neutral' },
   vang: { label: 'Chưa đến', tone: 'danger' },
@@ -73,7 +77,11 @@ export function Attendance() {
             <Tile label="Có ca hôm nay" value={summary.scheduled} />
             <Tile label="Đã chấm vào" value={summary.clockedIn} />
             <Tile label="Đang làm" value={summary.working} tone="ok" />
-            <Tile label="Đi muộn" value={summary.late} tone={summary.late > 0 ? 'warn' : undefined} />
+            <Tile
+              label="Đi muộn"
+              value={summary.late}
+              tone={summary.late > 0 ? 'warn' : undefined}
+            />
             <Tile
               label="Chưa đến"
               value={summary.absent}
@@ -100,26 +108,110 @@ export function Attendance() {
           </section>
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[1fr_150px_110px_110px_110px_130px_150px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Nhân viên</span>
-            <span>Ca xếp</span>
-            <span>Vào</span>
-            <span>Ra</span>
-            <span className="text-right">Giờ công</span>
-            <span>Lệch giờ</span>
-            <span>Trạng thái</span>
-          </div>
-
-          {board.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : rows.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chi nhánh này chưa có hồ sơ nhân viên nào đang làm việc.
-            </p>
-          ) : (
-            rows.map((row) => <Line key={row.employeeId} row={row} />)
-          )}
+        <div className="mt-5">
+          <DataTable
+            rows={rows}
+            rowKey={(row) => row.employeeId}
+            loading={board.isPending}
+            empty="Chi nhánh này chưa có hồ sơ nhân viên nào đang làm việc."
+            columns={[
+              {
+                key: 'employee',
+                header: 'Nhân viên',
+                width: 'minmax(200px, 1fr)',
+                cell: (row) => (
+                  <span className="min-w-0">
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.fullName}
+                    </span>
+                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                      {row.position}
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: 'scheduled',
+                header: 'Ca xếp',
+                width: '150px',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.scheduled
+                      ? `${hhmm(row.scheduled.startMinute)}–${hhmm(row.scheduled.endMinute)}${
+                          row.scheduled.dayKind === 'nghi'
+                            ? ' ·nghỉ'
+                            : row.scheduled.dayKind === 'le'
+                              ? ' ·lễ'
+                              : ''
+                        }`
+                      : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'in',
+                header: 'Vào',
+                width: '110px',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
+                    {row.clockIn ? formatTime(row.clockIn) : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'out',
+                header: 'Ra',
+                width: '110px',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
+                    {row.clockOut ? formatTime(row.clockOut) : row.clockIn ? '…' : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'worked',
+                header: 'Giờ công',
+                width: '120px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-b2)] text-ink-hi">
+                    {row.workedMinutes > 0 ? formatMinutes(row.workedMinutes) : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'drift',
+                header: 'Lệch giờ',
+                width: '130px',
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-c1)]">
+                    {row.lateMinutes > 0 ? (
+                      <span className="text-warn">muộn {row.lateMinutes}′</span>
+                    ) : row.earlyLeaveMinutes > 0 ? (
+                      <span className="text-ink-mute">sớm {row.earlyLeaveMinutes}′</span>
+                    ) : (
+                      <span className="text-ink-mute">—</span>
+                    )}
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Trạng thái',
+                width: '170px',
+                cell: (row) => (
+                  <span className="flex items-center gap-2">
+                    <Badge tone={STATUS[row.status].tone}>{STATUS[row.status].label}</Badge>
+                    {row.onLeave ? (
+                      <span className="text-[length:var(--fs-c2)] text-ink-mute">
+                        {LEAVE_LABELS[row.onLeave] ?? row.onLeave}
+                      </span>
+                    ) : null}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
@@ -128,55 +220,6 @@ export function Attendance() {
         </p>
       </div>
     </>
-  )
-}
-
-function Line({ row }: { row: AttendanceRow }) {
-  const status = STATUS[row.status]
-  return (
-    <div className="grid grid-cols-[1fr_150px_110px_110px_110px_130px_150px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0">
-      <span className="min-w-0">
-        <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">{row.fullName}</span>
-        <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">{row.position}</span>
-      </span>
-
-      <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-        {row.scheduled
-          ? `${hhmm(row.scheduled.startMinute)}–${hhmm(row.scheduled.endMinute)}${
-              row.scheduled.dayKind === 'nghi' ? ' ·nghỉ' : row.scheduled.dayKind === 'le' ? ' ·lễ' : ''
-            }`
-          : '—'}
-      </span>
-
-      <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
-        {row.clockIn ? formatTime(row.clockIn) : '—'}
-      </span>
-      <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
-        {row.clockOut ? formatTime(row.clockOut) : row.clockIn ? '…' : '—'}
-      </span>
-      <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
-        {row.workedMinutes > 0 ? formatMinutes(row.workedMinutes) : '—'}
-      </span>
-
-      <span className="text-[length:var(--fs-c1)]">
-        {row.lateMinutes > 0 ? (
-          <span className="text-warn">muộn {row.lateMinutes}′</span>
-        ) : row.earlyLeaveMinutes > 0 ? (
-          <span className="text-ink-mute">sớm {row.earlyLeaveMinutes}′</span>
-        ) : (
-          <span className="text-ink-mute">—</span>
-        )}
-      </span>
-
-      <span className="flex items-center gap-2">
-        <Badge tone={status.tone}>{status.label}</Badge>
-        {row.onLeave ? (
-          <span className="text-[length:var(--fs-c2)] text-ink-mute">
-            {LEAVE_LABELS[row.onLeave] ?? row.onLeave}
-          </span>
-        ) : null}
-      </span>
-    </div>
   )
 }
 
@@ -189,7 +232,14 @@ function Tile({
   value: number
   tone?: 'ok' | 'warn' | 'danger'
 }) {
-  const color = tone === 'ok' ? 'text-ok' : tone === 'warn' ? 'text-warn' : tone === 'danger' ? 'text-danger' : 'text-ink-hi'
+  const color =
+    tone === 'ok'
+      ? 'text-ok'
+      : tone === 'warn'
+        ? 'text-warn'
+        : tone === 'danger'
+          ? 'text-danger'
+          : 'text-ink-hi'
   return (
     <div className="rounded-md border border-line-1 bg-surface-1 px-5 py-4">
       <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">

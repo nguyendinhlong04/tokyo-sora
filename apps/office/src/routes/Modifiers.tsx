@@ -2,8 +2,10 @@ import { Button, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type ModifierGroupInput, type ModifierGroupRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field } from '../components/report'
+import { TextInput as Input, Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 const EMPTY: ModifierGroupInput = {
@@ -44,9 +46,7 @@ export function Modifiers() {
     mutationFn: (input: ModifierGroupInput) => api.saveModifierGroup(input),
     onSuccess: (result) => {
       toast(
-        result.dropped > 0
-          ? `Đã lưu nhóm — bỏ ${result.dropped} lựa chọn`
-          : 'Đã lưu nhóm tuỳ chọn',
+        result.dropped > 0 ? `Đã lưu nhóm — bỏ ${result.dropped} lựa chọn` : 'Đã lưu nhóm tuỳ chọn',
         'ok',
       )
       setDraft(null)
@@ -92,82 +92,95 @@ export function Modifiers() {
           />
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[1fr_130px_110px_130px_170px_140px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Tên nhóm</span>
-            <span>Kiểu</span>
-            <span className="text-right">Lựa chọn</span>
-            <span className="text-right">Áp cho</span>
-            <span className="text-right">Chênh giá</span>
-            <span />
-          </div>
-
-          {groups.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : rows.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa có nhóm tuỳ chọn nào. Món vẫn gọi được — POS chỉ thả thẳng vào phiếu order mà
-              không hỏi gì.
-            </p>
-          ) : (
-            rows.map((row) => (
-              <div
-                key={row.id}
-                className="grid grid-cols-[1fr_130px_110px_130px_170px_140px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                    {row.name}
+        <div className="mt-5">
+          <DataTable
+            rows={rows}
+            rowKey={(row) => row.id}
+            loading={groups.isPending}
+            empty="Chưa có nhóm tuỳ chọn nào. Món vẫn gọi được — POS chỉ thả thẳng vào phiếu order mà không hỏi gì."
+            columns={[
+              {
+                key: 'name',
+                header: 'Tên nhóm',
+                width: 'minmax(220px, 1fr)',
+                cell: (row) => (
+                  <span className="min-w-0">
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.name}
+                    </span>
+                    <span className="mt-0.5 block truncate font-mono text-[length:var(--fs-c2)] text-ink-mute">
+                      {row.id} · {row.options.map((o) => o.name).join(' · ')}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block truncate font-mono text-[length:var(--fs-c2)] text-ink-mute">
-                    {row.id} · {row.options.map((o) => o.name).join(' · ')}
+                ),
+              },
+              {
+                key: 'kind',
+                header: 'Kiểu',
+                width: '130px',
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-body">
+                    {row.required ? 'Bắt buộc' : 'Tuỳ ý'}
+                    <span className="block text-[length:var(--fs-c2)] text-ink-mute">
+                      {row.multi
+                        ? `chọn nhiều${row.pickMax ? ` · tối đa ${row.pickMax}` : ''}`
+                        : 'chọn một'}
+                    </span>
                   </span>
-                </span>
-
-                <span className="text-[length:var(--fs-c1)] text-ink-body">
-                  {row.required ? 'Bắt buộc' : 'Tuỳ ý'}
-                  <span className="block text-[length:var(--fs-c2)] text-ink-mute">
-                    {row.multi ? `chọn nhiều${row.pickMax ? ` · tối đa ${row.pickMax}` : ''}` : 'chọn một'}
+                ),
+              },
+              {
+                key: 'options',
+                header: 'Lựa chọn',
+                width: '110px',
+                numeric: true,
+                cell: (row) => <span className="text-ink-body">{row.options.length}</span>,
+              },
+              {
+                key: 'dishes',
+                header: 'Áp cho',
+                width: '130px',
+                numeric: true,
+                cell: (row) => <span className="text-ink-body">{row.dishCount} món</span>,
+              },
+              {
+                key: 'price',
+                header: 'Chênh giá',
+                width: '170px',
+                numeric: true,
+                cell: (row) => <span className="text-ink-body">{priceRange(row)}</span>,
+              },
+              {
+                key: 'actions',
+                header: '',
+                width: '150px',
+                cell: (row) => (
+                  <span className="flex justify-end gap-1.5">
+                    {mayEdit ? (
+                      <>
+                        <Button onClick={() => setDraft(toInput(row))} size="sm">
+                          Sửa
+                        </Button>
+                        <Button
+                          onClick={() => remove.mutate(row.id)}
+                          disabled={row.dishCount > 0}
+                          title={
+                            row.dishCount > 0
+                              ? 'Còn món đang dùng — gỡ khỏi các món đó trước'
+                              : undefined
+                          }
+                          size="sm"
+                          variant="danger"
+                        >
+                          Xoá
+                        </Button>
+                      </>
+                    ) : null}
                   </span>
-                </span>
-
-                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                  {row.options.length}
-                </span>
-
-                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                  {row.dishCount} món
-                </span>
-
-                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                  {priceRange(row)}
-                </span>
-
-                <span className="flex justify-end gap-1.5">
-                  {mayEdit ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setDraft(toInput(row))}
-                        className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => remove.mutate(row.id)}
-                        disabled={row.dishCount > 0}
-                        title={row.dishCount > 0 ? 'Còn món đang dùng — gỡ khỏi các món đó trước' : undefined}
-                        className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-mute hover:text-danger disabled:opacity-40"
-                      >
-                        Xoá
-                      </button>
-                    </>
-                  ) : null}
-                </span>
-              </div>
-            ))
-          )}
+                ),
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
@@ -233,21 +246,29 @@ function GroupForm({
         <Field label="Bắt buộc chọn">
           <Toggle
             on={draft.required}
-            label={draft.required ? 'Bắt buộc' : 'Tuỳ ý'}
-            onToggle={() => set('required', !draft.required)}
-          />
+
+            onChange={() => set('required', !draft.required)}
+            tone="ok"
+          >
+            {draft.required ? 'Bắt buộc' : 'Tuỳ ý'}
+          </Toggle>
         </Field>
         <Field label="Số lựa chọn">
           <div className="flex gap-2">
             <Toggle
               on={draft.multi}
-              label={draft.multi ? 'Chọn nhiều' : 'Chọn một'}
-              onToggle={() => set('multi', !draft.multi)}
-            />
+
+              onChange={() => set('multi', !draft.multi)}
+              tone="ok"
+            >
+              {draft.multi ? 'Chọn nhiều' : 'Chọn một'}
+            </Toggle>
             {draft.multi ? (
               <Input
                 value={draft.pickMax === null ? '' : String(draft.pickMax)}
-                onChange={(v) => set('pickMax', v.trim() === '' ? null : Number(v.replace(/\D/g, '')) || null)}
+                onChange={(v) =>
+                  set('pickMax', v.trim() === '' ? null : Number(v.replace(/\D/g, '')) || null)
+                }
                 placeholder="tối đa"
               />
             ) : null}
@@ -261,7 +282,10 @@ function GroupForm({
         </p>
         <div className="mt-2.5 flex flex-col gap-2">
           {draft.options.map((option, index) => (
-            <div key={option.id ?? `moi-${index}`} className="grid grid-cols-[1fr_170px_150px_90px] items-center gap-3">
+            <div
+              key={option.id ?? `moi-${index}`}
+              className="grid grid-cols-[1fr_170px_150px_90px] items-center gap-3"
+            >
               <Input
                 value={option.name}
                 onChange={(v) => setOption(index, { name: v })}
@@ -274,35 +298,41 @@ function GroupForm({
               />
               <Toggle
                 on={option.affectsStock}
-                label={option.affectsStock ? 'Có trừ kho' : 'Không trừ kho'}
-                onToggle={() => setOption(index, { affectsStock: !option.affectsStock })}
-              />
-              <button
-                type="button"
+
+                onChange={() => setOption(index, { affectsStock: !option.affectsStock })}
+                tone="ok"
+              >
+                {option.affectsStock ? 'Có trừ kho' : 'Không trừ kho'}
+              </Toggle>
+              <Button
                 onClick={() =>
                   onChange({ ...draft, options: draft.options.filter((_, i) => i !== index) })
                 }
                 disabled={draft.options.length <= 1}
-                className="h-9 rounded-sm border border-line-3 text-[length:var(--fs-c1)] text-ink-mute hover:text-danger disabled:opacity-40"
+                size="sm"
+                variant="danger"
               >
                 Bỏ
-              </button>
+              </Button>
             </div>
           ))}
         </div>
 
-        <button
-          type="button"
+        <Button
           onClick={() =>
             onChange({
               ...draft,
-              options: [...draft.options, { id: null, name: '', priceDelta: 0, affectsStock: false }],
+              options: [
+                ...draft.options,
+                { id: null, name: '', priceDelta: 0, affectsStock: false },
+              ],
             })
           }
-          className="mt-2.5 h-9 rounded-sm border border-line-3 px-3 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
+          size="sm"
+          className="mt-2.5"
         >
           Thêm lựa chọn
-        </button>
+        </Button>
       </div>
 
       {tooFewForRequired ? (
@@ -324,42 +354,6 @@ function GroupForm({
         <Button onClick={onCancel}>Huỷ</Button>
       </div>
     </section>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  disabled = false,
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  disabled?: boolean
-}) {
-  return (
-    <input
-      value={value}
-      disabled={disabled}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi disabled:text-ink-mute"
-    />
-  )
-}
-
-function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-        on ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
-      }`}
-    >
-      {label}
-    </button>
   )
 }
 

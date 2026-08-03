@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, type DeliveryZone, type ParameterRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { useSession } from '../session-context'
 
@@ -96,57 +97,76 @@ export function DeliveryZones() {
       />
 
       <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-8 pb-8 xl:grid-cols-[1fr_380px] xl:items-start">
-        <div className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[1fr_120px_140px_110px_140px] gap-4 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Vùng</span>
-            <span className="text-right">Phí giao</span>
-            <span className="text-right">Đơn tối thiểu</span>
-            <span className="text-right">Thời gian</span>
-            <span />
-          </div>
-
-          {zones.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : rows.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chi nhánh này chưa khai vùng giao nào — khách chọn "giao hàng" sẽ được báo là ngoài
-              vùng.
-            </p>
-          ) : (
-            rows.map((zone) => (
-              <div
-                key={zone.id}
-                className={`grid grid-cols-[1fr_120px_140px_110px_140px] items-center gap-4 border-b border-line-1 px-5 py-3 ${
-                  zone.active ? '' : 'opacity-55'
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className="text-[length:var(--fs-b2)] text-ink-hi">{zone.name}</p>
-                  <p className="mt-1 truncate text-[length:var(--fs-c1)] text-ink-mute">
+        <DataTable
+          rows={rows}
+          rowKey={(zone) => zone.id}
+          loading={zones.isPending}
+          empty='Chi nhánh này chưa khai vùng giao nào — khách chọn "giao hàng" sẽ được báo là ngoài vùng.'
+          columns={[
+            {
+              key: 'name',
+              header: 'Vùng',
+              width: 'minmax(200px, 1fr)',
+              cell: (zone) => (
+                <span className={zone.active ? '' : 'opacity-55'}>
+                  <span className="block text-[length:var(--fs-b2)] text-ink-hi">{zone.name}</span>
+                  <span className="mt-1 block truncate text-[length:var(--fs-c1)] text-ink-mute">
                     {zone.wards.join(' · ')}
-                  </p>
-                </div>
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
+                  </span>
+                </span>
+              ),
+            },
+            {
+              key: 'fee',
+              header: 'Phí giao',
+              width: '130px',
+              numeric: true,
+              cell: (zone) => (
+                <span className="text-[length:var(--fs-b2)] text-ink-hi">
                   {formatVnd(zone.feeVnd)}
                 </span>
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
+              ),
+            },
+            {
+              key: 'minOrder',
+              header: 'Đơn tối thiểu',
+              width: '140px',
+              numeric: true,
+              cell: (zone) => (
+                <span className="text-[length:var(--fs-b2)] text-ink-hi">
                   {formatVnd(zone.minOrderVnd)}
                 </span>
-                <span className="text-right text-[length:var(--fs-b2)] text-ink-mute">
-                  {zone.etaMinutes}′
-                </span>
-                <div className="flex justify-end gap-2">
-                  <Button disabled={!mayEdit} onClick={() => setDraft(zone)}>
+              ),
+            },
+            {
+              key: 'eta',
+              header: 'Thời gian',
+              width: '110px',
+              numeric: true,
+              cell: (zone) => <span className="text-ink-mute">{zone.etaMinutes}′</span>,
+            },
+            {
+              key: 'actions',
+              header: '',
+              width: '160px',
+              cell: (zone) => (
+                <span className="flex justify-end gap-2">
+                  <Button size="sm" disabled={!mayEdit} onClick={() => setDraft(zone)}>
                     Sửa
                   </Button>
-                  <Button variant="danger" disabled={!mayEdit} onClick={() => remove.mutate(zone)}>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    disabled={!mayEdit}
+                    onClick={() => remove.mutate(zone)}
+                  >
                     Xoá
                   </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+                </span>
+              ),
+            },
+          ]}
+        />
 
         <section className="rounded-md border border-line-1 bg-surface-1 p-6">
           <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
@@ -243,7 +263,9 @@ function MinuteField({
         ) : null}
       </div>
       {parsed === null ? (
-        <span className="mt-1 block text-[length:var(--fs-c1)] text-danger">Viết theo mẫu 21:00</span>
+        <span className="mt-1 block text-[length:var(--fs-c1)] text-danger">
+          Viết theo mẫu 21:00
+        </span>
       ) : null}
     </label>
   )

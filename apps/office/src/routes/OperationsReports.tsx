@@ -3,6 +3,7 @@ import { Badge, ErrorState } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type PeriodChoice } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { PeriodComparator, formatPercent } from '../components/report'
 import { MetricTile, RateTile, SliceTable, formatDuration } from '../components/slices'
@@ -60,59 +61,101 @@ export function KitchenReport() {
                 delta={data.avgSeconds}
                 goodWhenUp={false}
               />
-              <MetricTile label="Số vé đã xong" value={String(data.tickets.value)} delta={data.tickets} />
-              <RateTile label="Tỉ lệ trễ SLA" rate={data.lateRate} hint="vé ra sau hạn của chính nó" />
+              <MetricTile
+                label="Số vé đã xong"
+                value={String(data.tickets.value)}
+                delta={data.tickets}
+              />
+              <RateTile
+                label="Tỉ lệ trễ SLA"
+                rate={data.lateRate}
+                hint="vé ra sau hạn của chính nó"
+              />
             </div>
 
-            <section className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-              <h2 className="border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
-                Theo trạm — tách hai kênh tại bàn và online
-              </h2>
-              <div className="grid grid-cols-[130px_110px_120px_120px_130px_130px] gap-3 border-b border-line-1 px-5 py-2 text-[length:var(--fs-c2)] tracking-[0.1em] text-ink-mute uppercase">
-                <span>Trạm</span>
-                <span className="text-right">Vé</span>
-                <span className="text-right">Trung bình</span>
-                <span className="text-right">Chậm nhất 10%</span>
-                <span className="text-right">Tại bàn / POS</span>
-                <span className="text-right">Online</span>
-              </div>
-              {data.byStation.length === 0 ? (
-                <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-                  Chưa có vé nào xong trong kỳ này.
-                </p>
-              ) : (
-                data.byStation.map((row) => (
-                  <div
-                    key={row.key}
-                    className="grid grid-cols-[130px_110px_120px_120px_130px_130px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">{row.key}</span>
-                      {row.lateRate !== null && row.lateRate > 0.2 ? (
-                        <Badge tone="danger">{formatPercent(row.lateRate)}</Badge>
-                      ) : null}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                      {row.total}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
-                      {formatDuration(row.avgSeconds)}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                      {formatDuration(row.p90Seconds)}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                      {row.bySource.pos !== undefined || row.bySource.table !== undefined
-                        ? formatDuration(row.bySource.pos ?? row.bySource.table ?? 0)
-                        : '—'}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                      {row.bySource.online !== undefined ? formatDuration(row.bySource.online) : '—'}
-                    </span>
-                  </div>
-                ))
-              )}
-            </section>
+            <div className="mt-5">
+              <DataTable
+                rows={data.byStation}
+                rowKey={(row) => row.key}
+                paginate={false}
+                empty="Chưa có vé nào xong trong kỳ này."
+                toolbar={
+                  <h2 className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+                    Theo trạm — tách hai kênh tại bàn và online
+                  </h2>
+                }
+                columns={[
+                  {
+                    key: 'station',
+                    header: 'Trạm',
+                    width: 'minmax(160px, 1fr)',
+                    cell: (row) => (
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">
+                          {row.key}
+                        </span>
+                        {row.lateRate !== null && row.lateRate > 0.2 ? (
+                          <Badge tone="danger">{formatPercent(row.lateRate)}</Badge>
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'total',
+                    header: 'Vé',
+                    width: '110px',
+                    numeric: true,
+                    cell: (row) => <span className="text-ink-body">{row.total}</span>,
+                  },
+                  {
+                    key: 'avg',
+                    header: 'Trung bình',
+                    width: '130px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className="text-[length:var(--fs-b2)] text-ink-hi">
+                        {formatDuration(row.avgSeconds)}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'p90',
+                    header: 'Chậm nhất 10%',
+                    width: '140px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className="text-ink-mute">{formatDuration(row.p90Seconds)}</span>
+                    ),
+                  },
+                  {
+                    key: 'onsite',
+                    header: 'Tại bàn / POS',
+                    width: '140px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className="text-ink-body">
+                        {row.bySource.pos !== undefined || row.bySource.table !== undefined
+                          ? formatDuration(row.bySource.pos ?? row.bySource.table ?? 0)
+                          : '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'online',
+                    header: 'Online',
+                    width: '130px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className="text-ink-body">
+                        {row.bySource.online !== undefined
+                          ? formatDuration(row.bySource.online)
+                          : '—'}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            </div>
 
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
               <section className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
@@ -160,7 +203,9 @@ export function KitchenReport() {
                       key={row.dishId}
                       className="grid grid-cols-[1fr_100px_110px_110px] items-center gap-3 border-b border-line-1 px-5 py-2 last:border-b-0"
                     >
-                      <span className="truncate text-[length:var(--fs-c1)] text-ink-hi">{row.name}</span>
+                      <span className="truncate text-[length:var(--fs-c1)] text-ink-hi">
+                        {row.name}
+                      </span>
                       <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
                         {row.served} lần
                       </span>
@@ -169,7 +214,9 @@ export function KitchenReport() {
                       </span>
                       <span
                         className={`text-right font-mono text-[length:var(--fs-c1)] ${
-                          row.lateRate !== null && row.lateRate > 0.2 ? 'text-danger' : 'text-ink-mute'
+                          row.lateRate !== null && row.lateRate > 0.2
+                            ? 'text-danger'
+                            : 'text-ink-mute'
                         }`}
                       >
                         {row.lateRate === null ? '—' : formatPercent(row.lateRate)}
@@ -226,8 +273,16 @@ export function TableTurnover() {
                 delta={data.avgMinutes}
                 goodWhenUp={false}
               />
-              <MetricTile label="Lượt bàn" value={String(data.sessions.value)} delta={data.sessions} />
-              <MetricTile label="Lượt khách" value={String(data.guests.value)} delta={data.guests} />
+              <MetricTile
+                label="Lượt bàn"
+                value={String(data.sessions.value)}
+                delta={data.sessions}
+              />
+              <MetricTile
+                label="Lượt khách"
+                value={String(data.guests.value)}
+                delta={data.guests}
+              />
               <MetricTile
                 label="Lượt / bàn / ngày"
                 value={data.turnsPerTableDay === null ? '—' : data.turnsPerTableDay.toFixed(2)}
@@ -235,56 +290,90 @@ export function TableTurnover() {
               />
             </div>
 
-            <section className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-              <h2 className="border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
-                Từng bàn
-              </h2>
-              <div className="grid grid-cols-[110px_130px_100px_120px_110px_120px_140px] gap-3 border-b border-line-1 px-5 py-2 text-[length:var(--fs-c2)] tracking-[0.1em] text-ink-mute uppercase">
-                <span>Bàn</span>
-                <span>Khu</span>
-                <span className="text-right">Lượt</span>
-                <span className="text-right">Lượt / ngày</span>
-                <span className="text-right">Ngồi TB</span>
-                <span className="text-right">Lấp đầy</span>
-                <span className="text-right">Doanh thu</span>
-              </div>
-              {data.byTable.length === 0 ? (
-                <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-                  Chưa có phiên bàn nào đóng trong kỳ này.
-                </p>
-              ) : (
-                data.byTable.map((row) => (
-                  <div
-                    key={row.tableId}
-                    className="grid grid-cols-[110px_130px_100px_120px_110px_120px_140px] items-center gap-3 border-b border-line-1 px-5 py-2 last:border-b-0"
-                  >
-                    <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">{row.code}</span>
-                    <span className="truncate text-[length:var(--fs-c1)] text-ink-mute">
-                      {row.areaName ?? '—'}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                      {row.sessions}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-hi">
-                      {row.turnsPerDay.toFixed(2)}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                      {row.avgMinutes}p
-                    </span>
-                    <span
-                      className={`text-right font-mono text-[length:var(--fs-c1)] ${
-                        row.occupancy !== null && row.occupancy < 0.5 ? 'text-warn' : 'text-ink-mute'
-                      }`}
-                    >
-                      {row.occupancy === null ? '—' : formatPercent(row.occupancy)}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                      {formatVnd(row.revenueVnd)}
-                    </span>
-                  </div>
-                ))
-              )}
-            </section>
+            <div className="mt-5">
+              <DataTable
+                rows={data.byTable}
+                rowKey={(row) => row.tableId}
+                paginate={false}
+                empty="Chưa có phiên bàn nào đóng trong kỳ này."
+                toolbar={
+                  <h2 className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+                    Từng bàn
+                  </h2>
+                }
+                columns={[
+                  {
+                    key: 'code',
+                    header: 'Bàn',
+                    width: '110px',
+                    cell: (row) => (
+                      <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">
+                        {row.code}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'area',
+                    header: 'Khu',
+                    width: 'minmax(130px, 1fr)',
+                    cell: (row) => (
+                      <span className="truncate text-[length:var(--fs-c1)] text-ink-mute">
+                        {row.areaName ?? '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'sessions',
+                    header: 'Lượt',
+                    width: '100px',
+                    numeric: true,
+                    cell: (row) => <span className="text-ink-body">{row.sessions}</span>,
+                  },
+                  {
+                    key: 'turns',
+                    header: 'Lượt / ngày',
+                    width: '120px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className="text-ink-hi">{row.turnsPerDay.toFixed(2)}</span>
+                    ),
+                  },
+                  {
+                    key: 'avg',
+                    header: 'Ngồi TB',
+                    width: '110px',
+                    numeric: true,
+                    cell: (row) => <span className="text-ink-body">{row.avgMinutes}p</span>,
+                  },
+                  {
+                    key: 'occupancy',
+                    header: 'Lấp đầy',
+                    width: '120px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span
+                        className={
+                          row.occupancy !== null && row.occupancy < 0.5
+                            ? 'text-warn'
+                            : 'text-ink-mute'
+                        }
+                      >
+                        {row.occupancy === null ? '—' : formatPercent(row.occupancy)}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'revenue',
+                    header: 'Doanh thu',
+                    width: '150px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className="text-ink-body">{formatVnd(row.revenueVnd)}</span>
+                    ),
+                  },
+                ]}
+              />
+            </div>
 
             <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
               "Lấp đầy" là số khách trung bình mỗi lượt so với sức chứa của bàn. Bàn sáu chỗ mà lúc
@@ -331,60 +420,83 @@ export function StaffReport() {
         {data ? (
           <>
             <div className="mt-5 grid gap-3 lg:grid-cols-3">
-              <MetricTile label="Doanh thu qua nhân viên" value={formatVnd(data.totals.revenueVnd)} />
+              <MetricTile
+                label="Doanh thu qua nhân viên"
+                value={formatVnd(data.totals.revenueVnd)}
+              />
               <MetricTile label="Đơn đã huỷ" value={String(data.totals.cancels)} />
               <MetricTile label="Lượt cần duyệt" value={String(data.totals.approvalRequests)} />
             </div>
 
-            <section className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-              <div className="grid grid-cols-[1fr_150px_100px_140px_110px_120px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-                <span>Nhân viên</span>
-                <span className="text-right">Doanh thu</span>
-                <span className="text-right">Đơn</span>
-                <span className="text-right">BQ mỗi đơn</span>
-                <span className="text-right">Huỷ</span>
-                <span className="text-right">Cần duyệt</span>
-              </div>
-              {data.rows.length === 0 ? (
-                <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-                  Chưa có đơn nào do nhân viên tạo trong kỳ này.
-                </p>
-              ) : (
-                data.rows.map((row) => (
-                  <div
-                    key={row.staffId}
-                    className="grid grid-cols-[1fr_150px_100px_140px_110px_120px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
-                  >
-                    <span className="truncate text-[length:var(--fs-b2)] text-ink-hi">
-                      {row.fullName}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
-                      {formatVnd(row.revenue.value)}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                      {row.orders}
-                    </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                      {formatVnd(row.perOrderVnd)}
-                    </span>
-                    <span
-                      className={`text-right font-mono text-[length:var(--fs-c1)] ${
-                        row.cancels > 0 ? 'text-warn' : 'text-ink-mute'
-                      }`}
-                    >
-                      {row.cancels || '—'}
-                    </span>
-                    <span
-                      className={`text-right font-mono text-[length:var(--fs-c1)] ${
-                        row.approvalRequests > 3 ? 'text-danger' : 'text-ink-mute'
-                      }`}
-                    >
-                      {row.approvalRequests || '—'}
-                    </span>
-                  </div>
-                ))
-              )}
-            </section>
+            <div className="mt-5">
+              <DataTable
+                rows={data.rows}
+                rowKey={(row) => row.staffId}
+                paginate={false}
+                empty="Chưa có đơn nào do nhân viên tạo trong kỳ này."
+                columns={[
+                  {
+                    key: 'name',
+                    header: 'Nhân viên',
+                    width: 'minmax(200px, 1fr)',
+                    cell: (row) => (
+                      <span className="truncate text-[length:var(--fs-b2)] text-ink-hi">
+                        {row.fullName}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'revenue',
+                    header: 'Doanh thu',
+                    width: '160px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className="text-[length:var(--fs-b2)] text-ink-hi">
+                        {formatVnd(row.revenue.value)}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'orders',
+                    header: 'Đơn',
+                    width: '100px',
+                    numeric: true,
+                    cell: (row) => <span className="text-ink-body">{row.orders}</span>,
+                  },
+                  {
+                    key: 'perOrder',
+                    header: 'BQ mỗi đơn',
+                    width: '140px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className="text-ink-body">{formatVnd(row.perOrderVnd)}</span>
+                    ),
+                  },
+                  {
+                    key: 'cancels',
+                    header: 'Huỷ',
+                    width: '110px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className={row.cancels > 0 ? 'text-warn' : 'text-ink-mute'}>
+                        {row.cancels || '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'approvals',
+                    header: 'Cần duyệt',
+                    width: '120px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className={row.approvalRequests > 3 ? 'text-danger' : 'text-ink-mute'}>
+                        {row.approvalRequests || '—'}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            </div>
 
             <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
               Ba cột cuối đứng cạnh nhau là có lý do: doanh thu cao mà số lần cần duyệt cũng cao thì
@@ -435,7 +547,11 @@ export function OnlineReport() {
               Đơn online
             </h2>
             <div className="mt-2 grid gap-3 lg:grid-cols-4">
-              <MetricTile label="Số đơn" value={String(data.online.orders.value)} delta={data.online.orders} />
+              <MetricTile
+                label="Số đơn"
+                value={String(data.online.orders.value)}
+                delta={data.online.orders}
+              />
               <MetricTile
                 label="Doanh thu"
                 value={formatVnd(data.online.revenue.value)}
@@ -461,8 +577,7 @@ export function OnlineReport() {
                   previous: 0,
                   diff: 0,
                   percent: null,
-                  share:
-                    data.online.orders.value > 0 ? h.orders / data.online.orders.value : 0,
+                  share: data.online.orders.value > 0 ? h.orders / data.online.orders.value : 0,
                 }))}
                 format={(v) => `${v} đơn`}
                 emptyLabel="Chưa có đơn online nào trong kỳ."
@@ -510,7 +625,9 @@ export function OnlineReport() {
                     </span>
                     <span
                       className={`text-right font-mono text-[length:var(--fs-c1)] ${
-                        row.noShowRate !== null && row.noShowRate > 0.15 ? 'text-danger' : 'text-ink-mute'
+                        row.noShowRate !== null && row.noShowRate > 0.15
+                          ? 'text-danger'
+                          : 'text-ink-mute'
                       }`}
                     >
                       {row.noShowRate === null ? '—' : formatPercent(row.noShowRate)}

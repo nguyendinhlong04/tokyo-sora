@@ -11,8 +11,10 @@ import {
   type VoucherInput,
   type VoucherKind,
 } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Field, formatDay } from '../components/report'
+import { TextInput as Input, Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 /**
@@ -107,82 +109,112 @@ export function Expenses() {
           />
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[100px_1fr_160px_120px_150px_130px_100px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Ngày</span>
-            <span>Nội dung</span>
-            <span>Khoản mục</span>
-            <span>Hình thức</span>
-            <span className="text-right">Số tiền</span>
-            <span>Trạng thái</span>
-            <span />
-          </div>
-
-          {rows.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : list.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa có phiếu chi nào trong khoảng này.
-            </p>
-          ) : (
-            list.map((row) => (
-              <div
-                key={row.id}
-                className={`grid grid-cols-[100px_1fr_160px_120px_150px_130px_100px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                  row.state === 'void' ? 'opacity-50' : ''
-                }`}
-              >
-                <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                  {formatDay(row.paidOn)}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                    {row.supplier ?? row.categoryName}
-                    {row.kind === 'advance' ? (
-                      <span className="ml-2 rounded-sm border border-warn px-1.5 py-0.5 text-[length:var(--fs-c2)] text-warn">
-                        tạm ứng
-                      </span>
-                    ) : null}
-                    {row.amortizeMonths > 1 ? (
-                      <span className="ml-2 rounded-sm border border-line-3 px-1.5 py-0.5 text-[length:var(--fs-c2)] text-ink-mute">
-                        chia {row.amortizeMonths} tháng
+        <div className="mt-5">
+          <DataTable
+            rows={list}
+            rowKey={(row) => row.id}
+            loading={rows.isPending}
+            resetKey={`${from}|${to}`}
+            empty="Chưa có phiếu chi nào trong khoảng này."
+            columns={[
+              {
+                key: 'paidOn',
+                header: 'Ngày',
+                width: '110px',
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                    {formatDay(row.paidOn)}
+                  </span>
+                ),
+              },
+              {
+                key: 'memo',
+                header: 'Nội dung',
+                width: 'minmax(220px, 1fr)',
+                cell: (row) => (
+                  <span className={row.state === 'void' ? 'opacity-50' : ''}>
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.supplier ?? row.categoryName}
+                      {row.kind === 'advance' ? (
+                        <span className="ml-2 rounded-sm border border-warn px-1.5 py-0.5 text-[length:var(--fs-c2)] text-warn">
+                          tạm ứng
+                        </span>
+                      ) : null}
+                      {row.amortizeMonths > 1 ? (
+                        <span className="ml-2 rounded-sm border border-line-3 px-1.5 py-0.5 text-[length:var(--fs-c2)] text-ink-mute">
+                          chia {row.amortizeMonths} tháng
+                        </span>
+                      ) : null}
+                    </span>
+                    {row.memo ? (
+                      <span className="mt-0.5 block truncate text-[length:var(--fs-c1)] text-ink-mute">
+                        {row.memo}
                       </span>
                     ) : null}
                   </span>
-                  {row.memo ? (
-                    <span className="mt-0.5 block truncate text-[length:var(--fs-c1)] text-ink-mute">
-                      {row.memo}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="text-[length:var(--fs-c1)] text-ink-body">{row.categoryName}</span>
-                <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                  {row.method === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
-                  {formatVnd(row.amountVnd)}
-                </span>
-                <span
-                  className={`text-[length:var(--fs-c1)] ${
-                    row.state === 'approved' ? 'text-ok' : 'text-warn'
-                  }`}
-                >
-                  {STATE_LABELS[row.state] ?? row.state}
-                </span>
-                <span className="flex justify-end">
-                  {row.state === 'draft' && mayApprove ? (
-                    <button
-                      type="button"
-                      onClick={() => approve.mutate(row.id)}
-                      className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                    >
-                      Duyệt
-                    </button>
-                  ) : null}
-                </span>
-              </div>
-            ))
-          )}
+                ),
+              },
+              {
+                key: 'category',
+                header: 'Khoản mục',
+                width: '160px',
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-body">
+                    {row.categoryName}
+                  </span>
+                ),
+              },
+              {
+                key: 'method',
+                header: 'Hình thức',
+                width: '130px',
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.method === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}
+                  </span>
+                ),
+              },
+              {
+                key: 'amount',
+                header: 'Số tiền',
+                width: '150px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-b2)] text-ink-hi">
+                    {formatVnd(row.amountVnd)}
+                  </span>
+                ),
+              },
+              {
+                key: 'state',
+                header: 'Trạng thái',
+                width: '130px',
+                cell: (row) => (
+                  <span
+                    className={`text-[length:var(--fs-c1)] ${
+                      row.state === 'approved' ? 'text-ok' : 'text-warn'
+                    }`}
+                  >
+                    {STATE_LABELS[row.state] ?? row.state}
+                  </span>
+                ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                width: '110px',
+                cell: (row) => (
+                  <span className="flex justify-end">
+                    {row.state === 'draft' && mayApprove ? (
+                      <Button onClick={() => approve.mutate(row.id)} size="sm">
+                        Duyệt
+                      </Button>
+                    ) : null}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
@@ -277,16 +309,9 @@ function VoucherForm({
     <section className="rounded-md border border-accent bg-surface-1 p-5">
       <div className="flex gap-2">
         {(['expense', 'advance'] as VoucherKind[]).map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setKind(k)}
-            className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-              kind === k ? 'border-accent text-accent-ink' : 'border-line-3 text-ink-mute'
-            }`}
-          >
+          <Toggle key={k} onChange={() => setKind(k)} on={kind === k}>
             {k === 'expense' ? 'Phiếu chi' : 'Tạm ứng nhân viên'}
-          </button>
+          </Toggle>
         ))}
       </div>
 
@@ -371,7 +396,8 @@ function VoucherForm({
           {months > 1 ? (
             <span className="text-ink-mute">
               {' '}
-              · tiền ra một lần {formatVnd(amountNumber)}, chi phí {formatVnd(Math.floor(amountNumber / months))}
+              · tiền ra một lần {formatVnd(amountNumber)}, chi phí{' '}
+              {formatVnd(Math.floor(amountNumber / months))}
               /tháng trong {months} tháng
             </span>
           ) : null}
@@ -417,27 +443,5 @@ function VoucherForm({
         </Button>
       </div>
     </section>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
-    />
   )
 }

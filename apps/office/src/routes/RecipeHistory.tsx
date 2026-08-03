@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { api, type RecipeSubjectKind, type RecipeVersionCompare } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { formatTime } from '../components/report'
 
@@ -44,50 +45,56 @@ export function RecipeHistory() {
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6 overflow-hidden px-8 pb-8">
         <div className="min-h-0 overflow-y-auto">
-          <div className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
-            <div className="grid grid-cols-[70px_1fr_120px_130px] gap-3 border-b border-line-1 bg-canvas px-4 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-              <span>Loại</span>
-              <span>Công thức</span>
-              <span className="text-right">Giá vốn</span>
-              <span className="text-right">Người sửa</span>
-            </div>
-
-            {changes.isPending ? (
-              <p className="px-4 py-4 text-ink-mute">Đang tải…</p>
-            ) : rows.length === 0 ? (
-              <p className="px-4 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-                Chưa có phiên bản nào. Lịch sử bắt đầu từ lần lưu công thức tiếp theo — những công
-                thức khai trước khi màn này có mặt chưa có bản chụp nào để so.
-              </p>
-            ) : (
-              rows.map((row) => {
-                const delta =
-                  row.previousCostVnd === null ? null : row.costVnd - row.previousCostVnd
-                const active =
-                  selected?.kind === row.subjectKind && selected.id === row.subjectId
-                return (
-                  <button
-                    key={row.id}
-                    type="button"
-                    onClick={() =>
-                      setParams({ kind: row.subjectKind, id: row.subjectId }, { replace: true })
+          <DataTable
+            rows={rows}
+            rowKey={(row) => row.id}
+            loading={changes.isPending}
+            onRowClick={(row) =>
+              setParams({ kind: row.subjectKind, id: row.subjectId }, { replace: true })
+            }
+            empty="Chưa có phiên bản nào. Lịch sử bắt đầu từ lần lưu công thức tiếp theo — những công thức khai trước khi màn này có mặt chưa có bản chụp nào để so."
+            columns={[
+              {
+                key: 'kind',
+                header: 'Loại',
+                width: '70px',
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-c2)] text-ink-mute">
+                    {KIND_LABEL[row.subjectKind]}
+                  </span>
+                ),
+              },
+              {
+                key: 'subject',
+                header: 'Công thức',
+                width: 'minmax(180px, 1fr)',
+                cell: (row) => (
+                  <span
+                    className={
+                      selected?.kind === row.subjectKind && selected.id === row.subjectId
+                        ? 'text-accent-ink'
+                        : ''
                     }
-                    className={`grid w-full grid-cols-[70px_1fr_120px_130px] items-center gap-3 border-b border-line-1 px-4 py-2.5 text-left last:border-b-0 hover:bg-surface-3 ${
-                      active ? 'bg-surface-3' : ''
-                    }`}
                   >
-                    <span className="text-[length:var(--fs-c2)] text-ink-mute">
-                      {KIND_LABEL[row.subjectKind]}
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.subjectName}
                     </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                        {row.subjectName}
-                      </span>
-                      <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
-                        bản {row.version} · {row.lineCount} dòng · {formatTime(row.createdAt)}
-                      </span>
+                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                      bản {row.version} · {row.lineCount} dòng · {formatTime(row.createdAt)}
                     </span>
-                    <span className="text-right">
+                  </span>
+                ),
+              },
+              {
+                key: 'cost',
+                header: 'Giá vốn',
+                width: '130px',
+                align: 'right',
+                cell: (row) => {
+                  const delta =
+                    row.previousCostVnd === null ? null : row.costVnd - row.previousCostVnd
+                  return (
+                    <span>
                       <span className="block font-mono text-[length:var(--fs-b2)] text-ink-body">
                         {formatVnd(row.costVnd)}
                       </span>
@@ -100,19 +107,27 @@ export function RecipeHistory() {
                         </span>
                       ) : null}
                     </span>
-                    <span className="truncate text-right text-[length:var(--fs-c1)] text-ink-mute">
-                      {row.actorName ?? 'hệ thống'}
-                    </span>
-                  </button>
-                )
-              })
-            )}
-          </div>
+                  )
+                },
+              },
+              {
+                key: 'actor',
+                header: 'Người sửa',
+                width: '130px',
+                align: 'right',
+                cell: (row) => (
+                  <span className="truncate text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.actorName ?? 'hệ thống'}
+                  </span>
+                ),
+              },
+            ]}
+          />
 
           <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-            Giá vốn ở đây là giá MỘT PHẦN với món và MỘT MẺ với bán thành phẩm. Giá nguyên liệu
-            đổi không sinh phiên bản mới — nhập hàng không phải là sửa công thức, và nếu tính vào
-            thì mỗi lần nhập bò sẽ đẻ ra hàng chục dòng che hết những lần sửa thật.
+            Giá vốn ở đây là giá MỘT PHẦN với món và MỘT MẺ với bán thành phẩm. Giá nguyên liệu đổi
+            không sinh phiên bản mới — nhập hàng không phải là sửa công thức, và nếu tính vào thì
+            mỗi lần nhập bò sẽ đẻ ra hàng chục dòng che hết những lần sửa thật.
           </p>
         </div>
 
@@ -143,10 +158,7 @@ function VersionPanel({ kind, subjectId }: { kind: RecipeSubjectKind; subjectId:
   const versions = list.data.versions
   /** Mặc định so bản mới nhất với bản liền trước — câu hỏi hay gặp nhất */
   const chosen =
-    pair ??
-    (versions.length >= 2
-      ? { from: versions[1]!.version, to: versions[0]!.version }
-      : null)
+    pair ?? (versions.length >= 2 ? { from: versions[1]!.version, to: versions[0]!.version } : null)
 
   return (
     <section className="rounded-md border border-line-1 bg-surface-1">
@@ -252,7 +264,9 @@ function Diff({
   const { from, to, lines } = diff.data
   const delta = to.costVnd - from.costVnd
   // Đổi thứ tự dòng không phải là đổi công thức — dòng 'same' xuống cuối
-  const sorted = [...lines].sort((a, b) => Number(a.change === 'same') - Number(b.change === 'same'))
+  const sorted = [...lines].sort(
+    (a, b) => Number(a.change === 'same') - Number(b.change === 'same'),
+  )
 
   return (
     <>

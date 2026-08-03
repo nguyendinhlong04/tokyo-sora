@@ -3,6 +3,7 @@ import { Badge, ErrorState } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type PeriodChoice } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { PeriodComparator, formatDay, formatPercent } from '../components/report'
 import { DailyBars, MetricTile, SliceTable } from '../components/slices'
@@ -55,9 +56,17 @@ export function Revenue() {
         {data ? (
           <>
             <div className="mt-5 grid gap-3 lg:grid-cols-4">
-              <MetricTile label="Doanh thu" value={formatVnd(data.total.value)} delta={data.total} />
+              <MetricTile
+                label="Doanh thu"
+                value={formatVnd(data.total.value)}
+                delta={data.total}
+              />
               <MetricTile label="Số đơn" value={String(data.orders.value)} delta={data.orders} />
-              <MetricTile label="Lượt khách" value={String(data.guests.value)} delta={data.guests} />
+              <MetricTile
+                label="Lượt khách"
+                value={String(data.guests.value)}
+                delta={data.guests}
+              />
               <MetricTile
                 label="Bình quân mỗi khách"
                 value={formatVnd(data.perGuest.value)}
@@ -133,7 +142,11 @@ export function CostMargin() {
         {data ? (
           <>
             <div className="mt-5 grid gap-3 lg:grid-cols-4">
-              <MetricTile label="Doanh thu" value={formatVnd(data.revenue.value)} delta={data.revenue} />
+              <MetricTile
+                label="Doanh thu"
+                value={formatVnd(data.revenue.value)}
+                delta={data.revenue}
+              />
               <MetricTile
                 label="Giá vốn hàng bán"
                 value={formatVnd(data.cogs.value)}
@@ -147,7 +160,9 @@ export function CostMargin() {
               />
               <div
                 className={`rounded-md border px-5 py-4 ${
-                  data.foodCost.overTarget ? 'border-danger bg-surface-1' : 'border-line-1 bg-surface-1'
+                  data.foodCost.overTarget
+                    ? 'border-danger bg-surface-1'
+                    : 'border-line-1 bg-surface-1'
                 }`}
               >
                 <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
@@ -172,49 +187,80 @@ export function CostMargin() {
               </div>
             </div>
 
-            <section className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-              <h2 className="border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
-                Food cost từng ngày so với mục tiêu
-              </h2>
-              <div className="grid grid-cols-[120px_1fr_140px_140px_110px] gap-3 border-b border-line-1 px-5 py-2 text-[length:var(--fs-c2)] tracking-[0.1em] text-ink-mute uppercase">
-                <span>Ngày</span>
-                <span />
-                <span className="text-right">Doanh thu</span>
-                <span className="text-right">Giá vốn</span>
-                <span className="text-right">Food cost</span>
-              </div>
-              {data.daily.map((day) => (
-                <div
-                  key={day.day}
-                  className="grid grid-cols-[120px_1fr_140px_140px_110px] items-center gap-3 border-b border-line-1 px-5 py-2 last:border-b-0"
-                >
-                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                    {formatDay(day.day)}
-                  </span>
-                  <span className="h-2 overflow-hidden rounded-pill bg-surface-3">
-                    {day.foodCost !== null ? (
+            <div className="mt-5">
+              <DataTable
+                rows={data.daily}
+                rowKey={(day) => day.day}
+                paginate={false}
+                toolbar={
+                  <h2 className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+                    Food cost từng ngày so với mục tiêu
+                  </h2>
+                }
+                columns={[
+                  {
+                    key: 'day',
+                    header: 'Ngày',
+                    width: '120px',
+                    cell: (day) => (
+                      <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                        {formatDay(day.day)}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'bar',
+                    header: '',
+                    width: 'minmax(160px, 1fr)',
+                    cell: (day) => (
+                      <span className="block h-2 overflow-hidden rounded-pill bg-surface-3">
+                        {day.foodCost !== null ? (
+                          <span
+                            className={`block h-full rounded-pill ${day.overTarget ? 'bg-danger' : 'bg-ok'}`}
+                            style={{ width: `${Math.min(100, day.foodCost * 100)}%` }}
+                          />
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'revenue',
+                    header: 'Doanh thu',
+                    width: '150px',
+                    numeric: true,
+                    cell: (day) => (
+                      <span className="text-ink-body">{formatVnd(day.revenueVnd)}</span>
+                    ),
+                  },
+                  {
+                    key: 'cogs',
+                    header: 'Giá vốn',
+                    width: '150px',
+                    numeric: true,
+                    cell: (day) => <span className="text-ink-mute">{formatVnd(day.cogsVnd)}</span>,
+                  },
+                  {
+                    key: 'foodCost',
+                    header: 'Food cost',
+                    width: '120px',
+                    numeric: true,
+                    cell: (day) => (
                       <span
-                        className={`block h-full rounded-pill ${day.overTarget ? 'bg-danger' : 'bg-ok'}`}
-                        style={{ width: `${Math.min(100, day.foodCost * 100)}%` }}
-                      />
-                    ) : null}
-                  </span>
-                  <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                    {formatVnd(day.revenueVnd)}
-                  </span>
-                  <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                    {formatVnd(day.cogsVnd)}
-                  </span>
-                  <span
-                    className={`text-right font-mono text-[length:var(--fs-c1)] ${
-                      day.foodCost === null ? 'text-line-4' : day.overTarget ? 'text-danger' : 'text-ok'
-                    }`}
-                  >
-                    {day.foodCost === null ? '—' : formatPercent(day.foodCost)}
-                  </span>
-                </div>
-              ))}
-            </section>
+                        className={
+                          day.foodCost === null
+                            ? 'text-line-4'
+                            : day.overTarget
+                              ? 'text-danger'
+                              : 'text-ok'
+                        }
+                      >
+                        {day.foodCost === null ? '—' : formatPercent(day.foodCost)}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            </div>
 
             <section className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
               <h2 className="border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
@@ -230,7 +276,9 @@ export function CostMargin() {
                     key={row.key}
                     className="grid grid-cols-[1fr_140px_140px_150px_110px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
                   >
-                    <span className="truncate text-[length:var(--fs-b2)] text-ink-hi">{row.label}</span>
+                    <span className="truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.label}
+                    </span>
                     <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
                       {formatVnd(row.revenueVnd)}
                     </span>
@@ -315,7 +363,9 @@ export function SetsReport() {
                     key={row.dishId}
                     className="grid grid-cols-[1fr_110px_140px_140px_140px_110px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
                   >
-                    <span className="truncate text-[length:var(--fs-b2)] text-ink-hi">{row.name}</span>
+                    <span className="truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.name}
+                    </span>
                     <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
                       {row.sold} suất
                     </span>
@@ -340,7 +390,11 @@ export function SetsReport() {
               <MetricTile
                 label="Đơn có giảm giá"
                 value={`${data.discount.ordersWithDiscount}/${data.discount.ordersTotal}`}
-                hint={data.discount.rate === null ? 'chưa có đơn nào' : formatPercent(data.discount.rate)}
+                hint={
+                  data.discount.rate === null
+                    ? 'chưa có đơn nào'
+                    : formatPercent(data.discount.rate)
+                }
               />
               <MetricTile
                 label="Tiền đã giảm"
@@ -359,8 +413,8 @@ export function SetsReport() {
             </div>
 
             <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-              Hai ô bình quân cuối là câu hỏi thật của màn này: giảm giá có kéo đơn to lên không, hay
-              chỉ làm mỏng đơn vốn đã có. — {data.promotionsNote}
+              Hai ô bình quân cuối là câu hỏi thật của màn này: giảm giá có kéo đơn to lên không,
+              hay chỉ làm mỏng đơn vốn đã có. — {data.promotionsNote}
             </p>
           </>
         ) : null}

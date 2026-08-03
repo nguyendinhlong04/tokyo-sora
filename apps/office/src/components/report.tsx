@@ -1,5 +1,4 @@
 import { formatVnd } from '@sora/contracts'
-import type { ReactNode } from 'react'
 import type {
   BlockedTile,
   CompareKind,
@@ -8,6 +7,7 @@ import type {
   PeriodKind,
   ResolvedPeriod,
 } from '../api'
+import { DateInput, Field, SegmentedControl, Select } from './form'
 
 /**
  * Mảnh dùng chung của nhóm báo cáo.
@@ -68,29 +68,20 @@ export function PeriodComparator({
   return (
     <section className="flex flex-wrap items-end gap-x-6 gap-y-4 rounded-md border border-line-1 bg-surface-1 px-5 py-4">
       <Field label="Kỳ">
-        <div className="flex overflow-hidden rounded-sm border border-line-1">
-          {(Object.keys(PERIOD_LABELS) as PeriodKind[]).map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              onClick={() => onChange({ ...value, kind })}
-              className={`h-9 border-r border-line-1 px-3 text-[length:var(--fs-c1)] last:border-r-0 ${
-                value.kind === kind ? 'bg-surface-3 text-ink-hi' : 'text-ink-mute hover:text-ink-hi'
-              }`}
-            >
-              {PERIOD_LABELS[kind]}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={value.kind}
+          onChange={(kind) => onChange({ ...value, kind })}
+          options={(Object.keys(PERIOD_LABELS) as PeriodKind[]).map((kind) => ({
+            value: kind,
+            label: PERIOD_LABELS[kind],
+          }))}
+        />
       </Field>
 
       {value.kind === 'tuy-chon' ? (
         <>
           <Field label="Từ ngày">
-            <DateInput
-              value={value.from ?? ''}
-              onChange={(from) => onChange({ ...value, from })}
-            />
+            <DateInput value={value.from ?? ''} onChange={(from) => onChange({ ...value, from })} />
           </Field>
           <Field label="Đến ngày">
             <DateInput value={value.to ?? ''} onChange={(to) => onChange({ ...value, to })} />
@@ -106,17 +97,15 @@ export function PeriodComparator({
       )}
 
       <Field label="So với">
-        <select
+        <Select
           value={value.compare}
-          onChange={(e) => onChange({ ...value, compare: e.target.value as CompareKind })}
-          className="h-9 rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
-        >
-          {(Object.keys(COMPARE_LABELS) as CompareKind[]).map((kind) => (
-            <option key={kind} value={kind}>
-              {COMPARE_LABELS[kind]}
-            </option>
-          ))}
-        </select>
+          onChange={(compare) => onChange({ ...value, compare })}
+          options={(Object.keys(COMPARE_LABELS) as CompareKind[]).map((kind) => ({
+            value: kind,
+            label: COMPARE_LABELS[kind],
+          }))}
+          width={200}
+        />
       </Field>
 
       {resolved ? (
@@ -130,33 +119,12 @@ export function PeriodComparator({
   )
 }
 
-export function DateInput({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (next: string) => void
-}) {
-  return (
-    <input
-      type="date"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 rounded-sm border border-line-1 bg-canvas px-2.5 font-mono text-[length:var(--fs-b2)] text-ink-hi"
-    />
-  )
-}
-
-export function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
-        {label}
-      </span>
-      {children}
-    </label>
-  )
-}
+/**
+ * `Field` và `DateInput` đã dọn về `components/form.tsx` cùng phần còn lại của
+ * bộ ô nhập. Giữ lại đường xuất ở đây vì gần 40 màn đang import từ file này —
+ * đổi hết import chỉ để dời một dòng là churn không đọc được trong diff.
+ */
+export { DateInput, Field } from './form'
 
 // ---------------------------------------------------------------------------
 
@@ -188,7 +156,11 @@ export function DeltaChip({
       <span className="text-ink-mute">{label}</span>
       <span className={`font-mono ${tone}`}>
         {flat ? '=' : up ? '▲' : '▼'}
-        {delta.percent === null ? (delta.value === 0 ? ' —' : ' mới') : ` ${formatPercent(delta.percent)}`}
+        {delta.percent === null
+          ? delta.value === 0
+            ? ' —'
+            : ' mới'
+          : ` ${formatPercent(delta.percent)}`}
       </span>
     </span>
   )

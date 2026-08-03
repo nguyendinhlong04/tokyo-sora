@@ -80,8 +80,8 @@ export function Sets() {
 
         <p className="mt-5 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Lịch bán được cưỡng chế ở cửa gọi món: hết khung giờ thì POS, Table và đơn online đều bị
-          từ chối kèm lý do, và thực đơn online tự ẩn món. Bàn phím POS vẫn hiện set ngoài giờ —
-          nó đọc cấu hình đã cache, nên chỗ chặn là lúc bấm chứ chưa phải lúc nhìn.
+          từ chối kèm lý do, và thực đơn online tự ẩn món. Bàn phím POS vẫn hiện set ngoài giờ — nó
+          đọc cấu hình đã cache, nên chỗ chặn là lúc bấm chứ chưa phải lúc nhìn.
         </p>
       </div>
 
@@ -93,9 +93,7 @@ export function Sets() {
         />
       ) : null}
 
-      {scheduling ? (
-        <ScheduleDialog set={scheduling} onClose={() => setScheduling(null)} />
-      ) : null}
+      {scheduling ? <ScheduleDialog set={scheduling} onClose={() => setScheduling(null)} /> : null}
     </>
   )
 }
@@ -115,7 +113,9 @@ function SetCard({
   const known = set.unknownDishes.length === 0
 
   return (
-    <section className={`rounded-md border border-line-1 bg-surface-1 ${set.active ? '' : 'opacity-60'}`}>
+    <section
+      className={`rounded-md border border-line-1 bg-surface-1 ${set.active ? '' : 'opacity-60'}`}
+    >
       <header className="flex flex-wrap items-start gap-4 border-b border-line-1 px-5 py-4">
         <div className="min-w-0">
           <p className="text-[length:var(--fs-b1)] text-ink-hi">
@@ -360,8 +360,7 @@ function ScheduleDialog({ set, onClose }: { set: SetOverviewRow; onClose: () => 
         </div>
 
         <div className="mt-6 flex items-center gap-2">
-          <button
-            type="button"
+          <Button
             onClick={() =>
               setDraft({
                 saleFrom: null,
@@ -371,10 +370,10 @@ function ScheduleDialog({ set, onClose }: { set: SetOverviewRow; onClose: () => 
                 saleEndMinute: null,
               })
             }
-            className="h-9 rounded-sm border border-line-3 px-3 text-[length:var(--fs-c1)] text-ink-mute hover:text-ink-body"
+            size="sm"
           >
             Bỏ mọi giới hạn
-          </button>
+          </Button>
           <div className="ml-auto flex gap-2">
             <Button onClick={onClose}>Đóng</Button>
             <Button variant="primary" disabled={save.isPending} onClick={() => save.mutate()}>

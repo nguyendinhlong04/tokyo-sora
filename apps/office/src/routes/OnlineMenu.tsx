@@ -1,9 +1,11 @@
+import { Toggle } from '../components/form'
 import { formatVnd } from '@sora/contracts'
 import { Button, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, type DishRow, type ParameterRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { useSession } from '../session-context'
 
@@ -50,7 +52,11 @@ export function OnlineMenu() {
   const fail = (err: Error) => toast(err.message, 'danger')
 
   const setOverride = useMutation({
-    mutationFn: (input: { dish: DishRow; onlineVisible?: boolean | null; onlinePrice?: number | null }) =>
+    mutationFn: (input: {
+      dish: DishRow
+      onlineVisible?: boolean | null
+      onlinePrice?: number | null
+    }) =>
       api.setDishOverride(input.dish.id, branchId!, {
         price: input.dish.override?.price ?? null,
         active: input.dish.override?.active ?? null,
@@ -123,78 +129,100 @@ export function OnlineMenu() {
           </p>
         </section>
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[1fr_130px_150px_150px_130px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Món</span>
-            <span className="text-center">Bán online</span>
-            <span className="text-right">Giá tại quán</span>
-            <span className="text-right">Giá online</span>
-            <span className="text-right">Nguồn</span>
-          </div>
-
-          {dishes.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : (
-            rows.map((dish) => (
-              <div
-                key={dish.id}
-                className="grid grid-cols-[1fr_130px_150px_150px_130px] items-center gap-3 border-b border-line-1 px-5 py-2.5"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-[length:var(--fs-b2)] text-ink-hi">{dish.nameVi}</p>
-                  <p className="mt-0.5 font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                    {dish.code}
-                  </p>
-                </div>
-
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    disabled={!mayEdit || setOverride.isPending}
-                    onClick={() =>
-                      setOverride.mutate({ dish, onlineVisible: !dish.effectiveOnlineVisible })
-                    }
-                    className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-                      dish.effectiveOnlineVisible
-                        ? 'border-ok text-ok'
-                        : 'border-line-3 text-ink-mute'
-                    }`}
-                  >
-                    {dish.effectiveOnlineVisible ? 'Đang bán' : 'Đang tắt'}
-                  </button>
-                </div>
-
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-mute">
-                  {formatVnd(dish.effectivePrice)}
-                </span>
-
-                <div className="flex justify-end">
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    disabled={!mayEdit}
-                    defaultValue={dish.override?.onlinePrice ?? dish.onlinePrice ?? ''}
-                    placeholder={String(dish.effectivePrice)}
-                    onBlur={(e) => {
-                      const raw = e.target.value.trim()
-                      const next = raw === '' ? null : Number(raw)
-                      if (next !== (dish.override?.onlinePrice ?? dish.onlinePrice ?? null)) {
-                        setOverride.mutate({ dish, onlinePrice: next })
+        <div className="mt-5">
+          <DataTable
+            rows={rows}
+            rowKey={(dish) => dish.id}
+            loading={dishes.isPending}
+            empty="Không có món nào khớp bộ lọc."
+            columns={[
+              {
+                key: 'dish',
+                header: 'Món',
+                width: 'minmax(220px, 1fr)',
+                cell: (dish) => (
+                  <span className="min-w-0">
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {dish.nameVi}
+                    </span>
+                    <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                      {dish.code}
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: 'visible',
+                header: 'Bán online',
+                width: '140px',
+                align: 'center',
+                cell: (dish) => (
+                  <span className="flex justify-center">
+                    <Toggle
+                      disabled={!mayEdit || setOverride.isPending}
+                      onChange={() =>
+                        setOverride.mutate({ dish, onlineVisible: !dish.effectiveOnlineVisible })
                       }
-                    }}
-                    className="h-9 w-[130px] rounded-sm border border-line-1 bg-canvas px-2.5 text-right font-mono text-[length:var(--fs-b2)] text-ink-hi"
-                  />
-                </div>
-
-                <span className="text-right text-[length:var(--fs-c1)] text-ink-mute">
-                  {dish.override?.onlinePrice != null || dish.override?.onlineVisible != null
-                    ? 'Riêng chi nhánh'
-                    : 'Toàn chuỗi'}
-                </span>
-              </div>
-            ))
-          )}
+                      on={dish.effectiveOnlineVisible}
+                      tone="ok"
+                    >
+                      {dish.effectiveOnlineVisible ? 'Đang bán' : 'Đang tắt'}
+                    </Toggle>
+                  </span>
+                ),
+              },
+              {
+                key: 'price',
+                header: 'Giá tại quán',
+                width: '150px',
+                numeric: true,
+                cell: (dish) => (
+                  <span className="text-[length:var(--fs-b2)] text-ink-mute">
+                    {formatVnd(dish.effectivePrice)}
+                  </span>
+                ),
+              },
+              {
+                key: 'onlinePrice',
+                header: 'Giá online',
+                width: '160px',
+                align: 'right',
+                cell: (dish) => (
+                  <span className="flex justify-end">
+                    <input
+                      type="number"
+                      min={0}
+                      step={1000}
+                      disabled={!mayEdit}
+                      defaultValue={dish.override?.onlinePrice ?? dish.onlinePrice ?? ''}
+                      placeholder={String(dish.effectivePrice)}
+                      onBlur={(e) => {
+                        const raw = e.target.value.trim()
+                        const next = raw === '' ? null : Number(raw)
+                        if (next !== (dish.override?.onlinePrice ?? dish.onlinePrice ?? null)) {
+                          setOverride.mutate({ dish, onlinePrice: next })
+                        }
+                      }}
+                      className="h-9 w-[130px] rounded-sm border border-line-1 bg-canvas px-2.5 text-right font-mono text-[length:var(--fs-b2)] text-ink-hi"
+                    />
+                  </span>
+                ),
+              },
+              {
+                key: 'source',
+                header: 'Nguồn',
+                width: '140px',
+                align: 'right',
+                cell: (dish) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                    {dish.override?.onlinePrice != null || dish.override?.onlineVisible != null
+                      ? 'Riêng chi nhánh'
+                      : 'Toàn chuỗi'}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[720px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">

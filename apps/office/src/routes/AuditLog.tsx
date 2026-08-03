@@ -2,8 +2,10 @@ import { Button, ErrorState } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type AuditRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Field, formatTime } from '../components/report'
+import { Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 /**
@@ -53,10 +55,12 @@ export function AuditLog() {
   })
 
   /** Đổi bộ lọc là quay về trang đầu — con trỏ cũ thuộc về tập kết quả khác */
-  const reset = <T,>(set: (v: T) => void) => (value: T) => {
-    setCursors([])
-    set(value)
-  }
+  const reset =
+    <T,>(set: (v: T) => void) =>
+    (value: T) => {
+      setCursors([])
+      set(value)
+    }
 
   const rows = page.data?.rows ?? []
 
@@ -107,20 +111,17 @@ export function AuditLog() {
           </Field>
 
           <Field label="Phạm vi">
-            <button
-              type="button"
-              onClick={() => {
+            <Toggle
+              onChange={() => {
                 setCursors([])
                 setActorId('')
                 setAction('')
                 setAllBranches(!allBranches)
               }}
-              className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-                allBranches ? 'border-accent text-accent-ink' : 'border-line-3 text-ink-mute'
-              }`}
+              on={allBranches}
             >
               {allBranches ? 'Cả chuỗi' : `Chi nhánh ${branchId ?? ''}`}
-            </button>
+            </Toggle>
           </Field>
         </section>
 
@@ -130,24 +131,78 @@ export function AuditLog() {
           </div>
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[150px_170px_1fr_190px_60px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Lúc</span>
-            <span>Ai</span>
-            <span>Hành động</span>
-            <span>Đối tượng</span>
-            <span>Chi nhánh</span>
-          </div>
-
-          {page.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : rows.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Không có thao tác nào khớp bộ lọc trong khoảng này.
-            </p>
-          ) : (
-            rows.map((row) => <AuditLine key={row.id} row={row} />)
-          )}
+        <div className="mt-5">
+          {/* `paginate={false}`: màn này đã có phân trang CURSOR phía máy chủ ở dưới
+              — cắt thêm một lần ở trình duyệt là hai bộ đếm trang chọi nhau. */}
+          <DataTable
+            rows={rows}
+            rowKey={(row) => row.id}
+            paginate={false}
+            loading={page.isPending}
+            empty="Không có thao tác nào khớp bộ lọc trong khoảng này."
+            renderDetail={(row) =>
+              row.payload === null || row.payload === undefined ? null : (
+                <pre className="overflow-x-auto font-mono text-[length:var(--fs-c2)] leading-relaxed text-ink-body">
+                  {JSON.stringify(row.payload, null, 2)}
+                </pre>
+              )
+            }
+            columns={[
+              {
+                key: 'at',
+                header: 'Lúc',
+                width: '150px',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    {formatStamp(row.createdAt)}
+                  </span>
+                ),
+              },
+              {
+                key: 'actor',
+                header: 'Ai',
+                width: '170px',
+                cell: (row) => (
+                  <span className="truncate text-[length:var(--fs-c1)] text-ink-body">
+                    {row.actorName ?? actorFallback(row)}
+                  </span>
+                ),
+              },
+              {
+                key: 'action',
+                header: 'Hành động',
+                width: 'minmax(220px, 1fr)',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-hi">
+                    {row.action}
+                    {row.payload !== null && row.payload !== undefined ? (
+                      <span className="ml-2 text-ink-mute">▸</span>
+                    ) : null}
+                  </span>
+                ),
+              },
+              {
+                key: 'entity',
+                header: 'Đối tượng',
+                width: '190px',
+                cell: (row) => (
+                  <span className="truncate font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.entity} #{row.entityId}
+                  </span>
+                ),
+              },
+              {
+                key: 'branch',
+                header: 'Chi nhánh',
+                width: '110px',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.branchId ?? '—'}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <div className="mt-4 flex items-center gap-3">
@@ -166,47 +221,6 @@ export function AuditLog() {
         </div>
       </div>
     </>
-  )
-}
-
-function AuditLine({ row }: { row: AuditRow }) {
-  const [open, setOpen] = useState(false)
-  const hasPayload = row.payload !== null && row.payload !== undefined
-
-  return (
-    <div className="border-b border-line-1 last:border-b-0">
-      <div className="grid grid-cols-[150px_170px_1fr_190px_60px] items-baseline gap-3 px-5 py-2.5">
-        <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-          {formatStamp(row.createdAt)}
-        </span>
-        <span className="min-w-0 truncate text-[length:var(--fs-c1)] text-ink-body">
-          {row.actorName ?? actorFallback(row)}
-        </span>
-        <span className="min-w-0">
-          <button
-            type="button"
-            disabled={!hasPayload}
-            onClick={() => setOpen(!open)}
-            className="text-left font-mono text-[length:var(--fs-c1)] text-ink-hi disabled:cursor-default"
-          >
-            {row.action}
-            {hasPayload ? <span className="ml-2 text-ink-mute">{open ? '▾' : '▸'}</span> : null}
-          </button>
-        </span>
-        <span className="min-w-0 truncate font-mono text-[length:var(--fs-c1)] text-ink-mute">
-          {row.entity} #{row.entityId}
-        </span>
-        <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-          {row.branchId ?? '—'}
-        </span>
-      </div>
-
-      {open && hasPayload ? (
-        <pre className="mx-5 mb-3 overflow-x-auto rounded-sm border border-line-1 bg-canvas px-4 py-3 font-mono text-[length:var(--fs-c2)] leading-relaxed text-ink-body">
-          {JSON.stringify(row.payload, null, 2)}
-        </pre>
-      ) : null}
-    </div>
   )
 }
 

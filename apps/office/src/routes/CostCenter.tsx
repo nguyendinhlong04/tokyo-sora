@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { api, type PayMethod } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Field, formatDay, formatPercent } from '../components/report'
 import { useSession } from '../session-context'
@@ -81,60 +82,78 @@ export function ExpenseOverview() {
               </p>
             ) : null}
 
-            {data.lines.length === 0 ? (
-              <p className="mt-5 text-[length:var(--fs-b2)] text-ink-mute">
-                Tháng này chưa có khoản chi nào.{' '}
-                <Link to="/chi-phi" className="text-accent-ink">
-                  Ghi phiếu chi đầu tiên
-                </Link>
-                .
-              </p>
-            ) : (
-              <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-                <div className="grid grid-cols-[1fr_180px_150px_150px_160px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-                  <span>Khoản mục</span>
-                  <span>Tỉ trọng</span>
-                  <span className="text-right">Tháng này</span>
-                  <span className="text-right">Tháng trước</span>
-                  <span className="text-right">Ngân sách</span>
-                </div>
-
-                {data.lines.map((line) => {
-                  const share = data.totalVnd === 0 ? 0 : line.amountVnd / data.totalVnd
-                  return (
-                    <div
-                      key={line.categoryId}
-                      className="grid grid-cols-[1fr_180px_150px_150px_160px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
-                    >
+            <div className="mt-5">
+              <DataTable
+                rows={data.lines}
+                rowKey={(line) => line.categoryId}
+                paginate={false}
+                empty="Tháng này chưa có khoản chi nào."
+                columns={[
+                  {
+                    key: 'name',
+                    header: 'Khoản mục',
+                    width: 'minmax(200px, 1fr)',
+                    cell: (line) => (
                       <span className="truncate text-[length:var(--fs-b2)] text-ink-hi">
                         {line.name}
                       </span>
-
-                      <span className="block">
-                        <span className="block h-2 w-full overflow-hidden rounded-pill bg-surface-3">
-                          <span
-                            className={`block h-full rounded-pill ${
-                              line.overBudget ? 'bg-danger' : 'bg-accent'
-                            }`}
-                            style={{ width: `${Math.min(100, share * 100)}%` }}
-                          />
+                    ),
+                  },
+                  {
+                    key: 'share',
+                    header: 'Tỉ trọng',
+                    width: '180px',
+                    cell: (line) => {
+                      const share = data.totalVnd === 0 ? 0 : line.amountVnd / data.totalVnd
+                      return (
+                        <span className="block">
+                          <span className="block h-2 w-full overflow-hidden rounded-pill bg-surface-3">
+                            <span
+                              className={`block h-full rounded-pill ${
+                                line.overBudget ? 'bg-danger' : 'bg-accent'
+                              }`}
+                              style={{ width: `${Math.min(100, share * 100)}%` }}
+                            />
+                          </span>
+                          <span className="mt-1 block text-[length:var(--fs-c2)] text-ink-mute">
+                            {formatPercent(share).replace('+', '')} tổng chi
+                          </span>
                         </span>
-                        <span className="mt-1 block text-[length:var(--fs-c2)] text-ink-mute">
-                          {formatPercent(share).replace('+', '')} tổng chi
-                        </span>
-                      </span>
-
+                      )
+                    },
+                  },
+                  {
+                    key: 'amount',
+                    header: 'Tháng này',
+                    width: '150px',
+                    numeric: true,
+                    cell: (line) => (
                       <span
-                        className={`text-right font-mono text-[length:var(--fs-b2)] ${
+                        className={`text-[length:var(--fs-b2)] ${
                           line.overBudget ? 'text-danger' : 'text-ink-hi'
                         }`}
                       >
                         {formatVnd(line.amountVnd)}
                       </span>
-                      <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    ),
+                  },
+                  {
+                    key: 'previous',
+                    header: 'Tháng trước',
+                    width: '150px',
+                    numeric: true,
+                    cell: (line) => (
+                      <span className="text-ink-mute">
                         {line.previousVnd === 0 ? '—' : formatVnd(line.previousVnd)}
                       </span>
-
+                    ),
+                  },
+                  {
+                    key: 'budget',
+                    header: 'Ngân sách',
+                    width: '170px',
+                    align: 'right',
+                    cell: (line) => (
                       <span className="flex justify-end">
                         {mayBudget ? (
                           <input
@@ -155,11 +174,11 @@ export function ExpenseOverview() {
                           </span>
                         )}
                       </span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                    ),
+                  },
+                ]}
+              />
+            </div>
 
             <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
               Ba ngưỡng đang áp: chi vặt {formatVnd(data.thresholds.pettyCashVnd)} · chủ duyệt từ{' '}
@@ -241,58 +260,77 @@ export function RecurringExpenses() {
           />
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[1fr_180px_130px_150px_130px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Khoản</span>
-            <span>Khoản mục</span>
-            <span>Sinh ngày</span>
-            <span className="text-right">Dự kiến</span>
-            <span>Hình thức</span>
-          </div>
-
-          {rows.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : list.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa khai khoản định kỳ nào.
-            </p>
-          ) : (
-            list.map(({ recurring, categoryName }) => (
-              <div
-                key={recurring.id}
-                className={`grid grid-cols-[1fr_180px_130px_150px_130px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                  recurring.active ? '' : 'opacity-60'
-                }`}
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                    {recurring.name}
-                  </span>
-                  {recurring.supplier ? (
-                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
-                      {recurring.supplier}
+        <div className="mt-5">
+          <DataTable
+            rows={list}
+            rowKey={({ recurring }) => recurring.id}
+            loading={rows.isPending}
+            empty="Chưa khai khoản định kỳ nào."
+            columns={[
+              {
+                key: 'name',
+                header: 'Khoản',
+                width: 'minmax(200px, 1fr)',
+                cell: ({ recurring }) => (
+                  <span className={recurring.active ? '' : 'opacity-60'}>
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {recurring.name}
                     </span>
-                  ) : null}
-                </span>
-                <span className="text-[length:var(--fs-c1)] text-ink-body">{categoryName}</span>
-                <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                  ngày {recurring.dayOfMonth}
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
-                  {formatVnd(recurring.expectedVnd)}
-                </span>
-                <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                  {recurring.method === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}
-                </span>
-              </div>
-            ))
-          )}
+                    {recurring.supplier ? (
+                      <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                        {recurring.supplier}
+                      </span>
+                    ) : null}
+                  </span>
+                ),
+              },
+              {
+                key: 'category',
+                header: 'Khoản mục',
+                width: '180px',
+                cell: ({ categoryName }) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-body">{categoryName}</span>
+                ),
+              },
+              {
+                key: 'day',
+                header: 'Sinh ngày',
+                width: '130px',
+                cell: ({ recurring }) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    ngày {recurring.dayOfMonth}
+                  </span>
+                ),
+              },
+              {
+                key: 'expected',
+                header: 'Dự kiến',
+                width: '150px',
+                numeric: true,
+                cell: ({ recurring }) => (
+                  <span className="text-[length:var(--fs-b2)] text-ink-hi">
+                    {formatVnd(recurring.expectedVnd)}
+                  </span>
+                ),
+              },
+              {
+                key: 'method',
+                header: 'Hình thức',
+                width: '140px',
+                cell: ({ recurring }) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                    {recurring.method === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Phiếu sinh ra mang số DỰ KIẾN và ở trạng thái nháp: điện nước biến động nên phải điền số
-          thật rồi mới duyệt. Chưa có bộ hẹn giờ chạy nền, nên hằng tháng phải bấm nút sinh —
-          nút đó chạy lại bao nhiêu lần cũng không tạo phiếu trùng.
+          thật rồi mới duyệt. Chưa có bộ hẹn giờ chạy nền, nên hằng tháng phải bấm nút sinh — nút đó
+          chạy lại bao nhiêu lần cũng không tạo phiếu trùng.
         </p>
       </div>
     </>
@@ -468,79 +506,104 @@ export function Assets() {
           />
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[1fr_120px_130px_140px_140px_140px_100px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Tài sản</span>
-            <span>Dùng từ</span>
-            <span className="text-right">Khấu hao</span>
-            <span className="text-right">Nguyên giá</span>
-            <span className="text-right">Đã khấu hao</span>
-            <span className="text-right">Còn lại</span>
-            <span />
-          </div>
-
-          {rows.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : list.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa ghi nhận tài sản nào. Mua thiết bị từ ngưỡng tài sản trở lên thì ghi ở đây thay
-              vì ghi phiếu chi.
-            </p>
-          ) : (
-            list.map((asset) => (
-              <div
-                key={asset.id}
-                className={`grid grid-cols-[1fr_120px_130px_140px_140px_140px_100px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                  asset.retiredOn ? 'opacity-60' : ''
-                }`}
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                    {asset.name}
-                    {asset.retiredOn ? (
-                      <span className="ml-2 text-[length:var(--fs-c2)] text-ink-mute">
-                        thanh lý {formatDay(asset.retiredOn)}
-                      </span>
-                    ) : null}
+        <div className="mt-5">
+          <DataTable
+            rows={list}
+            rowKey={(asset) => asset.id}
+            loading={rows.isPending}
+            empty="Chưa ghi nhận tài sản nào. Mua thiết bị từ ngưỡng tài sản trở lên thì ghi ở đây thay vì ghi phiếu chi."
+            columns={[
+              {
+                key: 'name',
+                header: 'Tài sản',
+                width: 'minmax(200px, 1fr)',
+                cell: (asset) => (
+                  <span className={asset.retiredOn ? 'opacity-60' : ''}>
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {asset.name}
+                      {asset.retiredOn ? (
+                        <span className="ml-2 text-[length:var(--fs-c2)] text-ink-mute">
+                          thanh lý {formatDay(asset.retiredOn)}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                      {asset.depreciationMonths} tháng đường thẳng
+                    </span>
                   </span>
-                  <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
-                    {asset.depreciationMonths} tháng đường thẳng
+                ),
+              },
+              {
+                key: 'from',
+                header: 'Dùng từ',
+                width: '120px',
+                cell: (asset) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                    {formatDay(asset.inServiceFrom)}
                   </span>
-                </span>
-                <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                  {formatDay(asset.inServiceFrom)}
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
-                  {formatVnd(asset.monthlyVnd)}/th
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-body">
-                  {formatVnd(asset.costVnd)}
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                  {formatVnd(asset.accumulatedVnd)}
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
-                  {formatVnd(asset.remainingVnd)}
-                </span>
-                <span className="flex justify-end">
-                  {asset.retiredOn ? null : (
-                    <button
-                      type="button"
-                      onClick={() => retire.mutate(asset.id)}
-                      className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-mute hover:text-danger"
-                    >
-                      Thanh lý
-                    </button>
-                  )}
-                </span>
-              </div>
-            ))
-          )}
+                ),
+              },
+              {
+                key: 'monthly',
+                header: 'Khấu hao',
+                width: '140px',
+                numeric: true,
+                cell: (asset) => (
+                  <span className="text-ink-body">{formatVnd(asset.monthlyVnd)}/th</span>
+                ),
+              },
+              {
+                key: 'cost',
+                header: 'Nguyên giá',
+                width: '140px',
+                numeric: true,
+                cell: (asset) => (
+                  <span className="text-[length:var(--fs-b2)] text-ink-body">
+                    {formatVnd(asset.costVnd)}
+                  </span>
+                ),
+              },
+              {
+                key: 'accumulated',
+                header: 'Đã khấu hao',
+                width: '140px',
+                numeric: true,
+                cell: (asset) => (
+                  <span className="text-ink-mute">{formatVnd(asset.accumulatedVnd)}</span>
+                ),
+              },
+              {
+                key: 'remaining',
+                header: 'Còn lại',
+                width: '140px',
+                numeric: true,
+                cell: (asset) => (
+                  <span className="text-[length:var(--fs-b2)] text-ink-hi">
+                    {formatVnd(asset.remainingVnd)}
+                  </span>
+                ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                width: '130px',
+                cell: (asset) => (
+                  <span className="flex justify-end">
+                    {asset.retiredOn ? null : (
+                      <Button onClick={() => retire.mutate(asset.id)} size="sm" variant="danger">
+                        Thanh lý
+                      </Button>
+                    )}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-          Khấu hao đi thẳng vào sổ chi phí, không qua phiếu chi — nó là chi phí mà không có đồng
-          nào rời két, nên chỉ xuất hiện ở chế độ dồn tích của{' '}
+          Khấu hao đi thẳng vào sổ chi phí, không qua phiếu chi — nó là chi phí mà không có đồng nào
+          rời két, nên chỉ xuất hiện ở chế độ dồn tích của{' '}
           <Link to="/lai-lo" className="text-accent-ink">
             F7 · Lãi / Lỗ
           </Link>

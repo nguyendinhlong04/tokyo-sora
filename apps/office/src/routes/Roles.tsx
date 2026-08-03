@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { api, type RoleAssignments } from '../api'
 import { PageHeader } from '../components/PageHeader'
+import { SegmentedControl } from '../components/form'
 
 /**
  * A2 — Vai trò & quyền.
@@ -27,7 +28,11 @@ import { PageHeader } from '../components/PageHeader'
 
 const PERMISSION_MARK: Record<Permission, { mark: string; className: string; title: string }> = {
   allow: { mark: '✓', className: 'text-ok', title: 'Làm được ngay' },
-  approve: { mark: '△', className: 'text-warn', title: 'Làm được nhưng phải có người khác duyệt bằng PIN' },
+  approve: {
+    mark: '△',
+    className: 'text-warn',
+    title: 'Làm được nhưng phải có người khác duyệt bằng PIN',
+  },
   deny: { mark: '–', className: 'text-line-4', title: 'Không được phép' },
 }
 
@@ -35,7 +40,11 @@ const PERMISSION_MARK: Record<Permission, { mark: string; className: string; tit
 const GROUPS: { label: string; test: (action: ActionKey) => boolean }[] = [
   {
     label: 'Nhân sự (§4.2b)',
-    test: (a) => a.startsWith('staff.') || a.startsWith('schedule.') || a.startsWith('timesheet.') || a.startsWith('payroll.'),
+    test: (a) =>
+      a.startsWith('staff.') ||
+      a.startsWith('schedule.') ||
+      a.startsWith('timesheet.') ||
+      a.startsWith('payroll.'),
   },
   {
     label: 'Chi phí, tài sản & Lãi/Lỗ (§4.2b)',
@@ -64,25 +73,15 @@ export function Roles() {
         title="Vai trò & quyền"
         subtitle="Ma trận §4.2 dựng thành lưới. Đọc chứ không sửa: quyền là bản thiết kế, sửa quyền là sửa bản thiết kế rồi triển khai lại."
         action={
-          <div className="flex overflow-hidden rounded-sm border border-line-1">
-            {(
-              [
-                ['matrix', 'Ma trận quyền'],
-                ['scope', 'Hạn mức & phạm vi'],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTab(key)}
-                className={`h-[var(--hit-target)] border-r border-line-1 px-4 text-[length:var(--fs-b2)] last:border-r-0 ${
-                  tab === key ? 'bg-surface-3 text-ink-hi' : 'text-ink-mute hover:text-ink-hi'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            size="md"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'matrix', label: 'Ma trận quyền' },
+              { value: 'scope', label: 'Hạn mức & phạm vi' },
+            ]}
+          />
         }
       />
 
@@ -229,9 +228,14 @@ function ScopeTab({ data }: { data: RoleAssignments }) {
                       <span className="font-mono text-ink-mute">{role.code}</span>{' '}
                       <span className="text-ink-hi">{role.label}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-ink-body">{discountLabel(role.code as Role)}</td>
                     <td className="px-4 py-2.5 text-ink-body">
-                      {expenseLabel(limitOf(role.code as Role, 'expense.record-over-limit'), limitOf(role.code as Role, 'expense.record-petty'))}
+                      {discountLabel(role.code as Role)}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-body">
+                      {expenseLabel(
+                        limitOf(role.code as Role, 'expense.record-over-limit'),
+                        limitOf(role.code as Role, 'expense.record-petty'),
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
                       {holders.length === 0 ? (
@@ -261,9 +265,9 @@ function ScopeTab({ data }: { data: RoleAssignments }) {
         <Badge tone="info">Con số hạn mức nằm ở A6</Badge>
         <p className="max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Hạn mức chi vặt, ngưỡng chủ duyệt và ngưỡng ghi nhận tài sản là ba tham số
-          <span className="font-mono"> expense.* </span>
-          ở Trung tâm tham số — sửa ở đó, cả hệ thống đổi theo. Bảng này chỉ nói vai trò nào rơi vào
-          bước nào của luồng, vì đó là thứ ma trận quyết định chứ không phải con số.
+          <span className="font-mono"> expense.* </span>ở Trung tâm tham số — sửa ở đó, cả hệ thống
+          đổi theo. Bảng này chỉ nói vai trò nào rơi vào bước nào của luồng, vì đó là thứ ma trận
+          quyết định chứ không phải con số.
         </p>
       </div>
     </>

@@ -3,6 +3,7 @@ import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type CustomerRow } from '../api'
+import { Pagination, usePaged } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field, formatDay } from '../components/report'
 import { useSession } from '../session-context'
@@ -37,6 +38,7 @@ export function Customers() {
   })
 
   const rows = customers.data ?? []
+  const paged = usePaged(rows, 25, search)
 
   return (
     <>
@@ -75,7 +77,7 @@ export function Customers() {
                 : 'Sổ khách còn trống. Hồ sơ đầu tiên xuất hiện khi có đặt bàn, đơn online, hoặc bill thu tiền có số điện thoại.'}
             </p>
           ) : (
-            rows.map((row) => (
+            paged.visible.map((row) => (
               <CustomerCard
                 key={row.id}
                 row={row}
@@ -84,6 +86,7 @@ export function Customers() {
               />
             ))
           )}
+          <Pagination {...paged.controls} />
         </div>
       </div>
     </>
@@ -114,9 +117,7 @@ function CustomerCard({
 
         <span className="text-[length:var(--fs-c1)] text-ink-body">
           {row.visits} lượt
-          <span className="mt-0.5 block text-ink-mute">
-            gần nhất {formatDay(row.lastSeenOn)}
-          </span>
+          <span className="mt-0.5 block text-ink-mute">gần nhất {formatDay(row.lastSeenOn)}</span>
         </span>
 
         <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-hi">
@@ -144,13 +145,9 @@ function CustomerCard({
         </span>
 
         <span className="flex justify-end">
-          <button
-            type="button"
-            onClick={onToggle}
-            className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-          >
+          <Button onClick={onToggle} size="sm">
             {open ? 'Thu' : 'Hồ sơ'}
-          </button>
+          </Button>
         </span>
       </div>
 
@@ -219,8 +216,7 @@ function CustomerDetail({ id }: { id: number }) {
           </button>
         ))}
         {tab === 'ho-so' && mayEdit && !edit ? (
-          <button
-            type="button"
+          <Button
             onClick={() =>
               setEdit({
                 name: data.name ?? '',
@@ -228,10 +224,11 @@ function CustomerDetail({ id }: { id: number }) {
                 note: data.note ?? '',
               })
             }
-            className="ml-auto h-8 rounded-sm border border-line-3 px-3 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
+            size="sm"
+            className="ml-auto"
           >
             Sửa
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -258,7 +255,11 @@ function CustomerDetail({ id }: { id: number }) {
               </Field>
               <div className="flex gap-2 lg:col-span-3">
                 <Button onClick={() => setEdit(null)}>Bỏ</Button>
-                <Button variant="primary" disabled={save.isPending} onClick={() => save.mutate(edit)}>
+                <Button
+                  variant="primary"
+                  disabled={save.isPending}
+                  onClick={() => save.mutate(edit)}
+                >
                   Lưu
                 </Button>
               </div>
@@ -356,10 +357,7 @@ function CustomerDetail({ id }: { id: number }) {
           <div className="mt-4 grid gap-4 lg:grid-cols-4">
             <InfoBlock label="Số dư điểm" value={`${data.loyalty.balance} điểm`} />
             <InfoBlock label="Hạng hiện tại" value={data.loyalty.tierLabel} />
-            <InfoBlock
-              label="Chi tiêu 12 tháng trượt"
-              value={formatVnd(data.spend12MonthsVnd)}
-            />
+            <InfoBlock label="Chi tiêu 12 tháng trượt" value={formatVnd(data.spend12MonthsVnd)} />
             <InfoBlock
               label="Lên hạng tiếp theo"
               value={
@@ -415,13 +413,13 @@ function CustomerDetail({ id }: { id: number }) {
                 </Button>
               </div>
             ) : (
-              <button
-                type="button"
+              <Button
                 onClick={() => setAdjust({ points: '', reason: '' })}
-                className="mt-4 h-8 rounded-sm border border-line-3 px-3 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
+                size="sm"
+                className="mt-4"
               >
                 Điều chỉnh điểm tay
-              </button>
+              </Button>
             )
           ) : null}
 
@@ -444,8 +442,7 @@ function CustomerDetail({ id }: { id: number }) {
                     {ENTRY_LABELS[entry.kind]}
                   </span>
                   <span className="truncate text-[length:var(--fs-c1)] text-ink-mute">
-                    {entry.reason ??
-                      (entry.baseVnd ? `Bill ${formatVnd(entry.baseVnd)}` : '')}
+                    {entry.reason ?? (entry.baseVnd ? `Bill ${formatVnd(entry.baseVnd)}` : '')}
                     {entry.staffName ? ` · ${entry.staffName}` : ''}
                     {entry.expiresOn ? ` · hết hạn ${formatDay(entry.expiresOn)}` : ''}
                   </span>

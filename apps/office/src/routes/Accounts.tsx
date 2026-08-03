@@ -3,8 +3,10 @@ import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type AccountInput, type AccountRow, type RoleGrant } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field } from '../components/report'
+import { TextInput as Input, Toggle } from '../components/form'
 
 /**
  * A1 — Tài khoản.
@@ -38,7 +40,6 @@ export function Accounts() {
   const toast = useToast()
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<AccountInput | null>(null)
-  const [editing, setEditing] = useState<number | null>(null)
 
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts })
   const branches = useQuery({ queryKey: ['admin-branches'], queryFn: api.branches })
@@ -89,33 +90,84 @@ export function Accounts() {
           />
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[200px_1fr_190px_150px_90px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Người</span>
-            <span>Vai trò đã phân</span>
-            <span>Đăng nhập bằng</span>
-            <span>Email</span>
-            <span />
-          </div>
-
-          {accounts.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : list.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa có tài khoản nào.
-            </p>
-          ) : (
-            list.map((row) => (
-              <AccountLine
-                key={row.id}
-                row={row}
-                branches={branchList}
-                open={editing === row.id}
-                onToggle={() => setEditing(editing === row.id ? null : row.id)}
-                onChanged={refresh}
-              />
-            ))
-          )}
+        <div className="mt-5">
+          <DataTable
+            rows={list}
+            rowKey={(row) => row.id}
+            loading={accounts.isPending}
+            empty="Chưa có tài khoản nào."
+            renderDetail={(row) => (
+              <AccountDetail row={row} branches={branchList} onChanged={refresh} />
+            )}
+            columns={[
+              {
+                key: 'person',
+                header: 'Người',
+                width: '200px',
+                cell: (row) => (
+                  <span className={row.active ? '' : 'opacity-60'}>
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.fullName}
+                    </span>
+                    <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                      {row.code}
+                      {row.active ? '' : ' · đã ngừng'}
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: 'roles',
+                header: 'Vai trò đã phân',
+                width: 'minmax(220px, 1fr)',
+                cell: (row) => (
+                  <span className="flex flex-wrap gap-1.5">
+                    {row.roles.length === 0 ? (
+                      <span className="text-[length:var(--fs-c1)] text-danger">
+                        Chưa có vai trò
+                      </span>
+                    ) : (
+                      row.roles.map((grant) => (
+                        <span
+                          key={`${grant.roleCode}:${grant.branchId ?? '*'}`}
+                          className="inline-flex h-[22px] items-center rounded-pill border border-line-3 px-2 text-[length:var(--fs-c2)] text-ink-body"
+                        >
+                          {grant.roleCode}
+                          <span className="ml-1 text-ink-mute">
+                            {grant.branchId ?? 'toàn chuỗi'}
+                          </span>
+                        </span>
+                      ))
+                    )}
+                  </span>
+                ),
+              },
+              {
+                key: 'auth',
+                header: 'Đăng nhập bằng',
+                width: '190px',
+                cell: (row) => (
+                  <span className="flex gap-1.5">
+                    {row.hasPassword ? <Badge tone="accent">Office</Badge> : null}
+                    {row.hasPin ? <Badge tone="info">PIN</Badge> : null}
+                    {!row.hasPassword && !row.hasPin ? (
+                      <Badge tone="danger">Không vào được</Badge>
+                    ) : null}
+                  </span>
+                ),
+              },
+              {
+                key: 'email',
+                header: 'Email',
+                width: '180px',
+                cell: (row) => (
+                  <span className="truncate text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.email ?? '—'}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
@@ -128,17 +180,13 @@ export function Accounts() {
   )
 }
 
-function AccountLine({
+function AccountDetail({
   row,
   branches,
-  open,
-  onToggle,
   onChanged,
 }: {
   row: AccountRow
   branches: { id: string; name: string }[]
-  open: boolean
-  onToggle: () => void
   onChanged: () => void
 }) {
   const toast = useToast()
@@ -152,68 +200,16 @@ function AccountLine({
       .catch((err: Error) => toast(err.message, 'danger'))
 
   return (
-    <div className={`border-b border-line-1 last:border-b-0 ${row.active ? '' : 'opacity-60'}`}>
-      <div className="grid grid-cols-[200px_1fr_190px_150px_90px] items-center gap-3 px-5 py-2.5">
-        <span className="min-w-0">
-          <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-            {row.fullName}
-          </span>
-          <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
-            {row.code}
-            {row.active ? '' : ' · đã ngừng'}
-          </span>
-        </span>
-
-        <span className="flex flex-wrap gap-1.5">
-          {row.roles.length === 0 ? (
-            <span className="text-[length:var(--fs-c1)] text-danger">Chưa có vai trò</span>
-          ) : (
-            row.roles.map((grant) => (
-              <span
-                key={`${grant.roleCode}:${grant.branchId ?? '*'}`}
-                className="inline-flex h-[22px] items-center rounded-pill border border-line-3 px-2 text-[length:var(--fs-c2)] text-ink-body"
-              >
-                {grant.roleCode}
-                <span className="ml-1 text-ink-mute">
-                  {grant.branchId ?? 'toàn chuỗi'}
-                </span>
-              </span>
-            ))
-          )}
-        </span>
-
-        <span className="flex gap-1.5">
-          {row.hasPassword ? <Badge tone="accent">Office</Badge> : null}
-          {row.hasPin ? <Badge tone="info">PIN</Badge> : null}
-          {!row.hasPassword && !row.hasPin ? <Badge tone="danger">Không vào được</Badge> : null}
-        </span>
-
-        <span className="truncate text-[length:var(--fs-c1)] text-ink-mute">{row.email ?? '—'}</span>
-
-        <span className="flex justify-end">
-          <button
-            type="button"
-            onClick={onToggle}
-            className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-          >
-            {open ? 'Đóng' : 'Sửa'}
-          </button>
-        </span>
-      </div>
-
-      {open ? (
-        <AccountEditor
-          row={row}
-          branches={branches}
-          onSaveInfo={(patch) => run(() => api.updateAccount(row.id, patch), 'Đã lưu tài khoản')}
-          onSetRoles={(roles) => run(() => api.setAccountRoles(row.id, roles), 'Đã đổi vai trò')}
-          onSetPassword={(value) =>
-            run(() => api.setAccountPassword(row.id, value), 'Đã đặt mật khẩu Office')
-          }
-          onSetPin={(value) => run(() => api.setAccountPin(row.id, value), 'Đã đặt PIN')}
-        />
-      ) : null}
-    </div>
+    <AccountEditor
+      row={row}
+      branches={branches}
+      onSaveInfo={(patch) => run(() => api.updateAccount(row.id, patch), 'Đã lưu tài khoản')}
+      onSetRoles={(roles) => run(() => api.setAccountRoles(row.id, roles), 'Đã đổi vai trò')}
+      onSetPassword={(value) =>
+        run(() => api.setAccountPassword(row.id, value), 'Đã đặt mật khẩu Office')
+      }
+      onSetPin={(value) => run(() => api.setAccountPin(row.id, value), 'Đã đặt PIN')}
+    />
   )
 }
 
@@ -253,23 +249,28 @@ function AccountEditor({
           <Input value={info.fullName} onChange={(v) => setInfo({ ...info, fullName: v })} />
         </Field>
         <Field label="Điện thoại">
-          <Input value={info.phone ?? ''} onChange={(v) => setInfo({ ...info, phone: v || null })} mono />
+          <Input
+            value={info.phone ?? ''}
+            onChange={(v) => setInfo({ ...info, phone: v || null })}
+            mono
+          />
         </Field>
         <Field label="Email đăng nhập Office">
-          <Input value={info.email ?? ''} onChange={(v) => setInfo({ ...info, email: v || null })} />
+          <Input
+            value={info.email ?? ''}
+            onChange={(v) => setInfo({ ...info, email: v || null })}
+          />
         </Field>
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setInfo({ ...info, active: !info.active })}
-          className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-            info.active ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
-          }`}
+        <Toggle
+          onChange={() => setInfo({ ...info, active: !info.active })}
+          on={info.active}
+          tone="ok"
         >
           {info.active ? 'Đang hoạt động' : 'Đã ngừng'}
-        </button>
+        </Toggle>
         <Button onClick={() => onSaveInfo(info)}>Lưu thông tin</Button>
       </div>
 
@@ -347,7 +348,11 @@ function AccountForm({
           <Input value={draft.code} onChange={(v) => set('code', v)} placeholder="PV07" mono />
         </Field>
         <Field label="Họ tên">
-          <Input value={draft.fullName} onChange={(v) => set('fullName', v)} placeholder="Nguyễn Văn A" />
+          <Input
+            value={draft.fullName}
+            onChange={(v) => set('fullName', v)}
+            placeholder="Nguyễn Văn A"
+          />
         </Field>
         <Field label="Điện thoại">
           <Input value={draft.phone ?? ''} onChange={(v) => set('phone', v || null)} mono />
@@ -372,7 +377,11 @@ function AccountForm({
       </div>
 
       <div className="mt-5 border-t border-line-1 pt-5">
-        <RolePicker branches={branches} value={draft.roles} onChange={(roles) => set('roles', roles)} />
+        <RolePicker
+          branches={branches}
+          value={draft.roles}
+          onChange={(roles) => set('roles', roles)}
+        />
       </div>
 
       <div className="mt-5 flex items-center gap-2">
@@ -462,31 +471,5 @@ function RolePicker({
         </tbody>
       </table>
     </div>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  mono = false,
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-  mono?: boolean
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi ${
-        mono ? 'font-mono' : ''
-      }`}
-    />
   )
 }

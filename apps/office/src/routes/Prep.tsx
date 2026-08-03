@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, type IngredientRow, type PrepRecipeView } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { formatPercent } from '../components/report'
 import { useSession } from '../session-context'
@@ -33,6 +34,7 @@ const DRIFT_ALERT = 0.1
 // ---------------------------------------------------------------- danh sách
 
 export function PrepList() {
+  const navigate = useNavigate()
   const preps = useQuery({ queryKey: ['preps'], queryFn: api.preps })
   const rows = preps.data ?? []
   const noRecipe = rows.filter((r) => r.lineCount === 0).length
@@ -45,68 +47,92 @@ export function PrepList() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <div className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[110px_1fr_130px_130px_140px_140px_90px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Mã</span>
-            <span>Bán thành phẩm</span>
-            <span className="text-right">Sản lượng mẻ</span>
-            <span className="text-right">Tiền một mẻ</span>
-            <span className="text-right">Giá chuẩn</span>
-            <span className="text-right">Giá đang dùng</span>
-            <span className="text-right">Món dùng</span>
-          </div>
-
-          {preps.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : rows.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa có bán thành phẩm nào. Bật cờ <span className="text-ink-body">bán thành phẩm</span>{' '}
-              cho một nguyên liệu ở{' '}
+        <DataTable
+          rows={rows}
+          rowKey={(row) => row.id}
+          loading={preps.isPending}
+          onRowClick={(row) => navigate(`/ban-thanh-pham/${row.id}`)}
+          empty={
+            <>
+              Chưa có bán thành phẩm nào. Bật cờ{' '}
+              <span className="text-ink-body">bán thành phẩm</span> cho một nguyên liệu ở{' '}
               <Link to="/nguyen-lieu" className="text-accent-ink">
                 M7 · Nguyên liệu
               </Link>{' '}
               rồi quay lại đây khai công thức mẻ.
-            </p>
-          ) : (
-            rows.map((row) => {
-              const drift =
-                row.standardMilli !== null && row.costPerBaseMilli > 0
-                  ? (row.costPerBaseMilli - row.standardMilli) / row.standardMilli
-                  : null
-
-              return (
-                <Link
-                  key={row.id}
-                  to={`/ban-thanh-pham/${row.id}`}
-                  className="grid grid-cols-[110px_1fr_130px_130px_140px_140px_90px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 hover:bg-surface-3"
-                >
-                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                    {row.code}
+            </>
+          }
+          columns={[
+            {
+              key: 'code',
+              header: 'Mã',
+              width: '110px',
+              cell: (row) => (
+                <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                  {row.code}
+                </span>
+              ),
+            },
+            {
+              key: 'name',
+              header: 'Bán thành phẩm',
+              width: 'minmax(200px, 1fr)',
+              // Vẫn là <Link> thật để ctrl+click mở tab mới — bấm cả dòng chỉ là lối tắt
+              cell: (row) => (
+                <Link to={`/ban-thanh-pham/${row.id}`} className="block min-w-0">
+                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                    {row.name}
                   </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                      {row.name}
-                    </span>
-                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
-                      {row.lineCount === 0
-                        ? 'chưa khai công thức'
-                        : `${row.lineCount} nguyên liệu`}
-                    </span>
+                  <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.lineCount === 0 ? 'chưa khai công thức' : `${row.lineCount} nguyên liệu`}
                   </span>
-                  <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-body">
-                    {row.yieldBase === 0 ? (
-                      <span className="text-warn">chưa khai</span>
-                    ) : (
-                      `${row.yieldBase.toLocaleString('vi-VN')} ${row.baseUnit}`
-                    )}
+                </Link>
+              ),
+            },
+            {
+              key: 'yield',
+              header: 'Sản lượng mẻ',
+              width: '140px',
+              numeric: true,
+              cell: (row) =>
+                row.yieldBase === 0 ? (
+                  <span className="text-warn">chưa khai</span>
+                ) : (
+                  <span className="text-[length:var(--fs-b2)] text-ink-body">
+                    {row.yieldBase.toLocaleString('vi-VN')} {row.baseUnit}
                   </span>
-                  <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-body">
-                    {row.lineCount === 0 ? '—' : formatVnd(row.batchCostVnd)}
-                  </span>
-                  <span className="text-right">
-                    <PerUnit milli={row.standardMilli} unit={row.baseUnit} />
-                  </span>
-                  <span className="text-right">
+                ),
+            },
+            {
+              key: 'batchCost',
+              header: 'Tiền một mẻ',
+              width: '140px',
+              numeric: true,
+              cell: (row) => (
+                <span className="text-[length:var(--fs-b2)] text-ink-body">
+                  {row.lineCount === 0 ? '—' : formatVnd(row.batchCostVnd)}
+                </span>
+              ),
+            },
+            {
+              key: 'standard',
+              header: 'Giá chuẩn',
+              width: '140px',
+              align: 'right',
+              cell: (row) => <PerUnit milli={row.standardMilli} unit={row.baseUnit} />,
+            },
+            {
+              key: 'actual',
+              header: 'Giá đang dùng',
+              width: '150px',
+              align: 'right',
+              cell: (row) => {
+                const drift =
+                  row.standardMilli !== null && row.costPerBaseMilli > 0
+                    ? (row.costPerBaseMilli - row.standardMilli) / row.standardMilli
+                    : null
+                return (
+                  <>
                     <PerUnit milli={row.costPerBaseMilli || null} unit={row.baseUnit} />
                     {drift !== null && Math.abs(drift) >= DRIFT_ALERT ? (
                       <span
@@ -115,15 +141,19 @@ export function PrepList() {
                         {formatPercent(drift)} so công thức
                       </span>
                     ) : null}
-                  </span>
-                  <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                    {row.usedByDishes}
-                  </span>
-                </Link>
-              )
-            })
-          )}
-        </div>
+                  </>
+                )
+              },
+            },
+            {
+              key: 'used',
+              header: 'Món dùng',
+              width: '110px',
+              numeric: true,
+              cell: (row) => <span className="text-ink-mute">{row.usedByDishes}</span>,
+            },
+          ]}
+        />
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           <span className="text-ink-body">Giá chuẩn</span> là thứ công thức nói;{' '}
@@ -378,13 +408,13 @@ export function PrepEditor() {
 
                   <span className="flex justify-end">
                     {mayEdit ? (
-                      <button
-                        type="button"
+                      <Button
                         onClick={() => setDraft(draft.filter((_, i) => i !== index))}
-                        className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-mute hover:text-danger"
+                        size="sm"
+                        variant="danger"
                       >
                         Bỏ
-                      </button>
+                      </Button>
                     ) : null}
                   </span>
                 </div>
@@ -462,7 +492,9 @@ function previewOf(lines: DraftLine[], byId: Map<string, IngredientRow>, yieldBa
   const priced = lines.map((line) => {
     const effectiveQty = Math.round((line.qtyBase * (10_000 + line.wasteBp)) / 10_000)
     return {
-      costVnd: Math.round((effectiveQty * (byId.get(line.ingredientId)?.costPerBaseMilli ?? 0)) / 1_000),
+      costVnd: Math.round(
+        (effectiveQty * (byId.get(line.ingredientId)?.costPerBaseMilli ?? 0)) / 1_000,
+      ),
     }
   })
   const batchCostVnd = priced.reduce((sum, l) => sum + l.costVnd, 0)

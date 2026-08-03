@@ -50,6 +50,8 @@
 
   /* ---- Trạng thái ---- */
   --sora-ok: #4a8f63;
+  /* Nền đặc cho nút "duyệt": --sora-ok quá sáng để đặt chữ kem lên (3.4:1) */
+  --sora-ok-strong: #2f6b45;
   --sora-warn: #d08a1c;
   --sora-danger: #b5382c;
   --sora-danger-line: #8c2f2f;
@@ -179,6 +181,7 @@
   --color-kraft-ink: var(--sora-kraft-ink);
   --color-kraft-ink-2: var(--sora-kraft-ink-2);
   --color-ok: var(--sora-ok);
+  --color-ok-strong: var(--sora-ok-strong);
   --color-warn: var(--sora-warn);
   --color-danger: var(--sora-danger);
   --color-danger-line: var(--sora-danger-line);

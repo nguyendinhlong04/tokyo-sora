@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { api, type EinvoiceConfig } from '../api'
 import { PageHeader } from '../components/PageHeader'
+import { TextInput as Input } from '../components/form'
 import { Field } from '../components/report'
 import { useSession } from '../session-context'
 
@@ -81,7 +82,8 @@ export function EInvoice() {
     )
   }
 
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft({ ...draft, [key]: value })
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+    setDraft({ ...draft, [key]: value })
   const current = config.data
   const daysLeft = current.certificateDaysLeft
 
@@ -236,31 +238,5 @@ export function EInvoice() {
         </p>
       </div>
     </>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  mono = false,
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-  mono?: boolean
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi ${
-        mono ? 'font-mono' : ''
-      }`}
-    />
   )
 }

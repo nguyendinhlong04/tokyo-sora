@@ -3,8 +3,10 @@ import { Button, ErrorState, Modal, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type EmployeeInput, type EmployeeRow, type PayKind } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field, formatDay } from '../components/report'
+import { TextInput as Input, Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 /**
@@ -122,75 +124,102 @@ export function Employees() {
           />
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[1fr_150px_130px_160px_150px_110px_90px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Nhân viên</span>
-            <span>Vị trí</span>
-            <span>Trả lương</span>
-            <span className="text-right">Đơn giá / lương</span>
-            <span className="text-right">Phụ cấp</span>
-            <span>Vào từ</span>
-            <span />
-          </div>
-
-          {rows.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : list.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa có hồ sơ nào. Chọn một tài khoản ở nút phía trên để bắt đầu.
-            </p>
-          ) : (
-            list.map((row) => (
-              <div
-                key={row.id}
-                className={`grid grid-cols-[1fr_150px_130px_160px_150px_110px_90px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                  row.active ? '' : 'opacity-60'
-                }`}
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                    {row.fullName}
+        <div className="mt-5">
+          <DataTable
+            rows={list}
+            rowKey={(row) => row.id}
+            loading={rows.isPending}
+            empty="Chưa có hồ sơ nào. Chọn một tài khoản ở nút phía trên để bắt đầu."
+            columns={[
+              {
+                key: 'name',
+                header: 'Nhân viên',
+                width: 'minmax(200px, 1fr)',
+                cell: (row) => (
+                  <span className={row.active ? '' : 'opacity-60'}>
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.fullName}
+                    </span>
+                    <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                      {row.code}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                    {row.code}
+                ),
+              },
+              {
+                key: 'position',
+                header: 'Vị trí',
+                width: '150px',
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-body">{row.position}</span>
+                ),
+              },
+              {
+                key: 'payKind',
+                header: 'Trả lương',
+                width: '130px',
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                    {PAY_KIND_LABELS[row.payKind]}
                   </span>
-                </span>
-                <span className="text-[length:var(--fs-c1)] text-ink-body">{row.position}</span>
-                <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                  {PAY_KIND_LABELS[row.payKind]}
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
-                  {row.payKind === 'hourly'
-                    ? `${formatVnd(row.hourlyRateVnd)}/giờ`
-                    : `${formatVnd(row.monthlySalaryVnd)}/tháng`}
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                  {row.fixedAllowanceVnd === 0 ? '—' : formatVnd(row.fixedAllowanceVnd)}
-                </span>
-                <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                  {formatDay(row.startedOn)}
-                </span>
-                <span className="flex justify-end gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => link.mutate(row)}
-                    disabled={link.isPending || !row.active}
-                    title="Cấp link Kênh nhân viên (H8 · H9) — link cũ ngừng hoạt động ngay"
-                    className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3 disabled:opacity-40"
-                  >
-                    Link
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDraft({ input: toInput(row), id: row.id })}
-                    className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                  >
-                    Sửa
-                  </button>
-                </span>
-              </div>
-            ))
-          )}
+                ),
+              },
+              {
+                key: 'rate',
+                header: 'Đơn giá / lương',
+                width: '170px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-b2)] text-ink-hi">
+                    {row.payKind === 'hourly'
+                      ? `${formatVnd(row.hourlyRateVnd)}/giờ`
+                      : `${formatVnd(row.monthlySalaryVnd)}/tháng`}
+                  </span>
+                ),
+              },
+              {
+                key: 'allowance',
+                header: 'Phụ cấp',
+                width: '150px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-ink-mute">
+                    {row.fixedAllowanceVnd === 0 ? '—' : formatVnd(row.fixedAllowanceVnd)}
+                  </span>
+                ),
+              },
+              {
+                key: 'startedOn',
+                header: 'Vào từ',
+                width: '110px',
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                    {formatDay(row.startedOn)}
+                  </span>
+                ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                width: '150px',
+                cell: (row) => (
+                  <span className="flex justify-end gap-1.5">
+                    <Button
+                      onClick={() => link.mutate(row)}
+                      disabled={link.isPending || !row.active}
+                      title="Cấp link Kênh nhân viên (H8 · H9) — link cũ ngừng hoạt động ngay"
+                      size="sm"
+                    >
+                      Link
+                    </Button>
+                    <Button onClick={() => setDraft({ input: toInput(row), id: row.id })} size="sm">
+                      Sửa
+                    </Button>
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
@@ -249,8 +278,8 @@ function ChannelLinkDialog({
     >
       <div className="flex flex-col gap-4">
         <p className="text-[length:var(--fs-b2)] text-ink-body">
-          Gửi cho nhân viên qua Zalo. Mở link một lần trên điện thoại của họ là máy nhớ, sau đó
-          chỉ cần PIN.
+          Gửi cho nhân viên qua Zalo. Mở link một lần trên điện thoại của họ là máy nhớ, sau đó chỉ
+          cần PIN.
         </p>
         <code className="rounded-sm border border-line-2 bg-canvas px-3 py-2 font-mono text-[length:var(--fs-c1)] break-all text-ink-hi">
           {issued?.url}
@@ -289,7 +318,11 @@ function EmployeeForm({
     <section className="rounded-md border border-accent bg-surface-1 p-5">
       <div className="grid gap-4 lg:grid-cols-4">
         <Field label="Vị trí">
-          <Input value={draft.position} onChange={(v) => set('position', v)} placeholder="Bếp chính" />
+          <Input
+            value={draft.position}
+            onChange={(v) => set('position', v)}
+            placeholder="Bếp chính"
+          />
         </Field>
 
         <Field label="Cách trả lương">
@@ -342,15 +375,9 @@ function EmployeeForm({
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => set('active', !draft.active)}
-          className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-            draft.active ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
-          }`}
-        >
+        <Toggle onChange={() => set('active', !draft.active)} on={draft.active} tone="ok">
           {draft.active ? 'Đang làm việc' : 'Đã nghỉ'}
-        </button>
+        </Toggle>
         <div className="ml-auto flex gap-2">
           <Button onClick={onCancel}>Bỏ</Button>
           <Button variant="primary" onClick={onSave} disabled={saving}>
@@ -364,27 +391,5 @@ function EmployeeForm({
         quy đổi từ số giờ chuẩn tháng (đặt ở Trung tâm tham số A6).
       </p>
     </section>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
-    />
   )
 }

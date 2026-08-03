@@ -1,8 +1,10 @@
 import { formatVnd } from '@sora/contracts'
+import { SegmentedControl } from '../components/form'
 import { ErrorState } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type PeriodChoice, type PnlBasis, type PnlRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { PeriodComparator, formatPercent } from '../components/report'
 import { useSession } from '../session-context'
@@ -60,21 +62,16 @@ export function ProfitLoss() {
         title="Lãi / Lỗ"
         subtitle="Bảng tài chính hợp nhất — không dòng nào nhập tay. Dòng để trống là dòng chưa có nguồn, không phải dòng bằng không."
         action={
-          <div className="flex overflow-hidden rounded-sm border border-line-1">
-            {(Object.keys(BASIS_LABELS) as PnlBasis[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setBasis(mode)}
-                title={BASIS_LABELS[mode].hint}
-                className={`h-[var(--hit-target)] border-r border-line-1 px-4 text-[length:var(--fs-b2)] last:border-r-0 ${
-                  basis === mode ? 'bg-surface-3 text-ink-hi' : 'text-ink-mute hover:text-ink-hi'
-                }`}
-              >
-                {BASIS_LABELS[mode].label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            size="md"
+            value={basis}
+            onChange={setBasis}
+            options={(Object.keys(BASIS_LABELS) as PnlBasis[]).map((mode) => ({
+              value: mode,
+              label: BASIS_LABELS[mode].label,
+              title: BASIS_LABELS[mode].hint,
+            }))}
+          />
         }
       />
 
@@ -97,53 +94,83 @@ export function ProfitLoss() {
           <p className="mt-5 text-ink-mute">Đang tải…</p>
         ) : (
           <>
-            <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-              <div className="grid grid-cols-[1fr_180px_180px_120px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-                <span>Khoản mục</span>
-                <span className="text-right">Kỳ này</span>
-                <span className="text-right">Kỳ đối chiếu</span>
-                <span className="text-right">% doanh thu</span>
-              </div>
-
-              {data.rows.map((row) => (
-                <div
-                  key={row.key}
-                  className={`grid grid-cols-[1fr_180px_180px_120px] items-baseline gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                    row.kind === 'subtotal' ? 'bg-surface-2' : ''
-                  } ${row.kind === 'memo' ? 'bg-canvas' : ''}`}
-                >
-                  <div className="min-w-0">
-                    <p className={`text-[length:var(--fs-b2)] ${KIND_STYLE[row.kind]}`}>
-                      {row.label}
-                    </p>
-                    {row.blockedBy ? (
-                      <p className="mt-0.5 text-[length:var(--fs-c1)] text-warn">
-                        Chưa có nguồn · {row.blockedBy}
-                      </p>
-                    ) : row.note ? (
-                      <p className="mt-0.5 text-[length:var(--fs-c1)] text-ink-mute">{row.note}</p>
-                    ) : null}
-                  </div>
-
-                  <span className={`text-right font-mono text-[length:var(--fs-b2)] ${KIND_STYLE[row.kind]}`}>
-                    {row.amount === null ? (
-                      <span className="text-line-4">—</span>
-                    ) : (
-                      formatVnd(row.amount)
-                    )}
-                  </span>
-
-                  <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                    {row.baseline === null ? '—' : formatVnd(row.baseline)}
-                  </span>
-
-                  <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                    {row.amount === null || net === 0 || row.kind === 'memo'
-                      ? '—'
-                      : formatPercent(row.amount / net).replace('+', '')}
-                  </span>
-                </div>
-              ))}
+            <div className="mt-5">
+              {/* `paginate={false}`: bảng Lãi/Lỗ là một bản tài chính đọc liền mạch từ
+                  doanh thu xuống lãi ròng — cắt trang giữa chừng là cắt mất mạch đọc. */}
+              <DataTable
+                rows={data.rows}
+                rowKey={(row) => row.key}
+                paginate={false}
+                rowClassName={(row) =>
+                  row.kind === 'subtotal' ? 'bg-surface-2' : row.kind === 'memo' ? 'bg-canvas' : ''
+                }
+                columns={[
+                  {
+                    key: 'label',
+                    header: 'Khoản mục',
+                    width: 'minmax(240px, 1fr)',
+                    cell: (row) => (
+                      <span className="min-w-0">
+                        <span
+                          className={`block text-[length:var(--fs-b2)] ${KIND_STYLE[row.kind]}`}
+                        >
+                          {row.label}
+                        </span>
+                        {row.blockedBy ? (
+                          <span className="mt-0.5 block text-[length:var(--fs-c1)] text-warn">
+                            Chưa có nguồn · {row.blockedBy}
+                          </span>
+                        ) : row.note ? (
+                          <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                            {row.note}
+                          </span>
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'amount',
+                    header: 'Kỳ này',
+                    width: '180px',
+                    align: 'right',
+                    cell: (row) => (
+                      <span
+                        className={`font-mono text-[length:var(--fs-b2)] ${KIND_STYLE[row.kind]}`}
+                      >
+                        {row.amount === null ? (
+                          <span className="text-line-4">—</span>
+                        ) : (
+                          formatVnd(row.amount)
+                        )}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'baseline',
+                    header: 'Kỳ đối chiếu',
+                    width: '180px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className="text-ink-mute">
+                        {row.baseline === null ? '—' : formatVnd(row.baseline)}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'share',
+                    header: '% doanh thu',
+                    width: '130px',
+                    numeric: true,
+                    cell: (row) => (
+                      <span className="text-ink-mute">
+                        {row.amount === null || net === 0 || row.kind === 'memo'
+                          ? '—'
+                          : formatPercent(row.amount / net).replace('+', '')}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
             </div>
 
             <section className="mt-5 grid gap-4 lg:grid-cols-2">
@@ -198,15 +225,11 @@ export function ProfitLoss() {
                 <ul className="mt-3 flex flex-col gap-2 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
                   <li>
                     Doanh thu ghi nhận theo <span className="text-ink-body">đơn</span>, không theo
-                    tiền về — dòng “Tiền đã thực thu” ở cuối bảng là mặt dòng tiền, đối chiếu với
-                    sổ quỹ F1.
+                    tiền về — dòng “Tiền đã thực thu” ở cuối bảng là mặt dòng tiền, đối chiếu với sổ
+                    quỹ F1.
                   </li>
-                  <li>
-                    VAT đầu ra là tiền thu hộ nhà nước, đứng ngoài doanh thu thuần.
-                  </li>
-                  <li>
-                    Kỳ này gồm {data.orderCount} đơn đã bán (đơn huỷ không tính).
-                  </li>
+                  <li>VAT đầu ra là tiền thu hộ nhà nước, đứng ngoài doanh thu thuần.</li>
+                  <li>Kỳ này gồm {data.orderCount} đơn đã bán (đơn huỷ không tính).</li>
                 </ul>
               </div>
             </section>

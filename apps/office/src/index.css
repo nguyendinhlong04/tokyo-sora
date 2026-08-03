@@ -1,3 +1,23 @@
 @import 'tailwindcss';
 @import '@sora/tokens/tokens.css';
 @import '@sora/tokens/fonts.css';
+
+/**
+ * Cuộn được nhưng không chiếm chỗ.
+ *
+ * Menu dọc của Office cao hơn màn hình nên bắt buộc phải cuộn, nhưng thanh trượt
+ * nằm sát mép cột 256px thì cắt mất chữ và nhảy vào/ra mỗi lần nhóm mở-thu. Ẩn
+ * thanh, GIỮ nguyên khả năng cuộn bằng bánh xe, phím và cảm ứng.
+ *
+ * Chỉ dùng cho vùng có mốc cuộn khác (ở đây là nhóm tự mở theo trang đang xem).
+ * Ẩn thanh ở vùng nội dung chính là lấy mất chỉ báo "còn nữa ở dưới".
+ */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+}

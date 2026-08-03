@@ -3,6 +3,7 @@ import { Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type PayrollDetail, type PayrollLine, type PeriodState } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Field, formatDay } from '../components/report'
 import { useSession } from '../session-context'
@@ -20,8 +21,18 @@ import { useSession } from '../session-context'
  */
 
 const STEPS: { state: PeriodState; label: string; action: string; hint: string }[] = [
-  { state: 'draft', label: 'Mở kỳ', action: 'lock', hint: 'Chốt công — sau bước này lịch của kỳ đóng băng' },
-  { state: 'locked', label: 'Đã chốt công', action: 'submit', hint: 'Quản lý nhân sự trình kỳ lương' },
+  {
+    state: 'draft',
+    label: 'Mở kỳ',
+    action: 'lock',
+    hint: 'Chốt công — sau bước này lịch của kỳ đóng băng',
+  },
+  {
+    state: 'locked',
+    label: 'Đã chốt công',
+    action: 'submit',
+    hint: 'Quản lý nhân sự trình kỳ lương',
+  },
   { state: 'submitted', label: 'Đã trình', action: 'check', hint: 'Kế toán kiểm' },
   { state: 'checked', label: 'Đã kiểm', action: 'approve', hint: 'Chủ duyệt' },
   { state: 'approved', label: 'Đã duyệt', action: 'pay', hint: 'Đánh dấu đã phát lương' },
@@ -69,8 +80,13 @@ export function Payroll() {
   const fail = (err: Error) => toast(err.message, 'danger')
 
   const advance = useMutation({
-    mutationFn: ({ id, step }: { id: number; step: 'lock' | 'submit' | 'check' | 'approve' | 'pay' }) =>
-      api.advancePayroll(id, step),
+    mutationFn: ({
+      id,
+      step,
+    }: {
+      id: number
+      step: 'lock' | 'submit' | 'check' | 'approve' | 'pay'
+    }) => api.advancePayroll(id, step),
     onSuccess: (result) => {
       toast(`Kỳ lương chuyển sang: ${STATE_LABELS[result.state]}`, 'ok')
       refresh()
@@ -111,50 +127,78 @@ export function Payroll() {
           />
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[1fr_160px_200px_1fr] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Kỳ</span>
-            <span>Trạng thái</span>
-            <span>Bước kế tiếp</span>
-            <span />
-          </div>
-
-          {periods.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : list.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa có kỳ lương nào. Mở kỳ đầu tiên để bắt đầu.
-            </p>
-          ) : (
-            list.map((period) => {
-              const step = STEPS.find((s) => s.state === period.state)!
-              const isOpen = selected === period.id
-              return (
-                <div key={period.id} className="border-b border-line-1 last:border-b-0">
-                  <div className="grid grid-cols-[1fr_160px_200px_1fr] items-center gap-3 px-5 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setSelected(isOpen ? null : period.id)}
-                      className="text-left text-[length:var(--fs-b2)] text-ink-hi"
-                    >
-                      {formatDay(period.periodStart)} – {formatDay(period.periodEnd)}
-                    </button>
-                    <span
-                      className={`text-[length:var(--fs-c1)] ${
-                        period.state === 'paid' ? 'text-ok' : 'text-ink-body'
-                      }`}
-                    >
-                      {STATE_LABELS[period.state]}
-                    </span>
-                    <span className="text-[length:var(--fs-c1)] text-ink-mute">{step.hint}</span>
-                    <span className="flex justify-end gap-2">
+        <div className="mt-5">
+          <DataTable
+            rows={list}
+            rowKey={(period) => period.id}
+            loading={periods.isPending}
+            empty="Chưa có kỳ lương nào. Mở kỳ đầu tiên để bắt đầu."
+            // Bảng lương của kỳ chỉ tải khi bung dòng — `onOpenChange` là cách trang
+            // biết đang mở kỳ nào để đặt khoá truy vấn.
+            onOpenChange={(key) => setSelected(key === null ? null : Number(key))}
+            renderDetail={(period) =>
+              selected === period.id && detail.data ? (
+                <PayrollTable detail={detail.data} />
+              ) : (
+                <p className="text-[length:var(--fs-c1)] text-ink-mute">Đang tải bảng lương…</p>
+              )
+            }
+            columns={[
+              {
+                key: 'period',
+                header: 'Kỳ',
+                width: 'minmax(220px, 1fr)',
+                cell: (period) => (
+                  <span className="text-[length:var(--fs-b2)] text-ink-hi">
+                    {formatDay(period.periodStart)} – {formatDay(period.periodEnd)}
+                  </span>
+                ),
+              },
+              {
+                key: 'state',
+                header: 'Trạng thái',
+                width: '160px',
+                cell: (period) => (
+                  <span
+                    className={`text-[length:var(--fs-c1)] ${
+                      period.state === 'paid' ? 'text-ok' : 'text-ink-body'
+                    }`}
+                  >
+                    {STATE_LABELS[period.state]}
+                  </span>
+                ),
+              },
+              {
+                key: 'hint',
+                header: 'Bước kế tiếp',
+                width: '200px',
+                cell: (period) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                    {STEPS.find((s) => s.state === period.state)!.hint}
+                  </span>
+                ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                width: 'minmax(240px, 1fr)',
+                cell: (period) => {
+                  const step = STEPS.find((s) => s.state === period.state)!
+                  return (
+                    // Cả dòng đã bắt onClick để bung bảng lương — mọi nút ở đây phải chặn lại
+                    <span className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                       {period.state === 'locked' ? (
-                        <Button onClick={() => compute.mutate(period.id)} disabled={compute.isPending}>
+                        <Button
+                          size="sm"
+                          onClick={() => compute.mutate(period.id)}
+                          disabled={compute.isPending}
+                        >
                           Tính nháp
                         </Button>
                       ) : null}
                       {step.action ? (
                         <Button
+                          size="sm"
                           variant="primary"
                           disabled={advance.isPending}
                           onClick={() =>
@@ -176,21 +220,22 @@ export function Payroll() {
                         </Button>
                       ) : null}
                     </span>
-                  </div>
-
-                  {isOpen && detail.data ? <PayrollTable detail={detail.data} /> : null}
-                </div>
-              )
-            })
-          )}
+                  )
+                },
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Chưa có trong bản dựng này: gọi API Chi lương ngân hàng (bước phát hiện chỉ đánh dấu),
           phát phiếu lương qua Kênh nhân viên hoặc Zalo (H8 · H9), quy tắc thưởng theo chỉ tiêu
           doanh thu, và tạm ứng lấy tự động từ phiếu chi (C2). Thuế TNCN đang dùng một tỉ lệ tạm
-          khấu trừ đặt ở Trung tâm tham số — <span className="text-warn">mặc định 0, tức là chưa
-          cấu hình chứ không phải miễn thuế</span>; biểu thuế luỹ tiến chưa cài.
+          khấu trừ đặt ở Trung tâm tham số —{' '}
+          <span className="text-warn">
+            mặc định 0, tức là chưa cấu hình chứ không phải miễn thuế
+          </span>
+          ; biểu thuế luỹ tiến chưa cài.
         </p>
       </div>
     </>
@@ -314,7 +359,9 @@ function OpenPeriodForm({
   const [start, setStart] = useState(`${today.slice(0, 7)}-01`)
   const [end, setEnd] = useState(() => {
     const at = new Date(`${today.slice(0, 7)}-01T00:00:00Z`)
-    return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+    return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 0))
+      .toISOString()
+      .slice(0, 10)
   })
 
   const open = useMutation({
@@ -344,8 +391,8 @@ function OpenPeriodForm({
         </div>
       </div>
       <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-        Giờ công của kỳ lấy từ lịch ĐÃ CÔNG BỐ trong khoảng này. Ca còn ở dạng nháp không được
-        tính — công bố lịch trước khi chốt công.
+        Giờ công của kỳ lấy từ lịch ĐÃ CÔNG BỐ trong khoảng này. Ca còn ở dạng nháp không được tính
+        — công bố lịch trước khi chốt công.
       </p>
     </section>
   )

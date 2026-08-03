@@ -2,7 +2,9 @@ import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type TimesheetDay, type TimesheetRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
+import { TextInput as Input } from '../components/form'
 import { DateInput, Field, formatDay, formatTime } from '../components/report'
 import { useSession } from '../session-context'
 import { formatMinutes } from './Attendance'
@@ -118,40 +120,151 @@ export function Timesheet() {
           />
         ) : null}
 
-        <div className="mt-5 flex flex-col gap-4">
-          {grid.isPending ? (
-            <p className="text-ink-mute">Đang tải…</p>
-          ) : rows.length === 0 ? (
-            <p className="text-[length:var(--fs-b2)] text-ink-mute">
-              Chi nhánh này chưa có hồ sơ nhân viên nào.
-            </p>
-          ) : (
-            rows.map((row) => (
-              <EmployeeCard
-                key={row.employeeId}
+        <div className="mt-5">
+          <DataTable
+            rows={rows}
+            rowKey={(row) => row.employeeId}
+            loading={grid.isPending}
+            empty="Chi nhánh này chưa có hồ sơ nhân viên nào."
+            // Cảnh báo phải thấy được khi LƯỚT, không phải sau khi mở từng người:
+            // "ai thiếu công" là câu hỏi mở màn này ra để hỏi.
+            renderBanner={(row) =>
+              row.missingDays.length === 0 && row.openShifts === 0 && row.leaveDays === 0 ? null : (
+                <>
+                  {row.openShifts > 0 ? (
+                    <Badge tone="danger">{row.openShifts} ca chưa chấm ra</Badge>
+                  ) : null}
+                  {row.missingDays.length > 0 ? (
+                    <span className="text-[length:var(--fs-c1)] text-warn">
+                      Thiếu công {row.missingDays.length} ngày:{' '}
+                      {row.missingDays.map(formatDay).join(', ')}
+                    </span>
+                  ) : null}
+                  {row.leaveDays > 0 ? (
+                    <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                      Nghỉ có phép {row.leaveDays} ngày
+                    </span>
+                  ) : null}
+                </>
+              )
+            }
+            renderDetail={(row) => (
+              <DayTable
                 row={row}
                 editable={editable}
-                onEdit={(day) =>
-                  setDraft({
-                    employeeId: row.employeeId,
-                    fullName: row.fullName,
-                    workDate: day?.workDate ?? today(),
-                    clockIn: day ? toHhMm(day.clockIn) : '08:00',
-                    clockOut: day?.clockOut ? toHhMm(day.clockOut) : '',
-                    breakMinutes: day?.breakMinutes ?? 0,
-                    reason: '',
-                  })
-                }
+                onEdit={(day) => setDraft(toDraft(row, day))}
               />
-            ))
-          )}
+            )}
+            columns={[
+              {
+                key: 'employee',
+                header: 'Nhân viên',
+                width: 'minmax(200px, 1fr)',
+                cell: (row) => (
+                  <span className="min-w-0">
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.fullName}
+                    </span>
+                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                      {row.position} · {row.days.length} ngày có công
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: 'worked',
+                header: 'Giờ thường',
+                width: '110px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-ink-body">{formatMinutes(row.total.worked)}</span>
+                ),
+              },
+              {
+                key: 'ot150',
+                header: 'TC 150%',
+                width: '110px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-ink-body">
+                    {row.total.otNormal ? formatMinutes(row.total.otNormal) : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'ot200',
+                header: 'TC 200%',
+                width: '110px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-ink-body">
+                    {row.total.otRest ? formatMinutes(row.total.otRest) : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'ot300',
+                header: 'TC 300%',
+                width: '110px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-ink-body">
+                    {row.total.otHoliday ? formatMinutes(row.total.otHoliday) : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'total',
+                header: 'Tổng',
+                width: '120px',
+                numeric: true,
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-b2)] font-semibold text-ink-hi">
+                    {formatMinutes(
+                      row.total.worked +
+                        row.total.otNormal +
+                        row.total.otRest +
+                        row.total.otHoliday,
+                    )}
+                  </span>
+                ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                width: '140px',
+                cell: (row) => (
+                  // Cả dòng đã bắt onClick để bung bảng ngày công — nút phải chặn lại
+                  <span className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                    {editable ? (
+                      <Button size="sm" onClick={() => setDraft(toDraft(row, null))}>
+                        Thêm ngày
+                      </Button>
+                    ) : null}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
       </div>
     </>
   )
 }
 
-function EmployeeCard({
+function toDraft(row: TimesheetRow, day: TimesheetDay | null) {
+  return {
+    employeeId: row.employeeId,
+    fullName: row.fullName,
+    workDate: day?.workDate ?? today(),
+    clockIn: day ? toHhMm(day.clockIn) : '08:00',
+    clockOut: day?.clockOut ? toHhMm(day.clockOut) : '',
+    breakMinutes: day?.breakMinutes ?? 0,
+    reason: '',
+  }
+}
+
+function DayTable({
   row,
   editable,
   onEdit,
@@ -160,134 +273,78 @@ function EmployeeCard({
   editable: boolean
   onEdit: (day: TimesheetDay | null) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const totalMinutes = row.total.worked + row.total.otNormal + row.total.otRest + row.total.otHoliday
-
   return (
-    <section className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
-      <div className="grid grid-cols-[1fr_110px_110px_110px_110px_120px_150px] items-center gap-3 px-5 py-3">
-        <span className="min-w-0">
-          <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-            {row.fullName}
-          </span>
-          <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
-            {row.position} · {row.days.length} ngày có công
-          </span>
-        </span>
-
-        <Cell label="Giờ thường" value={formatMinutes(row.total.worked)} />
-        <Cell label="TC 150%" value={row.total.otNormal ? formatMinutes(row.total.otNormal) : '—'} />
-        <Cell label="TC 200%" value={row.total.otRest ? formatMinutes(row.total.otRest) : '—'} />
-        <Cell label="TC 300%" value={row.total.otHoliday ? formatMinutes(row.total.otHoliday) : '—'} />
-        <Cell label="Tổng" value={formatMinutes(totalMinutes)} strong />
-
-        <span className="flex justify-end gap-2">
-          {editable ? (
-            <button
-              type="button"
-              onClick={() => onEdit(null)}
-              className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-            >
-              Thêm ngày
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setOpen(!open)}
-            className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-          >
-            {open ? 'Thu' : 'Chi tiết'}
-          </button>
-        </span>
+    <>
+      <div className="grid grid-cols-[120px_100px_100px_90px_1fr_120px] gap-3 border-b border-line-1 px-5 py-2 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
+        <span>Ngày</span>
+        <span>Vào</span>
+        <span>Ra</span>
+        <span className="text-right">Công</span>
+        <span>Nguồn</span>
+        <span />
       </div>
-
-      {row.missingDays.length > 0 || row.openShifts > 0 || row.leaveDays > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-line-1 px-5 py-2.5">
-          {row.openShifts > 0 ? (
-            <Badge tone="danger">{row.openShifts} ca chưa chấm ra</Badge>
-          ) : null}
-          {row.missingDays.length > 0 ? (
-            <span className="text-[length:var(--fs-c1)] text-warn">
-              Thiếu công {row.missingDays.length} ngày: {row.missingDays.map(formatDay).join(', ')}
+      {row.days.length === 0 ? (
+        <p className="px-5 py-3 text-[length:var(--fs-c1)] text-ink-mute">
+          Chưa có ngày công nào trong khoảng này.
+        </p>
+      ) : (
+        row.days.map((day) => (
+          <div
+            key={day.workDate}
+            className="grid grid-cols-[120px_100px_100px_90px_1fr_120px] items-center gap-3 border-b border-line-1 px-5 py-2 last:border-b-0"
+          >
+            <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
+              {formatDay(day.workDate)}
+              {day.dayKind !== 'thuong' ? (
+                <span className="ml-1 text-accent-ink">{day.dayKind === 'le' ? 'lễ' : 'nghỉ'}</span>
+              ) : null}
             </span>
-          ) : null}
-          {row.leaveDays > 0 ? (
-            <span className="text-[length:var(--fs-c1)] text-ink-mute">
-              Nghỉ có phép {row.leaveDays} ngày
+            <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
+              {formatTime(day.clockIn)}
             </span>
-          ) : null}
-        </div>
-      ) : null}
-
-      {open ? (
-        <div className="border-t border-line-1 bg-canvas">
-          <div className="grid grid-cols-[120px_100px_100px_90px_1fr_120px] gap-3 border-b border-line-1 px-5 py-2 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Ngày</span>
-            <span>Vào</span>
-            <span>Ra</span>
-            <span className="text-right">Công</span>
-            <span>Nguồn</span>
-            <span />
+            <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
+              {day.clockOut ? (
+                formatTime(day.clockOut)
+              ) : (
+                <span className="text-danger">chưa ra</span>
+              )}
+            </span>
+            <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-hi">
+              {formatMinutes(day.worked + day.otNormal + day.otRest + day.otHoliday)}
+            </span>
+            <span className="min-w-0 text-[length:var(--fs-c1)] text-ink-mute">
+              {day.source === 'manual' ? (
+                <span className="truncate">
+                  sửa tay · {day.editedBy ?? '?'} · {day.editReason}
+                </span>
+              ) : day.source === 'kiosk' ? (
+                'kiosk'
+              ) : (
+                'suy từ phiên POS'
+              )}
+            </span>
+            <span className="flex justify-end">
+              {editable ? (
+                <Button onClick={() => onEdit(day)} size="sm">
+                  Sửa
+                </Button>
+              ) : null}
+            </span>
           </div>
-          {row.days.length === 0 ? (
-            <p className="px-5 py-3 text-[length:var(--fs-c1)] text-ink-mute">
-              Chưa có ngày công nào trong khoảng này.
-            </p>
-          ) : (
-            row.days.map((day) => (
-              <div
-                key={day.workDate}
-                className="grid grid-cols-[120px_100px_100px_90px_1fr_120px] items-center gap-3 border-b border-line-1 px-5 py-2 last:border-b-0"
-              >
-                <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
-                  {formatDay(day.workDate)}
-                  {day.dayKind !== 'thuong' ? (
-                    <span className="ml-1 text-accent-ink">
-                      {day.dayKind === 'le' ? 'lễ' : 'nghỉ'}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
-                  {formatTime(day.clockIn)}
-                </span>
-                <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
-                  {day.clockOut ? formatTime(day.clockOut) : <span className="text-danger">chưa ra</span>}
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-hi">
-                  {formatMinutes(day.worked + day.otNormal + day.otRest + day.otHoliday)}
-                </span>
-                <span className="min-w-0 text-[length:var(--fs-c1)] text-ink-mute">
-                  {day.source === 'manual' ? (
-                    <span className="truncate">
-                      sửa tay · {day.editedBy ?? '?'} · {day.editReason}
-                    </span>
-                  ) : day.source === 'kiosk' ? (
-                    'kiosk'
-                  ) : (
-                    'suy từ phiên POS'
-                  )}
-                </span>
-                <span className="flex justify-end">
-                  {editable ? (
-                    <button
-                      type="button"
-                      onClick={() => onEdit(day)}
-                      className="h-7 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                    >
-                      Sửa
-                    </button>
-                  ) : null}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      ) : null}
-    </section>
+        ))
+      )}
+    </>
   )
 }
-
-function Cell({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+function Cell({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string
+  value: string
+  strong?: boolean
+}) {
   return (
     <span className="text-right">
       <span className="block text-[length:var(--fs-c2)] tracking-[0.08em] text-ink-mute uppercase">
@@ -317,7 +374,8 @@ function EntryForm({
   onSave: () => void
   saving: boolean
 }) {
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => onChange({ ...draft, [key]: value })
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+    onChange({ ...draft, [key]: value })
 
   return (
     <section className="mt-4 rounded-md border border-accent bg-surface-1 p-5">
@@ -366,28 +424,6 @@ function EntryForm({
         </div>
       </div>
     </section>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
-    />
   )
 }
 

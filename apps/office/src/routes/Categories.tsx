@@ -2,8 +2,10 @@ import { Button, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type CategoryInput, type CategoryNode } from '../api'
+import { Pagination, usePaged } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field } from '../components/report'
+import { TextInput as Input, Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 /**
@@ -83,6 +85,7 @@ export function Categories() {
   })
 
   const rows = tree.data ?? []
+  const paged = usePaged(rows)
 
   const drop = (target: DropTarget) => {
     setOver(null)
@@ -106,7 +109,10 @@ export function Categories() {
     move.mutate({
       id,
       parentId: node.parentId,
-      position: Math.max(0, siblings.findIndex((s) => s.id === target.id)),
+      position: Math.max(
+        0,
+        siblings.findIndex((s) => s.id === target.id),
+      ),
     })
   }
 
@@ -153,7 +159,7 @@ export function Categories() {
               để khách lướt.
             </p>
           ) : (
-            rows.map((row) => (
+            paged.visible.map((row) => (
               <div
                 key={row.id}
                 draggable={mayEdit}
@@ -184,7 +190,10 @@ export function Categories() {
                       : ''
                 }`}
               >
-                <span className="flex min-w-0 items-center gap-2" style={{ paddingLeft: row.depth * 22 }}>
+                <span
+                  className="flex min-w-0 items-center gap-2"
+                  style={{ paddingLeft: row.depth * 22 }}
+                >
                   {mayEdit ? (
                     <span className="cursor-grab text-line-4 select-none" aria-hidden>
                       ⠿
@@ -223,32 +232,29 @@ export function Categories() {
                 <span className="flex justify-end gap-1.5">
                   {mayEdit ? (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => setDraft(toInput(row))}
-                        className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                      >
+                      <Button onClick={() => setDraft(toInput(row))} size="sm">
                         Sửa
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
                         onClick={() => remove.mutate(row.id)}
                         disabled={row.childCount > 0 || row.totalDishCount > 0}
-                        className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-mute hover:text-danger disabled:opacity-40"
                         title={
                           row.childCount > 0 || row.totalDishCount > 0
                             ? 'Còn nhóm con hoặc còn món — chuyển đi trước'
                             : undefined
                         }
+                        size="sm"
+                        variant="danger"
                       >
                         Xoá
-                      </button>
+                      </Button>
                     </>
                   ) : null}
                 </span>
               </div>
             ))
           )}
+          <Pagination {...paged.controls} />
 
           {mayEdit && rows.length > 0 ? (
             <div
@@ -270,10 +276,10 @@ export function Categories() {
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-          Số trong ngoặc là tổng món tính cả nhóm con. Tắt kênh chỉ ẩn NHÓM, cờ bán của từng món
-          giữ nguyên — bật lại là mọi thứ trở về như cũ. Kênh online đã ẩn thật (thực đơn O2 đọc
-          trực tiếp); cờ <span className="text-ink-body">bàn</span> đi theo cấu hình xuống POS và
-          Table, hai app đó dùng nó khi dựng lại bảng phím món.
+          Số trong ngoặc là tổng món tính cả nhóm con. Tắt kênh chỉ ẩn NHÓM, cờ bán của từng món giữ
+          nguyên — bật lại là mọi thứ trở về như cũ. Kênh online đã ẩn thật (thực đơn O2 đọc trực
+          tiếp); cờ <span className="text-ink-body">bàn</span> đi theo cấu hình xuống POS và Table,
+          hai app đó dùng nó khi dựng lại bảng phím món.
         </p>
       </div>
     </>
@@ -346,7 +352,11 @@ function CategoryForm({
         </Field>
 
         <Field label="Kanji hiển thị">
-          <Input value={draft.kanji ?? ''} onChange={(v) => set('kanji', v || null)} placeholder="牛" />
+          <Input
+            value={draft.kanji ?? ''}
+            onChange={(v) => set('kanji', v || null)}
+            placeholder="牛"
+          />
         </Field>
         <Field label="Ảnh bìa (URL)">
           <Input
@@ -377,14 +387,18 @@ function CategoryForm({
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <Toggle
           on={draft.tableVisible}
-          onToggle={() => set('tableVisible', !draft.tableVisible)}
-          label="Hiện ở kênh tại bàn"
-        />
+          onChange={() => set('tableVisible', !draft.tableVisible)}
+          tone="ok"
+        >
+          Hiện ở kênh tại bàn
+        </Toggle>
         <Toggle
           on={draft.onlineVisible}
-          onToggle={() => set('onlineVisible', !draft.onlineVisible)}
-          label="Hiện ở kênh online"
-        />
+          onChange={() => set('onlineVisible', !draft.onlineVisible)}
+          tone="ok"
+        >
+          Hiện ở kênh online
+        </Toggle>
         <div className="ml-auto flex gap-2">
           <Button onClick={onCancel}>Bỏ</Button>
           <Button variant="primary" onClick={onSave} disabled={saving}>
@@ -398,42 +412,6 @@ function CategoryForm({
         thứ tự anh em ở cả chỗ cũ lẫn chỗ mới.
       </p>
     </section>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  disabled = false,
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  disabled?: boolean
-}) {
-  return (
-    <input
-      value={value}
-      disabled={disabled}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi disabled:text-ink-mute"
-    />
-  )
-}
-
-function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-        on ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
-      }`}
-    >
-      {label}
-    </button>
   )
 }
 

@@ -2,8 +2,10 @@ import { Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type PrinterInput, type PrinterRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field } from '../components/report'
+import { TextInput as Input, Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 /**
@@ -98,72 +100,88 @@ export function Printers() {
           />
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[1fr_190px_150px_180px_120px_150px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Máy in</span>
-            <span>Loại</span>
-            <span>Trạm</span>
-            <span>Địa chỉ</span>
-            <span>Mẫu in</span>
-            <span />
-          </div>
-
-          {data.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : printers.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chi nhánh này chưa khai máy in nào.
-            </p>
-          ) : (
-            printers.map((row) => (
-              <div
-                key={row.id}
-                className={`grid grid-cols-[1fr_190px_150px_180px_120px_150px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                  row.active ? '' : 'opacity-60'
-                }`}
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                    {row.name}
-                  </span>
-                  {!row.active ? (
-                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
-                      đang tắt — cầu in không nhận máy này
+        <div className="mt-5">
+          <DataTable
+            rows={printers}
+            rowKey={(row) => row.id}
+            loading={data.isPending}
+            empty="Chi nhánh này chưa khai máy in nào."
+            columns={[
+              {
+                key: 'name',
+                header: 'Máy in',
+                width: 'minmax(180px, 1fr)',
+                cell: (row) => (
+                  <span className={row.active ? '' : 'opacity-60'}>
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {row.name}
                     </span>
-                  ) : null}
-                </span>
-                <span className="text-[length:var(--fs-c1)] text-ink-body">
-                  {KIND_LABELS[row.kind]}
-                </span>
-                <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                  {row.stationId ?? '—'}
-                </span>
-                <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
-                  {row.host}:{row.port}
-                </span>
-                <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                  {row.template}
-                  {row.copies > 1 ? ` ×${row.copies}` : ''}
-                </span>
-                <span className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDraft({ input: toInput(row), id: row.id })}
-                    className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                  >
-                    Sửa
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => remove.mutate(row.id)}
-                    className="h-8 rounded-sm border border-danger-line px-2 text-[length:var(--fs-c1)] text-danger hover:bg-danger/8"
-                  >
-                    Bỏ
-                  </button>
-                </span>
-              </div>
-            ))
-          )}
+                    {!row.active ? (
+                      <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                        đang tắt — cầu in không nhận máy này
+                      </span>
+                    ) : null}
+                  </span>
+                ),
+              },
+              {
+                key: 'kind',
+                header: 'Loại',
+                width: '190px',
+                cell: (row) => (
+                  <span className="text-[length:var(--fs-c1)] text-ink-body">
+                    {KIND_LABELS[row.kind]}
+                  </span>
+                ),
+              },
+              {
+                key: 'station',
+                header: 'Trạm',
+                width: '150px',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.stationId ?? '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'host',
+                header: 'Địa chỉ',
+                width: '180px',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
+                    {row.host}:{row.port}
+                  </span>
+                ),
+              },
+              {
+                key: 'template',
+                header: 'Mẫu in',
+                width: '130px',
+                cell: (row) => (
+                  <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    {row.template}
+                    {row.copies > 1 ? ` ×${row.copies}` : ''}
+                  </span>
+                ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                width: '150px',
+                cell: (row) => (
+                  <span className="flex justify-end gap-2">
+                    <Button onClick={() => setDraft({ input: toInput(row), id: row.id })} size="sm">
+                      Sửa
+                    </Button>
+                    <Button onClick={() => remove.mutate(row.id)} size="sm" variant="danger">
+                      Bỏ
+                    </Button>
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
@@ -222,7 +240,10 @@ function PrinterForm({
       template: templates[kind][0] ?? draft.template,
     })
 
-  const ready = draft.name.trim() !== '' && draft.host.trim() !== '' && (draft.kind === 'bill' || draft.stationId !== null)
+  const ready =
+    draft.name.trim() !== '' &&
+    draft.host.trim() !== '' &&
+    (draft.kind === 'bill' || draft.stationId !== null)
 
   return (
     <section className="rounded-md border border-accent bg-surface-1 p-5">
@@ -300,15 +321,9 @@ function PrinterForm({
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => set('active', !draft.active)}
-          className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-            draft.active ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
-          }`}
-        >
+        <Toggle onChange={() => set('active', !draft.active)} on={draft.active} tone="ok">
           {draft.active ? 'Đang dùng' : 'Đang tắt'}
-        </button>
+        </Toggle>
         <div className="ml-auto flex gap-2">
           <Button onClick={onCancel}>Bỏ</Button>
           <Button variant="primary" disabled={!ready || saving} onClick={onSave}>
@@ -317,31 +332,5 @@ function PrinterForm({
         </div>
       </div>
     </section>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  mono = false,
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-  mono?: boolean
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi ${
-        mono ? 'font-mono' : ''
-      }`}
-    />
   )
 }

@@ -2,8 +2,10 @@ import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type CmsJob, type CmsPost } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field, formatDay } from '../components/report'
+import { SegmentedControl, TextInput as Input, Toggle } from '../components/form'
 
 /**
  * A8 — CMS website.
@@ -22,7 +24,15 @@ import { Field, formatDay } from '../components/report'
  * trang tin hiện một tiêu đề cụt.
  */
 
-const CATEGORIES = ['Bếp', 'Nguyên liệu', 'Chi nhánh', 'Sự kiện', 'Thực đơn', 'Ưu đãi', 'Câu chuyện']
+const CATEGORIES = [
+  'Bếp',
+  'Nguyên liệu',
+  'Chi nhánh',
+  'Sự kiện',
+  'Thực đơn',
+  'Ưu đãi',
+  'Câu chuyện',
+]
 const EMPLOYMENTS = ['Toàn thời gian', 'Toàn thời gian · ca tối', 'Bán thời gian', 'Thời vụ']
 
 type PostDraft = Omit<CmsPost, 'id' | 'updatedAt' | 'updatedBy'>
@@ -54,25 +64,15 @@ export function Cms() {
         title="Nội dung website"
         subtitle="Tin tức và tuyển dụng của website thương hiệu. Giá món, giờ mở và địa chỉ thì không nằm ở đây — chúng có nguồn riêng và website đọc thẳng."
         action={
-          <div className="flex overflow-hidden rounded-sm border border-line-1">
-            {(
-              [
-                ['posts', 'W8 · Tin tức'],
-                ['jobs', 'W9 · Tuyển dụng'],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTab(key)}
-                className={`h-[var(--hit-target)] border-r border-line-1 px-4 text-[length:var(--fs-b2)] last:border-r-0 ${
-                  tab === key ? 'bg-surface-3 text-ink-hi' : 'text-ink-mute hover:text-ink-hi'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            size="md"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'posts', label: 'W8 · Tin tức' },
+              { value: 'jobs', label: 'W9 · Tuyển dụng' },
+            ]}
+          />
         }
       />
 
@@ -185,20 +185,18 @@ function PostsTab() {
           </Field>
 
           <div className="mt-4 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() =>
+            <Toggle
+              onChange={() =>
                 setDraft({
                   ...draft,
                   input: { ...draft.input, published: !draft.input.published },
                 })
               }
-              className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-                draft.input.published ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
-              }`}
+              on={draft.input.published}
+              tone="ok"
             >
               {draft.input.published ? 'Đăng lên website' : 'Giữ ở nháp'}
-            </button>
+            </Toggle>
             <div className="ml-auto flex gap-2">
               <Button onClick={() => setDraft(null)}>Bỏ</Button>
               <Button
@@ -213,72 +211,81 @@ function PostsTab() {
         </section>
       ) : null}
 
-      <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-        <div className="grid grid-cols-[1fr_140px_120px_110px_160px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-          <span>Bài viết</span>
-          <span>Mục</span>
-          <span>Ngày đăng</span>
-          <span>Trạng thái</span>
-          <span />
-        </div>
-
-        {posts.isPending ? (
-          <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-        ) : list.length === 0 ? (
-          <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-            Chưa có bài nào. Trang Tin tức sẽ trống cho tới khi có bài được đăng.
-          </p>
-        ) : (
-          list.map((row, index) => (
-            <div
-              key={row.id}
-              className={`grid grid-cols-[1fr_140px_120px_110px_160px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                row.published ? '' : 'opacity-60'
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                  {row.title}
-                </span>
-                {row.published && index === 0 ? (
-                  <span className="mt-0.5 block text-[length:var(--fs-c1)] text-accent-ink">
-                    Đang là bài nổi bật trên W8
+      <div className="mt-5">
+        <DataTable
+          rows={list}
+          rowKey={(row) => row.id}
+          loading={posts.isPending}
+          empty="Chưa có bài nào. Trang Tin tức sẽ trống cho tới khi có bài được đăng."
+          columns={[
+            {
+              key: 'title',
+              header: 'Bài viết',
+              width: 'minmax(220px, 1fr)',
+              cell: (row, index) => (
+                <span className={row.published ? '' : 'opacity-60'}>
+                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                    {row.title}
                   </span>
-                ) : null}
-              </span>
-              <span className="text-[length:var(--fs-c1)] text-ink-body">{row.category}</span>
-              <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                {formatDay(row.publishedOn)}
-              </span>
-              <span>
-                {row.published ? <Badge tone="ok">Đã đăng</Badge> : <Badge>Nháp</Badge>}
-              </span>
-              <span className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggle.mutate({ id: row.id, published: !row.published })}
-                  className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                >
-                  {row.published ? 'Gỡ' : 'Đăng'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraft({ input: toPostDraft(row), id: row.id })}
-                  className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                >
-                  Sửa
-                </button>
-                <button
-                  type="button"
-                  onClick={() => remove.mutate(row.id)}
-                  className="h-8 rounded-sm border border-danger-line px-2 text-[length:var(--fs-c1)] text-danger hover:bg-danger/8"
-                >
-                  Xoá
-                </button>
-              </span>
-            </div>
-          ))
-        )}
+                  {row.published && index === 0 ? (
+                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-accent-ink">
+                      Đang là bài nổi bật trên W8
+                    </span>
+                  ) : null}
+                </span>
+              ),
+            },
+            {
+              key: 'category',
+              header: 'Mục',
+              width: '140px',
+              cell: (row) => (
+                <span className="text-[length:var(--fs-c1)] text-ink-body">{row.category}</span>
+              ),
+            },
+            {
+              key: 'publishedOn',
+              header: 'Ngày đăng',
+              width: '130px',
+              cell: (row) => (
+                <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                  {formatDay(row.publishedOn)}
+                </span>
+              ),
+            },
+            {
+              key: 'state',
+              header: 'Trạng thái',
+              width: '120px',
+              cell: (row) =>
+                row.published ? <Badge tone="ok">Đã đăng</Badge> : <Badge>Nháp</Badge>,
+            },
+            {
+              key: 'actions',
+              header: '',
+              width: '210px',
+              cell: (row) => (
+                <span className="flex justify-end gap-2">
+                  <Button
+                    onClick={() => toggle.mutate({ id: row.id, published: !row.published })}
+                    size="sm"
+                  >
+                    {row.published ? 'Gỡ' : 'Đăng'}
+                  </Button>
+                  <Button
+                    onClick={() => setDraft({ input: toPostDraft(row), id: row.id })}
+                    size="sm"
+                  >
+                    Sửa
+                  </Button>
+                  <Button onClick={() => remove.mutate(row.id)} size="sm" variant="danger">
+                    Xoá
+                  </Button>
+                </span>
+              ),
+            },
+          ]}
+        />
       </div>
     </>
   )
@@ -393,24 +400,24 @@ function JobsTab() {
               <Input
                 type="number"
                 value={String(draft.input.slots)}
-                onChange={(v) => setDraft({ ...draft, input: { ...draft.input, slots: Number(v) || 1 } })}
+                onChange={(v) =>
+                  setDraft({ ...draft, input: { ...draft.input, slots: Number(v) || 1 } })
+                }
                 mono
               />
             </Field>
           </div>
 
           <div className="mt-4 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() =>
+            <Toggle
+              onChange={() =>
                 setDraft({ ...draft, input: { ...draft.input, published: !draft.input.published } })
               }
-              className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-                draft.input.published ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
-              }`}
+              on={draft.input.published}
+              tone="ok"
             >
               {draft.input.published ? 'Hiện trên website' : 'Chưa mở tuyển'}
-            </button>
+            </Toggle>
             <div className="ml-auto flex gap-2">
               <Button onClick={() => setDraft(null)}>Bỏ</Button>
               <Button
@@ -425,65 +432,85 @@ function JobsTab() {
         </section>
       ) : null}
 
-      <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-        <div className="grid grid-cols-[1fr_170px_200px_100px_110px_160px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-          <span>Vị trí</span>
-          <span>Chi nhánh</span>
-          <span>Hình thức</span>
-          <span>Số lượng</span>
-          <span>Trạng thái</span>
-          <span />
-        </div>
-
-        {jobs.isPending ? (
-          <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-        ) : list.length === 0 ? (
-          <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-            Chưa có vị trí nào. Trang Liên hệ sẽ mời ứng viên gửi hồ sơ chung.
-          </p>
-        ) : (
-          list.map((row) => (
-            <div
-              key={row.id}
-              className={`grid grid-cols-[1fr_170px_200px_100px_110px_160px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                row.published ? '' : 'opacity-60'
-              }`}
-            >
-              <span className="truncate text-[length:var(--fs-b2)] text-ink-hi">{row.title}</span>
-              <span className="text-[length:var(--fs-c1)] text-ink-body">
-                {row.branchName ?? 'Cả chuỗi'}
-              </span>
-              <span className="text-[length:var(--fs-c1)] text-ink-mute">{row.employment}</span>
-              <span className="font-mono text-[length:var(--fs-c1)] text-ink-body">
-                {row.slots}
-              </span>
-              <span>{row.published ? <Badge tone="ok">Đang tuyển</Badge> : <Badge>Đóng</Badge>}</span>
-              <span className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggle.mutate({ id: row.id, published: !row.published })}
-                  className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
+      <div className="mt-5">
+        <DataTable
+          rows={list}
+          rowKey={(row) => row.id}
+          loading={jobs.isPending}
+          empty="Chưa có vị trí nào. Trang Liên hệ sẽ mời ứng viên gửi hồ sơ chung."
+          columns={[
+            {
+              key: 'title',
+              header: 'Vị trí',
+              width: 'minmax(200px, 1fr)',
+              cell: (row) => (
+                <span
+                  className={`truncate text-[length:var(--fs-b2)] text-ink-hi ${
+                    row.published ? '' : 'opacity-60'
+                  }`}
                 >
-                  {row.published ? 'Đóng' : 'Mở'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraft({ input: toJobDraft(row), id: row.id })}
-                  className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                >
-                  Sửa
-                </button>
-                <button
-                  type="button"
-                  onClick={() => remove.mutate(row.id)}
-                  className="h-8 rounded-sm border border-danger-line px-2 text-[length:var(--fs-c1)] text-danger hover:bg-danger/8"
-                >
-                  Xoá
-                </button>
-              </span>
-            </div>
-          ))
-        )}
+                  {row.title}
+                </span>
+              ),
+            },
+            {
+              key: 'branch',
+              header: 'Chi nhánh',
+              width: '170px',
+              cell: (row) => (
+                <span className="text-[length:var(--fs-c1)] text-ink-body">
+                  {row.branchName ?? 'Cả chuỗi'}
+                </span>
+              ),
+            },
+            {
+              key: 'employment',
+              header: 'Hình thức',
+              width: '200px',
+              cell: (row) => (
+                <span className="text-[length:var(--fs-c1)] text-ink-mute">{row.employment}</span>
+              ),
+            },
+            {
+              key: 'slots',
+              header: 'Số lượng',
+              width: '110px',
+              numeric: true,
+              cell: (row) => <span className="text-ink-body">{row.slots}</span>,
+            },
+            {
+              key: 'state',
+              header: 'Trạng thái',
+              width: '130px',
+              cell: (row) =>
+                row.published ? <Badge tone="ok">Đang tuyển</Badge> : <Badge>Đóng</Badge>,
+            },
+            {
+              key: 'actions',
+              header: '',
+              width: '210px',
+              cell: (row) => (
+                <span className="flex justify-end gap-2">
+                  <Button
+                    onClick={() => toggle.mutate({ id: row.id, published: !row.published })}
+                    size="sm"
+                  >
+                    {row.published ? 'Đóng' : 'Mở'}
+                  </Button>
+                  <Button
+                    onClick={() => setDraft({ input: toJobDraft(row), id: row.id })}
+                    size="sm"
+                  >
+                    Sửa
+                  </Button>
+                  <Button onClick={() => remove.mutate(row.id)} size="sm" variant="danger">
+                    Xoá
+                  </Button>
+                </span>
+              ),
+            },
+          ]}
+        />
       </div>
     </>
   )
@@ -498,30 +525,4 @@ function toJobDraft(row: CmsJob): JobDraft {
     published: row.published,
     sort: row.sort,
   }
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  mono = false,
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-  mono?: boolean
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi ${
-        mono ? 'font-mono' : ''
-      }`}
-    />
-  )
 }

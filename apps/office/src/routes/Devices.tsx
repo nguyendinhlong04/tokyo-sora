@@ -2,6 +2,7 @@ import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type DeviceRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { Field, formatTime } from '../components/report'
 import { useSession } from '../session-context'
@@ -183,28 +184,17 @@ function DeviceTable({
       <h2 className="mb-2 text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
         {title}
       </h2>
-      <div className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
-        <div className="grid grid-cols-[1fr_160px_150px_1fr_110px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-          <span>Máy</span>
-          <span>Loại</span>
-          <span>Trạm</span>
-          <span>Đang đăng nhập</span>
-          <span />
-        </div>
-
-        {rows.length === 0 ? (
-          <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-            Chưa có máy nào. Sinh mã ghép ở trên rồi nhập vào máy cần ghép.
-          </p>
-        ) : (
-          rows.map((row) => (
-            <div
-              key={row.id}
-              className={`grid grid-cols-[1fr_160px_150px_1fr_110px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                row.revokedAt ? 'opacity-60' : ''
-              }`}
-            >
-              <span className="min-w-0">
+      <DataTable
+        rows={rows}
+        rowKey={(row) => row.id}
+        empty="Chưa có máy nào. Sinh mã ghép ở trên rồi nhập vào máy cần ghép."
+        columns={[
+          {
+            key: 'name',
+            header: 'Máy',
+            width: 'minmax(200px, 1fr)',
+            cell: (row) => (
+              <span className={row.revokedAt ? 'opacity-60' : ''}>
                 <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
                   {row.name}
                 </span>
@@ -213,12 +203,33 @@ function DeviceTable({
                   {row.pairedByName ? ` · ${row.pairedByName}` : ''}
                 </span>
               </span>
+            ),
+          },
+          {
+            key: 'kind',
+            header: 'Loại',
+            width: '160px',
+            cell: (row) => (
               <span className="text-[length:var(--fs-c1)] text-ink-body">
                 {KIND_LABELS[row.kind] ?? row.kind}
               </span>
+            ),
+          },
+          {
+            key: 'station',
+            header: 'Trạm',
+            width: '150px',
+            cell: (row) => (
               <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
                 {row.stationId ? `${row.stationId} · ${row.stationName ?? ''}` : '—'}
               </span>
+            ),
+          },
+          {
+            key: 'signedIn',
+            header: 'Đang đăng nhập',
+            width: 'minmax(180px, 1fr)',
+            cell: (row) => (
               <span className="flex flex-wrap gap-1.5">
                 {row.signedIn.length === 0 ? (
                   <span className="text-[length:var(--fs-c1)] text-ink-mute">Không ai</span>
@@ -230,26 +241,33 @@ function DeviceTable({
                   ))
                 )}
               </span>
+            ),
+          },
+          {
+            key: 'actions',
+            header: '',
+            width: '120px',
+            cell: (row) => (
               <span className="flex justify-end">
                 {onRevoke ? (
-                  <button
-                    type="button"
+                  <Button
                     disabled={busy}
                     onClick={() => onRevoke(row.id)}
-                    className="h-8 rounded-sm border border-danger-line px-2 text-[length:var(--fs-c1)] text-danger hover:bg-danger/8 disabled:opacity-50"
+                    size="sm"
+                    variant="danger"
                   >
                     Ngắt máy
-                  </button>
+                  </Button>
                 ) : (
                   <span className="text-[length:var(--fs-c1)] text-ink-mute">
                     {formatTime(row.revokedAt!)}
                   </span>
                 )}
               </span>
-            </div>
-          ))
-        )}
-      </div>
+            ),
+          },
+        ]}
+      />
     </section>
   )
 }

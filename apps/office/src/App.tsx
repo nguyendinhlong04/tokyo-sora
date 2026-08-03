@@ -1,7 +1,8 @@
 import type { ActionKey } from '@sora/contracts'
 import { ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router'
 import { Debts, InvoiceBook, PeriodClose, RevenueJournal, TaxReport } from './routes/Accounting'
 import { Accounts } from './routes/Accounts'
 import { Attendance } from './routes/Attendance'
@@ -42,12 +43,7 @@ import { Suppliers } from './routes/Suppliers'
 import { Timesheet } from './routes/Timesheet'
 import { MenuMatrix } from './routes/MenuMatrix'
 import { Modifiers } from './routes/Modifiers'
-import {
-  KitchenReport,
-  OnlineReport,
-  StaffReport,
-  TableTurnover,
-} from './routes/OperationsReports'
+import { KitchenReport, OnlineReport, StaffReport, TableTurnover } from './routes/OperationsReports'
 import { OnlineMenu } from './routes/OnlineMenu'
 import { Parameters } from './routes/Parameters'
 import { Payroll } from './routes/Payroll'
@@ -66,16 +62,21 @@ const queryClient = new QueryClient({
 /**
  * Điều hướng của Office — nhóm theo đúng cột trái của bản thiết kế.
  *
- * Chỉ liệt kê những màn ĐÃ dựng. Các nhóm còn lại (Kho, Nhân sự) thêm vào khi có
- * màn thật: một mục bấm vào không ra gì tệ hơn một mục chưa có.
+ * Chỉ liệt kê những màn ĐÃ dựng. Các nhóm còn lại thêm vào khi có màn thật: một
+ * mục bấm vào không ra gì tệ hơn một mục chưa có.
  *
  * Mục nào khai `need` thì chỉ hiện với vai trò có quyền đó — cùng lý do: mục bấm
  * vào chỉ để nhận màn "không được phép" là mục thừa. Guard ở máy chủ vẫn là thứ
  * cưỡng chế, đây chỉ là dọn màn hình.
+ *
+ * Chia nhóm theo SỐ MỤC ĐỌC ĐƯỢC MỘT LẦN, không theo sơ đồ phòng ban. Trước đây
+ * "Món & kho" gánh 21 mục còn "Kênh online" có 3 — mở nhóm 21 mục ra thì vẫn
+ * phải cuộn, tức là thu nhóm chẳng giải quyết gì. Giờ nhóm to nhất 12 mục, vừa
+ * đúng một màn hình 1080 không cần cuộn.
  */
 const NAV: { group: string; items: { to: string; label: string; need?: ActionKey }[] }[] = [
   {
-    group: 'Kinh doanh',
+    group: 'Báo cáo kinh doanh',
     items: [
       { to: '/hom-nay', label: 'B1 · Hôm nay', need: 'report.branch-revenue' },
       { to: '/doanh-thu', label: 'B2 · Doanh thu', need: 'report.branch-revenue' },
@@ -87,11 +88,20 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
       { to: '/set-khuyen-mai', label: 'B8 · Set & giảm giá', need: 'report.margin-foodcost' },
       { to: '/online-dat-ban', label: 'B9 · Online & đặt bàn', need: 'report.branch-revenue' },
       { to: '/trung-tam-bao-cao', label: 'B10 · Trung tâm báo cáo', need: 'report.branch-revenue' },
+    ],
+  },
+  {
+    group: 'Khách & khuyến mãi',
+    items: [
       { to: '/khuyen-mai', label: 'B11 · Khuyến mãi & voucher', need: 'promo.compose' },
       { to: '/so-khach', label: 'B12 · Sổ khách', need: 'customer.view-book' },
       { to: '/phan-hoi', label: 'B13 · Phản hồi khách', need: 'feedback.respond' },
       { to: '/tich-diem', label: 'B14 · Tích điểm & hạng', need: 'customer.view-book' },
-      { to: '/khach-doanh-nghiep', label: 'B15 · Khách doanh nghiệp', need: 'corporate.edit-profile' },
+      {
+        to: '/khach-doanh-nghiep',
+        label: 'B15 · Khách doanh nghiệp',
+        need: 'corporate.edit-profile',
+      },
     ],
   },
   {
@@ -129,7 +139,7 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
     ],
   },
   {
-    group: 'Món & kho',
+    group: 'Món & thực đơn',
     items: [
       { to: '/mon', label: 'M1 · Món và set' },
       { to: '/tuy-chon', label: 'M5 · Tuỳ chọn', need: 'menu.view-price' },
@@ -139,6 +149,11 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
       { to: '/lich-su-cong-thuc', label: 'M9 · Lịch sử công thức', need: 'cost.view-recipe' },
       { to: '/nhom-mon', label: 'M10 · Cây danh mục', need: 'menu.view-price' },
       { to: '/set-combo', label: 'M11 · Set & Combo', need: 'cost.view-recipe' },
+    ],
+  },
+  {
+    group: 'Kho & mua hàng',
+    items: [
       { to: '/kho', label: 'S1 · Tổng quan kho', need: 'cost.view-recipe' },
       { to: '/ton-kho', label: 'S2 · Tồn kho', need: 'cost.view-recipe' },
       { to: '/nha-cung-cap', label: 'S3 · Nhà cung cấp', need: 'cost.view-recipe' },
@@ -154,6 +169,14 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
     ],
   },
   {
+    group: 'Kênh online & đặt bàn',
+    items: [
+      { to: '/vung-giao', label: 'O10 · Vùng giao & phí' },
+      { to: '/menu-online', label: 'O11 · Menu online' },
+      { to: '/nhan-dat', label: 'R3 · Cấu hình nhận đặt' },
+    ],
+  },
+  {
     group: 'Quản trị',
     items: [
       { to: '/tai-khoan', label: 'A1 · Tài khoản', need: 'admin.manage-accounts-roles' },
@@ -164,16 +187,12 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
       { to: '/tham-so', label: 'A6 · Trung tâm tham số', need: 'admin.manage-accounts-roles' },
       { to: '/nhat-ky-thao-tac', label: 'A7 · Nhật ký thao tác', need: 'audit.view-log' },
       { to: '/noi-dung-web', label: 'A8 · Nội dung website', need: 'cms.edit' },
-      { to: '/hoa-don-dien-tu', label: 'A9 · Hoá đơn điện tử', need: 'admin.manage-accounts-roles' },
+      {
+        to: '/hoa-don-dien-tu',
+        label: 'A9 · Hoá đơn điện tử',
+        need: 'admin.manage-accounts-roles',
+      },
       { to: '/chi-nhanh', label: 'A10 · Chi nhánh', need: 'admin.manage-accounts-roles' },
-    ],
-  },
-  {
-    group: 'Kênh online & đặt bàn',
-    items: [
-      { to: '/vung-giao', label: 'O10 · Vùng giao & phí' },
-      { to: '/menu-online', label: 'O11 · Menu online' },
-      { to: '/nhan-dat', label: 'R3 · Cấu hình nhận đặt' },
     ],
   },
 ]
@@ -265,8 +284,35 @@ export function App() {
   )
 }
 
+const OPEN_GROUP_KEY = 'sora-office-nav-group'
+
 function Shell() {
   const { staff, ready, branchId, signOut, can } = useSession()
+  const { pathname } = useLocation()
+  const [openGroup, setOpenGroup] = useState<string | null>(() =>
+    localStorage.getItem(OPEN_GROUP_KEY),
+  )
+  const [filter, setFilter] = useState('')
+
+  const visible = useMemo(
+    () =>
+      NAV.map((group) => ({
+        group: group.group,
+        items: group.items.filter((item) => !item.need || can(item.need)),
+      })).filter((group) => group.items.length > 0),
+    [can],
+  )
+
+  // Nhóm chứa trang đang xem luôn tự mở. Không có cái này thì bấm một liên kết
+  // trong trang (ví dụ M4 mở màn sửa công thức) sẽ để menu chỉ vào chỗ khác.
+  const activeGroup = visible.find((g) => g.items.some((i) => pathname.startsWith(i.to)))?.group
+  useEffect(() => {
+    if (activeGroup) setOpenGroup(activeGroup)
+  }, [activeGroup])
+
+  useEffect(() => {
+    if (openGroup) localStorage.setItem(OPEN_GROUP_KEY, openGroup)
+  }, [openGroup])
 
   if (!ready) {
     return (
@@ -277,14 +323,21 @@ function Shell() {
   }
   if (!staff) return <Login />
 
-  const visible = NAV.map((group) => ({
-    group: group.group,
-    items: group.items.filter((item) => !item.need || can(item.need)),
-  })).filter((group) => group.items.length > 0)
+  // Đang gõ lọc thì bỏ qua accordion và trải phẳng kết quả: thu nhóm lúc này chỉ
+  // làm người dùng phải mở từng nhóm ra để xem cái mình vừa tìm nằm ở đâu.
+  const needle = filter.trim().toLowerCase()
+  const groups = needle
+    ? visible
+        .map((g) => ({
+          ...g,
+          items: g.items.filter((i) => i.label.toLowerCase().includes(needle)),
+        }))
+        .filter((g) => g.items.length > 0)
+    : visible
 
   return (
-    <div className="flex min-h-dvh bg-canvas font-sans text-ink-body">
-      <aside className="flex w-60 flex-none flex-col border-r border-line-1">
+    <div className="flex h-dvh overflow-hidden bg-canvas font-sans text-ink-body">
+      <aside className="flex w-64 flex-none flex-col border-r border-line-1 bg-surface-1">
         <div className="flex-none border-b border-line-1 px-5 py-4">
           <div className="flex items-baseline gap-2">
             <span className="font-jp text-[length:var(--fs-b2)] text-accent">東京空</span>
@@ -301,45 +354,100 @@ function Shell() {
           <p className="mt-1.5 text-[length:var(--fs-b2)] text-ink-hi">{branchId}</p>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-3">
-          {visible.map((group) => (
-            <div key={group.group} className="mb-4">
-              <p className="px-5 pb-2 text-[length:var(--fs-c2)] font-semibold tracking-[0.14em] text-ink-mute uppercase">
-                {group.group}
-              </p>
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `flex h-10 items-center px-5 text-[length:var(--fs-b2)] ${
-                      isActive
-                        ? 'bg-surface-3 font-medium text-ink-hi shadow-[inset_3px_0_0_var(--color-accent)]'
-                        : 'text-ink-mute hover:text-ink-hi'
-                    }`
-                  }
+        {/* Thu nhóm lại thì mất khả năng liếc một cái thấy hết mục. Ô lọc trả
+            lại đúng khả năng đó — gõ "kho" hoặc "S5" là ra ngay, không cần nhớ
+            mục nằm ở nhóm nào. */}
+        <div className="flex-none border-b border-line-1 px-4 py-3">
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Lọc menu…"
+            aria-label="Lọc menu"
+            className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-c1)] text-ink-hi outline-none placeholder:text-ink-mute focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25"
+          />
+        </div>
+
+        {/* `scrollbar-none` ẩn thanh trượt, `overscroll-contain` chặn việc cuộn
+            hết menu rồi lăn tiếp làm trôi nội dung trang bên phải. */}
+        <nav className="scrollbar-none flex-1 overflow-y-auto overscroll-contain py-2">
+          {groups.map((group) => {
+            const open = needle !== '' || openGroup === group.group
+            return (
+              <div key={group.group}>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenGroup(open && !needle ? null : group.group)}
+                  className="flex w-full items-center gap-2 px-5 py-2.5 text-left transition-colors hover:bg-surface-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                 >
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
-          ))}
+                  <span className="min-w-0 flex-1 truncate text-[length:var(--fs-c2)] font-semibold tracking-[0.14em] text-ink-mute uppercase">
+                    {group.group}
+                  </span>
+                  <span className="font-mono text-[length:var(--fs-c2)] text-line-4">
+                    {group.items.length}
+                  </span>
+                  <svg
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                    className={`size-3 flex-none text-ink-mute transition-transform duration-[var(--dur-micro)] ${
+                      open ? 'rotate-90' : ''
+                    }`}
+                  >
+                    <path
+                      d="M4 2.5 8 6l-4 3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    />
+                  </svg>
+                </button>
+
+                {open ? (
+                  <div className="pb-2">
+                    {group.items.map((item) => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        className={({ isActive }) =>
+                          `flex h-9 items-center pr-4 pl-7 text-[length:var(--fs-b2)] transition-colors ${
+                            isActive
+                              ? 'bg-surface-3 font-medium text-ink-hi shadow-[inset_3px_0_0_var(--color-accent)]'
+                              : 'text-ink-mute hover:bg-surface-3 hover:text-ink-hi'
+                          }`
+                        }
+                      >
+                        <span className="truncate">{item.label}</span>
+                      </NavLink>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
+
+          {groups.length === 0 ? (
+            <p className="px-5 py-4 text-[length:var(--fs-c1)] text-ink-mute">
+              Không có mục nào khớp “{filter}”.
+            </p>
+          ) : null}
         </nav>
 
         <div className="flex-none border-t border-line-1 px-5 py-4">
-          <p className="text-[length:var(--fs-b2)] text-ink-hi">{staff.fullName}</p>
-          <p className="mt-1 text-[length:var(--fs-c1)] text-ink-mute">{staff.roles.join(' · ')}</p>
+          <p className="truncate text-[length:var(--fs-b2)] text-ink-hi">{staff.fullName}</p>
+          <p className="mt-1 truncate text-[length:var(--fs-c1)] text-ink-mute">
+            {staff.roles.join(' · ')}
+          </p>
           <button
             type="button"
             onClick={() => void signOut()}
-            className="mt-3 text-[length:var(--fs-c1)] text-accent-ink"
+            className="mt-3 rounded-sm text-[length:var(--fs-c1)] text-accent-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             Đăng xuất
           </button>
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Outlet />
       </div>
     </div>

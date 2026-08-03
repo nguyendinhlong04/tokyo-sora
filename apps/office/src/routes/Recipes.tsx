@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, type FoodCostBand, type IngredientRow, type RecipeView } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { formatPercent } from '../components/report'
 import { useSession } from '../session-context'
@@ -40,6 +41,7 @@ interface DraftLine {
 /** Danh sách món xếp theo food cost — "sắp theo food cost tìm món lãi thấp" (§24 M1) */
 export function RecipeList() {
   const { branchId } = useSession()
+  const navigate = useNavigate()
 
   const dishes = useQuery({
     queryKey: ['dishes', branchId],
@@ -48,10 +50,7 @@ export function RecipeList() {
   })
   const costs = useQuery({ queryKey: ['dish-costs'], queryFn: api.dishCosts })
 
-  const costOf = useMemo(
-    () => new Map((costs.data ?? []).map((c) => [c.dishId, c])),
-    [costs.data],
-  )
+  const costOf = useMemo(() => new Map((costs.data ?? []).map((c) => [c.dishId, c])), [costs.data])
 
   const rows = (dishes.data ?? [])
     .filter((d) => d.kind !== 'set')
@@ -73,53 +72,79 @@ export function RecipeList() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        <div className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[120px_1fr_140px_140px_150px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Mã</span>
-            <span>Món</span>
-            <span className="text-right">Giá bán</span>
-            <span className="text-right">Giá vốn</span>
-            <span className="text-right">Food cost</span>
-          </div>
-
-          {dishes.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-          ) : (
-            rows.map(({ dish, costVnd, percent }) => (
-              <Link
-                key={dish.id}
-                to={`/cong-thuc/${dish.id}`}
-                className="grid grid-cols-[120px_1fr_140px_140px_150px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 hover:bg-surface-3"
-              >
+        <DataTable
+          rows={rows}
+          rowKey={({ dish }) => dish.id}
+          loading={dishes.isPending}
+          onRowClick={({ dish }) => navigate(`/cong-thuc/${dish.id}`)}
+          empty="Chưa có món nào trong danh mục."
+          columns={[
+            {
+              key: 'code',
+              header: 'Mã',
+              width: '120px',
+              cell: ({ dish }) => (
                 <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
                   {dish.code}
                 </span>
-                <span className="truncate text-[length:var(--fs-b2)] text-ink-hi">
+              ),
+            },
+            {
+              key: 'name',
+              header: 'Món',
+              width: 'minmax(200px, 1fr)',
+              // Giữ <Link> thật để ctrl+click mở tab mới — bấm cả dòng chỉ là lối tắt
+              cell: ({ dish }) => (
+                <Link
+                  to={`/cong-thuc/${dish.id}`}
+                  className="block truncate text-[length:var(--fs-b2)] text-ink-hi"
+                >
                   {dish.nameVi}
-                </span>
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-body">
+                </Link>
+              ),
+            },
+            {
+              key: 'price',
+              header: 'Giá bán',
+              width: '140px',
+              numeric: true,
+              cell: ({ dish }) => (
+                <span className="text-[length:var(--fs-b2)] text-ink-body">
                   {formatVnd(dish.effectivePrice)}
                 </span>
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-body">
+              ),
+            },
+            {
+              key: 'cost',
+              header: 'Giá vốn',
+              width: '140px',
+              numeric: true,
+              cell: ({ costVnd }) => (
+                <span className="text-[length:var(--fs-b2)] text-ink-body">
                   {costVnd === null ? <span className="text-line-4">—</span> : formatVnd(costVnd)}
                 </span>
-                <span className="text-right">
-                  {percent === null ? (
-                    <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                      chưa khai công thức
-                    </span>
-                  ) : (
-                    <span
-                      className={`font-mono text-[length:var(--fs-b2)] ${BANDS[bandOf(percent)].tone}`}
-                    >
-                      {formatPercent(percent).replace('+', '')}
-                    </span>
-                  )}
-                </span>
-              </Link>
-            ))
-          )}
-        </div>
+              ),
+            },
+            {
+              key: 'foodCost',
+              header: 'Food cost',
+              width: '160px',
+              align: 'right',
+              cell: ({ percent }) =>
+                percent === null ? (
+                  <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                    chưa khai công thức
+                  </span>
+                ) : (
+                  <span
+                    className={`font-mono text-[length:var(--fs-b2)] ${BANDS[bandOf(percent)].tone}`}
+                  >
+                    {formatPercent(percent).replace('+', '')}
+                  </span>
+                ),
+            },
+          ]}
+        />
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Set không có dòng riêng ở đây: set không có công thức của mình, giá vốn của set là tổng
@@ -328,13 +353,13 @@ export function RecipeEditor() {
 
                   <span className="flex justify-end">
                     {mayEdit ? (
-                      <button
-                        type="button"
+                      <Button
                         onClick={() => setDraft(draft.filter((_, i) => i !== index))}
-                        className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-mute hover:text-danger"
+                        size="sm"
+                        variant="danger"
                       >
                         Bỏ
-                      </button>
+                      </Button>
                     ) : null}
                   </span>
                 </div>
@@ -368,9 +393,9 @@ export function RecipeEditor() {
         ) : null}
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-          Hao hụt cộng THÊM vào lượng phải xuất: khai 500ml với hao hụt 6% thì kho trừ 530ml —
-          đúng cách quầy bia mất bọt khi rót. Mỗi lần lưu mà công thức thật sự đổi đều để lại một
-          bản chụp ở{' '}
+          Hao hụt cộng THÊM vào lượng phải xuất: khai 500ml với hao hụt 6% thì kho trừ 530ml — đúng
+          cách quầy bia mất bọt khi rót. Mỗi lần lưu mà công thức thật sự đổi đều để lại một bản
+          chụp ở{' '}
           <Link to={`/lich-su-cong-thuc?kind=dish&id=${dishId}`} className="text-accent-ink">
             M9 · Lịch sử công thức
           </Link>
@@ -448,8 +473,7 @@ function AddLine({
         <option value="">Thêm nguyên liệu…</option>
         {available.map((ing) => (
           <option key={ing.id} value={ing.id}>
-            {ing.name} ({ing.baseUnit})
-            {ing.costPerBaseMilli === 0 ? ' — chưa có giá' : ''}
+            {ing.name} ({ing.baseUnit}){ing.costPerBaseMilli === 0 ? ' — chưa có giá' : ''}
           </option>
         ))}
       </select>
@@ -486,7 +510,10 @@ function previewOf(
   }
 }
 
-function sameLines(a: DraftLine[], b: { ingredientId: string; qtyBase: number; wasteBp: number }[]) {
+function sameLines(
+  a: DraftLine[],
+  b: { ingredientId: string; qtyBase: number; wasteBp: number }[],
+) {
   if (a.length !== b.length) return false
   return a.every((line, i) => {
     const other = b[i]!

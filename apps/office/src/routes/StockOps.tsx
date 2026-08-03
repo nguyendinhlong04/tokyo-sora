@@ -1,4 +1,5 @@
 import { formatVnd } from '@sora/contracts'
+import { SegmentedControl } from '../components/form'
 import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -92,7 +93,9 @@ export function StockIssues() {
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">{kind.hint}</p>
+          <p className="mt-2 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+            {kind.hint}
+          </p>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-3">
             <Field label="Nguyên liệu">
@@ -113,7 +116,9 @@ export function StockIssues() {
               <input
                 type="number"
                 value={form.qtyBase || ''}
-                onChange={(e) => setForm({ ...form, qtyBase: Math.round(Number(e.target.value)) || 0 })}
+                onChange={(e) =>
+                  setForm({ ...form, qtyBase: Math.round(Number(e.target.value)) || 0 })
+                }
                 className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 font-mono text-[length:var(--fs-b2)] text-ink-hi"
               />
             </Field>
@@ -136,7 +141,11 @@ export function StockIssues() {
               className="ml-auto"
               variant="primary"
               disabled={
-                !mayIssue || issue.isPending || !form.ingredientId || form.qtyBase <= 0 || !form.reason.trim()
+                !mayIssue ||
+                issue.isPending ||
+                !form.ingredientId ||
+                form.qtyBase <= 0 ||
+                !form.reason.trim()
               }
               onClick={() => issue.mutate()}
             >
@@ -153,7 +162,11 @@ export function StockIssues() {
 
 const RUN_KINDS = [
   { id: 'pha-che' as const, label: 'Pha chế', hint: 'Sốt, nước dùng, kim chi' },
-  { id: 'pha-loc' as const, label: 'Pha lóc', hint: 'Tảng bò ra nầm, dẻ sườn — phần hao nằm lại trong giá' },
+  {
+    id: 'pha-loc' as const,
+    label: 'Pha lóc',
+    hint: 'Tảng bò ra nầm, dẻ sườn — phần hao nằm lại trong giá',
+  },
   { id: 'duc-keg' as const, label: 'Khác', hint: 'Chia lẻ, sơ chế' },
 ]
 
@@ -169,7 +182,9 @@ export function Production() {
   const queryClient = useQueryClient()
   const [kind, setKind] = useState<'pha-che' | 'pha-loc' | 'duc-keg'>('pha-loc')
   const [inputs, setInputs] = useState<Line[]>([{ ingredientId: '', qtyBase: 0, costShareBp: 0 }])
-  const [outputs, setOutputs] = useState<Line[]>([{ ingredientId: '', qtyBase: 0, costShareBp: 10_000 }])
+  const [outputs, setOutputs] = useState<Line[]>([
+    { ingredientId: '', qtyBase: 0, costShareBp: 10_000 },
+  ])
   const [result, setResult] = useState<ProductionResult | null>(null)
 
   const mayRun = can('stock.receive')
@@ -219,20 +234,12 @@ export function Production() {
         title="Sản xuất nội bộ"
         subtitle="Pha chế và pha lóc. Hao không có dòng riêng — tiền của nó nằm lại trong giá của thành phẩm dùng được."
         action={
-          <div className="flex overflow-hidden rounded-sm border border-line-1">
-            {RUN_KINDS.map((k) => (
-              <button
-                key={k.id}
-                type="button"
-                onClick={() => setKind(k.id)}
-                className={`h-[var(--hit-target)] border-r border-line-1 px-4 text-[length:var(--fs-b2)] last:border-r-0 ${
-                  kind === k.id ? 'bg-surface-3 text-ink-hi' : 'text-ink-mute hover:text-ink-hi'
-                }`}
-              >
-                {k.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            size="md"
+            value={kind}
+            onChange={setKind}
+            options={RUN_KINDS.map((k) => ({ value: k.id, label: k.label }))}
+          />
         }
       />
 
@@ -255,9 +262,7 @@ export function Production() {
           items={items}
           showShare
           onChange={setOutputs}
-          extra={
-            <Button onClick={shareByWeight}>Chia đều theo cân</Button>
-          }
+          extra={<Button onClick={shareByWeight}>Chia đều theo cân</Button>}
         />
 
         <div className="mt-4 flex items-center gap-3">
@@ -287,7 +292,8 @@ export function Production() {
                 Ra <span className="font-mono text-ink-hi">{result.totalOutBase}</span>
               </span>
               <span className="text-warn">
-                Hao <span className="font-mono">{result.wasteBase}</span> — tiền đã nằm trong giá đầu ra
+                Hao <span className="font-mono">{result.wasteBase}</span> — tiền đã nằm trong giá
+                đầu ra
               </span>
             </div>
             <div className="mt-4 flex flex-col gap-1.5">
@@ -335,7 +341,9 @@ function LineTable({
         </h2>
         <div className="ml-auto flex gap-2">
           {extra}
-          <Button onClick={() => onChange([...lines, { ingredientId: '', qtyBase: 0, costShareBp: 0 }])}>
+          <Button
+            onClick={() => onChange([...lines, { ingredientId: '', qtyBase: 0, costShareBp: 0 }])}
+          >
             Thêm dòng
           </Button>
         </div>
@@ -378,13 +386,9 @@ function LineTable({
               </span>
             ) : null}
             {lines.length > 1 ? (
-              <button
-                type="button"
-                onClick={() => onChange(lines.filter((_, i) => i !== index))}
-                className="h-9 rounded-sm border border-line-3 px-3 text-[length:var(--fs-c1)] text-ink-mute hover:bg-surface-3"
-              >
+              <Button onClick={() => onChange(lines.filter((_, i) => i !== index))} size="sm">
                 Bỏ
-              </button>
+              </Button>
             ) : null}
           </div>
         ))}
@@ -513,8 +517,14 @@ function CountSheetView({
     <>
       <div className="flex flex-wrap items-center gap-4 rounded-md border border-line-1 bg-surface-1 px-5 py-4">
         <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">Phiếu #{sheet.id}</span>
-        <Badge tone={sheet.state === 'counting' ? 'accent' : sheet.state === 'closed' ? 'ok' : 'neutral'}>
-          {sheet.state === 'counting' ? 'Đang đếm' : sheet.state === 'closed' ? 'Đã chốt' : 'Đã huỷ'}
+        <Badge
+          tone={sheet.state === 'counting' ? 'accent' : sheet.state === 'closed' ? 'ok' : 'neutral'}
+        >
+          {sheet.state === 'counting'
+            ? 'Đang đếm'
+            : sheet.state === 'closed'
+              ? 'Đã chốt'
+              : 'Đã huỷ'}
         </Badge>
         <span className="text-[length:var(--fs-c1)] text-ink-mute">
           {sheet.countedLines}/{sheet.lines.length} dòng đã đếm · mở {formatTime(sheet.openedAt)}
@@ -554,7 +564,9 @@ function CountSheetView({
             >
               <span className="min-w-0 truncate text-[length:var(--fs-b2)] text-ink-hi">
                 {line.ingredientName}
-                <span className="ml-2 text-[length:var(--fs-c1)] text-ink-mute">{line.baseUnit}</span>
+                <span className="ml-2 text-[length:var(--fs-c1)] text-ink-mute">
+                  {line.baseUnit}
+                </span>
               </span>
               <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
                 {line.snapshotBase}
@@ -575,7 +587,13 @@ function CountSheetView({
               </span>
               <span
                 className={`text-right font-mono text-[length:var(--fs-c1)] ${
-                  diff === null ? 'text-line-4' : diff === 0 ? 'text-ink-mute' : diff < 0 ? 'text-danger' : 'text-ok'
+                  diff === null
+                    ? 'text-line-4'
+                    : diff === 0
+                      ? 'text-ink-mute'
+                      : diff < 0
+                        ? 'text-danger'
+                        : 'text-ok'
                 }`}
               >
                 {diff === null ? 'chưa đếm' : diff > 0 ? `+${diff}` : diff}
@@ -707,13 +725,17 @@ export function Transfers() {
                 <input
                   type="number"
                   value={form.qtyBase || ''}
-                  onChange={(e) => setForm({ ...form, qtyBase: Math.round(Number(e.target.value)) || 0 })}
+                  onChange={(e) =>
+                    setForm({ ...form, qtyBase: Math.round(Number(e.target.value)) || 0 })
+                  }
                   className="h-9 w-[130px] rounded-sm border border-line-1 bg-canvas px-2.5 font-mono text-[length:var(--fs-b2)] text-ink-hi"
                 />
               </Field>
               <Button
                 variant="primary"
-                disabled={send.isPending || !form.toBranchId || !form.ingredientId || form.qtyBase <= 0}
+                disabled={
+                  send.isPending || !form.toBranchId || !form.ingredientId || form.qtyBase <= 0
+                }
                 onClick={() => send.mutate()}
               >
                 Gửi hàng

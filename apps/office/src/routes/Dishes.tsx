@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { api } from '../api'
 import { DishEditor, BLANK_DISH } from './DishEditor'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { useSession } from '../session-context'
 
@@ -112,40 +113,39 @@ export function Dishes() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-8 pb-8">
-        <div className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="sticky top-0 z-5 grid grid-cols-[56px_120px_1fr_140px_130px_120px_150px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span />
-            <span>Mã</span>
-            <span>Tên món</span>
-            <span>Nhóm</span>
-            <span>Trạm</span>
-            <span className="text-right">Giá bán</span>
-            <span>Trạng thái</span>
-          </div>
-
-          {dishes.isPending ? (
-            <p className="px-5 py-4 text-ink-mute">Đang tải danh mục…</p>
-          ) : rows.length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Không có món nào khớp bộ lọc.
-            </p>
-          ) : (
-            rows.map((dish) => (
-              <button
-                key={dish.id}
-                type="button"
-                onClick={() => setEditing(dish.id)}
-                className={`grid w-full grid-cols-[56px_120px_1fr_140px_130px_120px_150px] items-center gap-3 border-b border-line-1 px-5 py-2.5 text-left hover:bg-surface-3 ${
-                  dish.effectiveActive ? '' : 'opacity-60'
-                }`}
-              >
+        <DataTable
+          rows={rows}
+          rowKey={(dish) => dish.id}
+          loading={dishes.isPending}
+          empty="Không có món nào khớp bộ lọc."
+          onRowClick={(dish) => setEditing(dish.id)}
+          columns={[
+            {
+              key: 'kana',
+              header: '',
+              width: '56px',
+              cell: (dish) => (
                 <span className="grid size-10 place-items-center rounded-md border border-line-1 bg-canvas font-jp text-[length:var(--fs-t2)] text-accent">
                   {dish.kana ?? dish.nameJa?.charAt(0) ?? dish.nameVi.charAt(0)}
                 </span>
+              ),
+            },
+            {
+              key: 'code',
+              header: 'Mã',
+              width: '120px',
+              cell: (dish) => (
                 <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
                   {dish.code}
                 </span>
-                <span className="min-w-0">
+              ),
+            },
+            {
+              key: 'name',
+              header: 'Tên món',
+              width: 'minmax(220px, 1fr)',
+              cell: (dish) => (
+                <span className={dish.effectiveActive ? '' : 'opacity-60'}>
                   <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
                     {dish.nameVi}
                     {dish.signature ? (
@@ -160,9 +160,23 @@ export function Dishes() {
                     </span>
                   ) : null}
                 </span>
+              ),
+            },
+            {
+              key: 'category',
+              header: 'Nhóm',
+              width: '140px',
+              cell: (dish) => (
                 <span className="text-[length:var(--fs-c1)] text-ink-mute">
                   {dish.categoryId ? (categoryName.get(dish.categoryId) ?? dish.categoryId) : '—'}
                 </span>
+              ),
+            },
+            {
+              key: 'station',
+              header: 'Trạm',
+              width: '130px',
+              cell: (dish) => (
                 <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
                   {dish.kind === 'set'
                     ? 'set'
@@ -172,7 +186,15 @@ export function Dishes() {
                           : ''
                       }`}
                 </span>
-                <span className="text-right font-mono text-[length:var(--fs-b2)] text-ink-hi">
+              ),
+            },
+            {
+              key: 'price',
+              header: 'Giá bán',
+              width: '130px',
+              align: 'right',
+              cell: (dish) => (
+                <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">
                   {formatVnd(dish.effectivePrice)}
                   {dish.override?.price != null ? (
                     <span className="mt-0.5 block text-[length:var(--fs-c2)] text-accent">
@@ -180,15 +202,25 @@ export function Dishes() {
                     </span>
                   ) : null}
                 </span>
+              ),
+            },
+            {
+              key: 'state',
+              header: 'Trạng thái',
+              width: '170px',
+              cell: (dish) => (
                 <span className="flex flex-wrap gap-1.5">
-                  <Chip on={dish.effectiveActive} label={dish.effectiveActive ? 'Đang bán' : 'Ngừng'} />
+                  <Chip
+                    on={dish.effectiveActive}
+                    label={dish.effectiveActive ? 'Đang bán' : 'Ngừng'}
+                  />
                   {dish.onlineVisible ? <Chip on label="Online" /> : null}
                   {dish.tableOrderable ? <Chip on label="Tại bàn" /> : null}
                 </span>
-              </button>
-            ))
-          )}
-        </div>
+              ),
+            },
+          ]}
+        />
       </div>
 
       {editing ? (

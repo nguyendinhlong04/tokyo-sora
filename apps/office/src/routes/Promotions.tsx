@@ -12,6 +12,7 @@ import {
 } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { Field, formatDay } from '../components/report'
+import { TextInput as Input, Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 /**
@@ -121,9 +122,7 @@ export function Promotions() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-        {promotions.isError ? (
-          <ErrorState message={(promotions.error as Error).message} />
-        ) : null}
+        {promotions.isError ? <ErrorState message={(promotions.error as Error).message} /> : null}
 
         {draft ? (
           <PromotionForm
@@ -237,7 +236,9 @@ function PromotionCard({
     <section className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
       <div className="grid grid-cols-[1fr_170px_150px_130px_190px] items-center gap-3 px-5 py-3">
         <span className="min-w-0">
-          <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">{promo.name}</span>
+          <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+            {promo.name}
+          </span>
           <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
             {promo.code} · {formatDay(promo.startsOn)} – {formatDay(promo.endsOn)}
           </span>
@@ -334,7 +335,9 @@ function PromotionDetail({
     promo.fromMinute !== null && promo.toMinute !== null
       ? `Khung giờ ${hhmm(promo.fromMinute)}–${hhmm(promo.toMinute)}`
       : 'Cả ngày',
-    promo.minOrderVnd > 0 ? `Đơn tối thiểu ${formatVnd(promo.minOrderVnd)}` : 'Không có đơn tối thiểu',
+    promo.minOrderVnd > 0
+      ? `Đơn tối thiểu ${formatVnd(promo.minOrderVnd)}`
+      : 'Không có đơn tối thiểu',
     promo.maxDiscountVnd ? `Trần giảm ${formatVnd(promo.maxDiscountVnd)}` : 'Không có trần giảm',
   ]
 
@@ -393,8 +396,7 @@ function PromotionDetail({
                   {code.usedCount}/{code.maxUses}
                 </span>
                 {mayCompose && code.state === 'live' ? (
-                  <button
-                    type="button"
+                  <Button
                     onClick={() =>
                       api
                         .voidVoucher(code.id)
@@ -404,10 +406,11 @@ function PromotionDetail({
                         })
                         .catch((err: Error) => toast(err.message, 'danger'))
                     }
-                    className="text-danger"
+                    size="sm"
+                    variant="danger"
                   >
                     ×
-                  </button>
+                  </Button>
                 ) : null}
               </span>
             )
@@ -480,10 +483,7 @@ function PromotionForm({
     onChange({ ...draft, [key]: value })
 
   const toggle = (key: 'channels' | 'branchIds', id: string) =>
-    set(
-      key,
-      draft[key].includes(id) ? draft[key].filter((x) => x !== id) : [...draft[key], id],
-    )
+    set(key, draft[key].includes(id) ? draft[key].filter((x) => x !== id) : [...draft[key], id])
 
   const ready = draft.code.trim() !== '' && draft.name.trim() !== ''
   const hasWindow = draft.fromMinute !== null
@@ -492,10 +492,19 @@ function PromotionForm({
     <section className="rounded-md border border-accent bg-surface-1 p-5">
       <div className="grid gap-4 lg:grid-cols-4">
         <Field label="Mã chương trình">
-          <Input value={draft.code} onChange={(v) => set('code', v.toUpperCase())} placeholder="KM-TRUA" mono />
+          <Input
+            value={draft.code}
+            onChange={(v) => set('code', v.toUpperCase())}
+            placeholder="KM-TRUA"
+            mono
+          />
         </Field>
         <Field label="Tên">
-          <Input value={draft.name} onChange={(v) => set('name', v)} placeholder="Giảm 10% giờ trưa" />
+          <Input
+            value={draft.name}
+            onChange={(v) => set('name', v)}
+            placeholder="Giảm 10% giờ trưa"
+          />
         </Field>
         <Field label="Loại">
           <select
@@ -645,7 +654,10 @@ function PromotionForm({
           </>
         ) : null}
 
-        <Chip on={draft.requiresVoucher} onClick={() => set('requiresVoucher', !draft.requiresVoucher)}>
+        <Chip
+          on={draft.requiresVoucher}
+          onClick={() => set('requiresVoucher', !draft.requiresVoucher)}
+        >
           Bắt buộc có mã voucher
         </Chip>
 
@@ -744,15 +756,9 @@ function Chip({
   children: React.ReactNode
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-        on ? 'border-accent text-accent-ink' : 'border-line-3 text-ink-mute hover:text-ink-hi'
-      }`}
-    >
+    <Toggle onChange={onClick} on={on}>
       {children}
-    </button>
+    </Toggle>
   )
 }
 
@@ -775,31 +781,5 @@ function SmallButton({
     >
       {children}
     </button>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  mono = false,
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-  mono?: boolean
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi ${
-        mono ? 'font-mono' : ''
-      }`}
-    />
   )
 }

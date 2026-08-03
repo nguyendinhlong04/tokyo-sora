@@ -3,8 +3,10 @@ import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type CorporateInput, type CorporateRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Field, formatDay } from '../components/report'
+import { TextInput as Input, Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 /**
@@ -45,7 +47,6 @@ export function Corporate() {
   const toast = useToast()
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<{ input: CorporateInput; id?: number } | null>(null)
-  const [open, setOpen] = useState<number | null>(null)
 
   const mayEdit = can('corporate.edit-profile')
   const companies = useQuery({ queryKey: ['corporate'], queryFn: api.corporate })
@@ -94,32 +95,108 @@ export function Corporate() {
 
         {rows.length > 0 ? (
           <p className="mt-5 text-[length:var(--fs-c1)] text-ink-mute">
-            Tổng đang nợ:{' '}
-            <span className="font-mono text-ink-hi">{formatVnd(outstanding)}</span> trên{' '}
-            {rows.length} hồ sơ
+            Tổng đang nợ: <span className="font-mono text-ink-hi">{formatVnd(outstanding)}</span>{' '}
+            trên {rows.length} hồ sơ
           </p>
         ) : null}
 
-        <div className="mt-3 flex flex-col gap-3">
-          {companies.isPending ? (
-            <p className="text-ink-mute">Đang tải…</p>
-          ) : rows.length === 0 ? (
-            <p className="text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa có công ty nào. Hình thức <em>Ghi nợ công ty</em> ở quầy chỉ hiện khi có ít nhất
-              một hồ sơ đang hoạt động.
-            </p>
-          ) : (
-            rows.map((company) => (
-              <CorporateCard
-                key={company.id}
-                company={company}
-                mayEdit={mayEdit}
-                open={open === company.id}
-                onToggle={() => setOpen(open === company.id ? null : company.id)}
-                onEdit={() => setDraft({ input: toInput(company), id: company.id })}
-              />
-            ))
-          )}
+        <div className="mt-3">
+          <DataTable
+            rows={rows}
+            rowKey={(company) => company.id}
+            loading={companies.isPending}
+            empty={
+              <>
+                Chưa có công ty nào. Hình thức <em>Ghi nợ công ty</em> ở quầy chỉ hiện khi có ít
+                nhất một hồ sơ đang hoạt động.
+              </>
+            }
+            renderDetail={(company) => <Statement company={company} />}
+            columns={[
+              {
+                key: 'name',
+                header: 'Công ty',
+                width: 'minmax(220px, 1fr)',
+                cell: (company) => (
+                  <span className={company.active ? '' : 'opacity-60'}>
+                    <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                      {company.name}
+                    </span>
+                    <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                      {company.code} · MST {company.taxCode} · NET {company.paymentTermDays}
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: 'outstanding',
+                header: 'Đang nợ',
+                width: '150px',
+                align: 'right',
+                cell: (company) => (
+                  <span>
+                    <span className="block font-mono text-[length:var(--fs-b2)] text-ink-hi">
+                      {formatVnd(company.outstandingVnd)}
+                    </span>
+                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                      đang nợ
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: 'available',
+                header: 'Còn ghi được',
+                width: '150px',
+                align: 'right',
+                cell: (company) => (
+                  <span>
+                    <span className="block font-mono text-[length:var(--fs-c1)] text-ink-body">
+                      {formatVnd(company.availableVnd)}
+                    </span>
+                    <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
+                      còn ghi được
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: 'state',
+                header: 'Quầy',
+                width: 'minmax(180px, 1fr)',
+                cell: (company) => (
+                  <span className="min-w-0 text-[length:var(--fs-c1)]">
+                    {company.blockedReason ? (
+                      <span className="text-danger">{company.blockedReason}</span>
+                    ) : (
+                      <Badge tone="neutral">Quầy ghi nợ được</Badge>
+                    )}
+                  </span>
+                ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                width: '110px',
+                cell: (company) => (
+                  <span className="flex justify-end">
+                    {mayEdit ? (
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          // Cả dòng đã bắt onClick để bung bảng kê — nút Sửa phải chặn lại
+                          e.stopPropagation()
+                          setDraft({ input: toInput(company), id: company.id })
+                        }}
+                      >
+                        Sửa
+                      </Button>
+                    ) : null}
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
       </div>
     </>
@@ -144,92 +221,16 @@ function toInput(row: CorporateRow): CorporateInput {
   }
 }
 
-function CorporateCard({
-  company,
-  mayEdit,
-  open,
-  onToggle,
-  onEdit,
-}: {
-  company: CorporateRow
-  mayEdit: boolean
-  open: boolean
-  onToggle: () => void
-  onEdit: () => void
-}) {
-  return (
-    <section
-      className={`overflow-hidden rounded-md border bg-surface-1 ${
-        company.blockedReason ? 'border-danger-line' : 'border-line-1'
-      } ${company.active ? '' : 'opacity-60'}`}
-    >
-      <div className="grid grid-cols-[1fr_150px_150px_1fr_120px] items-center gap-3 px-5 py-3">
-        <span className="min-w-0">
-          <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-            {company.name}
-          </span>
-          <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
-            {company.code} · MST {company.taxCode} · NET {company.paymentTermDays}
-          </span>
-        </span>
-
-        <span className="text-right">
-          <span className="block font-mono text-[length:var(--fs-b2)] text-ink-hi">
-            {formatVnd(company.outstandingVnd)}
-          </span>
-          <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">đang nợ</span>
-        </span>
-
-        <span className="text-right">
-          <span className="block font-mono text-[length:var(--fs-c1)] text-ink-body">
-            {formatVnd(company.availableVnd)}
-          </span>
-          <span className="mt-0.5 block text-[length:var(--fs-c1)] text-ink-mute">
-            còn ghi được
-          </span>
-        </span>
-
-        <span className="min-w-0 text-[length:var(--fs-c1)]">
-          {company.blockedReason ? (
-            <span className="text-danger">{company.blockedReason}</span>
-          ) : (
-            <Badge tone="neutral">Quầy ghi nợ được</Badge>
-          )}
-        </span>
-
-        <span className="flex justify-end gap-2">
-          {mayEdit ? (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-            >
-              Sửa
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={onToggle}
-            className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-          >
-            {open ? 'Thu' : 'Bảng kê'}
-          </button>
-        </span>
-      </div>
-
-      {open ? <Statement company={company} /> : null}
-    </section>
-  )
-}
-
 function Statement({ company }: { company: CorporateRow }) {
   const { can } = useSession()
   const toast = useToast()
   const queryClient = useQueryClient()
   const [range, setRange] = useState({ from: monthStart(), to: today() })
-  const [settling, setSettling] = useState<{ chargeId: number; amount: string; note: string } | null>(
-    null,
-  )
+  const [settling, setSettling] = useState<{
+    chargeId: number
+    amount: string
+    note: string
+  } | null>(null)
 
   const maySettle = can('corporate.settle-writeoff')
   const statement = useQuery({
@@ -340,8 +341,7 @@ function Statement({ company }: { company: CorporateRow }) {
                   </span>
                   <span className="flex justify-end">
                     {maySettle && charge.remainingVnd > 0 ? (
-                      <button
-                        type="button"
+                      <Button
                         onClick={() =>
                           setSettling({
                             chargeId: charge.id,
@@ -349,10 +349,10 @@ function Statement({ company }: { company: CorporateRow }) {
                             note: '',
                           })
                         }
-                        className="h-7 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
+                        size="sm"
                       >
                         Gạch nợ
-                      </button>
+                      </Button>
                     ) : null}
                   </span>
                 </div>
@@ -497,23 +497,40 @@ function CorporateForm({
     <section className="rounded-md border border-accent bg-surface-1 p-5">
       <div className="grid gap-4 lg:grid-cols-4">
         <Field label="Mã">
-          <Input value={draft.code} onChange={(v) => set('code', v.toUpperCase())} placeholder="CT-FPT" mono />
+          <Input
+            value={draft.code}
+            onChange={(v) => set('code', v.toUpperCase())}
+            placeholder="CT-FPT"
+            mono
+          />
         </Field>
         <Field label="Tên công ty">
           <Input value={draft.name} onChange={(v) => set('name', v)} />
         </Field>
         <Field label="Mã số thuế">
-          <Input value={draft.taxCode} onChange={(v) => set('taxCode', v)} placeholder="0101234567" mono />
+          <Input
+            value={draft.taxCode}
+            onChange={(v) => set('taxCode', v)}
+            placeholder="0101234567"
+            mono
+          />
         </Field>
         <Field label="Người liên hệ">
           <Input value={draft.contactName ?? ''} onChange={(v) => set('contactName', v || null)} />
         </Field>
 
         <Field label="Điện thoại">
-          <Input value={draft.contactPhone ?? ''} onChange={(v) => set('contactPhone', v || null)} mono />
+          <Input
+            value={draft.contactPhone ?? ''}
+            onChange={(v) => set('contactPhone', v || null)}
+            mono
+          />
         </Field>
         <Field label="Email nhận bảng kê">
-          <Input value={draft.contactEmail ?? ''} onChange={(v) => set('contactEmail', v || null)} />
+          <Input
+            value={draft.contactEmail ?? ''}
+            onChange={(v) => set('contactEmail', v || null)}
+          />
         </Field>
         <Field label="Hạn mức nợ (₫)">
           <Input
@@ -553,7 +570,10 @@ function CorporateForm({
           <select
             value={draft.einvoiceMode ?? ''}
             onChange={(e) =>
-              set('einvoiceMode', e.target.value === '' ? null : (e.target.value as 'per-bill' | 'aggregate'))
+              set(
+                'einvoiceMode',
+                e.target.value === '' ? null : (e.target.value as 'per-bill' | 'aggregate'),
+              )
             }
             className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
           >
@@ -568,15 +588,9 @@ function CorporateForm({
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => set('active', !draft.active)}
-          className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-            draft.active ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
-          }`}
-        >
+        <Toggle onChange={() => set('active', !draft.active)} on={draft.active} tone="ok">
           {draft.active ? 'Đang hợp tác' : 'Ngừng hợp tác'}
-        </button>
+        </Toggle>
         <p className="max-w-[520px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Để trống hai ô "theo tham số chung" nghĩa là dùng số của cả chuỗi ở A6 — sửa một chỗ, mọi
           công ty chưa khai riêng đều đổi theo.
@@ -589,31 +603,5 @@ function CorporateForm({
         </div>
       </div>
     </section>
-  )
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  mono = false,
-}: {
-  value: string
-  onChange: (next: string) => void
-  placeholder?: string
-  type?: string
-  mono?: boolean
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi ${
-        mono ? 'font-mono' : ''
-      }`}
-    />
   )
 }

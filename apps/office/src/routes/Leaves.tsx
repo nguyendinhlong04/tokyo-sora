@@ -249,22 +249,22 @@ function PendingLine({
             placeholder="Ghi chú khi quyết"
             className="h-8 w-[180px] rounded-sm border border-line-1 bg-canvas px-2 text-[length:var(--fs-c1)] text-ink-hi"
           />
-          <button
-            type="button"
+          <Button
             disabled={busy}
             onClick={() => onDecide(true, note || null)}
-            className="h-8 rounded-sm border border-ok px-3 text-[length:var(--fs-c1)] text-ok hover:bg-ok/8 disabled:opacity-50"
+            size="sm"
+            variant="success"
           >
             Duyệt
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             disabled={busy}
             onClick={() => onDecide(false, note || null)}
-            className="h-8 rounded-sm border border-danger-line px-3 text-[length:var(--fs-c1)] text-danger hover:bg-danger/8 disabled:opacity-50"
+            size="sm"
+            variant="danger"
           >
             Từ chối
-          </button>
+          </Button>
         </span>
       </div>
     </div>
@@ -286,7 +286,8 @@ function LeaveForm({
   onSave: () => void
   saving: boolean
 }) {
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => onChange({ ...draft, [key]: value })
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+    onChange({ ...draft, [key]: value })
 
   const changeKind = (kind: LeaveKind) =>
     onChange({
@@ -374,7 +375,11 @@ function LeaveForm({
         <Button onClick={onCancel}>Bỏ</Button>
         <Button
           variant="primary"
-          disabled={saving || draft.reason.trim() === '' || (draft.kind === 'doi-ca' && !draft.counterpartId)}
+          disabled={
+            saving ||
+            draft.reason.trim() === '' ||
+            (draft.kind === 'doi-ca' && !draft.counterpartId)
+          }
           onClick={onSave}
         >
           Gửi yêu cầu

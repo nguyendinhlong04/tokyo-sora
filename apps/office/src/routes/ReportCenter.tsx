@@ -2,6 +2,7 @@ import { Button, useToast } from '@sora/ui'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { api, type PeriodChoice } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { PeriodComparator, formatRange } from '../components/report'
 import { useSession } from '../session-context'
@@ -30,7 +31,11 @@ interface ReportDef {
   title: string
   to: string
   hint: string
-  need: 'report.branch-revenue' | 'report.margin-foodcost' | 'accounting.ledger-close-period' | 'report.pnl-branch-summary'
+  need:
+    | 'report.branch-revenue'
+    | 'report.margin-foodcost'
+    | 'accounting.ledger-close-period'
+    | 'report.pnl-branch-summary'
   /** Kéo dữ liệu rồi trải thành các dòng phẳng để ghi CSV */
   fetch: (branchId: string, period: PeriodChoice) => Promise<Record<string, unknown>[]>
 }
@@ -240,40 +245,59 @@ export function ReportCenter() {
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
         <PeriodComparator value={period} onChange={setPeriod} />
 
-        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-          <div className="grid grid-cols-[80px_1fr_140px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-            <span>Mã</span>
-            <span>Báo cáo</span>
-            <span />
-          </div>
-
-          {visible.map((report) => (
-            <div
-              key={report.key}
-              className="grid grid-cols-[80px_1fr_140px] items-center gap-3 border-b border-line-1 px-5 py-3 last:border-b-0"
-            >
-              <span className="font-mono text-[length:var(--fs-b2)] text-ink-mute">{report.code}</span>
-              <span className="min-w-0">
-                <Link
-                  to={report.to}
-                  className="block truncate text-[length:var(--fs-b2)] text-ink-hi hover:text-accent-ink"
-                >
-                  {report.title}
-                </Link>
-                <span className="mt-0.5 block truncate text-[length:var(--fs-c1)] text-ink-mute">
-                  {report.hint}
-                </span>
-              </span>
-              <span className="flex justify-end">
-                <Button
-                  disabled={busy !== null || !branchId}
-                  onClick={() => void exportCsv(report)}
-                >
-                  {busy === report.key ? 'Đang lấy…' : 'Xuất CSV'}
-                </Button>
-              </span>
-            </div>
-          ))}
+        <div className="mt-5">
+          {/* Danh mục báo cáo cố định — không phân trang, đây là mục lục chứ không phải dữ liệu */}
+          <DataTable
+            rows={visible}
+            rowKey={(report) => report.key}
+            paginate={false}
+            columns={[
+              {
+                key: 'code',
+                header: 'Mã',
+                width: '80px',
+                cell: (report) => (
+                  <span className="font-mono text-[length:var(--fs-b2)] text-ink-mute">
+                    {report.code}
+                  </span>
+                ),
+              },
+              {
+                key: 'title',
+                header: 'Báo cáo',
+                width: 'minmax(280px, 1fr)',
+                cell: (report) => (
+                  <span className="min-w-0">
+                    <Link
+                      to={report.to}
+                      className="block truncate text-[length:var(--fs-b2)] text-ink-hi hover:text-accent-ink"
+                    >
+                      {report.title}
+                    </Link>
+                    <span className="mt-0.5 block truncate text-[length:var(--fs-c1)] text-ink-mute">
+                      {report.hint}
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: 'export',
+                header: '',
+                width: '150px',
+                cell: (report) => (
+                  <span className="flex justify-end">
+                    <Button
+                      size="sm"
+                      disabled={busy !== null || !branchId}
+                      onClick={() => void exportCsv(report)}
+                    >
+                      {busy === report.key ? 'Đang lấy…' : 'Xuất CSV'}
+                    </Button>
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         <section className="mt-5 rounded-md border border-line-3 bg-surface-1 p-6">
@@ -300,10 +324,12 @@ export function ReportCenter() {
         </section>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-          Kỳ đang chọn: {period.kind === 'tuy-chon' && period.from && period.to
+          Kỳ đang chọn:{' '}
+          {period.kind === 'tuy-chon' && period.from && period.to
             ? formatRange({ from: period.from, to: period.to })
-            : 'theo bộ chọn ở trên'}. Tệp CSV mở thẳng bằng Excel, dấu phân cách là dấu phẩy và mã
-          hoá UTF-8 có BOM để Excel không hỏng dấu tiếng Việt.
+            : 'theo bộ chọn ở trên'}
+          . Tệp CSV mở thẳng bằng Excel, dấu phân cách là dấu phẩy và mã hoá UTF-8 có BOM để Excel
+          không hỏng dấu tiếng Việt.
         </p>
       </div>
     </>

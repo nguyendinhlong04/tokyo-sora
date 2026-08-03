@@ -37,7 +37,7 @@ export function Floorplan() {
   const toast = useToast()
   const queryClient = useQueryClient()
   const mayEdit = can('admin.manage-accounts-roles')
-  const [editing, setEditing] = useState<TableInput & { id?: number } | null>(null)
+  const [editing, setEditing] = useState<(TableInput & { id?: number }) | null>(null)
   const [newArea, setNewArea] = useState('')
 
   const plan = useQuery({
@@ -128,13 +128,14 @@ export function Floorplan() {
                       {rows.length} bàn
                     </span>
                     {mayEdit && rows.length === 0 ? (
-                      <button
-                        type="button"
+                      <Button
                         onClick={() => removeArea.mutate(area)}
-                        className="ml-auto text-[length:var(--fs-c1)] text-danger"
+                        size="sm"
+                        variant="danger"
+                        className="ml-auto"
                       >
                         Xoá khu
-                      </button>
+                      </Button>
                     ) : null}
                   </header>
 
@@ -196,7 +197,10 @@ export function Floorplan() {
                   placeholder="Tên khu mới — Khu Sakura, Phòng riêng…"
                   className="h-10 w-[320px] rounded-sm border border-line-1 bg-surface-1 px-3 text-[length:var(--fs-b2)] text-ink-hi"
                 />
-                <Button disabled={newArea.trim() === '' || addArea.isPending} onClick={() => addArea.mutate()}>
+                <Button
+                  disabled={newArea.trim() === '' || addArea.isPending}
+                  onClick={() => addArea.mutate()}
+                >
                   Thêm khu
                 </Button>
               </div>
@@ -345,7 +349,8 @@ function TableEditor({
 
         <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
           Bàn có bếp than thì món sống ra quầy sống để khách tự nướng; bàn không bếp thì bếp nướng
-          hộ và món cộng thêm thời gian. Sức chứa tối đa là con số W6 dùng để lọc bàn cho nhóm khách.
+          hộ và món cộng thêm thời gian. Sức chứa tối đa là con số W6 dùng để lọc bàn cho nhóm
+          khách.
         </p>
 
         <div className="mt-6 flex justify-end gap-2">

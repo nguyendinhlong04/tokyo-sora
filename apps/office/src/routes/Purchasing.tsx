@@ -1,8 +1,10 @@
 import { formatVnd } from '@sora/contracts'
+import { SegmentedControl } from '../components/form'
 import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type PurchaseOrderRow, type ReceiveResult, type ReorderRow } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Field, formatDay } from '../components/report'
 import { useSession } from '../session-context'
@@ -16,7 +18,10 @@ import { useSession } from '../session-context'
  * là danh sách còn nợ hàng mà người mua cần thấy.
  */
 
-const STATE_LABELS: Record<PurchaseOrderRow['state'], { label: string; tone: 'neutral' | 'accent' | 'ok' | 'danger' }> = {
+const STATE_LABELS: Record<
+  PurchaseOrderRow['state'],
+  { label: string; tone: 'neutral' | 'accent' | 'ok' | 'danger' }
+> = {
   draft: { label: 'Nháp', tone: 'neutral' },
   sent: { label: 'Đã gửi', tone: 'accent' },
   received: { label: 'Đã nhận đủ', tone: 'ok' },
@@ -97,25 +102,15 @@ export function PurchaseOrders() {
         title="Đơn đặt hàng"
         subtitle="Gợi ý theo tốc độ tiêu thụ 14 ngày, đã trừ phần đã đặt chưa về. Nhận hàng ở màn Nhập kho sẽ tự đóng đơn khi đủ."
         action={
-          <div className="flex overflow-hidden rounded-sm border border-line-1">
-            {(
-              [
-                ['suggest', 'Gợi ý đặt hàng'],
-                ['orders', `Đơn (${(orders.data ?? []).length})`],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTab(key)}
-                className={`h-[var(--hit-target)] border-r border-line-1 px-4 text-[length:var(--fs-b2)] last:border-r-0 ${
-                  tab === key ? 'bg-surface-3 text-ink-hi' : 'text-ink-mute hover:text-ink-hi'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            size="md"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'suggest', label: 'Gợi ý đặt hàng' },
+              { value: 'orders', label: `Đơn (${(orders.data ?? []).length})` },
+            ]}
+          />
         }
       />
 
@@ -126,57 +121,86 @@ export function PurchaseOrders() {
               <ErrorState message={(suggestions.error as Error).message} />
             ) : null}
 
-            <div className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
-              <div className="grid grid-cols-[1fr_120px_110px_110px_110px_150px_110px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-                <span>Nguyên liệu</span>
-                <span className="text-right">Tồn</span>
-                <span className="text-right">Dùng / ngày</span>
-                <span className="text-right">Đủ mấy ngày</span>
-                <span className="text-right">Đang về</span>
-                <span>Mối chính</span>
-                <span className="text-right">Đặt</span>
-              </div>
-
-              {suggestions.isPending ? (
-                <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
-              ) : rows.length === 0 ? (
-                <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-                  Không có nguyên liệu nào cần đặt thêm.
-                </p>
-              ) : (
-                rows.map((row) => (
-                  <div
-                    key={row.ingredientId}
-                    className="grid grid-cols-[1fr_120px_110px_110px_110px_150px_110px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
-                  >
-                    <span className="min-w-0 truncate text-[length:var(--fs-b2)] text-ink-hi">
+            <DataTable
+              rows={rows}
+              rowKey={(row) => row.ingredientId}
+              loading={suggestions.isPending}
+              empty="Không có nguyên liệu nào cần đặt thêm."
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Nguyên liệu',
+                  width: 'minmax(200px, 1fr)',
+                  cell: (row) => (
+                    <span className="truncate text-[length:var(--fs-b2)] text-ink-hi">
                       {row.ingredientName}
                     </span>
+                  ),
+                },
+                {
+                  key: 'onHand',
+                  header: 'Tồn',
+                  width: '130px',
+                  numeric: true,
+                  cell: (row) => (
                     <span
-                      className={`text-right font-mono text-[length:var(--fs-c1)] ${
+                      className={
                         row.onHandBase < row.minLevelBase ? 'text-danger' : 'text-ink-body'
-                      }`}
+                      }
                     >
                       {row.onHandBase} {row.baseUnit}
                     </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                      {row.perDayBase}
-                    </span>
+                  ),
+                },
+                {
+                  key: 'perDay',
+                  header: 'Dùng / ngày',
+                  width: '120px',
+                  numeric: true,
+                  cell: (row) => <span className="text-ink-mute">{row.perDayBase}</span>,
+                },
+                {
+                  key: 'cover',
+                  header: 'Đủ mấy ngày',
+                  width: '120px',
+                  numeric: true,
+                  cell: (row) => (
                     <span
-                      className={`text-right font-mono text-[length:var(--fs-c1)] ${
-                        row.daysOfCover !== null && row.daysOfCover <= 2 ? 'text-warn' : 'text-ink-mute'
-                      }`}
+                      className={
+                        row.daysOfCover !== null && row.daysOfCover <= 2
+                          ? 'text-warn'
+                          : 'text-ink-mute'
+                      }
                     >
                       {row.daysOfCover === null ? '—' : `${row.daysOfCover}`}
                     </span>
-                    <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                      {row.pendingPurchase || '—'}
-                    </span>
+                  ),
+                },
+                {
+                  key: 'pending',
+                  header: 'Đang về',
+                  width: '110px',
+                  numeric: true,
+                  cell: (row) => (
+                    <span className="text-ink-mute">{row.pendingPurchase || '—'}</span>
+                  ),
+                },
+                {
+                  key: 'supplier',
+                  header: 'Mối chính',
+                  width: '150px',
+                  cell: (row) => (
                     <span className="truncate text-[length:var(--fs-c1)] text-ink-body">
-                      {row.supplierName ?? (
-                        <span className="text-warn">Chưa có mối</span>
-                      )}
+                      {row.supplierName ?? <span className="text-warn">Chưa có mối</span>}
                     </span>
+                  ),
+                },
+                {
+                  key: 'order',
+                  header: 'Đặt',
+                  width: '130px',
+                  align: 'right',
+                  cell: (row) => (
                     <span className="flex items-center justify-end gap-1">
                       <input
                         type="number"
@@ -190,10 +214,10 @@ export function PurchaseOrders() {
                         {row.purchaseUnit}
                       </span>
                     </span>
-                  </div>
-                ))
-              )}
-            </div>
+                  ),
+                },
+              ]}
+            />
 
             {mayEdit && bySupplier.size > 0 ? (
               <div className="mt-4 flex flex-wrap gap-3">
@@ -264,7 +288,9 @@ function OrderCard({
   return (
     <section className="overflow-hidden rounded-md border border-line-1 bg-surface-1">
       <div className="flex flex-wrap items-center gap-4 px-5 py-3">
-        <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">{order.displayCode}</span>
+        <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">
+          {order.displayCode}
+        </span>
         <span className="text-[length:var(--fs-b2)] text-ink-body">{order.supplierName}</span>
         <Badge tone={state.tone}>{state.label}</Badge>
         {order.expectedOn ? (
@@ -281,14 +307,9 @@ function OrderCard({
           </Button>
         ) : null}
         {mayEdit && order.state !== 'received' && order.state !== 'cancelled' ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onAct('cancel')}
-            className="h-9 rounded-sm border border-danger-line px-3 text-[length:var(--fs-c1)] text-danger hover:bg-danger/8"
-          >
+          <Button disabled={busy} onClick={() => onAct('cancel')} size="sm" variant="danger">
             Huỷ
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -367,7 +388,8 @@ export function Receiving() {
         purchaseOrderId: form.purchaseOrderId || null,
         lotCode: form.lotCode.trim() || null,
         expiresOn: form.expiresOn || null,
-        receiveTempDeciC: form.receiveTempDeciC === '' ? null : Math.round(Number(form.receiveTempDeciC) * 10),
+        receiveTempDeciC:
+          form.receiveTempDeciC === '' ? null : Math.round(Number(form.receiveTempDeciC) * 10),
         note: form.note.trim() || null,
       }),
     onSuccess: (res) => {
@@ -450,7 +472,10 @@ export function Receiving() {
               />
             </Field>
             <Field label={`Hạn dùng${selected?.lotRequired ? ' (bắt buộc)' : ''}`}>
-              <DateInput value={form.expiresOn} onChange={(v) => setForm({ ...form, expiresOn: v })} />
+              <DateInput
+                value={form.expiresOn}
+                onChange={(v) => setForm({ ...form, expiresOn: v })}
+              />
             </Field>
             <Field label="Nhiệt độ nhận (°C)">
               <TextInput

@@ -71,7 +71,10 @@ export function StockOverview() {
                   <li className="flex items-baseline gap-3">
                     <span className="font-mono text-ink-hi">{data.dishesWithoutRecipe}</span>
                     <span className="text-ink-body">món chưa khai công thức</span>
-                    <Link to="/cong-thuc" className="ml-auto text-[length:var(--fs-c1)] text-accent-ink">
+                    <Link
+                      to="/cong-thuc"
+                      className="ml-auto text-[length:var(--fs-c1)] text-accent-ink"
+                    >
                       Khai ở M4
                     </Link>
                   </li>
@@ -107,7 +110,8 @@ export function StockOverview() {
                         {row.name}
                       </span>
                       <span className="font-mono text-[length:var(--fs-c1)] text-danger">
-                        còn {row.qtyBase.toLocaleString('vi-VN')} / {row.minLevelBase.toLocaleString('vi-VN')} {row.baseUnit}
+                        còn {row.qtyBase.toLocaleString('vi-VN')} /{' '}
+                        {row.minLevelBase.toLocaleString('vi-VN')} {row.baseUnit}
                       </span>
                     </li>
                   ))}
@@ -116,10 +120,10 @@ export function StockOverview() {
             ) : null}
 
             <p className="mt-5 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-              Chưa có trong bản dựng này: nhà cung cấp (S3), đơn đặt hàng gợi ý theo tốc độ tiêu
-              thụ (S4), nhập theo lô kèm hạn dùng (S5 · S9), xuất kho bốn loại (S6), sản xuất nội
-              bộ và pha lóc thịt (S7), kiểm kê (S8), chuyển kho giữa chi nhánh (S10), báo cáo hao
-              hụt (S11), thẻ kho đầy đủ (S12).
+              Chưa có trong bản dựng này: nhà cung cấp (S3), đơn đặt hàng gợi ý theo tốc độ tiêu thụ
+              (S4), nhập theo lô kèm hạn dùng (S5 · S9), xuất kho bốn loại (S6), sản xuất nội bộ và
+              pha lóc thịt (S7), kiểm kê (S8), chuyển kho giữa chi nhánh (S10), báo cáo hao hụt
+              (S11), thẻ kho đầy đủ (S12).
             </p>
           </>
         )}
@@ -154,11 +158,7 @@ export function StockLevels() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
         {adjusting ? (
-          <AdjustForm
-            row={adjusting}
-            branchId={branchId!}
-            onClose={() => setAdjusting(null)}
-          />
+          <AdjustForm row={adjusting} branchId={branchId!} onClose={() => setAdjusting(null)} />
         ) : null}
 
         {inspecting ? (
@@ -215,21 +215,13 @@ export function StockLevels() {
                       </span>
 
                       <span className="flex justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setInspecting(row)}
-                          className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                        >
+                        <Button onClick={() => setInspecting(row)} size="sm">
                           Thẻ kho
-                        </button>
+                        </Button>
                         {mayAdjust ? (
-                          <button
-                            type="button"
-                            onClick={() => setAdjusting(row)}
-                            className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                          >
+                          <Button onClick={() => setAdjusting(row)} size="sm">
                             Điều chỉnh
-                          </button>
+                          </Button>
                         ) : null}
                       </span>
                     </div>
@@ -245,9 +237,7 @@ export function StockLevels() {
 
 function EmberBar({ row }: { row: IngredientRow }) {
   if (row.emberRatio === null) {
-    return (
-      <span className="text-[length:var(--fs-c1)] text-ink-mute">chưa khai định mức</span>
-    )
+    return <span className="text-[length:var(--fs-c1)] text-ink-mute">chưa khai định mức</span>
   }
   // Thanh vẽ mức CÒN LẠI, còn màu lấy theo mức CẠN
   const remaining = Math.max(0, Math.min(1, 1 - row.emberRatio))
@@ -371,13 +361,9 @@ function MoveList({
         <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
           Thẻ kho · {row.name}
         </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="ml-auto text-[length:var(--fs-c1)] text-accent-ink"
-        >
+        <Button onClick={onClose} size="sm" variant="ghost" className="ml-auto text-accent-ink">
           Đóng
-        </button>
+        </Button>
       </div>
 
       {moves.isPending ? (
@@ -412,8 +398,8 @@ function MoveList({
         </ul>
       )}
       <p className="mt-4 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-        Sổ kho là sổ bất biến: không dòng nào sửa hay xoá được, kể cả từ máy chủ. Đây là bản rút
-        gọn của thẻ kho S12 — 50 bút toán gần nhất.
+        Sổ kho là sổ bất biến: không dòng nào sửa hay xoá được, kể cả từ máy chủ. Đây là bản rút gọn
+        của thẻ kho S12 — 50 bút toán gần nhất.
       </p>
     </section>
   )
@@ -435,7 +421,9 @@ function Stat({
       <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
         {label}
       </p>
-      <p className={`mt-2 font-mono text-[length:var(--fs-d3)] leading-none ${tone ?? 'text-ink-hi'}`}>
+      <p
+        className={`mt-2 font-mono text-[length:var(--fs-d3)] leading-none ${tone ?? 'text-ink-hi'}`}
+      >
         {value}
       </p>
       <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">{note}</p>

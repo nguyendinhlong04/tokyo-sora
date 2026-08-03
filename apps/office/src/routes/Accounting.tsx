@@ -4,8 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { api, type InvoiceRow, type InvoiceState } from '../api'
+import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Money, formatDay, formatPercent, formatTime } from '../components/report'
+import { Toggle } from '../components/form'
 import { useSession } from '../session-context'
 
 /**
@@ -109,73 +111,101 @@ export function RevenueJournal() {
               ))}
             </div>
 
-            <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-              <div className="grid grid-cols-[100px_180px_1fr_150px_150px_140px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-                <span>Ngày</span>
-                <span>Loại</span>
-                <span>Nội dung</span>
-                <span>Người thao tác</span>
-                <span>Người duyệt</span>
-                <span className="text-right">Số tiền</span>
-              </div>
-
-              {data.rows.length === 0 ? (
-                <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-                  Khoảng này chưa có bút toán nào.
-                </p>
-              ) : (
-                data.rows.map((row) => (
-                  <div
-                    key={row.id}
-                    className="grid grid-cols-[100px_180px_1fr_150px_150px_140px] items-baseline gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
-                  >
-                    <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                      {formatDay(row.businessDate)}
-                    </span>
-                    <span
-                      className={`text-[length:var(--fs-c1)] ${
-                        row.amount < 0 ? 'text-danger' : 'text-ink-body'
-                      }`}
-                    >
-                      {KIND_LABELS[row.kind] ?? row.kind}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
-                        {row.memo ?? '—'}
+            <div className="mt-5">
+              <DataTable
+                rows={data.rows}
+                rowKey={(row) => row.id}
+                empty="Khoảng này chưa có bút toán nào."
+                columns={[
+                  {
+                    key: 'day',
+                    header: 'Ngày',
+                    width: '110px',
+                    cell: (row) => (
+                      <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                        {formatDay(row.businessDate)}
                       </span>
-                      {row.approvalReason ? (
-                        <span className="mt-0.5 block truncate text-[length:var(--fs-c1)] text-warn">
-                          lý do duyệt: {row.approvalReason}
+                    ),
+                  },
+                  {
+                    key: 'kind',
+                    header: 'Loại',
+                    width: '180px',
+                    cell: (row) => (
+                      <span
+                        className={`text-[length:var(--fs-c1)] ${
+                          row.amount < 0 ? 'text-danger' : 'text-ink-body'
+                        }`}
+                      >
+                        {KIND_LABELS[row.kind] ?? row.kind}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'memo',
+                    header: 'Nội dung',
+                    width: 'minmax(220px, 1fr)',
+                    cell: (row) => (
+                      <span className="min-w-0">
+                        <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                          {row.memo ?? '—'}
                         </span>
-                      ) : null}
-                      {row.orderCode ? (
-                        <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                          {row.orderCode}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                      {row.actorName ?? '—'}
-                    </span>
-                    <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                      {row.approverName ?? '—'}
-                    </span>
-                    <Money
-                      amount={row.amount}
-                      className={`text-right text-[length:var(--fs-b2)] ${
-                        row.amount < 0 ? 'text-danger' : 'text-ink-hi'
-                      }`}
-                    />
-                  </div>
-                ))
-              )}
+                        {row.approvalReason ? (
+                          <span className="mt-0.5 block truncate text-[length:var(--fs-c1)] text-warn">
+                            lý do duyệt: {row.approvalReason}
+                          </span>
+                        ) : null}
+                        {row.orderCode ? (
+                          <span className="mt-0.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                            {row.orderCode}
+                          </span>
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'actor',
+                    header: 'Người thao tác',
+                    width: '150px',
+                    cell: (row) => (
+                      <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                        {row.actorName ?? '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'approver',
+                    header: 'Người duyệt',
+                    width: '150px',
+                    cell: (row) => (
+                      <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                        {row.approverName ?? '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'amount',
+                    header: 'Số tiền',
+                    width: '150px',
+                    align: 'right',
+                    cell: (row) => (
+                      <Money
+                        amount={row.amount}
+                        className={`text-[length:var(--fs-b2)] ${
+                          row.amount < 0 ? 'text-danger' : 'text-ink-hi'
+                        }`}
+                      />
+                    ),
+                  },
+                ]}
+              />
             </div>
 
             <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
               Sổ này KHÔNG sửa được, kể cả từ máy chủ — cưỡng chế bằng trigger CSDL. Sửa sai là ghi
               bút toán ngược ở luồng nghiệp vụ, không phải sửa dòng cũ. Hiện có hai nguồn ghi: thu
-              tiền (P10) và huỷ món đã gửi bếp; giảm giá và tặng món sẽ vào đây khi luồng đó nối
-              vào đơn.
+              tiền (P10) và huỷ món đã gửi bếp; giảm giá và tặng món sẽ vào đây khi luồng đó nối vào
+              đơn.
             </p>
           </>
         )}
@@ -253,11 +283,7 @@ export function InvoiceBook() {
             ) : null}
 
             {voiding ? (
-              <VoidForm
-                invoice={voiding}
-                onClose={() => setVoiding(null)}
-                onDone={refresh}
-              />
+              <VoidForm invoice={voiding} onClose={() => setVoiding(null)} onDone={refresh} />
             ) : null}
 
             {data.missing.length > 0 ? (
@@ -286,80 +312,108 @@ export function InvoiceBook() {
               </section>
             ) : null}
 
-            <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
-              <div className="grid grid-cols-[100px_150px_140px_1fr_150px_140px_110px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-                <span>Ngày</span>
-                <span>Số hoá đơn</span>
-                <span>Đơn</span>
-                <span>Mã cơ quan thuế</span>
-                <span>Trạng thái</span>
-                <span className="text-right">Tổng tiền</span>
-                <span />
-              </div>
-
-              {data.rows.length === 0 ? (
-                <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-                  Khoảng này chưa phát hành hoá đơn nào.
-                </p>
-              ) : (
-                data.rows.map((row) => (
-                  <div
-                    key={row.id}
-                    className={`grid grid-cols-[100px_150px_140px_1fr_150px_140px_110px] items-baseline gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0 ${
-                      row.state === 'voided' || row.state === 'replaced' ? 'opacity-60' : ''
-                    }`}
-                  >
-                    <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                      {formatDay(row.businessDate)}
-                    </span>
-                    <span className="font-mono text-[length:var(--fs-b2)] text-ink-hi">
-                      {row.invoiceNo ? `${row.serial}-${row.invoiceNo}` : '—'}
-                    </span>
-                    <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                      {row.orderCode}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                        {row.taxCode ?? row.lastError ?? '—'}
+            <div className="mt-5">
+              <DataTable
+                rows={data.rows}
+                rowKey={(row) => row.id}
+                empty="Khoảng này chưa phát hành hoá đơn nào."
+                columns={[
+                  {
+                    key: 'day',
+                    header: 'Ngày',
+                    width: '110px',
+                    cell: (row) => (
+                      <span className="text-[length:var(--fs-c1)] text-ink-mute">
+                        {formatDay(row.businessDate)}
                       </span>
-                      {row.voidReason ? (
-                        <span className="mt-0.5 block truncate text-[length:var(--fs-c1)] text-warn">
-                          {row.voidReason}
+                    ),
+                  },
+                  {
+                    key: 'no',
+                    header: 'Số hoá đơn',
+                    width: '160px',
+                    cell: (row) => (
+                      <span
+                        className={`font-mono text-[length:var(--fs-b2)] text-ink-hi ${
+                          row.state === 'voided' || row.state === 'replaced' ? 'opacity-60' : ''
+                        }`}
+                      >
+                        {row.invoiceNo ? `${row.serial}-${row.invoiceNo}` : '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'order',
+                    header: 'Đơn',
+                    width: '140px',
+                    cell: (row) => (
+                      <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                        {row.orderCode}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'taxCode',
+                    header: 'Mã cơ quan thuế',
+                    width: 'minmax(180px, 1fr)',
+                    cell: (row) => (
+                      <span className="min-w-0">
+                        <span className="block truncate font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                          {row.taxCode ?? row.lastError ?? '—'}
                         </span>
-                      ) : null}
-                    </span>
-                    <span className={`text-[length:var(--fs-c1)] ${INVOICE_STATES[row.state].tone}`}>
-                      {INVOICE_STATES[row.state].label}
-                      {row.replacesId ? (
-                        <span className="block text-[length:var(--fs-c2)] text-ink-mute">
-                          thay cho #{row.replacesId}
-                        </span>
-                      ) : null}
-                    </span>
-                    <Money amount={row.amountTotal} className="text-right text-ink-body" />
-                    <span className="flex justify-end gap-1.5">
-                      {row.state === 'pending' || row.state === 'failed' ? (
-                        <button
-                          type="button"
-                          onClick={() => issue.mutate(row.orderId)}
-                          className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
-                        >
-                          Phát hành
-                        </button>
-                      ) : null}
-                      {row.state === 'issued' && mayVoid ? (
-                        <button
-                          type="button"
-                          onClick={() => setVoiding(row)}
-                          className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-mute hover:text-danger"
-                        >
-                          Huỷ
-                        </button>
-                      ) : null}
-                    </span>
-                  </div>
-                ))
-              )}
+                        {row.voidReason ? (
+                          <span className="mt-0.5 block truncate text-[length:var(--fs-c1)] text-warn">
+                            {row.voidReason}
+                          </span>
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'state',
+                    header: 'Trạng thái',
+                    width: '150px',
+                    cell: (row) => (
+                      <span
+                        className={`text-[length:var(--fs-c1)] ${INVOICE_STATES[row.state].tone}`}
+                      >
+                        {INVOICE_STATES[row.state].label}
+                        {row.replacesId ? (
+                          <span className="block text-[length:var(--fs-c2)] text-ink-mute">
+                            thay cho #{row.replacesId}
+                          </span>
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'amount',
+                    header: 'Tổng tiền',
+                    width: '150px',
+                    align: 'right',
+                    cell: (row) => <Money amount={row.amountTotal} className="text-ink-body" />,
+                  },
+                  {
+                    key: 'actions',
+                    header: '',
+                    width: '140px',
+                    cell: (row) => (
+                      <span className="flex justify-end gap-1.5">
+                        {row.state === 'pending' || row.state === 'failed' ? (
+                          <Button onClick={() => issue.mutate(row.orderId)} size="sm">
+                            Phát hành
+                          </Button>
+                        ) : null}
+                        {row.state === 'issued' && mayVoid ? (
+                          <Button onClick={() => setVoiding(row)} size="sm" variant="danger">
+                            Huỷ
+                          </Button>
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
             </div>
 
             <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
@@ -391,9 +445,7 @@ function VoidForm({
     mutationFn: () => api.voidInvoice(invoice.id, { reason, replace }),
     onSuccess: (result) => {
       toast(
-        result.replacement
-          ? 'Đã thay thế — bản mới đang chờ phát hành'
-          : 'Đã huỷ hoá đơn',
+        result.replacement ? 'Đã thay thế — bản mới đang chờ phát hành' : 'Đã huỷ hoá đơn',
         'ok',
       )
       onDone()
@@ -425,15 +477,9 @@ function VoidForm({
             className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
           />
         </label>
-        <button
-          type="button"
-          onClick={() => setReplace(!replace)}
-          className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
-            replace ? 'border-accent text-accent-ink' : 'border-line-3 text-ink-mute'
-          }`}
-        >
+        <Toggle onChange={() => setReplace(!replace)} on={replace}>
           {replace ? 'Huỷ và phát hành thay thế' : 'Chỉ huỷ'}
-        </button>
+        </Toggle>
         <div className="ml-auto flex gap-2">
           <Button onClick={onClose}>Bỏ</Button>
           <Button
@@ -649,9 +695,17 @@ export function Debts() {
                 <>
                   <div className="mt-4 grid grid-cols-4 gap-3">
                     <AgingCell label="Chưa tới hạn" value={data.receivable.totals.currentVnd} />
-                    <AgingCell label="Quá 1–30 ngày" value={data.receivable.totals.d0to30Vnd} warn />
+                    <AgingCell
+                      label="Quá 1–30 ngày"
+                      value={data.receivable.totals.d0to30Vnd}
+                      warn
+                    />
                     <AgingCell label="Quá 31–60" value={data.receivable.totals.d31to60Vnd} warn />
-                    <AgingCell label="Quá 60 ngày" value={data.receivable.totals.over60Vnd} danger />
+                    <AgingCell
+                      label="Quá 60 ngày"
+                      value={data.receivable.totals.over60Vnd}
+                      danger
+                    />
                   </div>
 
                   <div className="mt-4 flex flex-col">
@@ -706,7 +760,9 @@ export function PeriodClose() {
 
   const lastMonth = (() => {
     const at = new Date()
-    return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() - 1, 1)).toISOString().slice(0, 10)
+    return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() - 1, 1))
+      .toISOString()
+      .slice(0, 10)
   })()
   const [month, setMonth] = useState(lastMonth)
   const [note, setNote] = useState('')
@@ -801,9 +857,7 @@ export function PeriodClose() {
           </div>
 
           {(locks.data ?? []).length === 0 ? (
-            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
-              Chưa khoá kỳ nào.
-            </p>
+            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">Chưa khoá kỳ nào.</p>
           ) : (
             (locks.data ?? []).map((row) => (
               <div
@@ -845,7 +899,9 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
       <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
         {label}
       </p>
-      <p className={`mt-2 font-mono text-[length:var(--fs-t1)] leading-none ${tone ?? 'text-ink-hi'}`}>
+      <p
+        className={`mt-2 font-mono text-[length:var(--fs-t1)] leading-none ${tone ?? 'text-ink-hi'}`}
+      >
         {value}
       </p>
     </div>
@@ -879,7 +935,8 @@ function AgingCell({
   warn?: boolean
   danger?: boolean
 }) {
-  const tone = value === 0 ? 'text-ink-mute' : danger ? 'text-danger' : warn ? 'text-warn' : 'text-ink-hi'
+  const tone =
+    value === 0 ? 'text-ink-mute' : danger ? 'text-danger' : warn ? 'text-warn' : 'text-ink-hi'
   return (
     <div className="rounded-sm border border-line-1 bg-canvas px-3 py-2.5">
       <p className="text-[length:var(--fs-c2)] text-ink-mute">{label}</p>
