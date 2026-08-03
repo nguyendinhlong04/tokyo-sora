@@ -31,6 +31,7 @@ import {
   staffRoles,
   tableSessions,
 } from '../db/schema'
+import { pointsExpireOn, type LoyaltyConfig } from '../modules/crm/domain/loyalty'
 import { bootTestApp, type Fixtures } from './harness'
 
 let app: NestFastifyApplication
@@ -631,7 +632,12 @@ describe('B14 — Điểm chỉ sinh từ sự kiện thanh toán', () => {
       headers: bearer(owner),
     })
     expect(profile.json().loyalty.next).toMatchObject({ tier: 'bac' })
-    expect(profile.json().loyalty.entries[0].expiresOn).toBe('2027-08-02')
+    // Điểm tích lúc THANH TOÁN nên businessDate của bút toán là ngày chạy test
+    // thật, không phải TODAY — hạn phải tính từ nó, ghi cứng là đỏ khi qua ngày.
+    const entry = profile.json().loyalty.entries[0]
+    expect(entry.expiresOn).toBe(
+      pointsExpireOn(entry.businessDate, { expiryMonths: 12 } as LoyaltyConfig),
+    )
   })
 
   it('trần đổi mỗi giao dịch cắt trước cả khi khách còn thừa điểm', async () => {
