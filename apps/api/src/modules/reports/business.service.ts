@@ -212,7 +212,14 @@ export class BusinessReportsService {
 
     const label = (dict: Record<string, string>) => (key: string) => dict[key] ?? key
     const TYPE = label({ dinein: 'Tại bàn', takeaway: 'Mang về', delivery: 'Giao hàng' })
-    const CHANNEL = label({ pos: 'Quầy / phục vụ', table: 'Khách tự gọi', web: 'Website' })
+    const CHANNEL = label({
+      pos: 'Quầy / phục vụ',
+      table: 'Khách tự gọi',
+      web: 'Website',
+      grab: 'GrabFood',
+      shopee: 'ShopeeFood',
+      be: 'Be',
+    })
     const PAY = label({ cash: 'Tiền mặt', vietqr: 'Chuyển khoản', card: 'Thẻ', cod: 'Thu hộ' })
 
     const norm = (rows: { key: string | null; value: number }[], toLabel = (k: string) => k) =>
