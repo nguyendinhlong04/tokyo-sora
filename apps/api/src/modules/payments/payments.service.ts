@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { rooms } from '@sora/contracts'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
@@ -80,13 +80,21 @@ export class PaymentsService {
       if (!shift) throw new NotFoundException('Không có ca này')
       if (shift.state === 'closed') return { shiftId, changed: false }
 
+      /**
+       * Tiền phải có trong két = tiền mặt tại quầy + tiền COD shipper nộp về.
+       *
+       * Hai loại khoản khác nhau về nguồn nhưng giống nhau ở chỗ quan trọng nhất:
+       * chúng là tờ tiền nằm trong ngăn kéo. Bỏ COD ra ngoài thì đêm nào có đơn
+       * giao là đêm đó két thừa tiền và nhân viên phải giải trình một chênh lệch
+       * do chính công thức tạo ra.
+       */
       const cashRows = await tx
         .select({ cash: sql<number>`coalesce(sum(${payments.amount}), 0)::int` })
         .from(payments)
         .where(
           and(
             eq(payments.shiftId, shiftId),
-            eq(payments.kind, 'cash'),
+            inArray(payments.kind, ['cash', 'cod']),
             eq(payments.state, 'paid'),
           ),
         )

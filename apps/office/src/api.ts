@@ -881,6 +881,47 @@ export interface CategoryNode {
   nameEn: string | null
   nameJa: string | null
   kanji: string | null
+/** M5 — một lựa chọn trong nhóm tuỳ chọn */
+export interface ModifierOptionRow {
+  id: string
+  groupId: string
+  name: string
+  priceDelta: number
+  /** Có trừ kho không: "thêm tỏi" là nguyên liệu thật, "ít cay" thì không */
+  affectsStock: boolean
+  sort: number
+}
+
+export interface ModifierGroupRow {
+  id: string
+  name: string
+  required: boolean
+  multi: boolean
+  pickMin: number
+  pickMax: number | null
+  options: ModifierOptionRow[]
+  /** Bao nhiêu món đang hỏi khách nhóm này */
+  dishCount: number
+  priceMin: number
+  priceMax: number
+}
+
+export interface ModifierGroupInput {
+  id: string
+  name: string
+  required: boolean
+  multi: boolean
+  pickMin: number
+  pickMax: number | null
+  options: {
+    /** Rỗng = lựa chọn mới; giữ mã cũ khi sửa để giỏ hàng trên POS không hỏng */
+    id?: string | null
+    name: string
+    priceDelta: number
+    affectsStock: boolean
+  }[]
+}
+
   imageUrl: string | null
   onlineVisible: boolean
   tableVisible: boolean
@@ -2200,6 +2241,31 @@ export const api = {
 
   today: (branchId: string, date: string | null) =>
     apiFetch<TodayReport>(
+  // --------------------------------------------------------------------- M5
+
+  modifierGroups: () => apiFetch<ModifierGroupRow[]>('/api/admin/modifier-groups'),
+
+  /** Lưu trọn nhóm: ràng buộc "bắt buộc thì ≥ 2 lựa chọn" chỉ kiểm được cả nhóm */
+  saveModifierGroup: (input: ModifierGroupInput) =>
+    apiFetch<{ id: string; options: number; dropped: number }>(
+      `/api/admin/modifier-groups/${input.id}`,
+      { method: 'PUT', body: input },
+    ),
+
+  deleteModifierGroup: (id: string) =>
+    apiFetch<{ deleted: boolean }>(`/api/admin/modifier-groups/${id}`, { method: 'DELETE' }),
+
+  dishModifierGroups: (dishId: string) =>
+    apiFetch<{ dishId: string; groupIds: string[] }>(
+      `/api/admin/dishes/${dishId}/modifier-groups`,
+    ),
+
+  setDishModifierGroups: (dishId: string, groupIds: string[]) =>
+    apiFetch<{ dishId: string; groupIds: string[] }>(
+      `/api/admin/dishes/${dishId}/modifier-groups`,
+      { method: 'PUT', body: { groupIds } },
+    ),
+
       `/api/reports/today?branch=${encodeURIComponent(branchId)}${date ? `&date=${date}` : ''}`,
     ),
 

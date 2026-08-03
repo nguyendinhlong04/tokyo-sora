@@ -87,6 +87,24 @@ export function DishEditor({
     enabled: dishId !== null,
   })
   const pickers = useQuery({ queryKey: ['dish-pickers'], queryFn: api.dishPickers })
+
+  /**
+   * M5 — món này hỏi khách những nhóm nào.
+   *
+   * Danh sách nhóm là dữ liệu dùng chung nên chỉ TÍCH CHỌN ở đây; nội dung nhóm
+   * sửa ở màn Tuỳ chọn. Cho sửa cả nội dung trong trình sửa món là mở đường cho
+   * mười ba món nướng có mười ba bảng vị lệch nhau.
+   */
+  const modifiers = useQuery({ queryKey: ['modifier-groups'], queryFn: api.modifierGroups })
+  const dishGroups = useQuery({
+    queryKey: ['dish-modifier-groups', dishId],
+    queryFn: () => api.dishModifierGroups(dishId!),
+    enabled: dishId !== null,
+  })
+  const [groupIds, setGroupIds] = useState<string[]>([])
+  useEffect(() => {
+    if (dishGroups.data) setGroupIds(dishGroups.data.groupIds)
+  }, [dishGroups.data])
   const all = useQuery({
     queryKey: ['dishes', branchId],
     queryFn: () => api.dishes(branchId!),
@@ -139,6 +157,16 @@ export function DishEditor({
     onSuccess: () => {
       toast('Đã lưu các chặng của set', 'ok')
       refresh()
+    },
+    onError: fail,
+  })
+
+  const saveGroups = useMutation({
+    mutationFn: () => api.setDishModifierGroups(dishId!, groupIds),
+    onSuccess: () => {
+      toast('Đã lưu tuỳ chọn của món', 'ok')
+      void queryClient.invalidateQueries({ queryKey: ['dish-modifier-groups', dishId] })
+      void queryClient.invalidateQueries({ queryKey: ['modifier-groups'] })
     },
     onError: fail,
   })
@@ -426,6 +454,64 @@ export function DishEditor({
               </Button>
             </Section>
           )}
+
+          <Section title="Tuỳ chọn">
+            {dishId === null ? (
+              <p className="text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                Lưu món trước đã — nhóm tuỳ chọn gắn vào món đã có mã.
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2">
+                  {(modifiers.data ?? []).map((group) => {
+                    const on = groupIds.includes(group.id)
+                    return (
+                      <label
+                        key={group.id}
+                        className="flex items-center gap-2.5 text-[length:var(--fs-b2)] text-ink-hi"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          disabled={!mayEdit}
+                          onChange={() =>
+                            setGroupIds((current) =>
+                              on ? current.filter((id) => id !== group.id) : [...current, group.id],
+                            )
+                          }
+                        />
+                        <span className="min-w-0">
+                          {group.name}
+                          <span className="ml-2 text-[length:var(--fs-c1)] text-ink-mute">
+                            {group.required ? 'bắt buộc' : 'tuỳ ý'} ·{' '}
+                            {group.options.map((o) => o.name).join(' · ')}
+                          </span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                  {(modifiers.data?.length ?? 0) === 0 ? (
+                    <p className="text-[length:var(--fs-c1)] text-ink-mute">
+                      Chưa khai nhóm tuỳ chọn nào — dựng ở màn M5 · Tuỳ chọn rồi quay lại đây.
+                    </p>
+                  ) : null}
+                </div>
+
+                <Button
+                  variant="primary"
+                  className="mt-4"
+                  disabled={!mayEdit || saveGroups.isPending}
+                  onClick={() => saveGroups.mutate()}
+                >
+                  Lưu tuỳ chọn của món
+                </Button>
+                <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                  Thứ tự tích là thứ tự POS hỏi. Nội dung từng nhóm sửa ở màn M5 — sửa ở đó là mọi
+                  món dùng nhóm đó đổi theo.
+                </p>
+              </>
+            )}
+          </Section>
 
           <Section title="Kênh bán">
             <label className="flex items-center gap-2.5 text-[length:var(--fs-b2)] text-ink-hi">

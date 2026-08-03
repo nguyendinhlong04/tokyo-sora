@@ -1,17 +1,21 @@
 import { watchConnectivity } from '@sora/core'
 import { Button, OutboxBanner, ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router'
 import { api } from './api'
 import { usePwaUpdate } from './pwa'
 import { Dispatch } from './routes/Dispatch'
+import { DispatchRail } from './routes/DispatchRail'
 import { ExternalChannels } from './routes/ExternalChannels'
 import { Floorplan } from './routes/Floorplan'
 import { LateReservations } from './routes/LateReservations'
 import { Pay } from './routes/Pay'
+import { Reconcile } from './routes/Reconcile'
 import { Reservations } from './routes/Reservations'
+import { ShiftClose } from './routes/ShiftClose'
 import { ShiftLogin } from './routes/ShiftLogin'
+import { TableMove } from './routes/TableMove'
 import { TableOrder } from './routes/TableOrder'
 import { TableRequests } from './routes/TableRequests'
 import { SessionProvider, useSession } from './session-context'
@@ -45,7 +49,10 @@ export function App() {
                 <Route path="/kenh-ngoai" element={<ExternalChannels />} />
                 <Route path="/dat-cho" element={<Reservations />} />
                 <Route path="/qua-gio" element={<LateReservations />} />
+                <Route path="/doi-soat" element={<Reconcile />} />
+                <Route path="/dong-ca" element={<ShiftClose />} />
                 <Route path="/table/:sessionId" element={<TableOrder />} />
+                <Route path="/table/:sessionId/chuyen" element={<TableMove />} />
                 <Route path="/table/:sessionId/pay" element={<Pay />} />
               </Route>
               <Route path="*" element={<Navigate to="/floor" replace />} />
@@ -57,11 +64,33 @@ export function App() {
   )
 }
 
+/** Máy nào đang bật trạm thu ngân thì lần mở sau vẫn là trạm thu ngân */
+const STATION_KEY = 'sora.pos.station'
+
 /** Khung chung: chưa đăng nhập ca thì mọi màn vận hành đều đẩy về P1 */
 function Shell() {
   const { staff, ready, branchId, signOut } = useSession()
   const { needRefresh, applyUpdate } = usePwaUpdate()
   const navigate = useNavigate()
+
+  /**
+   * P16 trạm thu ngân — dải điều phối bật/tắt cho cả máy chứ không phải một màn
+   * riêng. Vận hành thường trực là "vừa tính tiền vừa liếc dải bên phải" (§21
+   * P16), nên dải phải sống qua mọi lần chuyển màn; một route riêng thì mỗi lần
+   * mở bàn là dải biến mất, đúng lúc đơn online kêu.
+   *
+   * Chỉ máy 22" trở lên mới đủ chỗ cho hai vùng — máy nhỏ bật lên sẽ bóp vùng
+   * việc chính, mà quy tắc là dải KHÔNG BAO GIỜ che chỗ tính tiền.
+   */
+  const [station, setStation] = useState(
+    () => typeof localStorage !== 'undefined' && localStorage.getItem(STATION_KEY) === 'on',
+  )
+  const toggleStation = () => {
+    setStation((on) => {
+      localStorage.setItem(STATION_KEY, on ? 'off' : 'on')
+      return !on
+    })
+  }
 
   // Chuông yêu cầu từ bàn: khách bấm gọi trên điện thoại thì phải thấy được ở
   // MỌI màn của POS, không phải chỉ khi ai đó nhớ mở P12.
@@ -125,6 +154,9 @@ function Shell() {
           >
             Yêu cầu từ bàn{pendingRequests > 0 ? ` · ${pendingRequests}` : ''}
           </Button>
+          <Button variant={station ? 'primary' : 'ghost'} onClick={toggleStation}>
+            Trạm thu ngân
+          </Button>
           {needRefresh ? (
             <button
               type="button"
@@ -135,6 +167,10 @@ function Shell() {
             </button>
           ) : null}
           <OutboxBanner />
+          {/* Đóng ca là ĐẾM KÉT rồi mới đăng xuất — không phải chỉ rời máy */}
+          <Button variant="ghost" onClick={() => void navigate('/dong-ca')}>
+            Đóng ca
+          </Button>
           <Button
             variant="ghost"
             onClick={async () => {
@@ -142,11 +178,21 @@ function Shell() {
               void navigate('/shift')
             }}
           >
-            Đóng ca
+            Đăng xuất
           </Button>
         </div>
       </header>
-      <Outlet />
+
+      {station ? (
+        <div className="flex h-[calc(100dvh-56px)] min-h-0">
+          <div className="min-w-0 flex-1 overflow-y-auto">
+            <Outlet />
+          </div>
+          <DispatchRail />
+        </div>
+      ) : (
+        <Outlet />
+      )}
     </div>
   )
 }

@@ -41,6 +41,7 @@ import { Production, StockCount, StockIssues, Transfers } from './routes/StockOp
 import { Suppliers } from './routes/Suppliers'
 import { Timesheet } from './routes/Timesheet'
 import { MenuMatrix } from './routes/MenuMatrix'
+import { Modifiers } from './routes/Modifiers'
 import {
   KitchenReport,
   OnlineReport,
@@ -131,6 +132,7 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
     group: 'Món & kho',
     items: [
       { to: '/mon', label: 'M1 · Món và set' },
+      { to: '/tuy-chon', label: 'M5 · Tuỳ chọn', need: 'menu.view-price' },
       { to: '/cong-thuc', label: 'M4 · Công thức & giá vốn', need: 'cost.view-recipe' },
       { to: '/nguyen-lieu', label: 'M7 · Nguyên liệu', need: 'cost.view-recipe' },
       { to: '/ban-thanh-pham', label: 'M8 · Bán thành phẩm', need: 'cost.view-recipe' },
@@ -208,6 +210,7 @@ export function App() {
                 <Route path="/ban-thanh-pham" element={<PrepList />} />
                 <Route path="/ban-thanh-pham/:prepId" element={<PrepEditor />} />
                 <Route path="/lich-su-cong-thuc" element={<RecipeHistory />} />
+                <Route path="/tuy-chon" element={<Modifiers />} />
                 <Route path="/nhom-mon" element={<Categories />} />
                 <Route path="/set-combo" element={<Sets />} />
                 <Route path="/kho" element={<StockOverview />} />

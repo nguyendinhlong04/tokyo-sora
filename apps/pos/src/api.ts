@@ -235,6 +235,76 @@ export const api = {
 
   config: (branchId: string) => apiFetch<ConfigBundle>(`/api/config?branch=${branchId}`),
 
+/** P14 — bảng số liệu trước khi đếm két */
+export interface ShiftSummary {
+  shift: {
+    id: number
+    branchId: string
+    businessDate: string
+    state: 'open' | 'closed'
+    openedAt: string
+    closedAt: string | null
+    openingCash: number
+    cashier: string | null
+  }
+  cash: { opening: number; sales: number; expected: number }
+  revenue: { byKind: { kind: string; amount: number; count: number }[]; total: number }
+  bank: {
+    system: number
+    statement: number
+    matched: number
+    unassigned: number
+    mismatched: number
+  }
+}
+
+/** P15 — ba nhóm đối soát */
+export interface ReconcileBoard {
+  businessDate: string
+  serverNow: string
+  lastEventAt: string | null
+  /** Lượt trả đang chờ ngân hàng — điều kiện thứ hai của banner đỏ */
+  pending: { count: number; amount: number }
+  matched: {
+    paymentId: number
+    amount: number
+    vaNumber: string | null
+    bankRef: string | null
+    paidAt: string | null
+    tableCode: string | null
+    orderCode: string | null
+  }[]
+  mismatch: {
+    paymentId: number
+    expected: number
+    received: number
+    diff: number
+    vaNumber: string | null
+    bankRef: string
+    receivedAt: string
+    tableCode: string | null
+    orderCode: string | null
+  }[]
+  unassigned: {
+    bankEventId: number
+    amount: number
+    vaNumber: string | null
+    bankRef: string
+    receivedAt: string
+  }[]
+}
+
+/** Sổ COD của dải P16 */
+export interface CodBook {
+  shippers: {
+    name: string
+    phone: string | null
+    due: number
+    orders: { id: number; displayCode: string; due: number }[]
+  }[]
+  total: number
+}
+
   availability: (branchId: string) =>
     apiFetch<AvailabilityRow[]>(`/api/availability?branch=${branchId}`),
 
@@ -267,6 +337,98 @@ export const api = {
     ),
 
   cancelOrder: (orderId: number, reason: string) =>
+  /** P5 — thứ tự 20 ô bàn phím nhanh; tên và giá vẫn lấy từ config bundle */
+  quickKeys: (branchId: string) =>
+    apiFetch<{ dishIds: string[]; days: number; since: string }>(
+      `/api/quick-keys?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  // --- P14 đóng ca · P15 đối soát · sổ COD ---
+
+  shiftSummary: (shiftId: number) => apiFetch<ShiftSummary>(`/api/shifts/${shiftId}/summary`),
+
+  closeShift: (shiftId: number, countedCash: number, note: string | null) =>
+    apiFetch<{ expected: number; counted: number; variance: number }>(
+      `/api/shifts/${shiftId}/close`,
+      { method: 'POST', body: { countedCash, note } },
+    ),
+
+  reconcile: (branchId: string, date?: string) =>
+    apiFetch<ReconcileBoard>(
+      `/api/payments/reconcile?branch=${encodeURIComponent(branchId)}${date ? `&date=${date}` : ''}`,
+    ),
+
+  acceptMismatch: (paymentId: number) =>
+    apiFetch<{ credited: number; gap: number }>(`/api/payments/${paymentId}/accept-mismatch`, {
+      method: 'POST',
+    }),
+
+  requestTopUp: (paymentId: number) =>
+    apiFetch<{ credited: number; gap: number }>(`/api/payments/${paymentId}/request-topup`, {
+      method: 'POST',
+    }),
+
+  assignBankEvent: (bankEventId: number, sessionId: number) =>
+    apiFetch<{ credited: number; paymentState: string }>(`/api/bank-events/${bankEventId}/assign`, {
+      method: 'POST',
+      body: { sessionId },
+    }),
+
+  codBook: (branchId: string) =>
+    apiFetch<CodBook>(`/api/orders/cod?branch=${encodeURIComponent(branchId)}`),
+
+  settleCod: (input: {
+    branchId: string
+    shipper: string
+    orderIds: number[]
+    receivedAmount?: number | null
+  }) =>
+    apiFetch<{ orders: number; due: number; received: number; variance: number }>(
+      '/api/orders/cod/settle',
+      { method: 'POST', body: input },
+    ),
+
+  shipperBook: (branchId: string) =>
+    apiFetch<{ name: string; phone: string | null; trips: number }[]>(
+      `/api/shippers?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  // --- P9 chuyển · ghép · tách bàn ---
+
+  /**
+   * Ba thao tác này KHÔNG đi qua hàng đợi offline: máy chủ còn phải trả lời "món
+   * này đổi trạm, có chắc không" trước khi chạy, mà một lệnh nằm chờ mạng thì
+   * không trả lời được câu đó.
+   */
+  moveSession: (sessionId: number, tableId: number, confirmReroute = false) =>
+    apiFetch<{ sessionId: number; tableCode: string; rerouted: number }>(
+      `/api/table-sessions/${sessionId}/move`,
+      { method: 'POST', body: { tableId, confirmReroute } },
+    ),
+
+  transferLines: (
+    sessionId: number,
+    input: {
+      lineIds: number[]
+      targetSessionId?: number | null
+      targetTableId?: number | null
+      guestCount?: number | null
+      confirmReroute?: boolean
+    },
+  ) =>
+    apiFetch<{
+      targetSessionId: number
+      targetTableCode: string
+      movedLines: number
+      rerouted: number
+    }>(`/api/table-sessions/${sessionId}/transfer`, { method: 'POST', body: input }),
+
+  mergeSessions: (sessionId: number, targetSessionId: number) =>
+    apiFetch<{ movedLines: number; rerouted: number }>(
+      `/api/table-sessions/${sessionId}/merge`,
+      { method: 'POST', body: { targetSessionId } },
+    ),
+
     apiFetch<{ changed: boolean }>(`/api/orders/${orderId}/cancel`, {
       method: 'POST',
       body: { reason },

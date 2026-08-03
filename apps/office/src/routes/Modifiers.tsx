@@ -1,0 +1,396 @@
+import { Button, useToast } from '@sora/ui'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { api, type ModifierGroupInput, type ModifierGroupRow } from '../api'
+import { PageHeader } from '../components/PageHeader'
+import { Field } from '../components/report'
+import { useSession } from '../session-context'
+
+const EMPTY: ModifierGroupInput = {
+  id: '',
+  name: '',
+  required: false,
+  multi: true,
+  pickMin: 0,
+  pickMax: null,
+  options: [{ id: null, name: '', priceDelta: 0, affectsStock: false }],
+}
+
+/**
+ * M5 — Tuỳ chọn.
+ *
+ * Nhóm tuỳ chọn DÙNG CHUNG cho nhiều món, nên nó có màn riêng chứ không nằm gọn
+ * trong trình sửa món: khai lại bảng vị ở từng món là cách chắc chắn để mười ba
+ * món nướng có mười ba bảng vị lệch nhau. Trình sửa món chỉ tích chọn dùng nhóm
+ * nào — và cột "Áp cho" ở đây là chỗ nhìn ra hậu quả trước khi sửa.
+ *
+ * Ô "trừ kho" là thứ duy nhất trên màn này chạm tới tiền: "thêm tỏi nướng" là một
+ * nguyên liệu thật phải trừ khỏi kho và tính vào giá vốn, còn "ít cay" thì không.
+ * Bật nhầm thì giá vốn món phồng lên mà không ai tìm ra vì sao.
+ */
+export function Modifiers() {
+  const { can } = useSession()
+  const toast = useToast()
+  const queryClient = useQueryClient()
+  const mayEdit = can('menu.edit-price')
+
+  const groups = useQuery({ queryKey: ['modifier-groups'], queryFn: api.modifierGroups })
+  const [draft, setDraft] = useState<ModifierGroupInput | null>(null)
+
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ['modifier-groups'] })
+  const fail = (err: Error) => toast(err.message, 'danger')
+
+  const save = useMutation({
+    mutationFn: (input: ModifierGroupInput) => api.saveModifierGroup(input),
+    onSuccess: (result) => {
+      toast(
+        result.dropped > 0
+          ? `Đã lưu nhóm — bỏ ${result.dropped} lựa chọn`
+          : 'Đã lưu nhóm tuỳ chọn',
+        'ok',
+      )
+      setDraft(null)
+      refresh()
+    },
+    onError: fail,
+  })
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.deleteModifierGroup(id),
+    onSuccess: () => {
+      toast('Đã xoá nhóm', 'ok')
+      refresh()
+    },
+    onError: fail,
+  })
+
+  const rows = groups.data ?? []
+
+  return (
+    <>
+      <PageHeader
+        title="Tuỳ chọn"
+        subtitle="Nhóm câu hỏi mà POS và điện thoại khách hỏi khi gọi món. Nhóm dùng chung cho nhiều món — sửa ở đây là mọi món dùng nhóm đó đổi theo."
+        action={
+          mayEdit ? (
+            <Button variant="primary" onClick={() => setDraft({ ...EMPTY })}>
+              Thêm nhóm
+            </Button>
+          ) : null
+        }
+      />
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
+        {draft ? (
+          <GroupForm
+            draft={draft}
+            existing={rows.some((g) => g.id === draft.id)}
+            onChange={setDraft}
+            onCancel={() => setDraft(null)}
+            onSave={() => save.mutate(draft)}
+            saving={save.isPending}
+          />
+        ) : null}
+
+        <div className="mt-5 overflow-hidden rounded-md border border-line-1 bg-surface-1">
+          <div className="grid grid-cols-[1fr_130px_110px_130px_170px_140px] gap-3 border-b border-line-1 bg-canvas px-5 py-3 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
+            <span>Tên nhóm</span>
+            <span>Kiểu</span>
+            <span className="text-right">Lựa chọn</span>
+            <span className="text-right">Áp cho</span>
+            <span className="text-right">Chênh giá</span>
+            <span />
+          </div>
+
+          {groups.isPending ? (
+            <p className="px-5 py-4 text-ink-mute">Đang tải…</p>
+          ) : rows.length === 0 ? (
+            <p className="px-5 py-4 text-[length:var(--fs-b2)] text-ink-mute">
+              Chưa có nhóm tuỳ chọn nào. Món vẫn gọi được — POS chỉ thả thẳng vào phiếu order mà
+              không hỏi gì.
+            </p>
+          ) : (
+            rows.map((row) => (
+              <div
+                key={row.id}
+                className="grid grid-cols-[1fr_130px_110px_130px_170px_140px] items-center gap-3 border-b border-line-1 px-5 py-2.5 last:border-b-0"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-[length:var(--fs-b2)] text-ink-hi">
+                    {row.name}
+                  </span>
+                  <span className="mt-0.5 block truncate font-mono text-[length:var(--fs-c2)] text-ink-mute">
+                    {row.id} · {row.options.map((o) => o.name).join(' · ')}
+                  </span>
+                </span>
+
+                <span className="text-[length:var(--fs-c1)] text-ink-body">
+                  {row.required ? 'Bắt buộc' : 'Tuỳ ý'}
+                  <span className="block text-[length:var(--fs-c2)] text-ink-mute">
+                    {row.multi ? `chọn nhiều${row.pickMax ? ` · tối đa ${row.pickMax}` : ''}` : 'chọn một'}
+                  </span>
+                </span>
+
+                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
+                  {row.options.length}
+                </span>
+
+                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
+                  {row.dishCount} món
+                </span>
+
+                <span className="text-right font-mono text-[length:var(--fs-c1)] text-ink-body">
+                  {priceRange(row)}
+                </span>
+
+                <span className="flex justify-end gap-1.5">
+                  {mayEdit ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setDraft(toInput(row))}
+                        className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => remove.mutate(row.id)}
+                        disabled={row.dishCount > 0}
+                        title={row.dishCount > 0 ? 'Còn món đang dùng — gỡ khỏi các món đó trước' : undefined}
+                        className="h-8 rounded-sm border border-line-3 px-2 text-[length:var(--fs-c1)] text-ink-mute hover:text-danger disabled:opacity-40"
+                      >
+                        Xoá
+                      </button>
+                    </>
+                  ) : null}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+          Tên và chênh giá của lựa chọn được ĐÓNG BĂNG vào dòng đơn lúc khách gọi, nên sửa ở đây
+          không viết lại hoá đơn cũ. Món nào hỏi nhóm nào thì chọn trong trình sửa món, mục “Tuỳ
+          chọn”.
+        </p>
+      </div>
+    </>
+  )
+}
+
+function GroupForm({
+  draft,
+  existing,
+  onChange,
+  onCancel,
+  onSave,
+  saving,
+}: {
+  draft: ModifierGroupInput
+  existing: boolean
+  onChange: (next: ModifierGroupInput) => void
+  onCancel: () => void
+  onSave: () => void
+  saving: boolean
+}) {
+  const set = <K extends keyof ModifierGroupInput>(key: K, value: ModifierGroupInput[K]) =>
+    onChange({ ...draft, [key]: value })
+
+  const setOption = (index: number, patch: Partial<ModifierGroupInput['options'][number]>) =>
+    onChange({
+      ...draft,
+      options: draft.options.map((o, i) => (i === index ? { ...o, ...patch } : o)),
+    })
+
+  // Nhóm bắt buộc mà một lựa chọn thì đó là thuộc tính của món, không phải câu hỏi
+  const tooFewForRequired = draft.required && draft.options.length < 2
+  const blocked =
+    draft.id.trim().length < 2 ||
+    draft.name.trim().length === 0 ||
+    draft.options.some((o) => o.name.trim().length === 0) ||
+    tooFewForRequired
+
+  return (
+    <section className="rounded-md border border-accent bg-surface-1 p-5">
+      <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+        {existing ? `Sửa ${draft.name}` : 'Nhóm tuỳ chọn mới'}
+      </p>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-4">
+        <Field label="Mã nhóm">
+          <Input
+            value={draft.id}
+            disabled={existing}
+            onChange={(v) => set('id', v)}
+            placeholder="do-chin"
+          />
+        </Field>
+        <Field label="Tên hiện cho khách">
+          <Input value={draft.name} onChange={(v) => set('name', v)} placeholder="Độ chín" />
+        </Field>
+        <Field label="Bắt buộc chọn">
+          <Toggle
+            on={draft.required}
+            label={draft.required ? 'Bắt buộc' : 'Tuỳ ý'}
+            onToggle={() => set('required', !draft.required)}
+          />
+        </Field>
+        <Field label="Số lựa chọn">
+          <div className="flex gap-2">
+            <Toggle
+              on={draft.multi}
+              label={draft.multi ? 'Chọn nhiều' : 'Chọn một'}
+              onToggle={() => set('multi', !draft.multi)}
+            />
+            {draft.multi ? (
+              <Input
+                value={draft.pickMax === null ? '' : String(draft.pickMax)}
+                onChange={(v) => set('pickMax', v.trim() === '' ? null : Number(v.replace(/\D/g, '')) || null)}
+                placeholder="tối đa"
+              />
+            ) : null}
+          </div>
+        </Field>
+      </div>
+
+      <div className="mt-5">
+        <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+          Lựa chọn
+        </p>
+        <div className="mt-2.5 flex flex-col gap-2">
+          {draft.options.map((option, index) => (
+            <div key={option.id ?? `moi-${index}`} className="grid grid-cols-[1fr_170px_150px_90px] items-center gap-3">
+              <Input
+                value={option.name}
+                onChange={(v) => setOption(index, { name: v })}
+                placeholder="Tên lựa chọn"
+              />
+              <Input
+                value={String(option.priceDelta)}
+                onChange={(v) => setOption(index, { priceDelta: toMoney(v) })}
+                placeholder="Chênh giá"
+              />
+              <Toggle
+                on={option.affectsStock}
+                label={option.affectsStock ? 'Có trừ kho' : 'Không trừ kho'}
+                onToggle={() => setOption(index, { affectsStock: !option.affectsStock })}
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({ ...draft, options: draft.options.filter((_, i) => i !== index) })
+                }
+                disabled={draft.options.length <= 1}
+                className="h-9 rounded-sm border border-line-3 text-[length:var(--fs-c1)] text-ink-mute hover:text-danger disabled:opacity-40"
+              >
+                Bỏ
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() =>
+            onChange({
+              ...draft,
+              options: [...draft.options, { id: null, name: '', priceDelta: 0, affectsStock: false }],
+            })
+          }
+          className="mt-2.5 h-9 rounded-sm border border-line-3 px-3 text-[length:var(--fs-c1)] text-ink-body hover:bg-surface-3"
+        >
+          Thêm lựa chọn
+        </button>
+      </div>
+
+      {tooFewForRequired ? (
+        <p className="mt-4 text-[length:var(--fs-c1)] text-warn">
+          Nhóm bắt buộc phải có ít nhất hai lựa chọn — một lựa chọn duy nhất là thuộc tính của món,
+          không phải câu hỏi để hỏi khách.
+        </p>
+      ) : null}
+
+      <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+        Bật “có trừ kho” khi lựa chọn là nguyên liệu thật (thêm tỏi, thêm rau) — nó vào giá vốn và
+        trừ khỏi tồn. Lựa chọn kiểu “ít cay”, “không hành” thì để tắt.
+      </p>
+
+      <div className="mt-5 flex gap-2">
+        <Button variant="primary" disabled={blocked || saving} onClick={onSave}>
+          Lưu nhóm
+        </Button>
+        <Button onClick={onCancel}>Huỷ</Button>
+      </div>
+    </section>
+  )
+}
+
+function Input({
+  value,
+  onChange,
+  placeholder,
+  disabled = false,
+}: {
+  value: string
+  onChange: (next: string) => void
+  placeholder?: string
+  disabled?: boolean
+}) {
+  return (
+    <input
+      value={value}
+      disabled={disabled}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi disabled:text-ink-mute"
+    />
+  )
+}
+
+function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`h-9 rounded-sm border px-3 text-[length:var(--fs-c1)] ${
+        on ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+/** Chênh giá âm hợp lệ: bỏ bớt topping có thể giảm giá suất */
+function toMoney(input: string): number {
+  const negative = input.trim().startsWith('-')
+  const digits = Number(input.replace(/\D/g, '')) || 0
+  return negative ? -digits : digits
+}
+
+function priceRange(row: ModifierGroupRow): string {
+  if (row.options.length === 0) return '—'
+  const format = (value: number) => `${value.toLocaleString('vi-VN')}₫`
+  return row.priceMin === row.priceMax
+    ? format(row.priceMin)
+    : `${format(row.priceMin)} – ${format(row.priceMax)}`
+}
+
+function toInput(row: ModifierGroupRow): ModifierGroupInput {
+  return {
+    id: row.id,
+    name: row.name,
+    required: row.required,
+    multi: row.multi,
+    pickMin: row.pickMin,
+    pickMax: row.pickMax,
+    options: row.options.map((o) => ({
+      id: o.id,
+      name: o.name,
+      priceDelta: o.priceDelta,
+      affectsStock: o.affectsStock,
+    })),
+  }
+}

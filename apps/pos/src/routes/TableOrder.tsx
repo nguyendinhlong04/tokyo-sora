@@ -41,7 +41,8 @@ export function TableOrder() {
   const toast = useToast()
   const queryClient = useQueryClient()
 
-  const [category, setCategory] = useState<string | null>(null)
+  /** `null` = tất cả · `'quick'` = bàn phím nhanh P5 · còn lại là mã nhóm món */
+  const [category, setCategory] = useState<string | null>('quick')
   const [pad, setPad] = useState<PadLine[]>([])
   const [voiding, setVoiding] = useState<OrderLineRow | null>(null)
   const [showQr, setShowQr] = useState(false)
@@ -74,10 +75,26 @@ export function TableOrder() {
     [availability.data],
   )
 
+  /**
+   * P5 bàn phím nhanh. Máy chủ chỉ trả về THỨ TỰ mã món; tên, giá, món hết vẫn
+   * đọc từ config bundle như mọi ô khác — một nguồn cho một con số.
+   */
+  const quick = useQuery({
+    queryKey: ['quick-keys', branchId],
+    queryFn: () => api.quickKeys(branchId!),
+    enabled: Boolean(branchId),
+    staleTime: 10 * 60_000,
+  })
+
   const categories = config.data?.categories ?? []
-  const dishes = (config.data?.dishes ?? []).filter(
-    (d) => !category || d.categoryId === category,
-  )
+  const dishes = useMemo(() => {
+    const all = config.data?.dishes ?? []
+    if (category === 'quick') {
+      const byId = new Map(all.map((d) => [d.id, d]))
+      return (quick.data?.dishIds ?? []).map((id) => byId.get(id)).filter((d) => d !== undefined)
+    }
+    return all.filter((d) => !category || d.categoryId === category)
+  }, [config.data?.dishes, category, quick.data?.dishIds])
 
   const groupsOf = (dish: ConfigDish): ModifierGroup[] =>
     dish.modifierGroupIds
@@ -159,6 +176,17 @@ export function TableOrder() {
       <nav className="flex flex-col gap-1 overflow-y-auto border-r border-line-1 p-3">
         <button
           type="button"
+          onClick={() => setCategory('quick')}
+          className={[
+            'flex items-center gap-2 rounded-sm px-3 py-3 text-left text-[length:var(--fs-b2)]',
+            category === 'quick' ? 'bg-surface-3 text-ink-hi' : 'text-ink-mute hover:bg-surface-2',
+          ].join(' ')}
+        >
+          <span className="text-accent-ink">⚡</span>
+          Nhanh
+        </button>
+        <button
+          type="button"
           onClick={() => setCategory(null)}
           className={[
             'rounded-sm px-3 py-3 text-left text-[length:var(--fs-b2)]',
@@ -185,7 +213,7 @@ export function TableOrder() {
 
       {/* Cột giữa: lưới món */}
       <div className="overflow-y-auto p-4">
-        {config.isPending ? (
+        {config.isPending || (category === 'quick' && quick.isPending) ? (
           <p className="text-ink-mute">Đang tải thực đơn…</p>
         ) : config.isError ? (
           <Card className="border-warn p-4 text-ink-body">
@@ -322,9 +350,20 @@ export function TableOrder() {
           >
             GỬI BẾP
           </Button>
-          <Button block onClick={() => void navigate(`/table/${id}/pay?code=${tableCode}`)}>
-            Tính tiền
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={() => void navigate(`/table/${id}/chuyen?code=${tableCode}`)}
+            >
+              Chuyển · ghép · tách
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => void navigate(`/table/${id}/pay?code=${tableCode}`)}
+            >
+              Tính tiền
+            </Button>
+          </div>
         </footer>
       </aside>
 

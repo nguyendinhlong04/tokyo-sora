@@ -311,6 +311,40 @@ export class DispatchService {
     })
   }
 
+  /**
+   * Sổ shipper quen của drawer gán ship (P16).
+   *
+   * Không có bảng shipper riêng và cố ý như vậy: người giao ở đây là mấy anh chạy
+   * quen quanh phố, không phải nhân sự có hồ sơ. Sổ này là những cái tên ĐÃ TỪNG
+   * giao cho chi nhánh, gần nhất lên trước — vừa đủ để bấm một cái thay vì gõ lại
+   * số điện thoại, mà không đẻ ra một danh mục phải bảo trì.
+   */
+  async shipperBook(branchId: string) {
+    const rows = await this.db
+      .select({ shipper: orders.shipper, at: orders.createdAt })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.branchId, branchId),
+          eq(orders.type, 'delivery'),
+          sql`${orders.shipper} IS NOT NULL`,
+        ),
+      )
+      .orderBy(desc(orders.createdAt))
+      .limit(300)
+
+    const seen = new Map<string, { name: string; phone: string | null; trips: number }>()
+    for (const row of rows) {
+      const shipper = (row.shipper ?? {}) as { name?: string; phone?: string | null }
+      const name = shipper.name?.trim()
+      if (!name) continue
+      const found = seen.get(name)
+      if (found) found.trips += 1
+      else seen.set(name, { name, phone: shipper.phone ?? null, trips: 1 })
+    }
+    return [...seen.values()]
+  }
+
   /** Đơn đã đóng trong ngày — O8 xem lại, không nằm trong cột đang chạy */
   async closed(branchId: string, businessDate: string) {
     const rows = await this.db

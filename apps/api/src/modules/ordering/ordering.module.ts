@@ -4,6 +4,7 @@ import { FeedbackService } from './feedback.service'
 import { FloorplanService } from './floorplan.service'
 import { OrderingController } from './ordering.controller'
 import { OrderingService } from './ordering.service'
+import { QuickKeysService } from './quick-keys.service'
 import { TableRequestService } from './table-request.service'
 import { TableSessionController } from './table-session.controller'
 
@@ -15,6 +16,7 @@ import { TableSessionController } from './table-session.controller'
     CatalogService,
     TableRequestService,
     FeedbackService,
+    QuickKeysService,
   ],
   exports: [
     OrderingService,

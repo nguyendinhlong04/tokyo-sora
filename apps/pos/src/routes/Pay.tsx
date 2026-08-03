@@ -58,6 +58,11 @@ export function Pay() {
 
   const outstanding = bill.data?.outstanding ?? 0
   const fullyPaid = bill.data ? bill.data.outstanding === 0 && bill.data.total > 0 : false
+  /**
+   * Số tiền một lượt thu riêng, do P9 "tách theo %" tính sẵn rồi đưa sang.
+   * Kẹp theo số còn phải trả: bill có thể đã thu bớt trong lúc nhân viên chọn.
+   */
+  const preset = Math.min(Math.max(Number(searchParams.get('thu') ?? 0) || 0, 0), outstanding)
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 p-6">
@@ -103,8 +108,19 @@ export function Pay() {
               Xoá
             </Button>
           </div>
+          {preset > 0 && preset < outstanding ? (
+            <Button
+              variant="primary"
+              size="lg"
+              block
+              disabled={pay.isPending}
+              onClick={() => pay.mutate(preset)}
+            >
+              Thu phần này · <Money amount={preset} />
+            </Button>
+          ) : null}
           <Button
-            variant="primary"
+            variant={preset > 0 && preset < outstanding ? 'secondary' : 'primary'}
             size="lg"
             block
             disabled={outstanding === 0 || pay.isPending}

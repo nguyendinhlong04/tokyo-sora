@@ -85,6 +85,14 @@ export class DispatchController {
     return this.dispatch.closed(branch ?? actor.branchId, date)
   }
 
+  /** P16 sổ shipper quen của drawer gán ship */
+  @Get('shippers')
+  shippers(@Req() req: RequestWithActor, @Query('branch') branch?: string) {
+    const actor = req.actor!
+    if (actor.kind === 'system') throw new BadRequestException('Không đọc được')
+    return this.dispatch.shipperBook(branch ?? actor.branchId)
+  }
+
   /** O9 chi tiết đơn */
   @Get('orders/:id')
   detail(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {

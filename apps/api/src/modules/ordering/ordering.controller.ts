@@ -6,6 +6,7 @@ import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { FloorplanService } from './floorplan.service'
 import { OrderingService } from './ordering.service'
+import { QuickKeysService } from './quick-keys.service'
 
 const OpenTableBody = z.object({
   guestCount: z.number().int().min(1).max(50),
@@ -32,6 +33,24 @@ const AddLinesBody = z.object({
     .max(50),
 })
 
+/** P9 tách món: đích là bàn đang có khách (`targetSessionId`) hoặc bàn trống (`targetTableId`) */
+const TransferBody = z.object({
+  lineIds: z.array(z.number().int().positive()).min(1).max(200),
+  targetSessionId: z.number().int().positive().nullish(),
+  targetTableId: z.number().int().positive().nullish(),
+  guestCount: z.number().int().min(1).max(50).nullish(),
+  confirmReroute: z.boolean().optional(),
+})
+
+const MoveBody = z.object({
+  tableId: z.number().int().positive(),
+  confirmReroute: z.boolean().optional(),
+})
+
+const MergeBody = z.object({
+  targetSessionId: z.number().int().positive(),
+})
+
 const VoidLineBody = z.object({
   reason: z.string().min(1).max(300),
   approval: z
@@ -49,6 +68,7 @@ export class OrderingController {
   constructor(
     private readonly floorplan: FloorplanService,
     private readonly ordering: OrderingService,
+    private readonly quick: QuickKeysService,
   ) {}
 
   /** P2 sơ đồ bàn */
@@ -109,6 +129,47 @@ export class OrderingController {
     @Req() req: RequestWithActor,
   ) {
     return this.ordering.fireBatch(id, batchNo, req.actor!)
+  }
+
+  /** P5 bàn phím nhanh — 20 món bán chạy tuần qua */
+  @Get('quick-keys')
+  @RequirePermission('order.create')
+  quickKeys(@Query('branch') branch: string) {
+    return this.quick.quickKeys(branch)
+  }
+
+  /** P9 chuyển cả bàn sang bàn trống */
+  @Post('table-sessions/:id/move')
+  @RequirePermission('table.move-merge-split')
+  moveSession(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    const input = MoveBody.parse(body)
+    return this.ordering.moveSession(id, input.tableId, input, req.actor!)
+  }
+
+  /** P9 tách món sang bàn khác */
+  @Post('table-sessions/:id/transfer')
+  @RequirePermission('table.move-merge-split')
+  transferLines(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    return this.ordering.transferLines(id, TransferBody.parse(body), req.actor!)
+  }
+
+  /** P9 ghép cả bàn vào bàn đích */
+  @Post('table-sessions/:id/merge')
+  @RequirePermission('table.move-merge-split')
+  mergeSessions(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    return this.ordering.mergeSessions(id, MergeBody.parse(body).targetSessionId, req.actor!)
   }
 
   /**

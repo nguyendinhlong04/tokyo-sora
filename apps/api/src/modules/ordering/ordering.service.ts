@@ -6,12 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { computeOrderTotals, rooms, type OrderLineInput } from '@sora/contracts'
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { businessDateOf, minuteOfDayIn } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { nextDisplayCode, orderNumberOf } from '../../common/display-code'
 import { emit, type DomainEvent } from '../../common/outbox'
 import { ParamsService } from '../../common/params.service'
+import { isUniqueViolation } from '../../common/pg-error'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
@@ -21,6 +22,7 @@ import {
   orderBatches,
   orderLines,
   orders,
+  payments,
   tableSessions,
   tables,
   ticketItems,
@@ -55,6 +57,18 @@ function ticketNote(modifiers: unknown, note: string | null): string | null {
   const names = chosen.map((m) => m.name).filter(Boolean).join(' · ')
   if (names && note) return `${names} — ${note}`
   return names || note || null
+}
+
+/**
+ * Câu cảnh báo trước khi đổi bàn khác loại (P9).
+ *
+ * Nói bằng hệ quả chứ không bằng tên cột: "phải nướng hộ ở bếp, lâu thêm" là thứ
+ * nhân viên cân nhắc được, còn "tableHasGrill đổi từ true sang false" thì không.
+ */
+function rerouteMessage(lines: number, fromGrill: boolean): string {
+  return fromGrill
+    ? `${lines} món đang ở bàn có bếp than sẽ chuyển sang bếp nướng hộ (lâu thêm khoảng 8 phút). Tiếp tục?`
+    : `${lines} món đang bếp nướng hộ sẽ chuyển sang bàn có bếp than — khách tự nướng. Tiếp tục?`
 }
 
 export interface AddLineInput {
@@ -758,6 +772,228 @@ export class OrderingService {
     })
   }
 
+  // ------------------------------------------- P9 chuyển · ghép · tách bàn
+
+  /**
+   * P9 chuyển cả bàn sang bàn trống.
+   *
+   * Phiên bàn ĐI THEO khách chứ không sinh phiên mới: giờ mở bàn, số khách và mọi
+   * khoản đã thu vẫn là của nhóm khách đó. Dựng phiên mới rồi chuyển món sang là
+   * cắt đôi một nhóm khách thành hai lượt ngồi — vòng quay bàn (B6) đọc xong sẽ
+   * ra một con số không có thật.
+   *
+   * Bàn đích khác loại bếp thì món CHƯA XONG phải định tuyến lại (§21 P9): thịt
+   * sống bưng ra bàn không có bếp than thì không ai nướng. Lần bấm đầu trả lỗi
+   * kèm số món sẽ đổi trạm, nhân viên bấm lại với `confirmReroute` mới chạy —
+   * người quyết vẫn là người đứng đó, máy chỉ nói trước hậu quả.
+   */
+  async moveSession(
+    sessionId: number,
+    tableId: number,
+    input: { confirmReroute?: boolean },
+    actor: Actor,
+  ) {
+    return this.db.transaction(async (tx) => {
+      const session = await this.liveSession(tx, sessionId)
+      const from = await this.tableOf(tx, session.tableId)
+      const to = await this.tableOf(tx, tableId)
+      if (to.id === from.id) throw new BadRequestException('Bàn đích trùng bàn nguồn')
+      if (to.branchId !== session.branchId) {
+        throw new BadRequestException('Bàn đích thuộc chi nhánh khác')
+      }
+      if (!to.active) throw new ConflictException('Bàn đích đang ngừng sử dụng')
+      if (session.guestCount > to.seatMax) {
+        throw new ConflictException(`Bàn ${to.code} chỉ ngồi tối đa ${to.seatMax} khách`)
+      }
+
+      const [order] = await tx.select().from(orders).where(eq(orders.tableSessionId, sessionId))
+      const live = order ? await this.linesStillInKitchen(tx, order.id) : []
+      const reroute = to.hasGrill !== from.hasGrill && live.length > 0
+      if (reroute && !input.confirmReroute) {
+        throw new ConflictException({
+          code: 'reroute_confirm',
+          message: rerouteMessage(live.length, from.hasGrill),
+          lines: live.length,
+        })
+      }
+
+      try {
+        await tx.update(tableSessions).set({ tableId }).where(eq(tableSessions.id, sessionId))
+      } catch (err) {
+        if (isUniqueViolation(err, 'table_sessions_one_live_per_table')) {
+          throw new ConflictException(`Bàn ${to.code} đang có khách`)
+        }
+        throw err
+      }
+
+      if (order) {
+        if (reroute) {
+          await this.reissueTickets(tx, { order, lines: live, table: to })
+        } else {
+          // Cùng loại bàn thì vé vẫn nấu ở đúng trạm cũ — chỉ đổi số bàn để người
+          // chạy món bưng đúng chỗ, và ĐỒNG HỒ VÉ GIỮ NGUYÊN.
+          await tx
+            .update(tickets)
+            .set({ tableCode: to.code })
+            .where(
+              and(
+                eq(tickets.orderId, order.id),
+                sql`${tickets.state} IN ('waiting','queued','cooking')`,
+              ),
+            )
+        }
+      }
+
+      await emit(tx, {
+        branchId: session.branchId,
+        topic: 'table.opened',
+        rooms: [rooms.tables(session.branchId), rooms.tableSession(sessionId)],
+        payload: { sessionId, tableId, tableCode: to.code, from: from.code },
+      })
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'table.session.moved',
+        entity: 'table_session',
+        entityId: String(sessionId),
+        payload: { from: from.code, to: to.code, rerouted: reroute ? live.length : 0 },
+      })
+
+      return { sessionId, tableId, tableCode: to.code, rerouted: reroute ? live.length : 0 }
+    })
+  }
+
+  /**
+   * P9 tách món sang bàn khác — bàn đang có khách hoặc bàn trống (mở phiên mới).
+   *
+   * KHÔNG tách được khi bàn nguồn đã có tiền vào (đã thu hoặc đang chờ ngân hàng):
+   * tiền đã ghi cho một đơn mà món thì bỏ sang đơn khác là tự tay làm lệch sổ.
+   * Thu tiền xong rồi thì mỗi bàn là một bill riêng, không còn gì để tách.
+   */
+  async transferLines(
+    sourceSessionId: number,
+    input: {
+      lineIds: number[]
+      targetSessionId?: number | null
+      targetTableId?: number | null
+      guestCount?: number | null
+      confirmReroute?: boolean
+    },
+    actor: Actor,
+  ) {
+    if (input.lineIds.length === 0) throw new BadRequestException('Chưa chọn món nào')
+
+    return this.db.transaction(async (tx) => {
+      const result = await this.transferWithin(tx, {
+        sourceSessionId,
+        lineIds: input.lineIds,
+        targetSessionId: input.targetSessionId ?? null,
+        targetTableId: input.targetTableId ?? null,
+        guestCount: input.guestCount ?? null,
+        confirmReroute: input.confirmReroute ?? false,
+        actor,
+      })
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'table.lines.transferred',
+        entity: 'table_session',
+        entityId: String(sourceSessionId),
+        payload: {
+          to: result.targetTableCode,
+          lines: result.movedLines,
+          rerouted: result.rerouted,
+        },
+      })
+      return result
+    })
+  }
+
+  /**
+   * P9 ghép cả bàn: dồn hết món sang bàn đích rồi đóng phiên nguồn.
+   *
+   * Ghép là chuyển TẤT CẢ rồi đóng, chứ không phải một phép riêng — viết lại lần
+   * hai thì hai đường sẽ lệch nhau đúng ở chỗ vé bếp.
+   */
+  async mergeSessions(sourceSessionId: number, targetSessionId: number, actor: Actor) {
+    return this.db.transaction(async (tx) => {
+      const source = await this.liveSession(tx, sourceSessionId)
+      const [sourceOrder] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.tableSessionId, sourceSessionId))
+
+      const lineIds = sourceOrder
+        ? (
+            await tx
+              .select({ id: orderLines.id })
+              .from(orderLines)
+              .where(
+                and(
+                  eq(orderLines.orderId, sourceOrder.id),
+                  sql`${orderLines.parentLineId} IS NULL`,
+                  sql`${orderLines.state} <> 'voided'`,
+                ),
+              )
+          ).map((l) => l.id)
+        : []
+
+      const result =
+        lineIds.length > 0
+          ? await this.transferWithin(tx, {
+              sourceSessionId,
+              lineIds,
+              targetSessionId,
+              targetTableId: null,
+              guestCount: null,
+              // Ghép bàn là quyết định đã bấm rồi — không hỏi lần hai về định tuyến
+              confirmReroute: true,
+              actor,
+            })
+          : null
+
+      const now = new Date()
+      await tx
+        .update(tableSessions)
+        .set({
+          status: 'closed',
+          closedAt: now,
+          closedBy: actor.kind === 'staff' ? actor.staffId : null,
+          qrTokenHash: null,
+        })
+        .where(eq(tableSessions.id, sourceSessionId))
+
+      if (sourceOrder) {
+        await tx
+          .update(orders)
+          .set({ status: 'done', doneAt: now })
+          .where(and(eq(orders.id, sourceOrder.id), sql`${orders.status} <> 'cancelled'`))
+      }
+
+      await emit(tx, {
+        branchId: source.branchId,
+        topic: 'table.paid',
+        rooms: [rooms.tables(source.branchId), rooms.tableSession(sourceSessionId)],
+        payload: { sessionId: sourceSessionId, merged: true },
+      })
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'table.session.merged',
+        entity: 'table_session',
+        entityId: String(sourceSessionId),
+        payload: { into: targetSessionId, lines: result?.movedLines ?? 0 },
+      })
+
+      return {
+        sourceSessionId,
+        targetSessionId,
+        movedLines: result?.movedLines ?? 0,
+        rerouted: result?.rerouted ?? 0,
+      }
+    })
+  }
+
   // ------------------------------------------------------------ Nội bộ
 
   private async liveSession(tx: Tx, sessionId: number) {
@@ -776,6 +1012,402 @@ export class OrderingService {
     return table
   }
 
+  /**
+   * Ruột của P9 — dùng chung cho tách món và ghép bàn.
+   *
+   * Món chuyển sang bàn đích vào MỘT ĐỢT MỚI: bếp và expo nhìn ra ngay đây là
+   * hàng vừa dồn sang, còn số đợt của bàn cũ thì không mang sang được (hai đơn
+   * đánh số đợt độc lập).
+   */
+  private async transferWithin(
+    tx: Tx,
+    ctx: {
+      sourceSessionId: number
+      lineIds: number[]
+      targetSessionId: number | null
+      targetTableId: number | null
+      guestCount: number | null
+      confirmReroute: boolean
+      actor: Actor
+    },
+  ) {
+    const source = await this.liveSession(tx, ctx.sourceSessionId)
+    const sourceTable = await this.tableOf(tx, source.tableId)
+    const [sourceOrder] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.tableSessionId, ctx.sourceSessionId))
+    if (!sourceOrder) throw new BadRequestException('Bàn nguồn chưa có món nào')
+
+    const [money] = await tx
+      .select({ held: sql<number>`coalesce(sum(${payments.amount}), 0)::int` })
+      .from(payments)
+      .where(
+        and(eq(payments.orderId, sourceOrder.id), inArray(payments.state, ['paid', 'pending'])),
+      )
+    if (Number(money?.held ?? 0) > 0) {
+      throw new ConflictException({
+        code: 'bill_has_money',
+        message: 'Bàn đã có khoản thu — tách bàn lúc này sẽ làm lệch sổ. Hoàn khoản trước.',
+      })
+    }
+
+    const picked = await tx
+      .select()
+      .from(orderLines)
+      .where(
+        and(
+          eq(orderLines.orderId, sourceOrder.id),
+          inArray(orderLines.id, ctx.lineIds),
+          sql`${orderLines.state} <> 'voided'`,
+        ),
+      )
+    if (picked.length !== new Set(ctx.lineIds).size) {
+      throw new BadRequestException('Có món không thuộc bàn này hoặc đã huỷ')
+    }
+    if (picked.some((l) => l.parentLineId !== null)) {
+      throw new BadRequestException('Món trong set đi theo cả set — chọn dòng set thay vì món con')
+    }
+
+    // Món thành phần của set đi theo dòng cha, luôn luôn: nửa set ở bàn này nửa
+    // set ở bàn kia thì bếp không biết dọn ra cùng lúc cho ai.
+    const children = await tx
+      .select()
+      .from(orderLines)
+      .where(
+        and(
+          inArray(
+            orderLines.parentLineId,
+            picked.map((l) => l.id),
+          ),
+          sql`${orderLines.state} <> 'voided'`,
+        ),
+      )
+    const moving = [...picked, ...children]
+
+    const targetSession = ctx.targetSessionId
+      ? await this.openTargetSession(tx, ctx.targetSessionId, source)
+      : await this.openSessionOnFreeTable(tx, {
+          tableId: ctx.targetTableId,
+          guestCount: ctx.guestCount ?? 1,
+          branchId: source.branchId,
+          actor: ctx.actor,
+        })
+    if (targetSession.id === source.id) throw new BadRequestException('Bàn đích trùng bàn nguồn')
+
+    const targetTable = await this.tableOf(tx, targetSession.tableId)
+    const targetOrder = await this.ensureOrder(tx, targetSession, ctx.actor)
+
+    const inKitchen = new Set(
+      (await this.linesStillInKitchen(tx, sourceOrder.id)).map((l) => l.id),
+    )
+    const liveMoving = moving.filter((l) => inKitchen.has(l.id))
+    const reroute = targetTable.hasGrill !== sourceTable.hasGrill && liveMoving.length > 0
+    if (reroute && !ctx.confirmReroute) {
+      throw new ConflictException({
+        code: 'reroute_confirm',
+        message: rerouteMessage(liveMoving.length, sourceTable.hasGrill),
+        lines: liveMoving.length,
+      })
+    }
+
+    const [maxBatch] = await tx
+      .select({ n: sql<number>`coalesce(max(${orderLines.batchNo}), 0)::int` })
+      .from(orderLines)
+      .where(eq(orderLines.orderId, targetOrder.id))
+    const batchNo = Number(maxBatch?.n ?? 0) + 1
+
+    // Món đã gửi bếp thì đợt mới bên bàn đích mở sẵn ở trạng thái ĐÃ RA: chúng
+    // đang nấu dở, bắt nhân viên bấm "Ra đợt" lần nữa là đứng hình cả vé.
+    if (moving.some((l) => l.state !== 'draft')) {
+      await tx
+        .insert(orderBatches)
+        .values({
+          orderId: targetOrder.id,
+          batchNo,
+          state: 'fired',
+          firedAt: new Date(),
+          firedBy: ctx.actor.kind === 'staff' ? ctx.actor.staffId : null,
+        })
+        .onConflictDoNothing()
+    }
+
+    await tx
+      .update(orderLines)
+      .set({ orderId: targetOrder.id, batchNo })
+      .where(
+        inArray(
+          orderLines.id,
+          moving.map((l) => l.id),
+        ),
+      )
+
+    const movedLive = liveMoving.map((l) => ({ ...l, orderId: targetOrder.id, batchNo }))
+    if (movedLive.length > 0) {
+      if (reroute) {
+        await this.reissueTickets(tx, { order: targetOrder, lines: movedLive, table: targetTable })
+      } else {
+        await this.followTickets(tx, {
+          order: targetOrder,
+          lines: movedLive,
+          table: targetTable,
+          batchNo,
+        })
+      }
+    }
+
+    const sourceMoney = await this.recomputeTotals(tx, sourceOrder.id, source.branchId)
+    const targetMoney = await this.recomputeTotals(tx, targetOrder.id, targetSession.branchId)
+
+    await emit(tx, {
+      branchId: source.branchId,
+      topic: 'order.updated',
+      rooms: [
+        rooms.orders(source.branchId),
+        rooms.tables(source.branchId),
+        rooms.tableSession(source.id),
+        rooms.tableSession(targetSession.id),
+      ],
+      payload: {
+        sourceOrderId: sourceOrder.id,
+        targetOrderId: targetOrder.id,
+        movedLines: moving.length,
+      },
+    })
+
+    return {
+      sourceSessionId: source.id,
+      targetSessionId: targetSession.id,
+      targetTableCode: targetTable.code,
+      movedLines: moving.length,
+      rerouted: reroute ? movedLive.length : 0,
+      sourceMoney,
+      targetMoney,
+    }
+  }
+
+  private async openTargetSession(
+    tx: Tx,
+    targetSessionId: number,
+    source: typeof tableSessions.$inferSelect,
+  ) {
+    const target = await this.liveSession(tx, targetSessionId)
+    if (target.branchId !== source.branchId) {
+      throw new BadRequestException('Bàn đích thuộc chi nhánh khác')
+    }
+    if (target.status !== 'open') {
+      throw new ConflictException('Bàn đích đã thanh toán, đang chờ dọn')
+    }
+    return target
+  }
+
+  /** Bàn trống được chọn làm đích thì mở phiên ngay tại đây, trong cùng transaction */
+  private async openSessionOnFreeTable(
+    tx: Tx,
+    ctx: { tableId: number | null; guestCount: number; branchId: string; actor: Actor },
+  ) {
+    if (!ctx.tableId) throw new BadRequestException('Chưa chọn bàn đích')
+    const table = await this.tableOf(tx, ctx.tableId)
+    if (table.branchId !== ctx.branchId) {
+      throw new BadRequestException('Bàn đích thuộc chi nhánh khác')
+    }
+    if (!table.active) throw new ConflictException('Bàn đích đang ngừng sử dụng')
+
+    const [branch] = await tx.select().from(branches).where(eq(branches.id, table.branchId))
+    const now = new Date()
+    try {
+      const [session] = await tx
+        .insert(tableSessions)
+        .values({
+          branchId: table.branchId,
+          tableId: table.id,
+          status: 'open',
+          guestCount: Math.min(Math.max(ctx.guestCount, 1), table.seatMax),
+          openedBy: ctx.actor.kind === 'staff' ? ctx.actor.staffId : null,
+          businessDate: businessDateOf(now, branch!.timezone),
+        })
+        .returning()
+
+      await emit(tx, {
+        branchId: table.branchId,
+        topic: 'table.opened',
+        rooms: [rooms.tables(table.branchId)],
+        payload: { tableId: table.id, tableCode: table.code, sessionId: session!.id },
+      })
+      return session!
+    } catch (err) {
+      if (isUniqueViolation(err, 'table_sessions_one_live_per_table')) {
+        throw new ConflictException(`Bàn ${table.code} đang có khách`)
+      }
+      throw err
+    }
+  }
+
+  /** Dòng đơn còn món nằm trong bếp — chỉ những dòng này mới phải nghĩ tới vé */
+  private async linesStillInKitchen(tx: Tx, orderId: number) {
+    const rows = await tx
+      .select({ line: orderLines })
+      .from(orderLines)
+      .innerJoin(ticketItems, eq(ticketItems.orderLineId, orderLines.id))
+      .where(
+        and(
+          eq(orderLines.orderId, orderId),
+          sql`${orderLines.state} <> 'voided'`,
+          sql`${ticketItems.state} IN ('queued','cooking')`,
+        ),
+      )
+
+    const byId = new Map<number, (typeof rows)[number]['line']>()
+    for (const row of rows) byId.set(row.line.id, row.line)
+    return [...byId.values()]
+  }
+
+  /**
+   * Đổi trạm cho món đang nấu dở: vé cũ chết, vé mới sinh theo bàn đích.
+   *
+   * Đồng hồ vé chạy lại từ đầu và đó là điều đúng — món vừa đổi trạm thì trạm mới
+   * mới bắt đầu làm, giữ đồng hồ cũ là báo trễ cho người chưa nhận việc.
+   */
+  private async reissueTickets(
+    tx: Tx,
+    ctx: {
+      order: typeof orders.$inferSelect
+      lines: (typeof orderLines.$inferSelect)[]
+      table: typeof tables.$inferSelect
+    },
+  ) {
+    await this.voidKitchenItems(tx, ctx.order.branchId, ctx.lines)
+
+    const firedBatches = new Set(
+      (
+        await tx
+          .select()
+          .from(orderBatches)
+          .where(and(eq(orderBatches.orderId, ctx.order.id), eq(orderBatches.state, 'fired')))
+      ).map((b) => b.batchNo),
+    )
+
+    const { events } = await this.createTickets(tx, {
+      order: ctx.order,
+      branchId: ctx.order.branchId,
+      lines: ctx.lines,
+      context: {
+        kind: 'dinein',
+        tableCode: ctx.table.code,
+        tableHasGrill: ctx.table.hasGrill,
+      },
+      firedBatches,
+    })
+    for (const event of events) await emit(tx, event)
+  }
+
+  /**
+   * Bàn đích cùng loại bếp: vé KHÔNG cần dựng lại, chỉ đổi bàn và đơn.
+   *
+   * Vé nào chỉ chứa món chuyển đi thì đi nguyên vé — giữ nguyên đồng hồ, bếp
+   * không thấy công việc của mình bị đặt lại. Vé còn món ở lại thì phải cắt: bỏ
+   * phần đã chuyển khỏi vé cũ rồi sinh vé mới cho bàn đích.
+   */
+  private async followTickets(
+    tx: Tx,
+    ctx: {
+      order: typeof orders.$inferSelect
+      lines: (typeof orderLines.$inferSelect)[]
+      table: typeof tables.$inferSelect
+      batchNo: number
+    },
+  ) {
+    const movingIds = new Set(ctx.lines.map((l) => l.id))
+    const ticketIds = [
+      ...new Set(
+        (
+          await tx
+            .select({ ticketId: ticketItems.ticketId })
+            .from(ticketItems)
+            .where(
+              and(
+                inArray(ticketItems.orderLineId, [...movingIds]),
+                sql`${ticketItems.state} IN ('queued','cooking')`,
+              ),
+            )
+        ).map((r) => r.ticketId),
+      ),
+    ]
+
+    const split: (typeof orderLines.$inferSelect)[] = []
+    for (const ticketId of ticketIds) {
+      const items = await tx
+        .select()
+        .from(ticketItems)
+        .where(and(eq(ticketItems.ticketId, ticketId), sql`${ticketItems.state} <> 'voided'`))
+
+      if (items.every((i) => movingIds.has(i.orderLineId))) {
+        const [ticket] = await tx.select().from(tickets).where(eq(tickets.id, ticketId))
+        // Mã vé mang số ĐƠN (A-0412) — vé đổi đơn thì số phải đổi theo, không thì
+        // bếp gọi một số mà expo tìm không ra bill nào mang số đó.
+        const prefix = ticket!.displayCode.split('-')[0] ?? ''
+        await tx
+          .update(tickets)
+          .set({
+            orderId: ctx.order.id,
+            tableCode: ctx.table.code,
+            batchNo: ctx.batchNo,
+            displayCode: `${prefix}-${orderNumberOf(ctx.order.displayCode)}`,
+          })
+          .where(eq(tickets.id, ticketId))
+        continue
+      }
+      split.push(...ctx.lines.filter((l) => items.some((i) => i.orderLineId === l.id)))
+    }
+
+    if (split.length > 0) {
+      await this.reissueTickets(tx, { order: ctx.order, lines: split, table: ctx.table })
+    }
+  }
+
+  /** Bỏ món khỏi vé cũ và đóng vé rỗng — dùng chung cho cả hai đường chuyển bàn */
+  private async voidKitchenItems(
+    tx: Tx,
+    branchId: string,
+    lines: (typeof orderLines.$inferSelect)[],
+  ) {
+    const voided = await tx
+      .update(ticketItems)
+      .set({ state: 'voided' })
+      .where(
+        and(
+          inArray(
+            ticketItems.orderLineId,
+            lines.map((l) => l.id),
+          ),
+          sql`${ticketItems.state} IN ('queued','cooking')`,
+        ),
+      )
+      .returning({ ticketId: ticketItems.ticketId })
+
+    for (const ticketId of new Set(voided.map((v) => v.ticketId))) {
+      const [left] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(ticketItems)
+        .where(
+          and(eq(ticketItems.ticketId, ticketId), sql`${ticketItems.state} IN ('queued','cooking')`),
+        )
+      const [ticket] = await tx.select().from(tickets).where(eq(tickets.id, ticketId))
+      if (!ticket) continue
+
+      // Vé không còn món nào để làm thì đóng lại, đừng để nó nằm trên màn bếp
+      if (Number(left?.n ?? 0) === 0) {
+        await tx.update(tickets).set({ state: 'voided' }).where(eq(tickets.id, ticketId))
+      }
+      await emit(tx, {
+        branchId,
+        topic: 'ticket.void',
+        rooms: [rooms.station(branchId, ticket.stationId), rooms.expo(branchId)],
+        payload: { ticketId, reason: 'Chuyển bàn' },
+      })
+    }
+  }
+
   private async ensureOrder(tx: Tx, session: typeof tableSessions.$inferSelect, actor: Actor) {
     const [existing] = await tx
       .select()
@@ -790,8 +1422,6 @@ export class OrderingService {
       branchId: session.branchId,
       kind: 'order',
       businessDate,
-      at: now,
-      timezone: branch!.timezone,
     })
 
     const [created] = await tx

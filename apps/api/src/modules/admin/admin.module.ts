@@ -15,6 +15,8 @@ import { DeliveryAdminController } from './delivery-admin.controller'
 import { DeliveryAdminService } from './delivery-admin.service'
 import { DeviceAdminController } from './device-admin.controller'
 import { DeviceAdminService } from './device-admin.service'
+import { DishModifierController, ModifierAdminController } from './modifier-admin.controller'
+import { ModifierAdminService } from './modifier-admin.service'
 import { SiteAdminController } from './site-admin.controller'
 import { SiteAdminService } from './site-admin.service'
 
@@ -29,6 +31,8 @@ import { SiteAdminService } from './site-admin.service'
     CatalogAdminController,
     CategoryAdminController,
     SetAdminController,
+    ModifierAdminController,
+    DishModifierController,
     DeliveryAdminController,
   ],
   providers: [
@@ -37,6 +41,7 @@ import { SiteAdminService } from './site-admin.service'
     DeviceAdminService,
     SiteAdminService,
     CatalogAdminService,
+    ModifierAdminService,
     DeliveryAdminService,
   ],
   exports: [
@@ -45,6 +50,7 @@ import { SiteAdminService } from './site-admin.service'
     DeviceAdminService,
     SiteAdminService,
     CatalogAdminService,
+    ModifierAdminService,
     DeliveryAdminService,
   ],
 })

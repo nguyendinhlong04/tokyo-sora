@@ -3,6 +3,7 @@ import { CrmModule } from '../crm/crm.module'
 import { MockBankProvider, PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider'
 import { PaymentsController } from './payments.controller'
 import { PaymentsService } from './payments.service'
+import { ReconcileService } from './reconcile.service'
 import { SplitPaymentController } from './split-payment.controller'
 import { SplitPaymentService } from './split-payment.service'
 
@@ -34,8 +35,9 @@ function createProvider(): PaymentProvider {
   providers: [
     PaymentsService,
     SplitPaymentService,
+    ReconcileService,
     { provide: PAYMENT_PROVIDER, useFactory: createProvider },
   ],
-  exports: [PaymentsService, SplitPaymentService, PAYMENT_PROVIDER],
+  exports: [PaymentsService, SplitPaymentService, ReconcileService, PAYMENT_PROVIDER],
 })
 export class PaymentsModule {}
