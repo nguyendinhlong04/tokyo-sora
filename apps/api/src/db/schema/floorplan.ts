@@ -99,6 +99,47 @@ export const tableSessions = pgTable(
 )
 
 /**
+ * Từng điện thoại đang gắn với một lượt ăn (LUONG-QR-BAN.md).
+ *
+ * Mã QR dán bàn KHÔNG còn là bí mật — nó chỉ nói "đây là bàn nào", ai chụp cũng
+ * được. Thứ quyết định một máy có gọi món được hay không nằm ở hàng này: mỗi lần
+ * quét sinh một máy mới, mang token riêng và trạng thái riêng.
+ *
+ * Không có bảng này thì cả bàn dùng chung một tấm vé và hệ thống không đếm nổi
+ * có mấy điện thoại đang nối vào — nên cũng không thể duyệt từng máy.
+ */
+export const tableDevices = pgTable(
+  'table_devices',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    tableSessionId: bigint('table_session_id', { mode: 'number' })
+      .notNull()
+      .references(() => tableSessions.id),
+    tokenHash: text('token_hash').notNull().unique(),
+    state: text('state').notNull().default('waiting'),
+    isHost: boolean('is_host').notNull().default(false),
+    /** 'wifi' tự vào · 'host' chủ bàn duyệt · 'staff' nhân viên duyệt */
+    admittedVia: text('admitted_via'),
+    admittedByStaffId: bigint('admitted_by_staff_id', { mode: 'number' }).references(() => staff.id),
+    admittedAt: timestamp('admitted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('table_devices_state_check', sql`${t.state} IN ('waiting','admitted','rejected')`),
+    check(
+      'table_devices_admitted_via_check',
+      sql`${t.admittedVia} IS NULL OR ${t.admittedVia} IN ('wifi','host','staff')`,
+    ),
+    // Chỉ máy đã vào mới được làm chủ bàn — máy đang chờ mà cầm quyền duyệt thì
+    // nó tự duyệt cho chính mình.
+    check('table_devices_host_admitted', sql`NOT ${t.isHost} OR ${t.state} = 'admitted'`),
+    // Một lượt ăn đúng một chủ bàn, ràng buộc ở CSDL chứ không ở kỷ luật code
+    uniqueIndex('table_devices_one_host').on(t.tableSessionId).where(sql`is_host`),
+    index('table_devices_session_idx').on(t.tableSessionId, t.state),
+  ],
+)
+
+/**
  * Khách chấm sao và nhận xét ngay trên hoá đơn (T15) — nguồn cho màn B13 của
  * Office ở GĐ5.
  *

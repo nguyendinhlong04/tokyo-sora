@@ -371,3 +371,67 @@ describe('Chia bill — chống trả trùng (T12)', () => {
     ).rejects.toThrow(/payments_paid_at_check/)
   })
 })
+
+/**
+ * Máy khách trong một bàn (LUONG-QR-BAN.md).
+ *
+ * Mã QR dán bàn ai chụp cũng được, nên toàn bộ sức nặng dồn vào việc phân biệt
+ * từng điện thoại. Hai bất biến dưới đây giữ cho vai chủ bàn không nhập nhằng —
+ * nếu chúng chỉ nằm trong code thì một đường ghi sót là mất sạch.
+ */
+describe('Máy khách trong bàn', () => {
+  let sessionId = 0
+
+  beforeAll(async () => {
+    // Dùng lại lượt ăn của các test trên: mỗi bàn chỉ được có một lượt chưa đóng,
+    // nên mở thêm một lượt nữa sẽ đụng đúng bất biến đó.
+    const existing = await db.query<{ id: number }>(
+      `SELECT id FROM table_sessions WHERE status <> 'closed' LIMIT 1`,
+    )
+    if (existing.rows.length > 0) {
+      sessionId = existing.rows[0]!.id
+    } else {
+      const { rows } = await db.query<{ id: number }>(`
+        INSERT INTO table_sessions (branch_id, table_id, business_date)
+          SELECT 'cg', id, '2026-08-01' FROM tables LIMIT 1
+          RETURNING id
+      `)
+      sessionId = rows[0]!.id
+    }
+    await db.exec(`
+      INSERT INTO table_devices (table_session_id, token_hash, state, is_host, admitted_via, admitted_at)
+        VALUES (${sessionId}, 'hash-chu-ban', 'admitted', true, 'wifi', now());
+    `)
+  })
+
+  it('một lượt ăn chỉ có đúng một chủ bàn', async () => {
+    await expect(
+      db.exec(`
+        INSERT INTO table_devices (table_session_id, token_hash, state, is_host, admitted_via, admitted_at)
+          VALUES (${sessionId}, 'hash-chu-ban-2', 'admitted', true, 'wifi', now())
+      `),
+    ).rejects.toThrow(/table_devices_one_host/)
+  })
+
+  it('máy đang chờ không được cầm quyền chủ bàn', async () => {
+    await expect(
+      db.exec(`
+        INSERT INTO table_devices (table_session_id, token_hash, state, is_host)
+          VALUES (${sessionId}, 'hash-cho-doi', 'waiting', true)
+      `),
+    ).rejects.toThrow(/table_devices_host_admitted/)
+  })
+
+  it('nhiều máy cùng chờ duyệt ở một bàn là bình thường', async () => {
+    await db.exec(`
+      INSERT INTO table_devices (table_session_id, token_hash, state)
+        VALUES (${sessionId}, 'hash-cho-1', 'waiting'),
+               (${sessionId}, 'hash-cho-2', 'waiting')
+    `)
+    const { rows } = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM table_devices
+        WHERE table_session_id = ${sessionId} AND state = 'waiting'`,
+    )
+    expect(rows[0]!.n).toBe(2)
+  })
+})

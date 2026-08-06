@@ -11,6 +11,7 @@
     "db:migrate": "tsx src/db/migrate-cli.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:dev-bootstrap": "tsx src/db/dev-bootstrap.ts",
+    "db:create-admin": "tsx src/db/create-admin.ts",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
