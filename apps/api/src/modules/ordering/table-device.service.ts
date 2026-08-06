@@ -286,9 +286,20 @@ export class TableDeviceService {
     }
   }
 
+  /**
+   * Địa chỉ mạng của chi nhánh, khai ở A6 dưới dạng CHUỖI ngăn bằng dấu phẩy.
+   *
+   * Không dùng mảng JSON vì ô nhập của A6 chỉ nhận một giá trị đơn — số, đúng/sai
+   * hoặc chuỗi. Chọn chuỗi để người vận hành khai được ngay trên màn có sẵn, thay
+   * vì phải sửa cả ô nhập lẫn phần kiểm tra dữ liệu chỉ để phục vụ một tham số.
+   *
+   * Chưa khai gì → không ai được coi là đang ở trong quán, mọi máy phải xin duyệt.
+   * Phiền nhưng an toàn; sai theo hướng ngược lại thì người ở nhà vào thẳng.
+   */
   private async isInside(branchId: string, forwardedFor: string | undefined): Promise<boolean> {
-    const networks = await this.params.get<unknown>('table.branchNetworks', branchId)
-    const allowed = Array.isArray(networks) ? networks.filter((n): n is string => typeof n === 'string') : []
+    const raw = await this.params.get<unknown>('table.branchNetworks', branchId)
+    const allowed =
+      typeof raw === 'string' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : []
     return isInsideBranch(clientIp(forwardedFor, trustedHops()), allowed)
   }
 

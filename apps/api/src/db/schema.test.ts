@@ -435,3 +435,33 @@ describe('Máy khách trong bàn', () => {
     expect(rows[0]!.n).toBe(2)
   })
 })
+
+/**
+ * Tham số địa chỉ mạng của quán (migration 9006).
+ *
+ * Màn A6 chỉ hiện những tham số đã có dòng trong CSDL. Thiếu dòng này thì người
+ * vận hành không có chỗ nào khai địa chỉ Wi-Fi của quán, và lớp 2 vĩnh viễn coi
+ * như không ai đang ngồi trong quán — hỏng âm thầm, không báo lỗi gì.
+ */
+describe('Tham số gọi món tại bàn', () => {
+  it('migration đã nạp sẵn dòng table.branchNetworks ở cấp chuỗi', async () => {
+    const { rows } = await db.query<{ value: string; unit: string | null }>(
+      `SELECT value::text AS value, unit FROM parameters
+        WHERE key = 'table.branchNetworks' AND branch_id IS NULL`,
+    )
+    expect(rows).toHaveLength(1)
+    // Để trống: chưa khai thì không ai được coi là ở trong quán
+    expect(rows[0]!.value).toBe('""')
+  })
+
+  it('khai đè được theo từng chi nhánh', async () => {
+    await db.exec(`
+      INSERT INTO parameters (key, branch_id, value)
+        VALUES ('table.branchNetworks', 'cg', '"203.0.113.10, 203.0.113.11"'::jsonb)
+    `)
+    const { rows } = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM parameters WHERE key = 'table.branchNetworks'`,
+    )
+    expect(rows[0]!.n).toBe(2)
+  })
+})

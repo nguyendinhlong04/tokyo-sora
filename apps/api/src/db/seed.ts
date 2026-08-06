@@ -96,6 +96,15 @@ const PARAMETERS: {
   // Gốc liên kết khách bấm — máy POS không tự biết tên miền của website
   { key: 'site.publicUrl', value: 'https://tokyosora.vn' },
 
+  /**
+   * Địa chỉ mạng của quán — lớp 2 của LUONG-QR-BAN.md.
+   *
+   * Khai RIÊNG từng chi nhánh (ghi đè ở A6), vì mỗi quán một đường truyền. Mặc
+   * định cấp chuỗi để trống là có chủ ý: chưa khai thì không ai được coi là đang
+   * ngồi trong quán, và mọi máy phải xin chủ bàn duyệt. Sai theo hướng an toàn.
+   */
+  { key: 'table.branchNetworks', value: '', unit: 'địa chỉ, ngăn bằng dấu phẩy' },
+
   // Nhân sự (§26 H6 — H6 là cửa vào theo ngữ cảnh, giá trị sống ở đây)
   { key: 'payroll.standardDailyMinutes', value: 8 * 60, unit: 'phút' },
   { key: 'payroll.standardMonthlyMinutes', value: 26 * 8 * 60, unit: 'phút' },
