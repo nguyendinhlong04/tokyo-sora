@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { Link, Outlet, useLocation, useNavigate } from 'react-router'
 import { api } from '../api'
 import { CallStaffSheet } from '../components/CallStaffSheet'
+import { HostApproval } from '../components/HostApproval'
 import { useTable } from '../table-context'
 
 const CallStaffCtx = createContext<() => void>(() => undefined)
@@ -104,6 +105,8 @@ export function Shell() {
 
         <Outlet />
         <CallStaffSheet open={calling} onClose={() => setCalling(false)} />
+        {/* Chỉ hiện trên máy chủ bàn, và chỉ khi có người đang xin vào */}
+        <HostApproval />
       </div>
     </CallStaffCtx.Provider>
   )

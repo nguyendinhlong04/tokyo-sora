@@ -49,9 +49,12 @@ export class TableDeviceController {
   ) {
     const input = JoinBody.parse(body)
     const forwardedFor = req.headers['x-forwarded-for']
+    const cookies = (req as FastifyRequest & { cookies?: Record<string, string> }).cookies
     const result = await this.devices.join({
       ...input,
       forwardedFor: typeof forwardedFor === 'string' ? forwardedFor : undefined,
+      // Máy đã quét mã bàn này rồi thì nhận lại đúng danh tính cũ, không đẻ máy mới
+      existingToken: cookies?.[TABLE_COOKIE],
     })
 
     reply.setCookie(TABLE_COOKIE, result.token, {

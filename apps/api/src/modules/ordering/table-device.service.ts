@@ -54,6 +54,7 @@ export class TableDeviceService {
     branchId: string
     tableCode: string
     forwardedFor: string | undefined
+    existingToken?: string
   }): Promise<JoinResult> {
     const [row] = await this.db
       .select({ session: tableSessions, table: tables })
@@ -68,6 +69,37 @@ export class TableDeviceService {
       )
     // Bàn chưa mở thì mã dán trên nó là một tấm giấy vô nghĩa — đây chính là lớp 1
     if (!row) throw new NotFoundException('Bàn chưa mở. Nhờ nhân viên mở bàn giúp bạn.')
+
+    /**
+     * Máy này đã từng quét mã bàn này trong bữa chưa?
+     *
+     * Không có bước tra lại này thì mỗi lần quét đẻ ra một máy mới, kéo theo hai
+     * hỏng hóc:
+     *
+     *   1. Máy bị TỪ CHỐI chỉ cần quét lại là có yêu cầu mới. Người ở nhà cứ thế
+     *      xin tới lúc chủ bàn bấm nhầm một lần — đúng thứ cả thiết kế sinh ra
+     *      để chặn (LUONG-QR-BAN.md mục 6b).
+     *   2. Khách đã vào bàn lỡ quét lại mã là số "đã có N máy vào" tăng khống.
+     *      Mà đó chính là bối cảnh chủ bàn dựa vào để biết chuyện có bất thường
+     *      không — thổi phồng nó là làm hỏng lớp 3 từ bên trong.
+     */
+    const known = input.existingToken ? await this.resolveToken(input.existingToken) : null
+    if (known && known.sessionId === row.session.id) {
+      if (known.state === 'rejected') {
+        throw new ForbiddenException(
+          'Máy này đã bị từ chối ở bàn. Nhờ nhân viên mở giúp nếu bạn ngồi tại bàn.',
+        )
+      }
+      return {
+        token: input.existingToken!,
+        deviceId: known.deviceId,
+        sessionId: known.sessionId,
+        branchId: known.branchId,
+        state: known.state as DeviceState,
+        isHost: known.isHost,
+        tableCode: row.table.code,
+      }
+    }
 
     const inside = await this.isInside(input.branchId, input.forwardedFor)
     const token = newToken()

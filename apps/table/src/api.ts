@@ -126,12 +126,50 @@ export interface NewLine {
   modifierOptionIds?: string[]
 }
 
+export type DeviceState = 'waiting' | 'admitted' | 'rejected'
+
+export interface JoinResult {
+  deviceId: number
+  sessionId: number
+  branchId: string
+  state: DeviceState
+  isHost: boolean
+  tableCode: string
+}
+
+export interface PendingList {
+  guestCount: number
+  admittedCount: number
+  waiting: { deviceId: number; since: string }[]
+}
+
 export const api = {
-  /** T1: đổi token trong URL lấy cookie httpOnly rồi xoá token khỏi thanh địa chỉ */
-  exchange: (token: string) =>
-    apiFetch<{ sessionId: number; branchId: string }>('/api/table-sessions/exchange', {
+  /**
+   * T1: quét mã dán bàn.
+   *
+   * Mã QR chỉ nói "bàn nào" — nó không phải bí mật. Máy chứng minh được đang ở
+   * trong quán thì vào thẳng; không thì nhận `waiting` và phải chờ chủ bàn duyệt.
+   */
+  join: (branchId: string, tableCode: string) =>
+    apiFetch<JoinResult>('/api/table-devices/join', {
       method: 'POST',
-      body: { token },
+      body: { branchId, tableCode },
+    }),
+
+  /** Máy đang chờ hỏi lại "tôi được duyệt chưa" */
+  deviceState: () =>
+    apiFetch<{ deviceId: number; state: DeviceState; isHost: boolean; sessionId: number }>(
+      '/api/table-devices/me',
+    ),
+
+  /** Chủ bàn xem ai đang xin vào, kèm bối cảnh số khách */
+  pending: () => apiFetch<PendingList>('/api/table-devices/pending'),
+
+  /** Chủ bàn bấm Đồng ý / Từ chối */
+  decide: (deviceId: number, approve: boolean) =>
+    apiFetch<{ deviceId: number; state: DeviceState }>('/api/table-devices/decide', {
+      method: 'POST',
+      body: { deviceId, approve },
     }),
 
   me: () => apiFetch<{ kind: string; tableSessionId?: number; branchId: string }>('/api/auth/me'),

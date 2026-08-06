@@ -10,7 +10,7 @@ import {
   useToast,
 } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { api, type ConfigDish, type ModifierGroup, type OrderLineRow } from '../api'
 import { useSession } from '../session-context'
@@ -381,7 +381,7 @@ export function TableOrder() {
       ) : null}
 
       <TableQrDialog
-        sessionId={id}
+        branchId={branchId!}
         tableCode={tableCode}
         open={showQr}
         onClose={() => setShowQr(false)}
@@ -521,43 +521,31 @@ function ModifierDialog({
 }
 
 /**
- * Mã QR dán bàn cho khách quét vào Sora Table.
+ * Mã QR của bàn — in một lần rồi DÁN CỐ ĐỊNH, không đổi giữa các bữa.
  *
- * Mỗi lần mở là cấp mã MỚI và mã cũ chết ngay — không có đường nào xem lại mã đã
- * cấp, vì máy chủ chỉ giữ bản băm. Đánh đổi có chủ ý: khách bàn trước không bao
- * giờ đọc được đơn của khách bàn sau.
+ * Mã chỉ mang một thông tin: "đây là bàn nào". Nó KHÔNG phải bí mật, ai chụp
+ * cũng được. Việc một máy có gọi món được hay không do máy chủ quyết qua ba lớp
+ * của LUONG-QR-BAN.md — quan trọng nhất là bàn phải đang mở và máy phải chứng
+ * minh được đang ở trong quán.
+ *
+ * Hộp này vì thế chỉ còn để in hoặc chìa cho khách quét, không cấp phát gì cả.
  *
  * Sora Table nằm ở tên miền khác POS nên địa chỉ lấy từ `VITE_TABLE_ORIGIN`; máy
  * dev không đặt biến này thì lấy chính gốc của POS.
  */
 function TableQrDialog({
-  sessionId,
+  branchId,
   tableCode,
   open,
   onClose,
 }: {
-  sessionId: number
+  branchId: string
   tableCode: string
   open: boolean
   onClose: () => void
 }) {
-  const toast = useToast()
-
-  const token = useQuery({
-    queryKey: ['qr-token', sessionId],
-    queryFn: () => api.issueQrToken(sessionId),
-    enabled: open,
-    // Mỗi lần mở hộp thoại là một mã mới: giữ cache ở đây là hiện lại mã đã chết
-    gcTime: 0,
-    staleTime: 0,
-  })
-
-  useEffect(() => {
-    if (token.error) toast((token.error as Error).message, 'danger')
-  }, [token.error, toast])
-
   const origin = import.meta.env.VITE_TABLE_ORIGIN ?? window.location.origin
-  const url = token.data ? `${origin}${token.data.url}` : null
+  const url = `${origin}/t/${branchId}/${tableCode}`
 
   return (
     <Modal
@@ -567,19 +555,13 @@ function TableQrDialog({
       footer={<Button onClick={onClose}>Đóng</Button>}
     >
       <div className="flex flex-col items-center gap-4">
-        {url ? (
-          <>
-            <div className="rounded-md bg-[var(--sora-washi-100)] p-4">
-              <QrCode value={url} size={240} label={`Mã QR vào bàn ${tableCode}`} />
-            </div>
-            <p className="text-center text-[length:var(--fs-b2)] text-ink-body">
-              Khách quét mã này để tự gọi món và tự thanh toán. Cấp mã mới sẽ làm mã cũ hết hiệu
-              lực ngay.
-            </p>
-          </>
-        ) : (
-          <p className="text-ink-mute">{token.isError ? 'Không cấp được mã' : 'Đang cấp mã…'}</p>
-        )}
+        <div className="rounded-md bg-[var(--sora-washi-100)] p-4">
+          <QrCode value={url} size={240} label={`Mã QR vào bàn ${tableCode}`} />
+        </div>
+        <p className="text-center text-[length:var(--fs-b2)] text-ink-body">
+          In mã này dán cố định tại bàn — nó không đổi giữa các bữa. Khách quét để tự gọi món;
+          bàn chưa mở thì mã không mở ra gì cả.
+        </p>
       </div>
     </Modal>
   )

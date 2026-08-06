@@ -14,6 +14,7 @@ import { PayQr } from './routes/PayQr'
 import { Search } from './routes/Search'
 import { Shell } from './routes/Shell'
 import { Split } from './routes/Split'
+import { Waiting } from './routes/Waiting'
 import { Welcome } from './routes/Welcome'
 import { TableProvider } from './table-context'
 
@@ -39,8 +40,9 @@ export function App() {
           <TableProvider>
             <CartProvider>
               <Routes>
-                {/* Địa chỉ in trong mã QR dán bàn */}
-                <Route path="/t/:token" element={<Enter />} />
+                {/* Địa chỉ in trong mã QR dán bàn — dán cố định, không phải bí mật */}
+                <Route path="/t/:branchId/:tableCode" element={<Enter />} />
+                <Route path="/cho-duyet" element={<Waiting />} />
                 <Route element={<Shell />}>
                   <Route path="/" element={<Welcome />} />
                   <Route path="/thuc-don" element={<Menu />} />

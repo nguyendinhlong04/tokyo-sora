@@ -18,6 +18,7 @@ import {
   staff,
   staffRoles,
   staffSessions,
+  tableDevices,
   tableSessions,
 } from '../../db/schema'
 import type { Actor, StaffActor } from './actor'
@@ -491,19 +492,31 @@ export class IdentityService {
     }
   }
 
-  /** Token QR của bàn → actor khách; chết ngay khi phiên bàn đóng */
+  /**
+   * Token của MÁY khách → actor khách; chết khi phiên bàn đóng.
+   *
+   * Chỉ máy ĐÃ VÀO BÀN mới thành khách. Máy đang chờ duyệt có cookie hợp lệ
+   * nhưng KHÔNG được là actor: nó chưa chứng minh được đang ngồi ở bàn, nên
+   * không được gọi món, không được đọc đơn, không được trả tiền hộ ai.
+   *
+   * Vì thế mọi chốt chặn sẵn có của khách tại bàn không phải sửa gì — chúng nhận
+   * diện qua `kind === 'customer'`, và cái điều kiện "đã vào bàn" được gói trọn
+   * ở đúng câu truy vấn này (LUONG-QR-BAN.md).
+   */
   async resolveTableToken(token: string): Promise<Actor | null> {
     const [row] = await this.db
-      .select({ id: tableSessions.id, branchId: tableSessions.branchId })
-      .from(tableSessions)
+      .select({ sessionId: tableSessions.id, branchId: tableSessions.branchId })
+      .from(tableDevices)
+      .innerJoin(tableSessions, eq(tableSessions.id, tableDevices.tableSessionId))
       .where(
         and(
-          eq(tableSessions.qrTokenHash, hashToken(token)),
+          eq(tableDevices.tokenHash, hashToken(token)),
+          eq(tableDevices.state, 'admitted'),
           sql`${tableSessions.status} <> 'closed'`,
         ),
       )
     if (!row) return null
-    return { kind: 'customer', tableSessionId: row.id, branchId: row.branchId }
+    return { kind: 'customer', tableSessionId: row.sessionId, branchId: row.branchId }
   }
 
   /** Băm PIN mới (đổi PIN, tạo nhân viên) */
