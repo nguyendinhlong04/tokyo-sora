@@ -96,6 +96,22 @@ export class KitchenController {
     return this.kitchen.markServed(orderId, batchNo, req.actor!)
   }
 
+  /**
+   * K2 — bấm Bắt đầu / Xong / Hoàn tác cho MỘT MÓN trên vé.
+   *
+   * Đây là thao tác chính của bếp. Nút cả vé ở `tickets/:id/state` vẫn còn, dùng
+   * cho vé mà mọi món ra cùng lúc.
+   */
+  @Post('ticket-items/:id/state')
+  @RequirePermission('kds.change-item-state')
+  changeItemState(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    return this.kitchen.changeItemState(id, StateBody.parse(body).action, req.actor!)
+  }
+
   /** K5 báo hết món */
   @Post('availability')
   @RequirePermission('menu.mark-sold-out')

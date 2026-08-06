@@ -18,12 +18,10 @@ const SYNC = (ticketId: number) => `
     FROM (
       SELECT ti.order_line_id AS id,
              CASE MIN(
-                    CASE t.state
-                      WHEN 'waiting' THEN 0
+                    CASE ti.state
                       WHEN 'queued'  THEN 0
                       WHEN 'cooking' THEN 1
-                      WHEN 'ready'   THEN 2
-                      WHEN 'closed'  THEN 2
+                      WHEN 'done'    THEN 2
                       ELSE 0
                     END)
                WHEN 0 THEN 'queued'
@@ -108,13 +106,13 @@ afterAll(async () => db?.close())
 
 describe('Trạng thái bếp kéo về dòng món', () => {
   it('bếp bắt đầu làm → món một trạm chuyển sang Đang làm', async () => {
-    await db.exec(`UPDATE tickets SET state = 'cooking' WHERE id = ${veChinh}`)
+    await db.exec(`UPDATE ticket_items SET state = 'cooking' WHERE ticket_id = ${veChinh}`)
     await db.exec(SYNC(veChinh))
     expect(await stateOf(lineDon)).toBe('cooking')
   })
 
   it('món đa trạm lấy mức CHẬM NHẤT — một vé xong không đủ', async () => {
-    await db.exec(`UPDATE tickets SET state = 'ready' WHERE id = ${veChinh}`)
+    await db.exec(`UPDATE ticket_items SET state = 'done', done_at = now() WHERE ticket_id = ${veChinh}`)
     await db.exec(SYNC(veChinh))
     // Vé phụ (nồi lẩu) vẫn đang xếp hàng → cả món phải giữ ở mức đó
     expect(await stateOf(lineDa)).toBe('queued')
@@ -123,13 +121,13 @@ describe('Trạng thái bếp kéo về dòng món', () => {
   })
 
   it('cả hai vé xong thì món đa trạm mới sang Sắp ra', async () => {
-    await db.exec(`UPDATE tickets SET state = 'ready' WHERE id = ${vePhu}`)
+    await db.exec(`UPDATE ticket_items SET state = 'done', done_at = now() WHERE ticket_id = ${vePhu}`)
     await db.exec(SYNC(vePhu))
     expect(await stateOf(lineDa)).toBe('ready')
   })
 
   it('bếp hoàn tác thì món kéo lùi theo', async () => {
-    await db.exec(`UPDATE tickets SET state = 'queued' WHERE id = ${veChinh}`)
+    await db.exec(`UPDATE ticket_items SET state = 'queued', done_at = NULL WHERE ticket_id = ${veChinh}`)
     await db.exec(SYNC(veChinh))
     expect(await stateOf(lineDon)).toBe('queued')
   })
@@ -140,7 +138,7 @@ describe('Trạng thái bếp kéo về dòng món', () => {
    */
   it('món đã mang ra bàn thì không bị bếp ghi đè', async () => {
     await db.exec(`UPDATE order_lines SET state = 'served' WHERE id = ${lineDon}`)
-    await db.exec(`UPDATE tickets SET state = 'cooking' WHERE id = ${veChinh}`)
+    await db.exec(`UPDATE ticket_items SET state = 'cooking' WHERE ticket_id = ${veChinh}`)
     await db.exec(SYNC(veChinh))
     expect(await stateOf(lineDon)).toBe('served')
   })
@@ -150,7 +148,7 @@ describe('Trạng thái bếp kéo về dòng món', () => {
     await db.exec(
       `UPDATE order_lines SET state = 'voided', void_reason = 'khách đổi ý' WHERE id = ${lineDa}`,
     )
-    await db.exec(`UPDATE tickets SET state = 'ready' WHERE id = ${vePhu}`)
+    await db.exec(`UPDATE ticket_items SET state = 'done', done_at = now() WHERE ticket_id = ${vePhu}`)
     await db.exec(SYNC(vePhu))
     expect(await stateOf(lineDa)).toBe('voided')
   })
@@ -160,7 +158,7 @@ describe('Trạng thái bếp kéo về dòng món', () => {
       `UPDATE order_lines SET state = 'queued', void_reason = NULL WHERE id = ${lineDa}`,
     )
     await db.exec(`UPDATE tickets SET state = 'voided' WHERE id = ${veChinh}`)
-    await db.exec(`UPDATE tickets SET state = 'ready' WHERE id = ${vePhu}`)
+    await db.exec(`UPDATE ticket_items SET state = 'done', done_at = now() WHERE ticket_id = ${vePhu}`)
     await db.exec(SYNC(vePhu))
     // Chỉ còn vé phụ còn sống và nó đã xong → món xong
     expect(await stateOf(lineDa)).toBe('ready')

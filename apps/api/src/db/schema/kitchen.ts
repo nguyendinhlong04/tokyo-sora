@@ -108,11 +108,23 @@ export const ticketItems = pgTable(
     portionLabel: text('portion_label'),
     linkGroup: text('link_group'),
     state: text('state').notNull().default('queued'),
+    /**
+     * Lúc món này được bấm xong — mốc tính cửa sổ hoàn tác của RIÊNG nó.
+     *
+     * Bếp bấm theo từng món chứ không theo cả vé, nên mỗi món có cửa sổ hoàn tác
+     * riêng: món nướng xong lúc 19:02 và món hầm xong lúc 19:14 không thể dùng
+     * chung một mốc trên vé.
+     */
+    doneAt: timestamp('done_at', { withTimezone: true }),
     /** Cân điện tử ST-02 tự điền */
     weightGrams: integer('weight_grams'),
   },
   (t) => [
     check('ticket_items_state_check', sql`${t.state} IN ('queued','cooking','done','voided')`),
+    check(
+      'ticket_items_done_at_check',
+      sql`(${t.state} = 'done') = (${t.doneAt} IS NOT NULL)`,
+    ),
     check('ticket_items_qty_check', sql`${t.qty} > 0`),
     index('ticket_items_ticket_idx').on(t.ticketId),
     index('ticket_items_link_group_idx').on(t.linkGroup),

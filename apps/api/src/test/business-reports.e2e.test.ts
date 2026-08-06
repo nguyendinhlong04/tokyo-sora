@@ -386,6 +386,8 @@ beforeAll(async () => {
       nameSnapshot: name,
       qty: 1,
       state: 'done',
+      // Món đã xong BẮT BUỘC có mốc giờ — cửa sổ hoàn tác giờ tính trên từng món
+      doneAt: new Date(),
     })
   }
 

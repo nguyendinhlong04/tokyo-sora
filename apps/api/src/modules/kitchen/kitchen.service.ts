@@ -212,9 +212,12 @@ export class KitchenService {
         })
         .where(eq(tickets.id, ticketId))
 
+      // Nút "cả vé" là đường tắt cho trường hợp thường: đặt MỌI món cùng lúc.
+      // Vẫn phải ghi mốc giờ từng món, vì cửa sổ hoàn tác giờ tính trên món.
+      const itemState = target === 'ready' ? 'done' : target === 'cooking' ? 'cooking' : 'queued'
       await tx
         .update(ticketItems)
-        .set({ state: target === 'ready' ? 'done' : target === 'cooking' ? 'cooking' : 'queued' })
+        .set({ state: itemState, doneAt: itemState === 'done' ? now : null })
         .where(and(eq(ticketItems.ticketId, ticketId), sql`${ticketItems.state} <> 'voided'`))
 
       // Trừ kho khi bếp bấm Xong (§25, quyết định 2). Nằm TRONG cùng transaction
@@ -358,12 +361,10 @@ export class KitchenService {
         FROM (
           SELECT ti.order_line_id AS id,
                  CASE MIN(
-                        CASE t.state
-                          WHEN 'waiting' THEN 0
+                        CASE ti.state
                           WHEN 'queued'  THEN 0
                           WHEN 'cooking' THEN 1
-                          WHEN 'ready'   THEN 2
-                          WHEN 'closed'  THEN 2
+                          WHEN 'done'    THEN 2
                           ELSE 0
                         END)
                    WHEN 0 THEN 'queued'
@@ -383,6 +384,120 @@ export class KitchenService {
          AND ol.state NOT IN ('served', 'voided')
          AND ol.state <> sub.new_state
     `)
+  }
+
+  /**
+   * Trạng thái vé SUY RA từ các món của nó, không phải ngược lại.
+   *
+   * Bếp bấm theo từng món, nên vé không còn là thứ được bấm — nó là bản tóm tắt.
+   * Còn món đang làm thì vé đang làm; mọi món xong thì vé xong; chưa ai đụng thì
+   * vé nằm chờ. Vé toàn món đã huỷ cũng coi như xong, nếu không nó treo trên màn
+   * mãi mãi.
+   */
+  private async deriveTicketState(tx: Tx, ticketId: number, actor: Actor) {
+    const [ticket] = await tx.select().from(tickets).where(eq(tickets.id, ticketId))
+    if (!ticket || ticket.state === 'waiting' || ticket.state === 'voided') return
+
+    const items = await tx
+      .select({ state: ticketItems.state })
+      .from(ticketItems)
+      .where(and(eq(ticketItems.ticketId, ticketId), sql`${ticketItems.state} <> 'voided'`))
+    if (items.length === 0) return
+
+    const target = items.every((i) => i.state === 'done')
+      ? ('ready' as const)
+      : items.some((i) => i.state === 'cooking')
+        ? ('cooking' as const)
+        : ('queued' as const)
+    if (target === ticket.state) return
+
+    const now = new Date()
+    await tx
+      .update(tickets)
+      .set({
+        state: target,
+        startedAt: target === 'cooking' ? (ticket.startedAt ?? now) : target === 'queued' ? null : ticket.startedAt,
+        readyAt: target === 'ready' ? now : null,
+      })
+      .where(eq(tickets.id, ticketId))
+
+    await emit(tx, {
+      branchId: ticket.branchId,
+      topic: target === 'ready' ? 'ticket.ready' : 'ticket.created',
+      rooms: [rooms.station(ticket.branchId, ticket.stationId), rooms.expo(ticket.branchId)],
+      payload: { ticketId, state: target, displayCode: ticket.displayCode },
+    })
+
+    await this.rollUpOrderStatus(tx, ticket.orderId)
+    void actor
+  }
+
+  /**
+   * K2 — bếp bấm Bắt đầu / Xong / Hoàn tác cho MỘT MÓN.
+   *
+   * Đây mới là thao tác thật của bếp. Một vé có thể gồm món nướng 40 giây và món
+   * hầm 15 phút; bấm cả vé một lượt là báo cho khách rằng món hầm đã xong trong
+   * khi nồi còn chưa sôi. Màn K3 Tổng món cũng bảo bếp nấu gộp bảy phần ba chỉ
+   * qua ba vé — không bấm được từng món thì không có cách nào ghi nhận bảy phần
+   * đó xong.
+   */
+  async changeItemState(itemId: number, action: TicketAction, actor: Actor) {
+    return this.db.transaction(async (tx) => {
+      const [item] = await tx.select().from(ticketItems).where(eq(ticketItems.id, itemId))
+      if (!item) throw new NotFoundException('Không có món này trên vé')
+      if (item.state === 'voided') throw new BadRequestException('Món đã bị huỷ')
+
+      const [ticket] = await tx.select().from(tickets).where(eq(tickets.id, item.ticketId))
+      if (!ticket) throw new NotFoundException('Không có vé của món này')
+      if (ticket.state === 'waiting') {
+        throw new BadRequestException('Đợt chưa ra — bấm "Ra đợt tiếp" trước')
+      }
+
+      const now = new Date()
+      const target = { start: 'cooking', done: 'done', undo: 'queued' }[action] as
+        | 'cooking'
+        | 'done'
+        | 'queued'
+      if (item.state === target) return { itemId, state: target, changed: false }
+
+      // Cửa sổ hoàn tác tính trên mốc của CHÍNH món này — hai món cùng vé xong
+      // cách nhau mười phút thì không thể chung một mốc.
+      if (action === 'undo' && item.state === 'done') {
+        const undoSeconds = await this.params.getNumber('kitchen.undoSeconds', 30, ticket.branchId)
+        const elapsed = item.doneAt
+          ? (now.getTime() - item.doneAt.getTime()) / 1000
+          : Number.POSITIVE_INFINITY
+        if (elapsed > undoSeconds) {
+          throw new BadRequestException(`Quá ${undoSeconds} giây rồi — không hoàn tác được nữa`)
+        }
+      }
+
+      await tx
+        .update(ticketItems)
+        .set({ state: target, doneAt: target === 'done' ? now : null })
+        .where(eq(ticketItems.id, itemId))
+
+      // Trừ kho khi món xong. Bút toán dùng onConflictDoNothing nên gọi nhiều lần
+      // không trừ hai lần — an toàn khi bếp bấm từng món.
+      if (target === 'done') {
+        await this.inventory.postSaleForTicket(tx, item.ticketId, actor)
+      }
+
+      await this.syncOrderLines(tx, item.ticketId)
+      await this.deriveTicketState(tx, item.ticketId, actor)
+
+      if (action === 'undo') {
+        await this.audit.write(tx, {
+          actor,
+          action: 'kds.item.undo',
+          entity: 'ticket_item',
+          entityId: String(itemId),
+          payload: { from: item.state, ticketId: item.ticketId },
+        })
+      }
+
+      return { itemId, state: target, changed: true }
+    })
   }
 
   /**

@@ -110,6 +110,15 @@ export const api = {
       label,
     }),
 
+  /** Bấm cho MỘT món trên vé — thao tác chính của bếp */
+  setItemState: (itemId: number, action: 'start' | 'done' | 'undo', label: string) =>
+    enqueue<{ state: string }>({
+      method: 'POST',
+      path: `/api/ticket-items/${itemId}/state`,
+      payload: { action },
+      label,
+    }),
+
   setAvailability: (
     dishId: string,
     status: 'sold_out' | 'limited' | 'available',

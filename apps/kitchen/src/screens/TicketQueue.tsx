@@ -22,6 +22,31 @@ export function TicketQueue({ queue, loading }: { queue: Queue | undefined; load
     onError: (err: Error) => toast(err.message, 'danger'),
   })
 
+  const setItem = useMutation({
+    mutationFn: ({
+      itemId,
+      action,
+      name,
+    }: {
+      itemId: number
+      action: 'start' | 'done' | 'undo'
+      name: string
+    }) => api.setItemState(itemId, action, `${ACTION_LABEL[action]} ${name}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['queue'] }),
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+
+  /**
+   * Chạm một dòng món là đi tiếp một nấc: chưa làm → đang làm → xong.
+   *
+   * Món đã xong thì chạm lại là HOÀN TÁC, và chỉ trong cửa sổ cho phép — quá hạn
+   * thì máy chủ từ chối và toast nói rõ, chứ không im lặng nuốt cú chạm.
+   */
+  const tapItem = (item: { id: number; name: string; state?: string }) => {
+    const action = item.state === 'queued' ? 'start' : item.state === 'cooking' ? 'done' : 'undo'
+    setItem.mutate({ itemId: item.id, action, name: item.name })
+  }
+
   const live = (queue?.tickets ?? []).filter((t) => t.state !== 'waiting')
 
   /**
@@ -87,7 +112,9 @@ export function TicketQueue({ queue, loading }: { queue: Queue | undefined; load
               componentLabel: i.componentLabel,
               portionLabel: i.portionLabel,
               weightGrams: i.weightGrams,
+              state: i.state,
             }))}
+            onItemTap={(item) => tapItem({ id: item.id, name: item.name, state: item.state })}
             onStart={() => setState.mutate({ ticket, action: 'start' })}
             onDone={() => setState.mutate({ ticket, action: 'done' })}
             onUndo={

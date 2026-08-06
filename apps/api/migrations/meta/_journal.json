@@ -162,6 +162,13 @@
       "when": 1785988802084,
       "tag": "0022_youthful_tinkerer",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786008528310,
+      "tag": "0023_minor_avengers",
+      "breakpoints": true
     }
   ]
 }

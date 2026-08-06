@@ -10,6 +10,8 @@ export interface TicketItemView {
   componentLabel: string | null
   portionLabel: string | null
   weightGrams: number | null
+  /** Trạng thái của RIÊNG món này — bếp bấm theo món, không theo cả vé */
+  state?: 'queued' | 'cooking' | 'done' | 'voided'
 }
 
 export interface OrderTicketProps {
@@ -31,6 +33,14 @@ export interface OrderTicketProps {
    * quay về nhãn "Đã xong" — nút biến mất là tín hiệu cho bếp biết đã chốt.
    */
   onUndo?: () => void
+  /**
+   * Chạm vào MỘT dòng món để bấm riêng món đó.
+   *
+   * Một vé có thể gồm món nướng 40 giây và món hầm 15 phút — bấm cả vé một lượt
+   * là báo cho khách rằng món hầm đã xong trong khi nồi còn chưa sôi. Nút ở chân
+   * vé vẫn giữ, cho vé mà mọi món ra cùng lúc.
+   */
+  onItemTap?: (item: TicketItemView) => void
 }
 
 /**
@@ -54,6 +64,7 @@ export function OrderTicket({
   onStart,
   onDone,
   onUndo,
+  onItemTap,
 }: OrderTicketProps) {
   const ratio = prepSeconds > 0 ? elapsedSeconds / prepSeconds : 0
   const overdue = isOverdue(ratio) && state !== 'waiting'
@@ -91,13 +102,27 @@ export function OrderTicket({
         </p>
       ) : null}
 
-      <ul className="flex flex-1 flex-col gap-3 px-4 py-3">
+      <ul className="flex flex-1 flex-col gap-1 px-2 py-3">
         {items.map((item) => (
-          <li key={item.id} className="flex gap-3">
+          <li
+            key={item.id}
+            /*
+              Cả dòng là một đích chạm, cao tối thiểu 56px — bếp đeo găng, tay
+              ướt. Món đang làm viền vàng, món xong mờ đi và gạch ngang: liếc một
+              cái là biết còn gì phải nấu.
+            */
+            onClick={onItemTap ? () => onItemTap(item) : undefined}
+            className={[
+              'flex min-h-[56px] items-start gap-3 rounded-sm px-2 py-2',
+              onItemTap ? 'cursor-pointer active:bg-surface-3' : '',
+              item.state === 'cooking' ? 'bg-accent/10 ring-1 ring-accent' : '',
+              item.state === 'done' ? 'opacity-45' : '',
+            ].join(' ')}
+          >
             <span className="min-w-[3ch] font-mono text-[length:var(--fs-ticket-qty)] font-semibold text-accent-ink">
               {showGrams && item.weightGrams ? `${item.weightGrams}g` : `${item.qty}×`}
             </span>
-            <div className="flex flex-1 flex-col">
+            <div className={`flex flex-1 flex-col ${item.state === 'done' ? 'line-through' : ''}`}>
               <span className="text-[length:var(--fs-ticket-dish)] leading-tight font-semibold text-ink-hi uppercase">
                 {item.name}
               </span>
