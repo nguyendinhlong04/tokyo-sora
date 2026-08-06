@@ -1,4 +1,4 @@
-import { setDeviceInfo, setDeviceToken } from '@sora/core'
+import { ApiError, setDeviceInfo, setDeviceToken } from '@sora/core'
 import { Card } from '@sora/ui'
 import { useState } from 'react'
 import { api } from '../api'
@@ -17,12 +17,34 @@ export function Pair({ onPaired }: { onPaired: () => void }) {
   const submit = async (value: string) => {
     setBusy(true)
     setError(null)
+    /**
+     * Tách làm hai chặng vì chúng hỏng theo hai kiểu khác hẳn nhau.
+     *
+     * Trước đây cả khối nằm trong một `catch` trả về đúng một câu "mã không
+     * đúng hoặc đã hết hạn". Nếu ghép THÀNH CÔNG rồi lượt hỏi danh tính mới rớt
+     * mạng, thì token đã nằm trong máy, mã ghép đã bị đánh dấu dùng rồi, mà màn
+     * hình lại bảo mã sai — người ở quán nhập lại mã đó và lần này hỏng thật.
+     * Bí một cách khó hiểu, ngay ở bước đầu tiên của một cái màn treo tường.
+     */
+    let token: string
+    let deviceId: number
     try {
       const result = await api.pair(value, 'Màn bếp')
-      setDeviceToken(result.token)
+      token = result.token
+      deviceId = result.deviceId
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Mã không đúng hoặc đã hết hạn')
+      setCode('')
+      setBusy(false)
+      return
+    }
+
+    // Ghép xong rồi — từ đây mọi lỗi đều KHÔNG phải lỗi mã ghép
+    setDeviceToken(token)
+    try {
       const me = await api.me()
       setDeviceInfo({
-        deviceId: result.deviceId,
+        deviceId,
         branchId: me.branchId,
         kind: 'kds',
         stationId: me.stationId,
@@ -30,7 +52,7 @@ export function Pair({ onPaired }: { onPaired: () => void }) {
       })
       onPaired()
     } catch {
-      setError('Mã không đúng hoặc đã hết hạn')
+      setError('Đã ghép được máy nhưng chưa đọc được trạm — kiểm tra mạng rồi tải lại trang, KHÔNG cần xin mã mới.')
       setCode('')
     } finally {
       setBusy(false)

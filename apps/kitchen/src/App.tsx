@@ -1,4 +1,4 @@
-import { calibrate, clearDevice, getDeviceToken, watchConnectivity } from '@sora/core'
+import { ApiError, calibrate, clearDevice, getDeviceToken, watchConnectivity } from '@sora/core'
 import { Button, OutboxBanner, ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
@@ -12,7 +12,23 @@ import { SoldOut } from './screens/SoldOut'
 import { TicketQueue } from './screens/TicketQueue'
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 2, refetchOnWindowFocus: true } },
+  defaultOptions: {
+    queries: {
+      /**
+       * Chỉ thử lại lỗi MẠNG và lỗi phía máy chủ.
+       *
+       * Lỗi 4xx là máy chủ đã hiểu và từ chối — "màn này chưa ghim vào trạm nào"
+       * hay "thiết bị đã bị thu hồi" thì thử lại một nghìn lần cũng vậy. Thử lại
+       * chỉ kéo dài quãng màn hình đứng ở chữ "Đang tải hàng vé…", đúng lúc đầu
+       * bếp cần biết vì sao vé không hiện.
+       */
+      retry: (soLan, err) => {
+        if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false
+        return soLan < 2
+      },
+      refetchOnWindowFocus: true,
+    },
+  },
 })
 
 export function App() {
@@ -79,6 +95,19 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
 
   return (
     <main className="flex h-dvh flex-col bg-canvas">
+      {/*
+        Lỗi tải hàng vé PHẢI hiện ra.
+        Trước đây `queue.error` không được dùng ở đâu cả: mọi thất bại — màn chưa
+        ghim trạm, thiết bị bị thu hồi từ xa, máy chủ chết — đều rơi xuống thành
+        "Chưa có vé nào. Vé mới sẽ tự hiện ở đây." Bếp nhìn một màn hình trống
+        trông y hệt lúc vắng khách, trong khi vé vẫn đang dồn ở dưới bàn.
+      */}
+      {queue.isError ? (
+        <div className="shrink-0 bg-danger px-6 py-3 text-[length:var(--fs-t2)] font-semibold text-canvas">
+          Không tải được hàng vé: {(queue.error as Error).message}
+        </div>
+      ) : null}
+
       <header className="flex h-16 shrink-0 items-center justify-between gap-6 border-b border-line-1 px-6">
         <div className="flex items-baseline gap-3">
           <span className="font-jp text-[length:var(--fs-t1)] text-accent-ink">

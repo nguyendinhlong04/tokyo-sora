@@ -1,4 +1,4 @@
-import { Badge, Button, EmptyState } from '@sora/ui'
+import { Badge, Button, EmptyState, useToast } from '@sora/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type ExpoOrder } from '../api'
@@ -62,6 +62,7 @@ export function Expo() {
 
 function ExpoCard({ order }: { order: ExpoOrder }) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [busy, setBusy] = useState(false)
 
   // Món đa trạm: gom theo linkGroup để thấy rõ hai nửa của cùng một món
@@ -153,6 +154,13 @@ function ExpoCard({ order }: { order: ExpoOrder }) {
                 `Mang ra ${order.tableCode ?? 'mang về'} đợt ${order.batchNo}`,
               )
               .then(() => queryClient.invalidateQueries({ queryKey: ['expo'] }))
+              /*
+                Máy chủ từ chối là chuyện có thật, không phải trường hợp hiếm:
+                "Đợt này chưa xong ở trạm ST-04" khi bảng vừa kịp đổi giữa lúc
+                người chạy đưa tay bấm. Không bắt lỗi thì nút cứ sáng lại như
+                chưa có gì, người chạy tưởng đã báo xong và bê món đi.
+              */
+              .catch((err: Error) => toast(err.message, 'danger'))
               .finally(() => setBusy(false))
           }}
         >
