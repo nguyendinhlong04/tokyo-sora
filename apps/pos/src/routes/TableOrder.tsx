@@ -156,6 +156,16 @@ export function TableOrder() {
     onError: (err: Error) => toast(err.message, 'danger'),
   })
 
+  const serve = useMutation({
+    mutationFn: (batchNo: number) =>
+      api.markServed(order.data!.order.id, batchNo, tableCode),
+    onSuccess: () => {
+      toast('Đã ghi nhận mang ra bàn', 'ok')
+      void queryClient.invalidateQueries({ queryKey: ['order', id] })
+    },
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+
   /**
    * Thêm một phần vào phiếu order.
    *
@@ -185,6 +195,20 @@ export function TableOrder() {
     (l) => l.state !== 'voided' && l.state !== 'draft',
   )
   const draftLines = (order.data?.lines ?? []).filter((l) => l.state === 'draft')
+
+  /**
+   * Đợt mà MỌI món đã xong ở bếp — chỉ khi đó mới cho bấm mang ra.
+   *
+   * Xét theo từng món chứ không theo vé, vì một đợt có thể trải nhiều trạm và
+   * món đa trạm còn nằm ở hai vé khác nhau. Cho bấm sớm là mời phục vụ bê nửa
+   * khay ra bàn.
+   */
+  const servableBatches = [...new Set(sentLines.map((l) => l.batchNo))]
+    .filter((no) => {
+      const inBatch = sentLines.filter((l) => l.batchNo === no)
+      return inBatch.length > 0 && inBatch.every((l) => l.state === 'ready')
+    })
+    .sort((a, b) => a - b)
   const heldBatches = (order.data?.batches ?? []).filter((b) => b.state === 'held')
 
   return (
@@ -344,6 +368,28 @@ export function TableOrder() {
               {heldBatches.map((b) => (
                 <Button key={b.batchNo} onClick={() => fire.mutate(b.batchNo)} block>
                   Ra đợt {b.batchNo}
+                </Button>
+              ))}
+            </section>
+          ) : null}
+
+          {/*
+            Người bưng món ra bàn là PHỤC VỤ, nên nút xác nhận nằm ở đây chứ không
+            ở màn bếp. Họ đang đăng nhập bằng danh tính của mình, nên nhật ký ghi
+            đúng tên người bưng — món thất lạc thì truy được.
+          */}
+          {servableBatches.length > 0 ? (
+            <section className="mt-5 flex flex-col gap-2">
+              <SectionLabel>Bếp đã xong — chờ mang ra</SectionLabel>
+              {servableBatches.map((batchNo) => (
+                <Button
+                  key={batchNo}
+                  variant="primary"
+                  block
+                  disabled={serve.isPending}
+                  onClick={() => serve.mutate(batchNo)}
+                >
+                  Đã mang ra bàn · đợt {batchNo}
                 </Button>
               ))}
             </section>

@@ -18,11 +18,6 @@ import { KitchenService } from './kitchen.service'
 
 const StateBody = z.object({ action: z.enum(['start', 'done', 'undo']) })
 
-const ServedBody = z.object({
-  orderId: z.number().int().positive(),
-  batchNo: z.number().int().positive(),
-})
-
 const AvailabilityBody = z.object({
   dishId: z.string().min(1),
   status: z.enum(['sold_out', 'limited', 'available']),
@@ -82,16 +77,23 @@ export class KitchenController {
   }
 
   /**
-   * K6 Expo — người chạy món bấm "Đã mang ra" cho cả một đợt.
+   * P4 — phục vụ xác nhận đã đặt món lên bàn.
    *
-   * Cùng khoá quyền với việc đổi trạng thái vé: người đứng ở màn bếp là người
-   * bê món ra, không phải người ngồi ở quầy.
+   * KHÔNG nằm ở màn bếp: người bưng món là phục vụ, và trạng thái khách nhìn
+   * thấy là "Đã ra" — nghĩa là đã ở trên bàn, chứ không phải đã rời bếp. Đặt nút
+   * ở màn bếp thì nhật ký ghi "thiết bị màn bếp" chứ không ghi ai bưng.
+   *
+   * Đặt cạnh `batches/:batchNo/fire` vì cùng một đơn vị: cả đợt một lượt, đúng
+   * như người ta bê cả khay.
    */
-  @Post('expo/served')
-  @RequirePermission('kds.change-item-state')
-  markServed(@Body() body: unknown, @Req() req: RequestWithActor) {
-    const input = ServedBody.parse(body)
-    return this.kitchen.markServed(input.orderId, input.batchNo, req.actor!)
+  @Post('orders/:orderId/batches/:batchNo/served')
+  @RequirePermission('order.mark-served')
+  markServed(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Param('batchNo', ParseIntPipe) batchNo: number,
+    @Req() req: RequestWithActor,
+  ) {
+    return this.kitchen.markServed(orderId, batchNo, req.actor!)
   }
 
   /** K5 báo hết món */

@@ -604,6 +604,20 @@ export const api = {
       label: `Ra đợt ${batchNo}`,
     }),
 
+  /**
+   * Phục vụ xác nhận đã đặt món lên bàn — khách thấy "Đã ra".
+   *
+   * Qua hàng đợi offline như mọi thao tác sàn khác: tay đang bưng khay, mất sóng
+   * một góc phòng thì lệnh tự gửi khi có mạng, không bắt đứng lại bấm mãi.
+   */
+  markServed: (orderId: number, batchNo: number, tableCode: string) =>
+    enqueue<{ served: boolean }>({
+      method: 'POST',
+      path: `/api/orders/${orderId}/batches/${batchNo}/served`,
+      payload: {},
+      label: `Mang ra bàn ${tableCode} đợt ${batchNo}`,
+    }),
+
   voidLine: (
     lineId: number,
     body: {

@@ -1,6 +1,5 @@
-import { Badge, Button, EmptyState, useToast } from '@sora/ui'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { Badge, EmptyState } from '@sora/ui'
+import { useQuery } from '@tanstack/react-query'
 import { api, type ExpoOrder } from '../api'
 
 /**
@@ -61,10 +60,6 @@ export function Expo() {
 }
 
 function ExpoCard({ order }: { order: ExpoOrder }) {
-  const queryClient = useQueryClient()
-  const toast = useToast()
-  const [busy, setBusy] = useState(false)
-
   // Món đa trạm: gom theo linkGroup để thấy rõ hai nửa của cùng một món
   const linked = new Map<string, typeof order.items>()
   const single: typeof order.items = []
@@ -136,36 +131,15 @@ function ExpoCard({ order }: { order: ExpoOrder }) {
       </ul>
 
       {/*
-        Chỉ hiện khi cả đợt đã xong ở MỌI trạm. Đợt còn chờ mà vẫn cho bấm là mời
-        người chạy bê nửa món ra bàn — đúng cái mà màn này sinh ra để ngăn.
+        KHÔNG có nút "Đã mang ra" ở đây — người bưng món là phục vụ, và họ xác
+        nhận trên POS bằng danh tính của mình. Bảng này vì thế nói đúng một điều
+        và nói rõ: món đã sẵn sàng mà CHƯA ai bưng đi. Đợt còn nằm đây là đợt còn
+        nằm ở quầy.
       */}
       {order.ready ? (
-        <Button
-          size="lg"
-          variant="primary"
-          block
-          disabled={busy}
-          onClick={() => {
-            setBusy(true)
-            void api
-              .markServed(
-                order.orderId,
-                order.batchNo,
-                `Mang ra ${order.tableCode ?? 'mang về'} đợt ${order.batchNo}`,
-              )
-              .then(() => queryClient.invalidateQueries({ queryKey: ['expo'] }))
-              /*
-                Máy chủ từ chối là chuyện có thật, không phải trường hợp hiếm:
-                "Đợt này chưa xong ở trạm ST-04" khi bảng vừa kịp đổi giữa lúc
-                người chạy đưa tay bấm. Không bắt lỗi thì nút cứ sáng lại như
-                chưa có gì, người chạy tưởng đã báo xong và bê món đi.
-              */
-              .catch((err: Error) => toast(err.message, 'danger'))
-              .finally(() => setBusy(false))
-          }}
-        >
-          Đã mang ra
-        </Button>
+        <p className="rounded-sm bg-ok/12 px-3 py-2 text-center text-[length:var(--fs-b2)] text-ok">
+          Chờ phục vụ bưng ra
+        </p>
       ) : null}
     </article>
   )

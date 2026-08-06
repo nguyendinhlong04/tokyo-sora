@@ -108,6 +108,19 @@ export const ACTIONS = {
     label: 'Xác nhận / đối soát khoản khách tự trả',
     grants: { R1: A, R2: A, R7: A, R8: A, R10: A },
   },
+  /**
+   * Dòng thứ 58 — §4.2 trong tài liệu thiết kế chưa có việc này, và đó là lý do
+   * ban đầu nút "Đã mang ra" phải mượn tạm khoá của bếp.
+   *
+   * Người bưng món ra bàn là PHỤC VỤ, không phải nhân viên bếp. Mượn khoá của bếp
+   * thì nhật ký ghi "thiết bị màn bếp" chứ không ghi ai — món thất lạc là không
+   * truy được người. Và trạng thái khách nhìn thấy là "Đã ra", nghĩa là đã ở trên
+   * bàn; người đặt nó lên bàn mới là người được xác nhận điều đó.
+   */
+  'order.mark-served': {
+    label: 'Xác nhận đã mang món ra bàn',
+    grants: { R1: A, R2: A, R7: A, R10: A },
+  },
   'table.close-after-paid': {
     label: 'Đóng bàn sau khi trả đủ',
     grants: { R1: A, R2: A, R7: A, R10: A },
