@@ -1,6 +1,7 @@
 import { elapsedSeconds } from '@sora/core'
 import { EmptyState, OrderTicket, useToast } from '@sora/ui'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { api, type Queue, type Ticket } from '../api'
 
 /**
@@ -12,6 +13,9 @@ import { api, type Queue, type Ticket } from '../api'
 export function TicketQueue({ queue, loading }: { queue: Queue | undefined; loading: boolean }) {
   const toast = useToast()
   const qc = useQueryClient()
+  const gridRef = useRef<HTMLDivElement>(null)
+  const columns = queue?.station.columns ?? 4
+  const rows = useFittingRows(gridRef, columns)
 
   const ACTION_LABEL = { start: 'Bắt đầu', done: 'Xong', undo: 'Hoàn tác' } as const
 
@@ -75,10 +79,9 @@ export function TicketQueue({ queue, loading }: { queue: Queue | undefined; load
   const stillUndoable = (t: Ticket) =>
     t.state === 'ready' && t.readyAt !== null && elapsedSeconds(t.readyAt) <= undoSeconds
 
-  // Lưới cố định theo số cột của TRẠM (§22): ST-02 sáu cột vé thấp, ST-06 bốn cột
-  // vé cao. Hai hàng là vừa tầm mắt trên TV treo tường.
-  const columns = queue?.station.columns ?? 4
-  const shown = sorted.slice(0, columns * 2)
+  // Số CỘT cố định theo trạm (§22): ST-02 sáu cột vé thấp, ST-06 bốn cột vé cao.
+  // Số HÀNG thì theo chỗ thật còn lại trên màn — xem useFittingRows.
+  const shown = sorted.slice(0, columns * rows)
   const overflow = sorted.length - shown.length
 
   if (loading) return <p className="p-4 text-ink-mute">Đang tải hàng vé…</p>
@@ -89,6 +92,7 @@ export function TicketQueue({ queue, loading }: { queue: Queue | undefined; load
   return (
     <div className="flex h-full flex-col">
       <div
+        ref={gridRef}
         className="grid flex-1 content-start gap-4 overflow-hidden"
         style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
       >
@@ -131,4 +135,41 @@ export function TicketQueue({ queue, loading }: { queue: Queue | undefined; load
       ) : null}
     </div>
   )
+}
+
+/** Hai hàng là tối đa: quá tầm mắt thì vé hàng dưới không ai đọc */
+const MAX_ROWS = 2
+/** Khớp `gap-4` của lưới */
+const GRID_GAP = 16
+
+/**
+ * Số hàng vé VỪA trong khung — đo thật, không đoán theo chiều cao màn.
+ *
+ * Ngưỡng cố định kiểu "màn cao hơn X thì hai hàng" không dùng được, vì thẻ vé cao
+ * theo SỐ MÓN: vé một món ~295px, vé ba món ~525px. Đúng giờ đông — lúc vé dài
+ * nhất và lúc màn này quan trọng nhất — ngưỡng nào cũng sai.
+ *
+ * Hàng thứ hai bị đáy màn cắt ngang thân thẻ còn tệ hơn không hiện: bếp tưởng đã
+ * đọc hết vé đó trong khi món cuối nằm dưới mép màn. Vé không vừa thì rơi xuống
+ * dòng "Còn N vé nữa", đúng cách màn này vẫn xử lý phần tràn.
+ *
+ * Đo theo HÀNG ĐẦU, hàng luôn hiện dù đang một hay hai hàng — nên con số không
+ * đổi theo chính kết quả của nó, và lưới không nhấp nháy giữa một và hai hàng.
+ */
+function useFittingRows(grid: RefObject<HTMLDivElement | null>, columns: number) {
+  const [rows, setRows] = useState(MAX_ROWS)
+
+  // Không cần ResizeObserver: màn này vẽ lại mỗi giây để nhích đồng hồ vé, nên
+  // phép đo tự bám theo cả lúc đổi cỡ cửa sổ lẫn lúc vé thay đổi số món.
+  useLayoutEffect(() => {
+    const el = grid.current
+    if (!el) return
+    const firstRow = [...el.children].slice(0, columns) as HTMLElement[]
+    const rowHeight = Math.max(0, ...firstRow.map((card) => card.offsetHeight))
+    if (rowHeight === 0) return
+    const fits = Math.floor((el.clientHeight + GRID_GAP) / (rowHeight + GRID_GAP))
+    setRows(Math.min(MAX_ROWS, Math.max(1, fits)))
+  })
+
+  return rows
 }

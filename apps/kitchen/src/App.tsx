@@ -165,9 +165,16 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden p-4">
+      {/*
+        Khung phải là FLEX CONTAINER, không phải block.
+        K3–K6 đều tự khai `overflow-y-auto`, nhưng thanh cuộn chỉ mọc ra khi phần
+        tử bị chặn chiều cao. Là block thì chúng cao theo nội dung, tràn khỏi
+        khung và bị `overflow-hidden` cắt đứt — phần dưới đáy màn MẤT HẲN chứ
+        không phải chờ cuộn tới. Màn TV cao thì ít lộ, laptop thì lộ ngay.
+      */}
+      <div className="flex flex-1 flex-col overflow-hidden p-4">
         {queue.isError && screen === 'queue' ? (
-          <p className="text-warn">
+          <p className="shrink-0 text-warn">
             Không nối được máy chủ. Vé đã hiện vẫn giữ nguyên, máy sẽ tự nối lại.
           </p>
         ) : null}
