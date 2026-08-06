@@ -78,7 +78,7 @@ export function OrderTicket({
         overdue ? 'animate-[sora-late_1.2s_step-end_infinite] border-danger' : 'border-line-2',
       ].join(' ')}
     >
-      <header className="flex items-baseline justify-between gap-3 border-b border-line-1 px-4 py-3">
+      <header className="flex items-baseline justify-between gap-3 border-b border-line-1 px-3 py-2">
         <div className="flex flex-col">
           <span className="text-[length:var(--fs-t1)] font-semibold text-ink-hi">
             {tableCode ? `Bàn ${tableCode}` : 'Mang về'} · Đợt {batchNo}
@@ -103,7 +103,7 @@ export function OrderTicket({
         </p>
       ) : null}
 
-      <ul className="flex flex-1 flex-col gap-1 px-2 py-3">
+      <ul className="flex flex-1 flex-col gap-0.5 px-2 py-1.5">
         {items.map((item) => (
           <li
             key={item.id}
@@ -115,7 +115,7 @@ export function OrderTicket({
             */
             onClick={onItemTap ? () => onItemTap(item) : undefined}
             className={[
-              'flex min-h-[var(--ticket-row-min)] items-start gap-3 rounded-sm px-2 py-2',
+              'flex min-h-[var(--ticket-row-min)] items-start gap-2 rounded-sm px-2 py-1',
               onItemTap ? 'cursor-pointer active:bg-surface-3' : '',
               item.state === 'cooking' ? 'bg-accent/10 ring-1 ring-accent' : '',
               item.state === 'done' ? 'opacity-45' : '',

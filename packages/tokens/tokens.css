@@ -181,17 +181,18 @@
 */
 @media (max-height: 1000px) {
   [data-scale='kds'] {
-    --hit-target: calc(52px * var(--kds-zoom));
-    --fs-t1: calc(18px * var(--kds-zoom));
-    --fs-t2: calc(16px * var(--kds-zoom));
-    --fs-b1: calc(15px * var(--kds-zoom));
-    --fs-b2: calc(13px * var(--kds-zoom));
-    --fs-c1: calc(12px * var(--kds-zoom));
-    --fs-ticket-dish: calc(19px * var(--kds-zoom));
-    --fs-ticket-qty: calc(24px * var(--kds-zoom));
-    --fs-clock: calc(32px * var(--kds-zoom));
-    --ticket-row-min: calc(44px * var(--kds-zoom));
-    --ticket-action-h: calc(56px * var(--kds-zoom));
+    --hit-target: calc(44px * var(--kds-zoom));
+    --fs-t1: calc(15px * var(--kds-zoom));
+    --fs-t2: calc(14px * var(--kds-zoom));
+    --fs-b1: calc(13px * var(--kds-zoom));
+    --fs-b2: calc(12px * var(--kds-zoom));
+    --fs-c1: calc(11px * var(--kds-zoom));
+    --fs-c2: calc(10px * var(--kds-zoom));
+    --fs-ticket-dish: calc(15px * var(--kds-zoom));
+    --fs-ticket-qty: calc(18px * var(--kds-zoom));
+    --fs-clock: calc(24px * var(--kds-zoom));
+    --ticket-row-min: calc(30px * var(--kds-zoom));
+    --ticket-action-h: calc(40px * var(--kds-zoom));
   }
 }
 
