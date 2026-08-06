@@ -576,6 +576,77 @@ export class KitchenService {
    * Đóng vé luôn sau khi giao — nếu không, đợt đã mang ra vẫn nằm trên bảng Expo
    * và người chạy tiếp theo lại bê ra lần nữa.
    */
+  /**
+   * Phục vụ xác nhận đã mang ra bàn MỘT MÓN.
+   *
+   * Đợt lẩu nướng có món ra trong bốn mươi giây và món hầm mười lăm phút. Bắt
+   * chờ cả đợt xong mới cho bưng thì món nhanh nằm nguội trên quầy đúng bằng
+   * thời gian nấu món chậm — mà đó là món khách chờ ít nhất.
+   *
+   * Bấm lại món đã mang ra là no-op thành công: hàng đợi offline của máy POS
+   * gửi lại mù, và bưng hai lần không phải lỗi cần chặn bằng thông báo đỏ.
+   */
+  async markLineServed(lineId: number, actor: Actor) {
+    return this.db.transaction(async (tx) => {
+      const [line] = await tx.select().from(orderLines).where(eq(orderLines.id, lineId))
+      if (!line) throw new NotFoundException('Không có món này trên đơn')
+      if (line.state === 'served') return { lineId, served: true, changed: false }
+      if (line.state === 'voided') throw new BadRequestException('Món này đã bị huỷ')
+      if (line.state !== 'ready') {
+        throw new BadRequestException('Bếp chưa báo xong món này')
+      }
+
+      await tx.update(orderLines).set({ state: 'served' }).where(eq(orderLines.id, lineId))
+
+      /**
+       * Vé nào đã mang ra HẾT thì đóng lại.
+       *
+       * Không đóng thì vé ở lại màn Expo sau khi món cuối của nó rời quầy, và
+       * người ra món đọc thành "còn phải bưng". Món đã huỷ tính là xong — vé
+       * toàn món huỷ mà không đóng thì treo trên màn mãi.
+       */
+      const holders = await tx
+        .selectDistinct({ ticketId: ticketItems.ticketId })
+        .from(ticketItems)
+        .where(eq(ticketItems.orderLineId, lineId))
+
+      for (const { ticketId } of holders) {
+        const rest = await tx
+          .select({ state: orderLines.state })
+          .from(ticketItems)
+          .innerJoin(orderLines, eq(orderLines.id, ticketItems.orderLineId))
+          .where(and(eq(ticketItems.ticketId, ticketId), sql`${ticketItems.state} <> 'voided'`))
+        const allGone = rest.every((r) => r.state === 'served' || r.state === 'voided')
+        if (!allGone) continue
+
+        await tx
+          .update(tickets)
+          .set({ state: 'closed' })
+          .where(and(eq(tickets.id, ticketId), sql`${tickets.state} = 'ready'`))
+      }
+
+      const [order] = await tx.select().from(orders).where(eq(orders.id, line.orderId))
+      if (order) {
+        await emit(tx, {
+          branchId: order.branchId,
+          topic: 'order.updated',
+          rooms: [rooms.expo(order.branchId), rooms.orders(order.branchId)],
+          payload: { orderId: line.orderId, lineId, served: true },
+        })
+      }
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'kds.line.served',
+        entity: 'order',
+        entityId: String(line.orderId),
+        payload: { lineId, batchNo: line.batchNo },
+      })
+
+      return { lineId, served: true, changed: true }
+    })
+  }
+
   async markServed(orderId: number, batchNo: number, actor: Actor) {
     return this.db.transaction(async (tx) => {
       const group = await tx

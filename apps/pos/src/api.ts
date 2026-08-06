@@ -610,6 +610,15 @@ export const api = {
    * Qua hàng đợi offline như mọi thao tác sàn khác: tay đang bưng khay, mất sóng
    * một góc phòng thì lệnh tự gửi khi có mạng, không bắt đứng lại bấm mãi.
    */
+  /** Mang ra bàn TỪNG MÓN — món nào bếp xong thì bưng món đó, không chờ cả đợt */
+  markLineServed: (lineId: number, name: string, tableCode: string) =>
+    enqueue<{ served: boolean }>({
+      method: 'POST',
+      path: `/api/order-lines/${lineId}/served`,
+      payload: {},
+      label: `Mang ra bàn ${tableCode} · ${name}`,
+    }),
+
   markServed: (orderId: number, batchNo: number, tableCode: string) =>
     enqueue<{ served: boolean }>({
       method: 'POST',

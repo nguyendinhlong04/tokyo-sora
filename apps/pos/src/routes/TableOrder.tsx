@@ -166,6 +166,16 @@ export function TableOrder() {
     onError: (err: Error) => toast(err.message, 'danger'),
   })
 
+  const serveLine = useMutation({
+    mutationFn: (line: OrderLineRow) =>
+      api.markLineServed(line.id, line.nameSnapshot, tableCode),
+    onSuccess: (_result, line) => {
+      toast(`Đã mang ra ${line.nameSnapshot}`, 'ok')
+      void queryClient.invalidateQueries({ queryKey: ['order', id] })
+    },
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+
   /**
    * Thêm một phần vào phiếu order.
    *
@@ -197,11 +207,20 @@ export function TableOrder() {
   const draftLines = (order.data?.lines ?? []).filter((l) => l.state === 'draft')
 
   /**
-   * Đợt mà MỌI món đã xong ở bếp — chỉ khi đó mới cho bấm mang ra.
+   * Món bếp đã báo xong mà chưa ai bưng đi.
    *
+   * Đây mới là danh sách việc thật của phục vụ. Một đợt lẩu nướng có món ra
+   * trong bốn mươi giây và món hầm mười lăm phút; bắt chờ cả đợt xong mới cho
+   * bưng thì món nhanh nằm nguội trên quầy đúng bằng thời gian nấu món chậm.
+   */
+  const readyLines = sentLines.filter((l) => l.state === 'ready')
+
+  /**
+   * Đợt mà MỌI món đã xong ở bếp — nút bưng cả khay một lượt.
+   *
+   * Vẫn giữ, vì phần lớn đợt ra cùng lúc thật và bấm một nút nhanh hơn bấm sáu.
    * Xét theo từng món chứ không theo vé, vì một đợt có thể trải nhiều trạm và
-   * món đa trạm còn nằm ở hai vé khác nhau. Cho bấm sớm là mời phục vụ bê nửa
-   * khay ra bàn.
+   * món đa trạm còn nằm ở hai vé khác nhau.
    */
   const servableBatches = [...new Set(sentLines.map((l) => l.batchNo))]
     .filter((no) => {
@@ -378,20 +397,55 @@ export function TableOrder() {
             ở màn bếp. Họ đang đăng nhập bằng danh tính của mình, nên nhật ký ghi
             đúng tên người bưng — món thất lạc thì truy được.
           */}
-          {servableBatches.length > 0 ? (
+          {readyLines.length > 0 ? (
             <section className="mt-5 flex flex-col gap-2">
               <SectionLabel>Bếp đã xong — chờ mang ra</SectionLabel>
-              {servableBatches.map((batchNo) => (
-                <Button
-                  key={batchNo}
-                  variant="primary"
-                  block
-                  disabled={serve.isPending}
-                  onClick={() => serve.mutate(batchNo)}
+
+              {/* Từng món một: bưng được món nào thì đánh dấu món đó */}
+              {readyLines.map((line) => (
+                <button
+                  key={line.id}
+                  type="button"
+                  disabled={serveLine.isPending}
+                  onClick={() => serveLine.mutate(line)}
+                  className="flex min-h-[var(--hit-target)] items-center gap-3 rounded-sm border border-accent bg-transparent px-3 py-2 text-left disabled:opacity-50"
                 >
-                  Đã mang ra bàn · đợt {batchNo}
-                </Button>
+                  <span className="font-mono text-[length:var(--fs-b1)] text-accent-ink">
+                    {line.qty}×
+                  </span>
+                  <span className="min-w-0 flex-1 text-[length:var(--fs-b1)] text-ink-hi">
+                    {line.nameSnapshot}
+                    {line.portionLabel ? (
+                      <span className="ml-2 font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                        {line.portionLabel}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="flex-none text-[length:var(--fs-c1)] font-semibold text-accent-ink">
+                    Đã mang ra
+                  </span>
+                </button>
               ))}
+
+              {/*
+                Nút cả đợt chỉ hiện khi đợt đó còn NHIỀU HƠN MỘT món đang chờ —
+                bằng đúng một món thì nó lặp lại cái nút ngay bên trên, và hai nút
+                cạnh nhau làm cùng một việc là chỗ để bấm nhầm.
+              */}
+              {servableBatches
+                .filter((no) => readyLines.filter((l) => l.batchNo === no).length > 1)
+                .map((batchNo) => (
+                  <Button
+                    key={batchNo}
+                    variant="primary"
+                    block
+                    disabled={serve.isPending}
+                    onClick={() => serve.mutate(batchNo)}
+                  >
+                    Mang ra cả đợt {batchNo} · {readyLines.filter((l) => l.batchNo === batchNo).length}{' '}
+                    món
+                  </Button>
+                ))}
             </section>
           ) : null}
         </div>

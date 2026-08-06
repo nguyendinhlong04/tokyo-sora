@@ -86,6 +86,18 @@ export class KitchenController {
    * Đặt cạnh `batches/:batchNo/fire` vì cùng một đơn vị: cả đợt một lượt, đúng
    * như người ta bê cả khay.
    */
+  /**
+   * Xác nhận đã mang ra bàn MỘT MÓN.
+   *
+   * Cùng quyền với nút cả đợt — vẫn là phục vụ bưng món, chỉ khác đơn vị: món
+   * nào bếp báo xong thì bưng món đó, không bắt món nhanh nằm chờ món hầm.
+   */
+  @Post('order-lines/:id/served')
+  @RequirePermission('order.mark-served')
+  markLineServed(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
+    return this.kitchen.markLineServed(id, req.actor!)
+  }
+
   @Post('orders/:orderId/batches/:batchNo/served')
   @RequirePermission('order.mark-served')
   markServed(
