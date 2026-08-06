@@ -24,7 +24,17 @@ export function DishRow({
 }) {
   return (
     <div className="flex h-26 items-center gap-3.5 border-b border-surface-4 px-4">
-      <button type="button" onClick={onOpen} className="flex flex-1 items-center gap-3.5 text-left">
+      {/*
+        `min-w-0` BẮT BUỘC ở đây, không phải chỉ ở thẻ chữ bên trong.
+        Mặc định một flex item không co xuống dưới bề rộng nội dung của nó, nên
+        món có mô tả dài sẽ đẩy phình cả hàng và hất nút + ra ngoài mép màn hình.
+        Đặt ở span con không cứu được vì chặn nằm ở đúng cấp này.
+      */}
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
+      >
         <Plate kanji={dish.kana} className="h-22 w-22 flex-none" />
         <span className="min-w-0 flex-1">
           <span className="block text-[length:var(--fs-t2)] font-semibold text-ink-hi">
