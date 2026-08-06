@@ -73,8 +73,25 @@ function normalizeIp(raw: string): string {
   return trimmed
 }
 
-/** Số chặng trung chuyển tin được. 0 = chưa đo → lớp 2 tắt, mọi máy phải xin duyệt. */
+/**
+ * Số chặng trung chuyển tin được.
+ *
+ * ĐÃ ĐO trên bản triển khai thật (06-08-2026), gọi cả qua ban.tokyo-sora.vn lẫn
+ * thẳng vào api.tokyo-sora.vn — hai đường cho kết quả y hệt, `x-forwarded-for`
+ * luôn đúng MỘT phần tử là địa chỉ thật của máy gọi.
+ *
+ * Quan trọng hơn con số: Vercel XOÁ HẲN phần `x-forwarded-for` do máy khách gửi
+ * lên rồi ghi lại bằng địa chỉ nó nhìn thấy. Thử khai `203.0.113.99`, rồi thử
+ * khai cả chuỗi hai địa chỉ — đều bị vứt sạch. Nên trò giả mạo mà `clientIp`
+ * phòng ở trên đã bị chặn từ tầng hạ tầng, trước khi chạm tới code này.
+ *
+ * Vì sao vẫn giữ mặc định là 1 chứ không bỏ luôn phép đếm: hạ tầng đổi thì code
+ * phải đổi theo một cách CÓ CHỦ Ý. Đặt thêm một lớp trung chuyển nữa ở trước
+ * (Cloudflare chẳng hạn) là con số này sai, và `TRUSTED_PROXY_HOPS` là chỗ sửa.
+ * Tự host thì phải ĐO LẠI, đừng tin con số này.
+ */
 export function trustedHops(): number {
   const raw = Number(process.env.TRUSTED_PROXY_HOPS)
-  return Number.isInteger(raw) && raw > 0 ? raw : 0
+  if (Number.isInteger(raw) && raw > 0) return raw
+  return 1
 }

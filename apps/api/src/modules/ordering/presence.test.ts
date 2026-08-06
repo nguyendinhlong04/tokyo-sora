@@ -49,6 +49,30 @@ describe('Lấy địa chỉ thật của máy khách', () => {
   })
 })
 
+/**
+ * Ghi lại phép đo trên bản triển khai thật (06-08-2026) thành test chạy được.
+ *
+ * Vercel xoá phần `x-forwarded-for` do máy khách gửi lên rồi ghi lại bằng địa chỉ
+ * nó nhìn thấy, nên chuỗi luôn đúng một phần tử. Nếu ngày nào đó hạ tầng đổi cách
+ * làm, chính test này là chỗ nhắc phải đo lại.
+ */
+describe('Hình dạng thật của chuỗi chuyển tiếp trên Vercel', () => {
+  const HOPS_DA_DO = 1
+
+  it('chuỗi một phần tử → lấy đúng địa chỉ thật của khách', () => {
+    expect(clientIp('14.167.9.225', HOPS_DA_DO)).toBe('14.167.9.225')
+  })
+
+  it('khách tự khai địa chỉ quán cũng vô ích vì Vercel đã ghi đè trước khi tới đây', () => {
+    // Đây là chuỗi thực tế nhận được khi gửi kèm "X-Forwarded-For: 203.0.113.99"
+    expect(clientIp('14.167.9.225', HOPS_DA_DO)).not.toBe('203.0.113.99')
+  })
+
+  it('nếu hạ tầng đổi sang NỐI THÊM thay vì ghi đè thì vẫn lấy đúng phần tử cuối', () => {
+    expect(clientIp('203.0.113.99, 14.167.9.225', HOPS_DA_DO)).toBe('14.167.9.225')
+  })
+})
+
 describe('Địa chỉ có thuộc đường mạng của quán không', () => {
   it('khớp đúng địa chỉ đã khai', () => {
     expect(isInsideBranch(QUAN, [QUAN])).toBe(true)

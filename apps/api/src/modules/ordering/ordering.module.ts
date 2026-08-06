@@ -4,7 +4,6 @@ import { FeedbackService } from './feedback.service'
 import { FloorplanService } from './floorplan.service'
 import { OrderingController } from './ordering.controller'
 import { OrderingService } from './ordering.service'
-import { ForwardingDiagController } from './forwarding-diag.controller'
 import { QuickKeysService } from './quick-keys.service'
 import { TableDeviceController } from './table-device.controller'
 import { TableDeviceService } from './table-device.service'
@@ -12,13 +11,7 @@ import { TableRequestService } from './table-request.service'
 import { TableSessionController } from './table-session.controller'
 
 @Module({
-  controllers: [
-    OrderingController,
-    TableSessionController,
-    TableDeviceController,
-    // TẠM THỜI — gỡ sau khi khai xong TRUSTED_PROXY_HOPS
-    ForwardingDiagController,
-  ],
+  controllers: [OrderingController, TableSessionController, TableDeviceController],
   providers: [
     OrderingService,
     FloorplanService,

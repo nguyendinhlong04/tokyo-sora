@@ -128,11 +128,19 @@ rời đi, nhân viên duyệt thay như trên.
 - Mã QR chuyển từ *sinh mỗi lượt ăn* sang *dán cố định theo bàn*.
 - Phân biệt từng máy trong cùng một bàn — hiện tại cả bàn dùng chung một tấm vé,
   hệ thống không biết có mấy điện thoại đang nối vào.
-- Kiểm tra đường mạng để biết máy có đang ở trong quán không. Hiện hệ thống chưa
-  đọc địa chỉ mạng của khách, và vì các ứng dụng đi qua một lớp trung chuyển nên
-  phải bật đúng thiết lập thì mới đọc được địa chỉ gốc thay vì địa chỉ của lớp
-  trung chuyển. **Làm sai chỗ này thì cả quán bị nhìn thành một địa chỉ duy nhất
-  và lớp 2 mất tác dụng một cách âm thầm** — không có lỗi nào báo ra.
+- ~~Kiểm tra đường mạng để biết máy có đang ở trong quán không.~~ **Đã xong.**
+  Đo trên bản triển khai thật ngày 06-08-2026: chuỗi chuyển tiếp luôn đúng một
+  phần tử, và hai đường (qua `ban.tokyo-sora.vn` lẫn gọi thẳng vào API) cho kết
+  quả y hệt — nên một giá trị dùng chung cho cả tám ứng dụng.
+
+  Phát hiện quan trọng: **Vercel xoá hẳn phần địa chỉ do máy khách gửi lên rồi
+  ghi lại bằng địa chỉ nó nhìn thấy.** Thử khai `203.0.113.99`, rồi thử khai cả
+  chuỗi hai địa chỉ — đều bị vứt sạch. Trò giả mạo bị chặn từ tầng hạ tầng,
+  trước khi chạm tới code. Lớp 2 vì thế chắc hơn dự kiến ban đầu.
+
+  Cảnh báo còn nguyên giá trị cho tương lai: đặt thêm một lớp trung chuyển ở
+  trước (Cloudflare) hoặc chuyển sang tự host là con số này sai, và **sai theo
+  kiểu không báo lỗi gì**. Phải đo lại, sửa ở `TRUSTED_PROXY_HOPS`.
 - Vai chủ bàn, chuyển quyền chủ bàn.
 - Màn chờ duyệt của khách; màn hỏi duyệt kèm bối cảnh số khách ở cả máy chủ bàn
   lẫn máy nhân viên.
