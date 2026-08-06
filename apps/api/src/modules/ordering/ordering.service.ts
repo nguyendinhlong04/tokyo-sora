@@ -487,6 +487,7 @@ export class OrderingService {
         channel: order.channel as OrderChannel,
         context,
         slotAt: order.slotAt,
+        slotMode: order.slotMode as 'asap' | 'scheduled' | null,
       },
       lines: drafts,
       catalog: (id) => {

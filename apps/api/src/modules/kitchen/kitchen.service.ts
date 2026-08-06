@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { rooms } from '@sora/contracts'
-import { and, asc, eq, gte, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, isNotNull, lte, or, sql } from 'drizzle-orm'
 import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
@@ -40,6 +40,8 @@ export class KitchenService {
   async queue(branchId: string, stationId: string) {
     const [station] = await this.db.select().from(stations).where(eq(stations.id, stationId))
     if (!station) throw new NotFoundException(`Không có trạm ${stationId}`)
+
+    await this.fireDueScheduledTickets(branchId)
 
     /**
      * Vé đã Xong nán lại đúng cửa sổ hoàn tác rồi tự rời màn (§22 K2: "Xong +
@@ -104,10 +106,74 @@ export class KitchenService {
   }
 
   /**
+   * Đơn hẹn giờ tới lúc phải nấu thì tự vào hàng.
+   *
+   * API chạy serverless nên KHÔNG có tiến trình nền để cắm cron vào — một
+   * `@Cron` ở đây sẽ chỉ chạy khi tình cờ có request, tức là không bao giờ đáng
+   * tin. Thay vào đó lấy chính màn bếp làm nhịp: nó hỏi hàng vé mỗi 5 giây, và
+   * mỗi lần hỏi là một lần kiểm. Không màn nào mở thì cũng không ai đứng bếp,
+   * nên quãng đó không mất gì — vé quá hạn vào hàng ngay lần hỏi đầu tiên.
+   *
+   * Quét theo CHI NHÁNH chứ không theo trạm đang hỏi: chỉ cần một màn bất kỳ còn
+   * mở là vé của mọi trạm đều được thả đúng giờ.
+   */
+  private async fireDueScheduledTickets(branchId: string) {
+    const now = new Date()
+    const due = await this.db
+      .select()
+      .from(tickets)
+      .where(
+        and(
+          eq(tickets.branchId, branchId),
+          eq(tickets.state, 'waiting'),
+          isNotNull(tickets.startBy),
+          lte(tickets.startBy, now),
+        ),
+      )
+    if (due.length === 0) return
+
+    await this.db.transaction(async (tx) => {
+      for (const ticket of due) {
+        /**
+         * `state = 'waiting'` lặp lại trong WHERE là chốt chống đua: hai màn bếp
+         * hỏi cùng lúc thì chỉ lượt đầu đổi được trạng thái, lượt sau không ăn
+         * dòng nào và bỏ qua — nếu không, vé bị đặt lại `queuedAt` mỗi 5 giây và
+         * đồng hồ đứng im ở 00:00 mãi mãi.
+         */
+        const updated = await tx
+          .update(tickets)
+          .set({
+            state: 'queued',
+            queuedAt: now,
+            dueAt: new Date(now.getTime() + ticket.prepSeconds * 1000),
+          })
+          .where(and(eq(tickets.id, ticket.id), eq(tickets.state, 'waiting')))
+          .returning({ id: tickets.id })
+        if (updated.length === 0) continue
+
+        await emit(tx, {
+          branchId,
+          topic: 'ticket.created',
+          rooms: [rooms.station(branchId, ticket.stationId), rooms.expo(branchId)],
+          payload: {
+            ticketId: ticket.id,
+            displayCode: ticket.displayCode,
+            station: ticket.stationId,
+            state: 'queued',
+            batchNo: ticket.batchNo,
+          },
+        })
+      }
+    })
+  }
+
+  /**
    * K6 Expo: gom theo đơn và đợt, biết còn chờ trạm nào.
    * Món đa trạm (chung `linkGroup`) chỉ tính là xong khi CẢ NHÓM xong.
    */
   async expo(branchId: string) {
+    await this.fireDueScheduledTickets(branchId)
+
     const rows = await this.db
       .select()
       .from(tickets)

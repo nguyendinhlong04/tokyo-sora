@@ -49,8 +49,16 @@ export interface OrderForTicket {
   orderNumber: string
   channel: OrderChannel
   context: ServiceContext
-  /** Giờ hẹn của đơn online (asap ⇒ null) */
+  /** Khung giờ của đơn online — đơn `asap` cũng được gán một khung, xem `slotMode` */
   slotAt?: Date | null
+  /**
+   * `scheduled` = khách tự chọn giờ; `asap` = nhận sớm nhất có thể.
+   *
+   * Phải phân biệt, vì đơn `asap` VẪN mang `slotAt` (khung sớm nhất còn mở, cách
+   * hiện tại đúng `online.leadMinutes`). Chỉ nhìn `slotAt` thì đơn "nhận ngay"
+   * cũng bị giữ lại chờ tới giờ — đúng chữ nhưng sai việc.
+   */
+  slotMode?: 'asap' | 'scheduled' | null
 }
 
 export interface TicketingParams extends RoutingParams {
@@ -226,8 +234,23 @@ export function buildTickets(input: BuildTicketsInput): DraftTicket[] {
   const tickets: DraftTicket[] = []
   for (const bucket of groups.values()) {
     const first = bucket[0]!
-    const fired = firedBatches.has(first.batchNo)
     const prepSeconds = Math.max(...bucket.map((p) => p.prepSeconds))
+    const startBy = startByOf(order, prepSeconds, params)
+
+    /**
+     * Đơn HẸN GIỜ chưa tới mốc phải nấu thì CHƯA vào hàng, dù đợt đã ra.
+     *
+     * Đơn hẹn 19h30 mà xác nhận lúc 14h: fire ngay thì đồng hồ vé chạy từ 14h và
+     * tới 15h nó đã đỏ như vé trễ một tiếng, trước cả khi ai đó chạm vào. Vé nằm
+     * ở K4 "Chờ ra" đếm ngược tới `startBy`, rồi tự vào hàng đúng lúc — xem
+     * `KitchenService.fireDueScheduledTickets`.
+     *
+     * CHỈ đơn `scheduled`. Đơn `asap` cũng có `startBy` (vì cũng được gán khung
+     * giờ), nhưng khách bấm "nhận ngay" là muốn bếp làm ngay — giữ nó lại nửa
+     * tiếng chờ khung là biến đơn nhanh thành đơn hẹn.
+     */
+    const notYetDue = order.slotMode === 'scheduled' && startBy !== null && startBy > now
+    const fired = firedBatches.has(first.batchNo) && !notYetDue
     const queuedAt = fired ? now : null
 
     tickets.push({
@@ -242,7 +265,7 @@ export function buildTickets(input: BuildTicketsInput): DraftTicket[] {
       prepSeconds,
       queuedAt,
       dueAt: queuedAt ? addSeconds(queuedAt, prepSeconds) : null,
-      startBy: startByOf(order, prepSeconds, params),
+      startBy,
       items: bucket.map((p) => p.item),
     })
   }

@@ -253,6 +253,63 @@ describe('Đơn online', () => {
     })
     expect(asap[0]!.startBy).toBeNull()
   })
+
+  it('đơn hẹn giờ chưa tới mốc phải nấu thì vé CHƯA vào hàng — đồng hồ chưa chạy', () => {
+    // Hẹn 20:00, phải bắt đầu 19:43, mà bây giờ mới 19:00
+    const tickets = build({
+      order: {
+        orderNumber: '2845',
+        channel: 'web',
+        context: { kind: 'takeaway' },
+        slotMode: 'scheduled',
+        slotAt: new Date('2026-08-01T20:00:00+07:00'),
+      },
+      lines: [line({ dishId: 'yakitori' })],
+    })
+    expect(tickets[0]).toMatchObject({ state: 'waiting', queuedAt: null, dueAt: null })
+  })
+
+  it('đơn hẹn giờ đã qua mốc phải nấu thì vào hàng ngay, không bắt chờ', () => {
+    // Hẹn 19:10 ⇒ phải bắt đầu 18:53, đã trôi qua so với 19:00
+    const tickets = build({
+      order: {
+        orderNumber: '2846',
+        channel: 'web',
+        context: { kind: 'takeaway' },
+        slotMode: 'scheduled',
+        slotAt: new Date('2026-08-01T19:10:00+07:00'),
+      },
+      lines: [line({ dishId: 'yakitori' })],
+    })
+    expect(tickets[0]).toMatchObject({ state: 'queued', queuedAt: NOW })
+  })
+
+  /**
+   * Chốt chặn hồi quy: đơn `asap` CŨNG được gán `slotAt` (khung sớm nhất còn mở,
+   * cách hiện tại `online.leadMinutes` — mặc định 30 phút), nên nó cũng có
+   * `startBy` nằm ở tương lai. Nếu chỉ nhìn `startBy` mà giữ vé lại thì mọi đơn
+   * "nhận ngay" đều nằm im ở K4 khoảng mười lăm phút trước khi bếp thấy.
+   */
+  it('đơn nhận ngay xuống bếp luôn, dù khung giờ của nó nằm ở tương lai', () => {
+    const tickets = build({
+      order: {
+        orderNumber: '2847',
+        channel: 'web',
+        context: { kind: 'takeaway' },
+        slotMode: 'asap',
+        slotAt: new Date('2026-08-01T19:30:00+07:00'),
+      },
+      lines: [line({ dishId: 'yakitori' })],
+    })
+    expect(tickets[0]).toMatchObject({ state: 'queued', queuedAt: NOW })
+    // Mốc vẫn được tính và gửi xuống KDS, chỉ là không dùng để giữ vé lại
+    expect(tickets[0]!.startBy).toEqual(new Date('2026-08-01T19:13:00+07:00'))
+  })
+
+  it('đơn tại bàn không bị mốc hẹn giờ chạm tới', () => {
+    const tickets = build({ lines: [line({ dishId: 'yakitori', batchNo: 1 })] })
+    expect(tickets[0]).toMatchObject({ state: 'queued', queuedAt: NOW, startBy: null })
+  })
 })
 
 describe('Bảo vệ dữ liệu hỏng', () => {
