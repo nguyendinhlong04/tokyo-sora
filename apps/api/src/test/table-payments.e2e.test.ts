@@ -10,10 +10,12 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { IDEMPOTENCY_HEADER } from '@sora/contracts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
+import { ParamsService } from '../common/params.service'
 import {
   bankEvents,
   devices,
   journalEntries,
+  parameters,
   payments,
   tableFeedback,
   ticketItems,
@@ -34,10 +36,28 @@ let cashier: string
 let sessionId: number
 /** Bàn bên cạnh — dùng để chứng minh token bàn này không mở được bàn kia */
 let otherSession: number
-let tableToken: string
-/** Cookie phiên bàn của "điện thoại" khách */
+/** Cookie của "điện thoại" khách — hai máy KHÁC NHAU, không dùng chung token */
 let phoneA: string
 let phoneB: string
+
+/** Địa chỉ giả lập máy đang bắt Wi-Fi của quán; khai vào tham số ở beforeAll */
+const TRONG_QUAN = '203.0.113.10'
+
+/** Mã bàn mà harness dựng sẵn */
+const GRILL_TABLE_CODE = 'A4'
+const SPARE_TABLE_CODE = 'A9'
+
+/** Khách quét mã dán bàn từ một địa chỉ mạng cho trước */
+const joinTable = (ip: string) =>
+  inject({
+    method: 'POST',
+    url: '/api/table-devices/join',
+    headers: { 'x-forwarded-for': ip },
+    payload: { branchId: fx.branchId, tableCode: GRILL_TABLE_CODE },
+  })
+
+const cookieOf = (res: { cookies: { name: string; value: string }[] }) =>
+  res.cookies.map((c) => `${c.name}=${c.value}`).join('; ')
 
 const inject = (opts: Parameters<NestFastifyApplication['inject']>[0]) => app.inject(opts)
 const staffAuth = () => ({ authorization: `Bearer ${cashier}`, [DEVICE_HEADER]: SEED_DEVICE })
@@ -95,6 +115,20 @@ beforeAll(async () => {
       payload: { guestCount: 4 },
     })
   ).json<{ id: number }>().id
+
+  /**
+   * Khai đường mạng của quán, rồi NẠP LẠI tham số.
+   *
+   * ParamsService giữ cache trong tiến trình và chỉ nạp lại khi có sự kiện đổi
+   * tham số — ghi thẳng vào CSDL sau khi app đã chạy thì nó không thấy, và mọi
+   * máy sẽ rơi vào hàng chờ duyệt. Sai kiểu này rất khó lần vì không có lỗi nào.
+   */
+  await db.insert(parameters).values({
+    key: 'table.branchNetworks',
+    branchId: fx.branchId,
+    value: TRONG_QUAN,
+  })
+  await app.get(ParamsService).reload()
 }, 120_000)
 
 afterAll(async () => {
@@ -103,50 +137,57 @@ afterAll(async () => {
 
 // ---------------------------------------------------------------------------
 
-describe('1. Quét QR vào bàn (T1)', () => {
-  it('POS in được mã QR cho bàn đang mở', async () => {
-    const res = await inject({
-      method: 'POST',
-      url: `/api/table-sessions/${sessionId}/qr-token`,
-      headers: staffAuth(),
-    })
+describe('1. Quét mã QR dán bàn (T1)', () => {
+  it('máy đang ở trong quán vào thẳng, thành chủ bàn', async () => {
+    const res = await joinTable(TRONG_QUAN)
     expect(res.statusCode).toBe(201)
-    const body = res.json<{ token: string; url: string }>()
-    tableToken = body.token
-    expect(body.url).toBe(`/t/${body.token}`)
-  })
-
-  it('CSDL chỉ giữ bản băm, không giữ token', async () => {
-    const row = await db.query.tableSessions.findFirst({
-      where: (s, { eq }) => eq(s.id, sessionId),
-    })
-    expect(row!.qrTokenHash).toBe(hashToken(tableToken))
-    expect(row!.qrTokenHash).not.toBe(tableToken)
-  })
-
-  it('đổi token lấy cookie httpOnly — token không còn phải nằm trong URL', async () => {
-    const res = await inject({
-      method: 'POST',
-      url: '/api/table-sessions/exchange',
-      payload: { token: tableToken },
-    })
-    expect(res.statusCode).toBe(201)
-    expect(res.json<{ sessionId: number }>().sessionId).toBe(sessionId)
+    const body = res.json<{ state: string; isHost: boolean; sessionId: number }>()
+    expect(body.state).toBe('admitted')
+    expect(body.isHost).toBe(true)
+    expect(body.sessionId).toBe(sessionId)
 
     const cookie = String(res.headers['set-cookie'])
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Strict')
-    phoneA = `sora_table=${tableToken}`
-    phoneB = phoneA
+    phoneA = cookieOf(res)
   })
 
-  it('token sai bị từ chối', async () => {
+  it('CSDL chỉ giữ bản băm của máy, không giữ token', async () => {
+    const rows = await db.query.tableDevices.findMany({
+      where: (d, { eq }) => eq(d.tableSessionId, sessionId),
+    })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.tokenHash).toHaveLength(64) // SHA-256 dạng hex
+    expect(phoneA).not.toContain(rows[0]!.tokenHash)
+  })
+
+  it('điện thoại thứ hai cùng bàn cũng vào được, nhưng không là chủ bàn', async () => {
+    const res = await joinTable(TRONG_QUAN)
+    const body = res.json<{ state: string; isHost: boolean }>()
+    expect(body.state).toBe('admitted')
+    expect(body.isHost).toBe(false)
+    phoneB = cookieOf(res)
+  })
+
+  /**
+   * Đây là lớp bảo vệ chính của luồng mới: mã QR dán bàn ai chụp cũng được, nên
+   * thứ chặn người ở nhà là việc họ KHÔNG đi ra internet qua đường mạng của quán.
+   */
+  it('máy ở ngoài quán chỉ được xếp hàng chờ duyệt', async () => {
+    const res = await joinTable('198.51.100.7')
+    const body = res.json<{ state: string; isHost: boolean }>()
+    expect(body.state).toBe('waiting')
+    expect(body.isHost).toBe(false)
+  })
+
+  it('quét mã của bàn chưa mở thì không mở ra gì cả', async () => {
     const res = await inject({
       method: 'POST',
-      url: '/api/table-sessions/exchange',
-      payload: { token: 'khong-phai-token-that' },
+      url: '/api/table-devices/join',
+      headers: { 'x-forwarded-for': TRONG_QUAN },
+      payload: { branchId: fx.branchId, tableCode: 'KHONG-CO-BAN-NAY' },
     })
-    expect(res.statusCode).toBe(401)
+    expect(res.statusCode).toBe(404)
   })
 
   it('khách chốt lại số khách của bàn mình', async () => {
@@ -536,14 +577,15 @@ describe('5. Chỉ ngân hàng mới đổi trạng thái đã trả (T13 · T14
     expect(opened.statusCode, opened.payload).toBe(201)
     qrSession = opened.json<{ id: number }>().id
 
-    const qrToken = (
-      await inject({
-        method: 'POST',
-        url: `/api/table-sessions/${qrSession}/qr-token`,
-        headers: staffAuth(),
-      })
-    ).json<{ token: string }>().token
-    qrCookie = `sora_table=${qrToken}`
+    const joined = await inject({
+      method: 'POST',
+      url: '/api/table-devices/join',
+      headers: { 'x-forwarded-for': TRONG_QUAN },
+      payload: { branchId: fx.branchId, tableCode: SPARE_TABLE_CODE },
+    })
+    expect(joined.statusCode, joined.payload).toBe(201)
+    expect(joined.json<{ state: string }>().state).toBe('admitted')
+    qrCookie = cookieOf(joined)
 
     await inject({
       method: 'POST',
@@ -792,12 +834,8 @@ describe('7. Đóng bàn thì token QR chết theo (§8)', () => {
     expect(res.statusCode).toBe(401)
   })
 
-  it('đổi lại token cũ cũng bị từ chối', async () => {
-    const res = await inject({
-      method: 'POST',
-      url: '/api/table-sessions/exchange',
-      payload: { token: tableToken },
-    })
-    expect(res.statusCode).toBe(401)
+  it('quét lại mã dán bàn cũng không vào được nữa — bàn đã đóng', async () => {
+    const res = await joinTable(TRONG_QUAN)
+    expect(res.statusCode).toBe(404)
   })
 })

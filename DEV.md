@@ -35,6 +35,16 @@ hành lại bundle** thì app mới thấy — `db:dev-bootstrap` ở cuối tra
 - `DATABASE_MIGRATION_URL` — superuser, vì `CREATE EVENT TRIGGER` cần quyền cao
 - `TEST_DATABASE_URL` — database `sora_test` riêng cho test tích hợp
 
+Chưa có Postgres trên máy thì dựng một cái bằng Docker, đủ để chạy toàn bộ test
+tích hợp — **KHÔNG trỏ `TEST_DATABASE_URL` vào CSDL thật**, mỗi lần chạy test là
+nó `DROP SCHEMA public CASCADE`:
+
+```bash
+docker run -d --name sora-test-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=sora_test -p 55432:5432 postgres:16-alpine
+```
+
+Rồi khai `TEST_DATABASE_URL=postgres://postgres:test@localhost:55432/sora_test`.
+
 Phân quyền role chạy một lần cho mỗi môi trường:
 
 ```bash
