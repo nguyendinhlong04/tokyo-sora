@@ -143,12 +143,28 @@
   --hit-target: 52px;
 }
 [data-scale='kds'] {
-  --hit-target: 64px;
-  --fs-ticket-dish: 24px;
-  --fs-ticket-qty: 30px;
-  --fs-clock: 40px;
-  --ticket-row-min: 56px;
-  --ticket-action-h: 72px;
+  /*
+    Hệ số cỡ chữ của RIÊNG màn này, người đứng trước nó chỉnh bằng nút A−/A+ ở
+    đầu màn và nhớ theo thiết bị.
+
+    Media query bên dưới đoán được cỡ hợp lý cho phần lớn màn, nhưng TV treo
+    tường nhìn từ 3 mét và laptop đặt trước mặt không bao giờ chung một cỡ — và
+    cùng một quán thường có cả hai. Chốt cuối phải để cho người nhìn nó quyết.
+  */
+  --kds-zoom: 1;
+
+  --hit-target: calc(64px * var(--kds-zoom));
+  --fs-t1: calc(22px * var(--kds-zoom));
+  --fs-t2: calc(18px * var(--kds-zoom));
+  --fs-b1: calc(16px * var(--kds-zoom));
+  --fs-b2: calc(14px * var(--kds-zoom));
+  --fs-c1: calc(13px * var(--kds-zoom));
+  --fs-c2: calc(11px * var(--kds-zoom));
+  --fs-ticket-dish: calc(24px * var(--kds-zoom));
+  --fs-ticket-qty: calc(30px * var(--kds-zoom));
+  --fs-clock: calc(40px * var(--kds-zoom));
+  --ticket-row-min: calc(56px * var(--kds-zoom));
+  --ticket-action-h: calc(72px * var(--kds-zoom));
 }
 
 /*
@@ -165,12 +181,17 @@
 */
 @media (max-height: 1000px) {
   [data-scale='kds'] {
-    --hit-target: 52px;
-    --fs-ticket-dish: 19px;
-    --fs-ticket-qty: 24px;
-    --fs-clock: 32px;
-    --ticket-row-min: 44px;
-    --ticket-action-h: 56px;
+    --hit-target: calc(52px * var(--kds-zoom));
+    --fs-t1: calc(18px * var(--kds-zoom));
+    --fs-t2: calc(16px * var(--kds-zoom));
+    --fs-b1: calc(15px * var(--kds-zoom));
+    --fs-b2: calc(13px * var(--kds-zoom));
+    --fs-c1: calc(12px * var(--kds-zoom));
+    --fs-ticket-dish: calc(19px * var(--kds-zoom));
+    --fs-ticket-qty: calc(24px * var(--kds-zoom));
+    --fs-clock: calc(32px * var(--kds-zoom));
+    --ticket-row-min: calc(44px * var(--kds-zoom));
+    --ticket-action-h: calc(56px * var(--kds-zoom));
   }
 }
 

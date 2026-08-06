@@ -152,6 +152,7 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
               Có bản mới — cập nhật khi hết vé
             </span>
           ) : null}
+          <ZoomControl />
           <Button
             variant="ghost"
             onClick={() => {
@@ -185,6 +186,79 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
         {screen === 'expo' ? <Expo /> : null}
       </div>
     </main>
+  )
+}
+
+/**
+ * Chỉnh cỡ chữ của riêng màn này.
+ *
+ * Thang chữ tự hạ theo chiều cao màn (xem tokens.css), nhưng đó vẫn là phỏng
+ * đoán: cùng một quán có TV treo tường nhìn từ ba mét và laptop đặt trước mặt,
+ * và không cỡ nào đúng cho cả hai. Nấc chỉnh nhớ theo THIẾT BỊ nên mỗi màn giữ
+ * cỡ của nó, không phải chỉnh lại mỗi ca.
+ */
+const ZOOM_KEY = 'sora.kds.zoom'
+const ZOOM_STEPS = [0.7, 0.8, 0.9, 1, 1.15]
+
+function useKdsZoom() {
+  const [zoom, setZoom] = useState(() => {
+    const saved = Number(localStorage.getItem(ZOOM_KEY))
+    return ZOOM_STEPS.includes(saved) ? saved : 1
+  })
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--kds-zoom', String(zoom))
+    try {
+      localStorage.setItem(ZOOM_KEY, String(zoom))
+    } catch {
+      // Trình duyệt chặn lưu trữ — cỡ vẫn áp cho phiên này
+    }
+  }, [zoom])
+
+  const at = ZOOM_STEPS.indexOf(zoom)
+  return {
+    zoom,
+    canShrink: at > 0,
+    canGrow: at < ZOOM_STEPS.length - 1,
+    step: (dir: -1 | 1) => setZoom((current) => {
+      const next = ZOOM_STEPS.indexOf(current) + dir
+      return ZOOM_STEPS[next] ?? current
+    }),
+  }
+}
+
+function ZoomControl() {
+  const { zoom, canShrink, canGrow, step } = useKdsZoom()
+
+  // Kích thước CỐ ĐỊNH, không đi theo `--hit-target`: hạ cỡ xuống nấc nhỏ nhất
+  // mà chính hai nút này cũng teo lại thì không còn gì để bấm quay lại.
+  const button =
+    'h-9 w-9 rounded-sm border border-line-3 text-[16px] text-ink-mute disabled:opacity-35'
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        aria-label="Giảm cỡ chữ"
+        disabled={!canShrink}
+        onClick={() => step(-1)}
+        className={button}
+      >
+        A−
+      </button>
+      <span className="w-10 text-center font-mono text-[13px] text-ink-mute tabular-nums">
+        {Math.round(zoom * 100)}%
+      </span>
+      <button
+        type="button"
+        aria-label="Tăng cỡ chữ"
+        disabled={!canGrow}
+        onClick={() => step(1)}
+        className={button}
+      >
+        A+
+      </button>
+    </div>
   )
 }
 
