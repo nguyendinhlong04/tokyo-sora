@@ -71,6 +71,15 @@ psql "<direct-url>" -v app_password="<mật khẩu role app>" -f deploy/db-roles
 > được `audit_log`, `journal_entries`. Khuyến nghị tạo `sora_app` và dùng nó cho
 > `DATABASE_URL`.
 
+> **Vùng của Supabase phải trùng vùng chạy hàm trên Vercel.** `apps/api/vercel.json`
+> đang ghim `"regions": ["sin1"]` (Singapore). Chọn Supabase ở vùng khác mà quên
+> sửa dòng đó là mỗi câu truy vấn phải đi vòng nửa vòng trái đất.
+>
+> Đo trên bản chạy thật khi CHƯA ghim vùng (hàm ở Washington, CSDL ở châu Á):
+> đường không chạm CSDL mất 0,4s, đường có chạm CSDL mất 1,0s — riêng khoảng cách
+> ăn 600ms mỗi lượt gọi. Màn thực đơn gọi bốn lượt liên tiếp nên khách chờ hơn ba
+> giây, và **không có lỗi nào báo ra**.
+
 ## Bước 2 — Vercel
 
 Tám project, mỗi project một thư mục gốc. Tách origin là có chủ ý: giao diện quản

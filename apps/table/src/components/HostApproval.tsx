@@ -43,8 +43,8 @@ export function HostApproval() {
     queryKey: ['pending-devices'],
     queryFn: () => api.pending(),
     enabled: isHost,
-    // Hỏi lại vài giây một lần — người xin vào đang đứng chờ, đừng bắt họ đợi lâu
-    refetchInterval: 4_000,
+    // Người xin vào đang đứng chờ trước mặt — hai giây là ngưỡng còn thấy tự nhiên
+    refetchInterval: 2_000,
     retry: false,
   })
 

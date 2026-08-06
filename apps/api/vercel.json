@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "regions": ["sin1"],
   "buildCommand": "pnpm --filter @sora/contracts build && pnpm --filter @sora/api build",
   "installCommand": "pnpm install --frozen-lockfile",
   "outputDirectory": "dist",

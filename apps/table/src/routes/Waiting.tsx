@@ -27,7 +27,12 @@ export function Waiting() {
   const state = useQuery({
     queryKey: ['device-state'],
     queryFn: () => api.deviceState(),
-    refetchInterval: 3_000,
+    /**
+     * Một giây — đây là màn DUY NHẤT có người đang đứng nhìn nó chờ, nên nhịp
+     * hỏi ở đây quyết định cảm giác "bấm xong thì máy kia vào ngay" hay "một lúc
+     * sau mới thấy". Câu hỏi rất nhẹ (một dòng CSDL) và chỉ sống vài chục giây.
+     */
+    refetchInterval: 1_000,
     retry: false,
   })
 
