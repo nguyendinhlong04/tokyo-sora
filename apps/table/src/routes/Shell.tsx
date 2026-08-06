@@ -35,7 +35,7 @@ export function useOutbox(): OutboxState {
  * phép xảy ra.
  */
 export function Shell() {
-  const { session, ready } = useTable()
+  const { session, ready, ended } = useTable()
   const [calling, setCalling] = useState(false)
   const openCallStaff = useCallback(() => setCalling(true), [])
   const outbox = useOutbox()
@@ -57,7 +57,7 @@ export function Shell() {
     )
   }
 
-  if (!session) return <ScanAgain />
+  if (!session) return <ScanAgain ended={ended} />
 
   const liveLines = (order.data?.lines ?? []).filter(
     (l) => l.state !== 'voided' && l.parentLineId === null,
@@ -142,21 +142,30 @@ function IconButton({
   )
 }
 
-/** Không có token bàn hợp lệ — nói rõ phải làm gì, đừng bỏ khách ở màn trắng (§13) */
-function ScanAgain() {
+/**
+ * Không còn phiên bàn — nói rõ phải làm gì, đừng bỏ khách ở màn trắng (§13).
+ *
+ * Hai lời khác hẳn nhau cho hai tình huống. Người vừa trả tiền xong mà bị mời
+ * "quét lại mã để bắt đầu" thì thấy như bị đuổi khéo; còn người mới mở app mà
+ * đọc lời cảm ơn thì không hiểu chuyện gì.
+ */
+function ScanAgain({ ended }: { ended: boolean }) {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-canvas px-8 text-center">
-      <span className="font-jp text-[56px] leading-none text-gold-900">空</span>
+      <span className="font-jp text-[56px] leading-none text-gold-900">{ended ? '謝' : '空'}</span>
       <p className="text-[length:var(--fs-t2)] font-medium text-ink-hi">
-        Chưa vào được bàn nào.
+        {ended ? 'Cảm ơn quý khách.' : 'Chưa vào được bàn nào.'}
       </p>
       <p className="text-[length:var(--fs-b1)] text-ink-body">
-        Quét lại mã QR dán trên bàn để bắt đầu. Nếu bàn vừa được dọn, nhờ nhân viên in mã mới giúp
-        bạn.
+        {ended
+          ? 'Bàn đã được dọn và bữa ăn kết thúc. Hẹn gặp lại quý khách ở Tokyo Sora.'
+          : 'Quét mã QR dán trên bàn để bắt đầu. Nếu quét rồi mà vẫn thấy màn này, nhờ nhân viên mở bàn giúp bạn.'}
       </p>
-      <Button size="lg" onClick={() => window.location.reload()}>
-        Thử lại
-      </Button>
+      {ended ? null : (
+        <Button size="lg" onClick={() => window.location.reload()}>
+          Thử lại
+        </Button>
+      )}
     </main>
   )
 }
