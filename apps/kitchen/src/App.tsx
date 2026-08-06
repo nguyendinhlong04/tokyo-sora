@@ -1,5 +1,5 @@
 import { ApiError, calibrate, clearDevice, getDeviceToken, watchConnectivity } from '@sora/core'
-import { Button, OutboxBanner, ToastProvider } from '@sora/ui'
+import { Button, ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { api } from './api'
@@ -152,7 +152,6 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
               Có bản mới — cập nhật khi hết vé
             </span>
           ) : null}
-          <OutboxBanner />
           <Button
             variant="ghost"
             onClick={() => {

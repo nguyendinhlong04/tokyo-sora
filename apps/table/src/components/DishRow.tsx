@@ -12,6 +12,7 @@ export function DishRow({
   dish,
   soldOut,
   needsChoice = false,
+  qty = 0,
   onOpen,
   onAdd,
 }: {
@@ -19,6 +20,8 @@ export function DishRow({
   soldOut: boolean
   /** Món phải chọn vị / số người ăn — chấm vàng báo trước rằng nút + sẽ mở chi tiết */
   needsChoice?: boolean
+  /** Đã có mấy phần món này trong giỏ — 0 thì không hiện gì */
+  qty?: number
   onOpen: () => void
   onAdd: () => void
 }) {
@@ -58,7 +61,22 @@ export function DishRow({
         onClick={onAdd}
         className="relative h-[var(--hit-target)] w-[var(--hit-target)] flex-none rounded-sm border border-accent text-[length:var(--fs-t1)] text-accent-ink disabled:border-line-4 disabled:text-ink-mute"
       >
-        {needsChoice && !soldOut ? (
+        {/*
+          Số phần đã có trong giỏ, gắn thẳng lên nút thêm.
+
+          KHÔNG đặt nó xuống hàng giá bên trái: hàng đó `flex-wrap` nằm trong dòng
+          cao cố định 104px, và đo thật cho thấy chỉ cần thêm một huy hiệu là món
+          tên dài (hoặc món vừa hết vừa có trong giỏ) bị đẩy xuống dòng thứ hai
+          rồi tràn ra ngoài dòng.
+
+          Có số thì số thay chỗ chấm vàng: chấm chỉ là lời báo trước rằng bấm +
+          sẽ mở màn chọn kiểu, mà khách đã chọn món này rồi thì họ biết điều đó.
+        */}
+        {qty > 0 ? (
+          <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-pill bg-accent-strong px-1 font-mono text-[length:var(--fs-c2)] font-semibold text-on-accent">
+            {qty}
+          </span>
+        ) : needsChoice && !soldOut ? (
           <span className="absolute -top-1 -right-1 h-2 w-2 rounded-pill bg-accent" />
         ) : null}
         +

@@ -47,7 +47,8 @@ export interface OrderTicketProps {
  * Vé bếp trên màn KDS.
  *
  * Cỡ chữ bám thang KDS ×1.25 (tên món 24 · số lượng 30 · đồng hồ 40 mono) và nút
- * cao 72px — bếp đeo găng, hơi nước, tay ướt.
+ * cao 72px — bếp đeo găng, hơi nước, tay ướt. Trên màn thấp cả thang này hạ
+ * xuống một nấc, xem `@media (max-height: 900px)` trong tokens.css.
  *
  * Ghi chú của khách dùng màu kohaku và KHÔNG BAO GIỜ bị ẩn (§22).
  */
@@ -107,13 +108,14 @@ export function OrderTicket({
           <li
             key={item.id}
             /*
-              Cả dòng là một đích chạm, cao tối thiểu 56px — bếp đeo găng, tay
-              ướt. Món đang làm viền vàng, món xong mờ đi và gạch ngang: liếc một
-              cái là biết còn gì phải nấu.
+              Cả dòng là một đích chạm — bếp đeo găng, tay ướt. Chiều cao tối
+              thiểu theo `--ticket-row-min`: 56px trên TV treo tường, 44px trên
+              màn thấp (xem tokens.css). Món đang làm viền vàng, món xong mờ đi
+              và gạch ngang: liếc một cái là biết còn gì phải nấu.
             */
             onClick={onItemTap ? () => onItemTap(item) : undefined}
             className={[
-              'flex min-h-[56px] items-start gap-3 rounded-sm px-2 py-2',
+              'flex min-h-[var(--ticket-row-min)] items-start gap-3 rounded-sm px-2 py-2',
               onItemTap ? 'cursor-pointer active:bg-surface-3' : '',
               item.state === 'cooking' ? 'bg-accent/10 ring-1 ring-accent' : '',
               item.state === 'done' ? 'opacity-45' : '',
@@ -176,7 +178,7 @@ export function OrderTicket({
             <button
               type="button"
               onClick={onStart}
-              className="h-[72px] flex-1 rounded-bl-md bg-surface-3 text-[length:var(--fs-t2)] font-semibold text-ink-hi active:bg-surface-4"
+              className="h-[var(--ticket-action-h)] flex-1 rounded-bl-md bg-surface-3 text-[length:var(--fs-t2)] font-semibold text-ink-hi active:bg-surface-4"
             >
               Bắt đầu cả vé{items.length > 1 ? ` · ${items.length} món` : ''}
             </button>
@@ -185,7 +187,7 @@ export function OrderTicket({
             <button
               type="button"
               onClick={onDone}
-              className="h-[72px] flex-1 rounded-b-md bg-accent-strong text-[length:var(--fs-t2)] font-semibold text-on-accent active:brightness-110"
+              className="h-[var(--ticket-action-h)] flex-1 rounded-b-md bg-accent-strong text-[length:var(--fs-t2)] font-semibold text-on-accent active:brightness-110"
             >
               Xong cả vé{items.length > 1 ? ` · ${items.length} món` : ''}
             </button>
@@ -194,13 +196,13 @@ export function OrderTicket({
             <button
               type="button"
               onClick={onUndo}
-              className="h-[72px] flex-1 rounded-b-md bg-surface-3 text-[length:var(--fs-t2)] font-semibold text-warn active:bg-surface-4"
+              className="h-[var(--ticket-action-h)] flex-1 rounded-b-md bg-surface-3 text-[length:var(--fs-t2)] font-semibold text-warn active:bg-surface-4"
             >
               Hoàn tác cả vé
             </button>
           ) : null}
           {state === 'ready' && !onUndo ? (
-            <div className="flex h-[72px] flex-1 items-center justify-center text-[length:var(--fs-t2)] text-ok">
+            <div className="flex h-[var(--ticket-action-h)] flex-1 items-center justify-center text-[length:var(--fs-t2)] text-ok">
               Đã xong
             </div>
           ) : null}

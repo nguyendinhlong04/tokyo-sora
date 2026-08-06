@@ -24,6 +24,13 @@ interface CartValue {
   count: number
   total: number
   add: (item: Omit<CartItem, 'qty'> & { qty?: number }) => void
+  /**
+   * Tổng số phần của MỘT món trong giỏ, gộp mọi dòng của nó.
+   *
+   * Một món nằm ở nhiều dòng khi khách dặn khác nhau (một chấm muối, một chấm
+   * miso). Đứng ở màn thực đơn thì khách chỉ cần biết đã chọn tất cả mấy phần.
+   */
+  qtyOf: (dishId: string) => number
   setQty: (index: number, qty: number) => void
   remove: (index: number) => void
   clear: () => void
@@ -88,11 +95,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  // Gộp sẵn theo món: màn thực đơn tra con số này cho từng dòng trong danh sách
+  // dài (78 món), nên không để nó quét lại cả giỏ ở mỗi dòng.
+  const qtyByDish = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const line of items) map.set(line.dishId, (map.get(line.dishId) ?? 0) + line.qty)
+    return map
+  }, [items])
+
   const value = useMemo<CartValue>(
     () => ({
       items,
       count: items.reduce((sum, l) => sum + l.qty, 0),
       total: items.reduce((sum, l) => sum + l.price * l.qty, 0),
+
+      qtyOf: (dishId) => qtyByDish.get(dishId) ?? 0,
 
       add: (item) =>
         update((current) => {
@@ -134,7 +151,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           modifierOptionIds: l.options.map((o) => o.id),
         })),
     }),
-    [items, update],
+    [items, qtyByDish, update],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

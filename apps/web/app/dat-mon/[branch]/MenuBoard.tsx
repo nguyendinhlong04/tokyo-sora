@@ -14,7 +14,7 @@ import { DishSheet } from './DishSheet'
  * nằm ở thanh ghim đáy — ngón cái với tới được.
  */
 export function MenuBoard({ menu }: { menu: OnlineMenu }) {
-  const { draft, set, add, setQty, count, sub } = useOrder()
+  const { draft, set, add, setQty, qtyOf, count, sub } = useOrder()
   const [open, setOpen] = useState<OnlineDish | null>(null)
 
   // Vào thẳng /dat-mon/{chi-nhánh} từ kết quả tìm kiếm thì chưa qua O1
@@ -109,8 +109,16 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
                   aria-label={`Thêm ${dish.nameVi}`}
                   disabled={dish.soldOut}
                   onClick={() => add(dish)}
-                  className="h-11 w-11 flex-none rounded-sm border border-accent text-[length:var(--fs-t1)] text-accent-ink disabled:border-line-4 disabled:text-ink-mute"
+                  className="relative h-11 w-11 flex-none rounded-sm border border-accent text-[length:var(--fs-t1)] text-accent-ink disabled:border-line-4 disabled:text-ink-mute"
                 >
+                  {/* Đã chọn mấy phần, gắn thẳng lên nút. Không đặt xuống hàng giá:
+                      hàng đó nằm trong dòng cao cố định và món tên dài sẽ bị đẩy
+                      xuống dòng thứ hai rồi tràn ra ngoài. */}
+                  {qtyOf(dish.id) > 0 ? (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-pill bg-accent-strong px-1 font-mono text-[length:var(--fs-c2)] font-semibold text-on-accent">
+                      {qtyOf(dish.id)}
+                    </span>
+                  ) : null}
                   +
                 </button>
               </div>

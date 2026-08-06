@@ -49,6 +49,8 @@ interface OrderValue {
   count: number
   sub: number
   set: (patch: Partial<OrderDraft>) => void
+  /** Đã có mấy phần món này trong giỏ — để thực đơn nói rõ thay vì chỉ có nút + */
+  qtyOf: (dishId: string) => number
   add: (dish: OnlineDish, qty?: number, note?: string) => void
   setQty: (dishId: string, qty: number) => void
   clear: () => void
@@ -101,6 +103,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       draft,
       count: draft.lines.reduce((sum, l) => sum + l.qty, 0),
       sub: draft.lines.reduce((sum, l) => sum + l.price * l.qty, 0),
+      // Gộp mọi dòng của cùng một món: khách dặn khác nhau thì thành hai dòng,
+      // nhưng đứng ở thực đơn họ chỉ cần biết tổng đã chọn mấy phần.
+      qtyOf: (dishId) =>
+        draft.lines.reduce((sum, l) => (l.dishId === dishId ? sum + l.qty : sum), 0),
       set,
       add: (dish, qty = 1, note = '') =>
         setDraft((current) => {

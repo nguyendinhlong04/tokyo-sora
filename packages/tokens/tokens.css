@@ -74,6 +74,10 @@
   /* ---- Vùng chạm: 44 khách · 52 POS · 64 KDS ---- */
   --hit-target: 44px;
 
+  /* ---- Vé bếp: cao tối thiểu của một dòng món, và của nút ở chân vé ---- */
+  --ticket-row-min: 44px;
+  --ticket-action-h: 56px;
+
   /* ---- Thang chữ (§9) ---- */
   --fs-d1: 60px;
   --fs-d2: 44px;
@@ -143,6 +147,31 @@
   --fs-ticket-dish: 24px;
   --fs-ticket-qty: 30px;
   --fs-clock: 40px;
+  --ticket-row-min: 56px;
+  --ticket-action-h: 72px;
+}
+
+/*
+  Màn thấp: hạ thang KDS về thang cơ sở.
+
+  Thang trên dựng cho TV treo tường nhìn từ 2–3 mét. Đặt nguyên nó lên laptop thì
+  một vé ba món cao 525px — gần hết khung nội dung, và màn chỉ còn chỗ cho một
+  hàng vé. Vùng chạm hạ về mức POS 52px, vẫn trên sàn 44px cho tay đeo găng.
+
+  Ngưỡng 1000px chứ không phải 900: trình duyệt toàn màn hình trên màn 1080p chỉ
+  còn ~950px sau thanh địa chỉ và taskbar, và đó chính là cái laptop cần thu nhỏ.
+  Màn treo tường chạy PWA ở chế độ `fullscreen` (xem manifest) giữ trọn 1080px
+  nên không rơi vào đây — vẫn đọc được từ đầu kia bếp.
+*/
+@media (max-height: 1000px) {
+  [data-scale='kds'] {
+    --hit-target: 52px;
+    --fs-ticket-dish: 19px;
+    --fs-ticket-qty: 24px;
+    --fs-clock: 32px;
+    --ticket-row-min: 44px;
+    --ticket-action-h: 56px;
+  }
 }
 
 /* ============================================================
