@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router'
 import { ConfigBranchProvider } from './components/config-branch'
+import { PublishConfig } from './components/publish-config'
 import { ReportBranchProvider } from './components/report'
 import { Debts, InvoiceBook, PeriodClose, RevenueJournal, TaxReport } from './routes/Accounting'
 import { Accounts } from './routes/Accounts'
@@ -433,6 +434,10 @@ function Shell() {
             </p>
           ) : null}
         </nav>
+
+        {/* Chỉ người sửa được giá mới phát hành được — cùng khoá quyền với việc
+            đổi giá, vì phát hành chính là lúc giá mới có hiệu lực ngoài quán */}
+        {branchId && can('menu.edit-price') ? <PublishConfig branchId={branchId} /> : null}
 
         <div className="flex-none border-t border-line-1 px-5 py-4">
           <p className="truncate text-[length:var(--fs-b2)] text-ink-hi">{staff.fullName}</p>

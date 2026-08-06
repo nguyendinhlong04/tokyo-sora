@@ -41,6 +41,23 @@ export class ConfigBundleController {
     return reply.send({ version: latest.version, publishedAt: latest.publishedAt, ...(latest.payload as object) })
   }
 
+  /**
+   * Bản cấu hình hiện hành là bản nào, phát hành lúc nào.
+   *
+   * Tách khỏi `GET /api/config` vì màn Office chỉ cần hai dòng chữ, mà bản đầy
+   * đủ nặng hơn 40KB — kéo cả thực đơn về chỉ để hiện một cái mốc giờ là lãng
+   * phí, nhất là khi thanh bên hiện ở mọi màn.
+   */
+  @Get('config/version')
+  async version(@Query() query: unknown) {
+    const { branch } = BranchQuery.parse(query)
+    const latest = await this.bundles.latest(branch)
+    return {
+      version: latest?.version ?? null,
+      publishedAt: latest?.publishedAt ?? null,
+    }
+  }
+
   /** Office bấm "Lưu & phát hành" */
   @Post('office/config/publish')
   @RequirePermission('menu.edit-price')

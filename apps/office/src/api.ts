@@ -2020,6 +2020,27 @@ export const api = {
   /** Danh sách chi nhánh để chọn lúc đăng nhập — công khai, dùng chung với web */
   publicBranches: () => apiFetch<{ id: string; name: string }[]>('/api/site/branches'),
 
+  // ------------------------------------------------- Phát hành cấu hình
+
+  /** Bản cấu hình chi nhánh đang chạy là bản nào, phát hành lúc nào */
+  configVersion: (branchId: string) =>
+    apiFetch<{ version: string | null; publishedAt: string | null }>(
+      `/api/config/version?branch=${branchId}`,
+    ),
+
+  /**
+   * Đóng gói toàn bộ thực đơn, giá, tuỳ chọn và tham số thành một bản rồi phát
+   * hành xuống POS, màn bếp và máy khách.
+   *
+   * Sửa giá hay bật tắt món ở Office KHÔNG tự xuống các máy đó — chúng đọc bản
+   * cấu hình đã phát hành, không đọc thẳng CSDL. Đây là chỗ duy nhất đẩy thay
+   * đổi đi.
+   */
+  publishConfig: (branchId: string) =>
+    apiFetch<{ version: string }>(`/api/office/config/publish?branch=${branchId}`, {
+      method: 'POST',
+    }),
+
   // ---------------------------------------------------------------- A6 · R3
 
   parameters: (branchId: string) =>
