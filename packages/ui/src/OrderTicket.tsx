@@ -141,10 +141,35 @@ export function OrderTicket({
                 <span className="text-[length:var(--fs-t2)] text-warn">{item.note}</span>
               ) : null}
             </div>
+
+            {/*
+              Mỗi dòng phải TỰ NÓI nó là một cái nút và chạm vào thì được gì.
+              Không có chữ này thì dòng món trông như chữ thường, bếp không biết
+              chạm được, và họ đi tìm cái nút to ở chân vé — cái đánh dấu cả vé.
+            */}
+            {onItemTap && item.state ? (
+              <span
+                className={[
+                  'flex-none self-center rounded-sm px-2 py-1 text-[length:var(--fs-c1)] font-semibold',
+                  item.state === 'queued' ? 'border border-line-3 text-ink-mute' : '',
+                  item.state === 'cooking' ? 'bg-accent-strong text-on-accent' : '',
+                  item.state === 'done' ? 'text-ok' : '',
+                ].join(' ')}
+              >
+                {item.state === 'queued' ? 'Bắt đầu' : item.state === 'cooking' ? 'Xong' : '✓'}
+              </span>
+            ) : null}
           </li>
         ))}
       </ul>
 
+      {/*
+        NHÃN PHẢI NÓI RÕ PHẠM VI.
+        Khi bếp chạm một dòng món cho nó "đang làm", vé suy ra thành "đang làm" và
+        nút này hiện lên ngay bên dưới — nếu nhãn chỉ ghi "Xong" thì nó đọc y như
+        "xong món vừa bắt đầu", trong khi nó đánh dấu xong CẢ VÉ. Đã có người bấm
+        nhầm đúng kiểu đó, và cả vé bị gạch hết.
+      */}
       {!waiting && (onStart || onDone || onUndo) ? (
         <footer className="flex gap-px border-t border-line-1">
           {state === 'queued' && onStart ? (
@@ -153,7 +178,7 @@ export function OrderTicket({
               onClick={onStart}
               className="h-[72px] flex-1 rounded-bl-md bg-surface-3 text-[length:var(--fs-t2)] font-semibold text-ink-hi active:bg-surface-4"
             >
-              Bắt đầu
+              Bắt đầu cả vé{items.length > 1 ? ` · ${items.length} món` : ''}
             </button>
           ) : null}
           {state === 'cooking' && onDone ? (
@@ -162,7 +187,7 @@ export function OrderTicket({
               onClick={onDone}
               className="h-[72px] flex-1 rounded-b-md bg-accent-strong text-[length:var(--fs-t2)] font-semibold text-on-accent active:brightness-110"
             >
-              Xong
+              Xong cả vé{items.length > 1 ? ` · ${items.length} món` : ''}
             </button>
           ) : null}
           {state === 'ready' && onUndo ? (
@@ -171,7 +196,7 @@ export function OrderTicket({
               onClick={onUndo}
               className="h-[72px] flex-1 rounded-b-md bg-surface-3 text-[length:var(--fs-t2)] font-semibold text-warn active:bg-surface-4"
             >
-              Hoàn tác
+              Hoàn tác cả vé
             </button>
           ) : null}
           {state === 'ready' && !onUndo ? (
