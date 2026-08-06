@@ -1,8 +1,8 @@
-import { ApiError } from '@sora/core'
+import { ApiError, getDeviceToken } from '@sora/core'
 import { Button, Card, PinPad, SectionLabel } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Navigate, useNavigate } from 'react-router'
 import { api, type StaffOption } from '../api'
 import { useSession } from '../session-context'
 
@@ -15,6 +15,12 @@ import { useSession } from '../session-context'
 export function ShiftLogin() {
   const { branchId, signIn } = useSession()
   const navigate = useNavigate()
+  /**
+   * Máy chưa ghép thì màn này không có gì để hiện — lưới nhân viên lấy theo chi
+   * nhánh, mà chi nhánh do việc ghép máy quyết định. Trước đây nó dừng ở một
+   * dòng báo lỗi không lối thoát; giờ đưa thẳng sang màn ghép.
+   */
+  const chuaGhep = getDeviceToken() === null
   const [picked, setPicked] = useState<StaffOption | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -40,6 +46,8 @@ export function ShiftLogin() {
     }
   }
 
+  if (chuaGhep) return <Navigate to="/ghep-may" replace />
+
   return (
     <main className="flex min-h-dvh items-center justify-center bg-canvas p-8">
       <Card className="w-full max-w-2xl p-8">
@@ -56,9 +64,14 @@ export function ShiftLogin() {
             {staffQuery.isPending ? (
               <p className="text-ink-mute">Đang tải danh sách…</p>
             ) : staffQuery.isError ? (
-              <p className="text-danger">
-                Không tải được danh sách nhân viên. Kiểm tra máy đã ghép với chi nhánh chưa.
-              </p>
+              /* Token còn trong máy nhưng máy chủ không nhận — thường là đã bị
+                 thu hồi từ xa ở A4. Không có nút này thì máy kẹt vĩnh viễn. */
+              <div className="flex flex-col items-start gap-3">
+                <p className="text-danger">
+                  Máy này chưa ghép với chi nhánh nào, hoặc đã bị thu hồi từ xa.
+                </p>
+                <Button onClick={() => void navigate('/ghep-may')}>Ghép lại máy</Button>
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {staffQuery.data?.map((person) => (

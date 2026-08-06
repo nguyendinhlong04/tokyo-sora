@@ -315,7 +315,27 @@ export const api = {
       { method: 'POST', body: input },
     ),
 
-  me: () => apiFetch<{ kind: string; branchId: string; fullName?: string; roles?: string[] }>('/api/auth/me'),
+  /**
+   * K1 · A4: máy nhập mã 6 số quản lý đọc cho, nhận token dài hạn.
+   *
+   * Công khai vì lúc này máy chưa có danh tính nào — chính mã ghép là thứ chứng
+   * minh người thao tác đang đứng trong quán. Token trả về ĐÚNG MỘT LẦN.
+   */
+  pair: (code: string, name: string) =>
+    apiFetch<{ token: string; deviceId: number }>('/api/auth/pair', {
+      method: 'POST',
+      body: { code, name },
+    }),
+
+  me: () =>
+    apiFetch<{
+      kind: string
+      branchId: string
+      fullName?: string
+      roles?: string[]
+      deviceKind?: string
+      stationId?: string | null
+    }>('/api/auth/me'),
 
   logout: () => apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 

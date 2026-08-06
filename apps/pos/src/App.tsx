@@ -14,6 +14,7 @@ import { Pay } from './routes/Pay'
 import { Reconcile } from './routes/Reconcile'
 import { Reservations } from './routes/Reservations'
 import { ShiftClose } from './routes/ShiftClose'
+import { PairDevice } from './routes/PairDevice'
 import { ShiftLogin } from './routes/ShiftLogin'
 import { TableMove } from './routes/TableMove'
 import { TableOrder } from './routes/TableOrder'
@@ -41,6 +42,7 @@ export function App() {
         <BrowserRouter>
           <SessionProvider>
             <Routes>
+              <Route path="/ghep-may" element={<PairDevice />} />
               <Route path="/shift" element={<ShiftLogin />} />
               <Route element={<Shell />}>
                 <Route path="/floor" element={<Floorplan />} />

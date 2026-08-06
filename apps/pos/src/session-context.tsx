@@ -14,7 +14,7 @@ interface SessionValue {
   ready: boolean
   signIn: (staff: StaffSession) => void
   signOut: () => Promise<void>
-  pairDevice: (token: string, branchId: string) => void
+  pairDevice: (token: string, deviceId: number) => Promise<void>
 }
 
 const Ctx = createContext<SessionValue | null>(null)
@@ -64,10 +64,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setStaff(null)
   }, [])
 
-  const pairDevice = useCallback((token: string, branch: string) => {
+  /**
+   * Ghi token vừa ghép rồi HỎI LẠI máy chủ xem mình là máy gì.
+   *
+   * Đường ghép chỉ trả về token và mã máy — chi nhánh, loại máy và trạm đều do
+   * mã ghép quyết định, nên máy khách không tự biết. Đoán bừa ở đây là màn bếp
+   * ghép nhầm thành máy thu ngân, hoặc POS gắn sai chi nhánh và hiện thực đơn
+   * của quán khác.
+   */
+  const pairDevice = useCallback(async (token: string, deviceId: number) => {
     setDeviceToken(token)
-    setDeviceInfo({ deviceId: 0, branchId: branch, kind: 'pos', stationId: null, name: 'POS' })
-    setBranchId(branch)
+    const me = await api.me()
+    setDeviceInfo({
+      deviceId,
+      branchId: me.branchId,
+      kind: me.deviceKind ?? 'cashier',
+      stationId: me.stationId ?? null,
+      name: 'POS',
+    })
+    setBranchId(me.branchId)
   }, [])
 
   const value = useMemo(
