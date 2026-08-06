@@ -6,3 +6,18 @@
    nên bị bỏ qua. Thiếu dòng này thì mọi class CHỈ xuất hiện trong package dùng chung
    không được sinh CSS — nút size lg tụt từ 55px xuống 24px, dưới sàn chạm 44px. */
 @source '../../../packages/ui/src';
+
+/* Thanh cuộn: con trượt line-3 trên rãnh surface-2, đúng vai hai token này giữ
+   trong §5. Mặc định của trình duyệt là thanh xám trắng — trên nền #07080A nó
+   sáng hơn cả vé bếp, kéo mắt về mép màn thay vì về món đang cháy.
+
+   Chỉ hai thuộc tính, KHÔNG dùng `::-webkit-scrollbar`: Chrome bỏ qua toàn bộ
+   nhánh webkit một khi `scrollbar-color` được khai, nên khối đó chỉ là code chết.
+   `color-scheme` lo nốt Safari cũ (chưa nhận `scrollbar-color`) — không ra đúng
+   màu thương hiệu nhưng vẫn là thanh tối, không phải thanh trắng.
+
+   Độ rộng để mặc định: màn bếp là màn chạm, tay đeo găng, thanh mảnh khó bấu. */
+:root {
+  color-scheme: dark;
+  scrollbar-color: var(--t-line-3) var(--t-surface-2);
+}
