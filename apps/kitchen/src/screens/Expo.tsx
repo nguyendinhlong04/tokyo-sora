@@ -1,5 +1,6 @@
-import { Badge, EmptyState } from '@sora/ui'
-import { useQuery } from '@tanstack/react-query'
+import { Badge, Button, EmptyState } from '@sora/ui'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { api, type ExpoOrder } from '../api'
 
 /**
@@ -60,6 +61,9 @@ export function Expo() {
 }
 
 function ExpoCard({ order }: { order: ExpoOrder }) {
+  const queryClient = useQueryClient()
+  const [busy, setBusy] = useState(false)
+
   // Món đa trạm: gom theo linkGroup để thấy rõ hai nửa của cùng một món
   const linked = new Map<string, typeof order.items>()
   const single: typeof order.items = []
@@ -129,6 +133,32 @@ function ExpoCard({ order }: { order: ExpoOrder }) {
           )
         })}
       </ul>
+
+      {/*
+        Chỉ hiện khi cả đợt đã xong ở MỌI trạm. Đợt còn chờ mà vẫn cho bấm là mời
+        người chạy bê nửa món ra bàn — đúng cái mà màn này sinh ra để ngăn.
+      */}
+      {order.ready ? (
+        <Button
+          size="lg"
+          variant="primary"
+          block
+          disabled={busy}
+          onClick={() => {
+            setBusy(true)
+            void api
+              .markServed(
+                order.orderId,
+                order.batchNo,
+                `Mang ra ${order.tableCode ?? 'mang về'} đợt ${order.batchNo}`,
+              )
+              .then(() => queryClient.invalidateQueries({ queryKey: ['expo'] }))
+              .finally(() => setBusy(false))
+          }}
+        >
+          Đã mang ra
+        </Button>
+      ) : null}
     </article>
   )
 }

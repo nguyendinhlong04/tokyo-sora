@@ -27,6 +27,23 @@ interface PadLine {
 }
 
 /**
+ * Nhãn trạng thái món cho phiếu order.
+ *
+ * Dùng ĐÚNG bộ chữ mà khách đang đọc trên điện thoại của họ — phục vụ và khách
+ * nhìn hai màn khác nhau nhưng phải nói cùng một thứ tiếng, nếu không khách bảo
+ * "app tôi ghi sắp ra" mà phục vụ lại thấy chữ khác thì không ai giải thích nổi.
+ *
+ * `draft` và `voided` không có nhãn: món chưa gửi bếp và món đã huỷ đều đã có
+ * cách hiển thị riêng ở dòng đó rồi.
+ */
+const LINE_STATE_LABEL: Record<string, string> = {
+  queued: 'Bếp đã nhận',
+  cooking: 'Đang làm',
+  ready: 'Sắp ra',
+  served: 'Đã ra',
+}
+
+/**
  * P4 Gọi món — ba cột: nhóm · lưới món · phiếu order.
  *
  * Phiếu order dựng ở CLIENT trước, chỉ gửi server khi bấm GỬI BẾP. Nhân viên bấm
@@ -410,6 +427,13 @@ function LineRow({ line, onVoid }: { line: OrderLineRow; onVoid: () => void }) {
         ) : null}
       </div>
       {line.state !== 'draft' ? <Badge tone="accent">Đợt {line.batchNo}</Badge> : null}
+      {/* Phục vụ đứng ở bàn phải trả lời được "món tôi tới đâu rồi" mà không
+          phải chạy vào bếp hỏi — cùng bộ chữ với màn hình khách đang thấy */}
+      {LINE_STATE_LABEL[line.state] ? (
+        <Badge tone={line.state === 'served' ? 'ok' : 'neutral'}>
+          {LINE_STATE_LABEL[line.state]}
+        </Badge>
+      ) : null}
       <button
         type="button"
         onClick={onVoid}

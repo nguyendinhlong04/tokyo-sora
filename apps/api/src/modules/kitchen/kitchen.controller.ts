@@ -18,6 +18,11 @@ import { KitchenService } from './kitchen.service'
 
 const StateBody = z.object({ action: z.enum(['start', 'done', 'undo']) })
 
+const ServedBody = z.object({
+  orderId: z.number().int().positive(),
+  batchNo: z.number().int().positive(),
+})
+
 const AvailabilityBody = z.object({
   dishId: z.string().min(1),
   status: z.enum(['sold_out', 'limited', 'available']),
@@ -74,6 +79,19 @@ export class KitchenController {
     @Req() req: RequestWithActor,
   ) {
     return this.kitchen.changeTicketState(id, StateBody.parse(body).action, req.actor!)
+  }
+
+  /**
+   * K6 Expo — người chạy món bấm "Đã mang ra" cho cả một đợt.
+   *
+   * Cùng khoá quyền với việc đổi trạng thái vé: người đứng ở màn bếp là người
+   * bê món ra, không phải người ngồi ở quầy.
+   */
+  @Post('expo/served')
+  @RequirePermission('kds.change-item-state')
+  markServed(@Body() body: unknown, @Req() req: RequestWithActor) {
+    const input = ServedBody.parse(body)
+    return this.kitchen.markServed(input.orderId, input.batchNo, req.actor!)
   }
 
   /** K5 báo hết món */

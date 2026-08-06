@@ -7,7 +7,15 @@ import { emit } from '../../common/outbox'
 import { ParamsService } from '../../common/params.service'
 import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
-import { branches, dishAvailability, orders, stations, ticketItems, tickets } from '../../db/schema'
+import {
+  branches,
+  dishAvailability,
+  orderLines,
+  orders,
+  stations,
+  ticketItems,
+  tickets,
+} from '../../db/schema'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 import { InventoryService } from '../inventory/inventory.service'
@@ -216,6 +224,8 @@ export class KitchenService {
         await this.inventory.postSaleForTicket(tx, ticketId, actor)
       }
 
+      await this.syncOrderLines(tx, ticketId)
+
       const orderStatus = await this.rollUpOrderStatus(tx, ticket.orderId)
 
       // Bấm Bắt đầu/Xong xảy ra hàng trăm lần mỗi ca và đã có mốc giờ trên chính
@@ -328,6 +338,121 @@ export class KitchenService {
   }
 
   /** Bếp bấm nút là đơn tự đổi bước — POS không phải thao tác thêm */
+  /**
+   * Kéo trạng thái từ VÉ BẾP về DÒNG MÓN mà khách nhìn thấy.
+   *
+   * Không có bước này thì màn "Đơn của bàn" của khách đứng nguyên ở "Bếp đã nhận"
+   * suốt cả bữa, dù bếp đã nấu xong từ lâu — bốn nấc trên màn đó chỉ là trang trí.
+   *
+   * Lấy mức CHẬM NHẤT chứ không phải mức nhanh nhất: món đa trạm (Sukiyaki có nồi
+   * ở ST-04, khay thịt ở ST-02) sinh ra hai mục ở hai vé khác nhau. Nồi xong
+   * trước mà báo khách "sắp ra" thì khách chờ tiếp cái khay thịt chưa ai đụng tới.
+   *
+   * Hai thứ KHÔNG bao giờ bị ghi đè: món đã mang ra bàn (`served`) — vì kéo lùi ở
+   * bếp không lấy lại được đĩa thức ăn đã đặt trước mặt khách; và món đã huỷ.
+   */
+  private async syncOrderLines(tx: Tx, ticketId: number) {
+    await tx.execute(sql`
+      UPDATE order_lines ol
+         SET state = sub.new_state
+        FROM (
+          SELECT ti.order_line_id AS id,
+                 CASE MIN(
+                        CASE t.state
+                          WHEN 'waiting' THEN 0
+                          WHEN 'queued'  THEN 0
+                          WHEN 'cooking' THEN 1
+                          WHEN 'ready'   THEN 2
+                          WHEN 'closed'  THEN 2
+                          ELSE 0
+                        END)
+                   WHEN 0 THEN 'queued'
+                   WHEN 1 THEN 'cooking'
+                   ELSE 'ready'
+                 END AS new_state
+            FROM ticket_items ti
+            JOIN tickets t ON t.id = ti.ticket_id
+           WHERE t.state <> 'voided'
+             AND ti.state <> 'voided'
+             AND ti.order_line_id IN (
+                   SELECT order_line_id FROM ticket_items WHERE ticket_id = ${ticketId}
+                 )
+           GROUP BY ti.order_line_id
+        ) sub
+       WHERE ol.id = sub.id
+         AND ol.state NOT IN ('served', 'voided')
+         AND ol.state <> sub.new_state
+    `)
+  }
+
+  /**
+   * K6 Expo — người chạy món bấm "Đã mang ra" cho cả một đợt của một bàn.
+   *
+   * Đơn vị là ĐỢT chứ không phải từng món: người chạy bê cả khay ra một lượt, và
+   * màn Expo cũng gom theo đợt. Bắt bấm từng món là bắt họ đứng bấm mười lần
+   * trong lúc thức ăn nguội đi.
+   *
+   * Đóng vé luôn sau khi giao — nếu không, đợt đã mang ra vẫn nằm trên bảng Expo
+   * và người chạy tiếp theo lại bê ra lần nữa.
+   */
+  async markServed(orderId: number, batchNo: number, actor: Actor) {
+    return this.db.transaction(async (tx) => {
+      const group = await tx
+        .select()
+        .from(tickets)
+        .where(and(eq(tickets.orderId, orderId), eq(tickets.batchNo, batchNo)))
+      const live = group.filter((t) => t.state !== 'voided')
+      if (live.length === 0) throw new NotFoundException('Không có vé nào của đợt này')
+
+      const chuaXong = live.filter((t) => t.state !== 'ready' && t.state !== 'closed')
+      if (chuaXong.length > 0) {
+        throw new BadRequestException(
+          `Đợt này chưa xong ở trạm ${[...new Set(chuaXong.map((t) => t.stationId))].join(', ')}`,
+        )
+      }
+
+      await tx
+        .update(orderLines)
+        .set({ state: 'served' })
+        .where(
+          and(
+            eq(orderLines.orderId, orderId),
+            eq(orderLines.batchNo, batchNo),
+            sql`${orderLines.state} NOT IN ('draft', 'served', 'voided')`,
+          ),
+        )
+
+      await tx
+        .update(tickets)
+        .set({ state: 'closed' })
+        .where(
+          and(
+            eq(tickets.orderId, orderId),
+            eq(tickets.batchNo, batchNo),
+            sql`${tickets.state} = 'ready'`,
+          ),
+        )
+
+      const branchId = live[0]!.branchId
+      await emit(tx, {
+        branchId,
+        topic: 'order.updated',
+        rooms: [rooms.expo(branchId), rooms.orders(branchId)],
+        payload: { orderId, batchNo, served: true },
+      })
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'kds.batch.served',
+        entity: 'order',
+        entityId: String(orderId),
+        payload: { batchNo },
+      })
+
+      return { orderId, batchNo, served: true }
+    })
+  }
+
   private async rollUpOrderStatus(tx: Tx, orderId: number) {
     const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
     if (!order) return null

@@ -97,6 +97,21 @@ export const api = {
 
   expo: () => apiFetch<{ serverTime: string; orders: ExpoOrder[] }>('/api/expo'),
 
+  /**
+   * K6: người chạy món bấm "Đã mang ra" cho cả một đợt.
+   *
+   * Đưa vào hàng đợi offline như các thao tác bếp khác — mất mạng giữa giờ cao
+   * điểm thì người chạy vẫn bấm được và lệnh tự gửi khi mạng về, thay vì đứng
+   * nhìn màn hình báo lỗi trong lúc tay bưng khay.
+   */
+  markServed: (orderId: number, batchNo: number, label: string) =>
+    enqueue<{ served: boolean }>({
+      method: 'POST',
+      path: '/api/expo/served',
+      payload: { orderId, batchNo },
+      label,
+    }),
+
   config: (branchId: string) =>
     apiFetch<{ dishes: ConfigDish[] }>(`/api/config?branch=${branchId}`),
 
