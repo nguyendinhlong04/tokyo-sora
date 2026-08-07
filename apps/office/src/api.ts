@@ -229,6 +229,21 @@ export interface CmsJob {
   updatedBy: string | null
 }
 
+/** Một khung nền của hero trang chủ (W1) — ảnh, hoặc video có ảnh chờ */
+export interface CmsHeroImage {
+  id: number
+  imageUrl: string
+  /** Video chiếu đè lên ảnh; null là khung ảnh tĩnh */
+  videoUrl: string | null
+  /** Chữ lớn đè lên ảnh — bỏ trống thì hero in tên quán */
+  caption: string | null
+  captionJa: string | null
+  published: boolean
+  sort: number
+  updatedAt: string
+  updatedBy: string | null
+}
+
 // ------------------------------------------------------- B2 · B4 … B9
 
 export interface Slice {
@@ -2247,6 +2262,19 @@ export const api = {
 
   deleteCmsJob: (id: number) =>
     apiFetch<{ deleted: boolean }>(`/api/admin/cms/jobs/${id}`, { method: 'DELETE' }),
+
+  cmsHeroImages: () => apiFetch<CmsHeroImage[]>('/api/admin/cms/hero'),
+
+  createCmsHeroImage: (input: Omit<CmsHeroImage, 'id' | 'updatedAt' | 'updatedBy'>) =>
+    apiFetch<CmsHeroImage>('/api/admin/cms/hero', { method: 'POST', body: input }),
+
+  updateCmsHeroImage: (
+    id: number,
+    patch: Partial<Omit<CmsHeroImage, 'id' | 'updatedAt' | 'updatedBy'>>,
+  ) => apiFetch<CmsHeroImage>(`/api/admin/cms/hero/${id}`, { method: 'PATCH', body: patch }),
+
+  deleteCmsHeroImage: (id: number) =>
+    apiFetch<{ deleted: boolean }>(`/api/admin/cms/hero/${id}`, { method: 'DELETE' }),
 
   // --------------------------------------------------------------------- M1
 

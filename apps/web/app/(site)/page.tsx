@@ -1,8 +1,11 @@
 import { formatVnd } from '@sora/contracts'
 import Link from 'next/link'
-import { DishGlyph, Eyebrow, PhotoFrame, SignatureBadge } from '../../components/visuals'
-import { HOW_TO_EAT, PROMISES, SITE } from '../../content/site'
-import { dishGlyph, getBranches, getMenu } from '../../lib/site'
+import { ChapterRail } from '../../components/ChapterRail'
+import { DishRails } from '../../components/DishRails'
+import { HomeHero } from '../../components/HomeHero'
+import { DishGlyph, SignatureBadge } from '../../components/visuals'
+import { FAQ, SERVICES, SITE } from '../../content/site'
+import { dishGlyph, getBranches, getHeroImages, getMenu } from '../../lib/site'
 
 /**
  * W1 — Trang chủ.
@@ -11,9 +14,81 @@ import { dishGlyph, getBranches, getMenu } from '../../lib/site'
  * website tồn tại để bán hai việc, đặt bàn và đặt món mang về (§19).
  */
 export default async function HomePage() {
-  const [menu, branches] = await Promise.all([getMenu(), getBranches()])
-  const signatures = menu.dishes.filter((d) => d.signature && d.kind !== 'set').slice(0, 6)
-  const hero = signatures[0]
+  const [menu, branches, heroImages] = await Promise.all([getMenu(), getBranches(), getHeroImages()])
+  const plates = menu.dishes.filter((d) => d.kind !== 'set')
+  const signatures = plates.filter((d) => d.signature).slice(0, 6)
+
+  // Lưới bên phải của dải hai cột phải đủ dài thì tấm bên trái dính lại mới có
+  // nghĩa: sáu món thôi là cuộn chưa kịp bắt đầu đã hết lưới. Món ký đứng trước,
+  // rồi bù món thường cho đủ mười hai.
+  const showcase = [...plates.filter((d) => d.signature), ...plates.filter((d) => !d.signature)].slice(0, 12)
+
+  /**
+   * Món của tấm mời gọi bên trái — SET đứng trước.
+   *
+   * Tấm này mời khách đặt món, mà lời mời mạnh nhất là một bữa trọn gói chứ không
+   * phải một đĩa thịt lẻ. Set không nằm trong `plates` (lưới bên phải và hai hàng
+   * ảnh chỉ dẫn sang trang món lẻ), nên phải lấy thẳng từ `menu.dishes`.
+   *
+   * Lấy set đã bật "Món ký của bếp" đứng đầu thực đơn; chưa bật set nào thì lùi
+   * về món ký đầu như trước. Đổi tấm này thì bật/tắt cờ món ký ở Office M1 —
+   * trang chủ không giữ tên món nào viết cứng.
+   */
+  const cover = menu.dishes.find((d) => d.kind === 'set' && d.signature) ?? signatures[0]
+
+  // Hai hàng ảnh trượt ngang: cắt đôi danh sách món rồi đảo chiều nửa sau, để hai
+  // hàng đi ngược nhau mà không lặp lại cùng một thứ tự món.
+  const rail = (list: typeof plates) =>
+    list.slice(0, 12).map((d) => ({
+      id: d.id,
+      nameVi: d.nameVi,
+      glyph: d.nameJa?.trim().charAt(0) || dishGlyph(d),
+      imageUrl: d.imageUrl,
+    }))
+  const half = Math.ceil(plates.length / 2)
+  const railTop = rail(plates.slice(0, half))
+  const railBottom = rail(plates.slice(half).reverse())
+
+  // Chương nào có món thì mới lên dải: một ô dẫn vào chương rỗng là một cú bấm
+  // phí. Ảnh lấy từ món đầu tiên có ảnh trong chương, chưa có thì vẽ chữ chương.
+  const chapters = menu.categories
+    .map((category) => {
+      const inside = menu.dishes.filter((d) => d.categoryId === category.id)
+      return {
+        id: category.id,
+        nameVi: category.nameVi,
+        glyph: category.kanji?.trim() || category.nameVi.charAt(0),
+        imageUrl: inside.find((d) => d.imageUrl)?.imageUrl ?? null,
+        count: inside.length,
+      }
+    })
+    .filter((category) => category.count > 0)
+
+  // Bộ ảnh và video hero xếp ở Office A8 đứng trước. Chưa ai xếp khung nào thì
+  // lùi về năm món ký đầu như trước khi có màn đó — trang chủ không bao giờ trống
+  // ảnh vì marketing chưa kịp nhập. Món chưa có ảnh vẫn vào danh sách: hero vẽ
+  // một chữ lớn thay ảnh, đúng như mọi chỗ khác trong trang. Một chữ chứ không cả
+  // chuỗi kana: chữ nền cao 340px, hai ba chữ là tràn ra ngoài.
+  const slides =
+    heroImages.length > 0
+      ? heroImages.map((image) => ({
+          id: `hero-${image.id}`,
+          // Chú thích là chữ LỚN của hero, nên không được rỗng: ảnh không có gì để
+          // chú thì hero nói tên quán, chứ không phải để trang chủ mất tiêu đề.
+          nameVi: image.caption ?? SITE.name,
+          nameJa: image.caption ? image.captionJa : SITE.kanji,
+          glyph: '空',
+          imageUrl: image.imageUrl,
+          videoUrl: image.videoUrl,
+        }))
+      : signatures.slice(0, 5).map((dish) => ({
+          id: dish.id,
+          nameVi: dish.nameVi,
+          nameJa: dish.nameJa,
+          glyph: dish.nameJa?.trim().charAt(0) || '空',
+          imageUrl: dish.imageUrl,
+          videoUrl: null,
+        }))
 
   const today = new Date()
   const dates = Array.from({ length: 7 }, (_, i) => {
@@ -27,150 +102,121 @@ export default async function HomePage() {
   return (
     <>
       {/* ---------------------------------------------------------- Hero */}
-      <section className="relative flex min-h-[560px] flex-col justify-center overflow-hidden lg:min-h-[820px]">
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-[radial-gradient(120%_90%_at_78%_38%,var(--sora-line-1)_0%,var(--sora-bg-base)_68%)]"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[linear-gradient(100deg,var(--sora-bg-base)_0%,rgba(7,8,10,0.92)_38%,rgba(7,8,10,0.35)_72%,rgba(7,8,10,0)_100%)]"
-        />
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 right-14 hidden -translate-y-1/2 font-jp text-[112px] leading-none tracking-[0.12em] text-ink-hi opacity-8 [writing-mode:vertical-rl] lg:block"
-        >
-          炭火焼
-        </span>
+      <HomeHero
+        slides={slides}
+        branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+      />
 
-        <div className="relative mx-auto w-full max-w-[1280px] px-5 py-24 lg:px-10 lg:py-0">
-          <span className="font-jp text-[length:var(--fs-t2)] tracking-[0.3em] text-accent">
-            {SITE.kanji}
-          </span>
-          <h1 className="mt-5 max-w-[620px] font-display text-[44px] leading-[1.08] font-light text-ink-hi lg:mt-6 lg:text-[length:var(--fs-d1)]">
-            Bầu trời Tokyo,
-            <br />
-            trên bếp than.
-          </h1>
-          <p className="mt-6 max-w-[420px] text-[length:var(--fs-b1)] leading-relaxed text-ink-body lg:mt-7">
-            {SITE.lead}
-          </p>
-          <div className="mt-10 flex flex-col gap-3 lg:mt-11 lg:flex-row lg:gap-3.5">
-            <Link
-              href="/dat-ban"
-              className="inline-flex h-14 items-center justify-center rounded-sm border border-accent px-8 text-[length:var(--fs-b1)] font-medium text-accent-ink transition-colors hover:border-gold-300 hover:text-gold-200"
-            >
-              Đặt bàn
-            </Link>
-            <Link
-              href="/thuc-don"
-              className="inline-flex h-14 items-center justify-center rounded-sm border border-line-3 px-8 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
-            >
-              Xem thực đơn
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* --------------------------------------------------- Món ký mở đầu */}
-      {hero ? (
-        <section className="relative overflow-hidden px-5 py-20 lg:px-10 lg:py-32">
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-[radial-gradient(60%_70%_at_62%_45%,var(--sora-line-1)_0%,var(--sora-bg-base)_72%)]"
-          />
-          <div className="relative mx-auto grid max-w-[1280px] items-center gap-12 lg:grid-cols-2 lg:gap-0">
-            <div className="order-2 lg:order-1">
-              <Eyebrow>Món ký</Eyebrow>
-              <h2 className="mt-5 font-display text-[44px] leading-[1.1] font-light text-ink-hi lg:text-[length:var(--fs-d1)]">
-                {hero.nameVi}
-              </h2>
-              {hero.nameJa ? (
-                <p className="mt-3 font-jp text-[length:var(--fs-t2)] tracking-[0.1em] text-accent-ink">
-                  {hero.nameJa}
-                </p>
-              ) : null}
-              <p className="mt-7 max-w-[380px] text-[length:var(--fs-b1)] leading-relaxed text-ink-body">
-                {hero.shortDesc ?? hero.longDesc}
-              </p>
-              <p className="mt-8 font-mono text-[length:var(--fs-t1)] text-accent-ink">
-                {formatVnd(hero.price)}
-              </p>
-              <Link
-                href={`/thuc-don/${hero.id}`}
-                className="mt-8 inline-flex h-13 items-center rounded-sm border border-line-3 px-7 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
-              >
-                Xem chi tiết món
-              </Link>
-            </div>
-            <div className="order-1 flex justify-center lg:order-2">
-              <DishGlyph
-                glyph={dishGlyph(hero)}
-                src={hero.imageUrl}
-                alt={hero.nameVi}
-                size="xl"
-                className="size-[250px] rounded-md drop-shadow-[0_12px_24px_rgba(0,0,0,0.45)] lg:size-[420px]"
-              />
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ------------------------------------------------------ Ba lời hứa */}
-      <section className="px-5 pb-20 lg:px-10 lg:pb-32">
-        <div className="mx-auto grid max-w-[1280px] gap-9 border-t border-accent/16 pt-10 lg:grid-cols-3 lg:gap-16 lg:pt-16">
-          {PROMISES.map((promise) => (
-            <div key={promise.text} className="flex gap-5 lg:block">
-              <span className="flex-none text-accent lg:block">
-                <PromiseIcon kind={promise.icon} />
+      {/* ------------------------------------------------ Dải cam kết dịch vụ */}
+      <section className="border-y border-accent/12 bg-surface-1 px-5 py-5 md:py-6 lg:px-10">
+        <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4 md:gap-6 lg:gap-10">
+          {SERVICES.map((service) => (
+            <div key={service.label} className="flex items-center gap-3.5">
+              <span className="flex-none text-accent">
+                <ServiceIcon kind={service.icon} />
               </span>
-              <p className="text-[length:var(--fs-t2)] leading-relaxed text-ink-hi lg:mt-6">
-                {promise.text}
-              </p>
+              <span className="text-[length:var(--fs-c1)] font-semibold tracking-[0.12em] text-ink-hi uppercase lg:text-[length:var(--fs-b2)]">
+                {service.label}
+              </span>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ------------------------------------------------------ Sáu món ký */}
-      {signatures.length > 0 ? (
-        <section className="px-5 pb-20 lg:px-10 lg:pb-32">
-          <div className="mx-auto max-w-[1280px]">
-            <div className="flex items-baseline justify-between gap-6">
-              <h2 className="font-display text-[30px] font-light text-ink-hi lg:text-[length:var(--fs-d2)]">
-                {signatures.length === 6 ? 'Sáu món ký' : 'Món ký của bếp'}
-              </h2>
-              <Link href="/thuc-don" className="text-[length:var(--fs-b2)] text-accent-ink">
-                Toàn bộ thực đơn →
-              </Link>
-            </div>
-            <p className="mt-3 font-jp text-[length:var(--fs-b1)] tracking-[0.14em] text-ink-mute">
-              — 焼 —
-            </p>
+      {/* --------------------------------------------- Món của bếp — hai cột
+          Trái là tấm mời gọi, dính lại tại chỗ trong lúc phải cuộn qua hết món.
+          Hết món thì lưới kết thúc, tấm bên trái nhả ra và cả hai cùng đi tiếp —
+          đó là toàn bộ việc `sticky` làm, không cần một dòng JavaScript nào.
 
-            <div className="mt-9 grid grid-cols-2 gap-4 lg:mt-14 lg:grid-cols-3 lg:gap-8">
-              {signatures.map((dish) => (
-                <Link key={dish.id} href={`/thuc-don/${dish.id}`} className="group">
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-md border border-accent/16">
-                    <DishGlyph glyph={dishGlyph(dish)} src={dish.imageUrl} alt={dish.nameVi} className="size-full" />
-                    <span className="absolute top-3 left-3 hidden lg:block">
-                      <SignatureBadge />
-                    </span>
+          `items-start` là điều kiện để nó dính: ô lưới mà kéo cao bằng cột kia
+          thì không còn gì để trượt bên trong. */}
+      {showcase.length > 0 ? (
+        /* Đệm trên bằng đúng `lg:top-35` của cột dính: lúc mép khối chạm đỉnh màn
+           thì tấm bên trái đã nằm sẵn ở chỗ nó sẽ dừng, nên chuyển sang dính
+           không thấy giật.
+
+           140 = dải vàng 44 + thanh điều hướng 80 + 16 thở. Hai thanh trên đều
+           dính, nên dừng ở 96 như trước là chui một phần xuống dưới chúng. */
+        <section className="px-5 pt-12 pb-12 lg:px-10 lg:pt-35 lg:pb-32">
+          <div className="mx-auto grid max-w-[1280px] items-start gap-6 lg:grid-cols-2 lg:gap-8">
+            <div className="lg:sticky lg:top-35">
+              {/* 156 = 140 dừng + 16 chừa mép dưới, để tấm không chạm đáy màn.
+
+                  Khổ ĐỨNG 4/5 trên điện thoại chứ không 4/3: ở 4/3 tấm chỉ cao
+                  251 mà riêng tiêu đề đã chiếm 7–47% của nó, nên chữ nằm trọn
+                  trong phần lớp phủ còn trong suốt và chìm vào ảnh. Cao thêm là
+                  ảnh có chỗ thở phía trên, chữ có dải tối phía dưới. */}
+              <div className="relative aspect-[4/5] overflow-hidden rounded-md border border-accent/16 sm:aspect-[4/3] lg:aspect-auto lg:h-[calc(100dvh-9.75rem)]">
+                {cover ? (
+                  <DishGlyph
+                    glyph={dishGlyph(cover)}
+                    src={cover.imageUrl}
+                    alt=""
+                    size="xl"
+                    className="size-full"
+                  />
+                ) : null}
+                {/* Trên điện thoại dốc tối sớm hơn hẳn: tấm ngắn nên khối chữ bắt
+                    đầu ngay quá nửa, còn mốc 0.35 ở 46% của bản desktop là dành
+                    cho tấm cao gần trọn màn, nơi chữ nằm tít dưới đáy. */}
+                <div
+                  aria-hidden
+                  className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,8,10,0.10)_0%,rgba(7,8,10,0.16)_30%,rgba(7,8,10,0.58)_47%,rgba(7,8,10,0.86)_64%,rgba(7,8,10,0.95)_100%)] lg:bg-[linear-gradient(180deg,rgba(7,8,10,0.15)_0%,rgba(7,8,10,0.35)_46%,rgba(7,8,10,0.92)_100%)]"
+                />
+                <div className="absolute inset-x-0 bottom-0 p-6 lg:p-10">
+                  <h2 className="max-w-[420px] font-display text-[30px] leading-[1.1] font-light text-ink-hi uppercase lg:text-[length:var(--fs-d2)]">
+                    Xem những món được gọi nhiều nhất
+                  </h2>
+                  <div className="mt-6 flex flex-wrap items-center gap-x-7 gap-y-3 lg:mt-8">
+                    <Link
+                      href="/dat-mon"
+                      className="inline-flex h-13 items-center justify-center rounded-pill bg-accent px-8 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-gold-300"
+                    >
+                      Đặt món ngay
+                    </Link>
+                    <Link
+                      href="/thuc-don"
+                      className="text-[length:var(--fs-b2)] text-accent-ink transition-colors hover:text-gold-200"
+                    >
+                      Toàn bộ thực đơn →
+                    </Link>
                   </div>
-                  <div className="mt-4 flex items-baseline justify-between gap-4 lg:mt-5">
-                    <div>
-                      <p className="text-[length:var(--fs-b2)] font-semibold text-ink-hi lg:text-[length:var(--fs-t2)]">
-                        {dish.nameVi}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 lg:gap-5">
+              {showcase.map((dish) => (
+                <Link
+                  key={dish.id}
+                  href={`/thuc-don/${dish.id}`}
+                  className="group overflow-hidden rounded-md border border-accent/16 bg-surface-2 transition-colors hover:border-accent/40"
+                >
+                  <div className="relative aspect-[4/3]">
+                    <DishGlyph
+                      glyph={dishGlyph(dish)}
+                      src={dish.imageUrl}
+                      alt={dish.nameVi}
+                      className="size-full"
+                    />
+                    {dish.signature ? (
+                      <span className="absolute top-2.5 left-2.5">
+                        <SignatureBadge compact />
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="p-3.5 lg:p-4">
+                    <p className="text-[length:var(--fs-b2)] font-semibold text-ink-hi lg:text-[length:var(--fs-t2)]">
+                      {dish.nameVi}
+                    </p>
+                    {dish.nameJa ? (
+                      <p className="mt-1.5 font-jp text-[length:var(--fs-c1)] tracking-[0.08em] text-ink-mute">
+                        {dish.nameJa}
                       </p>
-                      {dish.nameJa ? (
-                        <p className="mt-1.5 font-jp text-[length:var(--fs-b2)] tracking-[0.08em] text-ink-mute">
-                          {dish.nameJa}
-                        </p>
-                      ) : null}
-                    </div>
-                    <span className="flex-none font-mono text-[length:var(--fs-b2)] text-accent-ink lg:text-[length:var(--fs-b1)]">
+                    ) : null}
+                    <p className="mt-2.5 font-mono text-[length:var(--fs-b2)] text-accent-ink lg:text-[length:var(--fs-b1)]">
                       {formatVnd(dish.price)}
-                    </span>
+                    </p>
                   </div>
                 </Link>
               ))}
@@ -179,52 +225,27 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      {/* -------------------------------------------------- Cách ăn Yakiniku */}
-      <section className="px-5 pb-20 lg:px-10 lg:pb-32">
-        <div className="mx-auto grid max-w-[1280px] gap-10 border-t border-accent/16 pt-10 lg:grid-cols-[340px_1fr] lg:gap-24 lg:pt-24">
-          <div>
-            <h2 className="font-display text-[30px] leading-tight font-light text-ink-hi lg:text-[length:var(--fs-d2)]">
-              Cách ăn Yakiniku
+      {/* ------------------------------------- Hai hàng ảnh trượt theo cuộn */}
+      {railTop.length > 0 ? <DishRails top={railTop} bottom={railBottom} /> : null}
+
+      {/* ------------------------------------------- Chương thực đơn — dải ngang
+          Ô cùng cỡ với dải ảnh phía trên để hai dải đọc như một hệ. Cuộn ngang
+          bằng tay chứ không theo trang: đây là chỗ khách tìm nhóm món họ muốn,
+          nên phải để họ điều khiển. */}
+      {chapters.length > 0 ? (
+        <section className="pb-20 lg:pb-32">
+          <div className="mx-auto max-w-[1280px] px-5 lg:px-10">
+            <h2 className="font-display text-[30px] font-light text-ink-hi lg:text-[length:var(--fs-d2)]">
+              Các chương thực đơn
             </h2>
-            <p className="mt-3.5 font-jp text-[length:var(--fs-b1)] tracking-[0.14em] text-ink-mute">
-              焼肉の食べ方
-            </p>
-            <p className="mt-6 text-[length:var(--fs-b1)] leading-relaxed text-ink-body">
-              Bốn bước, làm đúng thì miếng thịt nào cũng ngon.
+            <p className="mt-3 font-jp text-[length:var(--fs-b1)] tracking-[0.14em] text-ink-mute">
+              — 品書 —
             </p>
           </div>
-          <ol className="relative pl-13 lg:pl-14">
-            <div
-              aria-hidden
-              className="absolute top-3 bottom-6 left-[17px] w-px bg-[linear-gradient(var(--sora-gold-900),var(--sora-line-3))] lg:left-[19px]"
-            />
-            {HOW_TO_EAT.map((step) => (
-              <li key={step.n} className="relative pb-9 lg:pb-11">
-                <span className="absolute top-0 -left-13 grid size-9 place-items-center rounded-full border border-gold-900 bg-canvas font-mono text-[length:var(--fs-b2)] text-accent-ink lg:-left-14 lg:size-10">
-                  {step.n}
-                </span>
-                <p className="text-[length:var(--fs-t2)] leading-snug font-medium text-ink-hi lg:text-[length:var(--fs-t1)]">
-                  {step.title}
-                </p>
-                <p className="mt-2.5 text-[length:var(--fs-b2)] leading-relaxed text-ink-mute lg:text-[length:var(--fs-b1)]">
-                  {step.desc}
-                </p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
 
-      {/* ------------------------------------------------------- Không gian */}
-      <section className="px-5 pb-20 lg:px-10 lg:pb-32">
-        <div className="mx-auto grid max-w-[1280px] auto-rows-[120px] grid-cols-2 gap-2.5 lg:auto-rows-[150px] lg:grid-cols-6 lg:gap-4">
-          <PhotoFrame glyph="炭" className="col-span-2 row-span-2 lg:col-span-3" />
-          <PhotoFrame glyph="間" className="row-span-2 lg:col-span-2 lg:mt-10" />
-          <PhotoFrame glyph="盃" className="hidden lg:block" />
-          <PhotoFrame glyph="火" className="hidden lg:block" />
-          <PhotoFrame glyph="夜" className="col-span-2 lg:col-span-3 lg:mt-4" />
-        </div>
-      </section>
+          <ChapterRail chapters={chapters} />
+        </section>
+      ) : null}
 
       {/* ------------------------------------------------- Dải tìm bàn tối nay */}
       <section className="relative overflow-hidden bg-gold-900">
@@ -287,6 +308,50 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* -------------------------------------------- Câu hỏi thường gặp
+          `<details>` chứ không phải khối đóng mở tự viết: trình duyệt lo sẵn phần
+          bàn phím và trình đọc màn hình, và câu trả lời vẫn nằm trong HTML nên
+          Google đọc được dù đang gập. */}
+      <section className="px-5 py-20 lg:px-10 lg:py-32">
+        <div className="mx-auto grid max-w-[1280px] gap-10 lg:grid-cols-2 lg:gap-20">
+          <div>
+            <h2 className="font-display text-[30px] font-light text-ink-hi lg:text-[length:var(--fs-d2)]">
+              Câu hỏi thường gặp
+            </h2>
+            <p className="mt-5 max-w-[380px] text-[length:var(--fs-b1)] leading-relaxed text-ink-body">
+              Không thấy câu trả lời ở đây thì nhắn cho chúng tôi.
+            </p>
+            <Link
+              href="/lien-he"
+              className="mt-6 inline-flex text-[length:var(--fs-b2)] text-accent-ink transition-colors hover:text-gold-200"
+            >
+              Gửi câu hỏi →
+            </Link>
+          </div>
+
+          <div className="border-t border-accent/12">
+            {FAQ.map((item) => (
+              <details key={item.q} className="group border-b border-accent/12 py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-[length:var(--fs-b1)] font-medium text-ink-hi lg:text-[length:var(--fs-t2)] [&::-webkit-details-marker]:hidden">
+                  {item.q}
+                  <span
+                    aria-hidden
+                    className="grid size-8 flex-none place-items-center rounded-full border border-accent/30 text-accent transition-transform group-open:rotate-45"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M6 1v10M1 6h10" />
+                    </svg>
+                  </span>
+                </summary>
+                <p className="mt-3.5 max-w-[520px] text-[length:var(--fs-b2)] leading-relaxed text-ink-body lg:text-[length:var(--fs-b1)]">
+                  {item.a}
+                </p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Hai hành động gắn thẳng vào thực thể Restaurant — điều kiện để nút đặt
           hiện ngay trên kết quả tìm kiếm (§23.1.4) */}
       <script
@@ -322,21 +387,14 @@ function formatDate(d: Date): string {
   return `${dow} ${d.getDate()}/${d.getMonth() + 1}`
 }
 
-function PromiseIcon({ kind }: { kind: 'fire' | 'knife' | 'room' }) {
+function ServiceIcon({ kind }: { kind: 'knife' | 'bolt' | 'shield' | 'phone' }) {
   const common = {
-    width: 26,
-    height: 26,
+    width: 22,
+    height: 22,
     viewBox: '0 0 24 24',
     fill: 'none',
     stroke: 'currentColor',
-    strokeWidth: 1.4,
-  }
-  if (kind === 'fire') {
-    return (
-      <svg {...common}>
-        <path d="M12 3c1.6 3.2.4 4.6-.8 6-1 1.2-1.6 2.3-1.6 3.7a2.4 2.4 0 0 0 4.8 0c0-.9-.3-1.6-.7-2.2 1.9 1 3.3 2.7 3.3 5A5 5 0 0 1 7 15.5C7 10 12 9 12 3Z" />
-      </svg>
-    )
+    strokeWidth: 1.5,
   }
   if (kind === 'knife') {
     return (
@@ -346,12 +404,24 @@ function PromiseIcon({ kind }: { kind: 'fire' | 'knife' | 'room' }) {
       </svg>
     )
   }
+  if (kind === 'bolt') {
+    return (
+      <svg {...common}>
+        <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" />
+      </svg>
+    )
+  }
+  if (kind === 'shield') {
+    return (
+      <svg {...common}>
+        <path d="M12 3l7 3v5.5c0 4.4-3 7.9-7 9.5-4-1.6-7-5.1-7-9.5V6l7-3Z" />
+        <path d="m9 12 2 2 4-4" />
+      </svg>
+    )
+  }
   return (
     <svg {...common}>
-      <path d="M4 20V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v15" />
-      <path d="M15 9h4a1 1 0 0 1 1 1v10" />
-      <path d="M3 20h18" />
-      <circle cx="11.5" cy="12" r=".9" fill="currentColor" stroke="none" />
+      <path d="M21 16.9v2.6a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.5-3 19.3 19.3 0 0 1-6-6 19.6 19.6 0 0 1-3-8.6A2 2 0 0 1 3.3 2H6a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.4 2.1L7.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.4 1.8.6 2.8.8a2 2 0 0 1 1.7 2Z" />
     </svg>
   )
 }

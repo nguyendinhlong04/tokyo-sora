@@ -85,8 +85,10 @@ export default async function MenuPage() {
         </div>
       </section>
 
-      {/* ------------------------------------------------ Thanh chương dính */}
-      <nav className="sticky top-16 z-40 mt-8 border-y border-accent/22 bg-canvas/94 backdrop-blur-md lg:top-20 lg:mt-10">
+      {/* ------------------------------------------------ Thanh chương dính
+          Dừng dưới cả dải vàng (32 · 40 · 44) lẫn thanh điều hướng (64 · 64 · 80)
+          — hai thanh đó đều dính, nên 96 · 104 · 124 mới là mép dưới phần đã ghim */}
+      <nav className="sticky top-24 z-40 mt-8 border-y border-accent/22 bg-canvas/94 backdrop-blur-md sm:top-26 lg:top-31 lg:mt-10">
         <div className="mx-auto flex max-w-[1280px] gap-1.5 overflow-x-auto px-5 py-3 lg:h-[70px] lg:items-center lg:px-10 lg:py-0">
           {groups.map((group) => (
             <a

@@ -32,11 +32,21 @@ const JobBody = z.object({
   sort: z.number().int().min(0).max(999).default(0),
 })
 
+const HeroBody = z.object({
+  imageUrl: z.string().min(1).max(600),
+  videoUrl: z.string().max(600).nullish().transform((v) => v ?? null),
+  caption: z.string().max(120).nullish().transform((v) => v ?? null),
+  captionJa: z.string().max(60).nullish().transform((v) => v ?? null),
+  published: z.boolean().default(false),
+  sort: z.number().int().min(0).max(999).default(0),
+})
+
 /**
  * A8 — CMS website. Quyền `cms.edit` của §4.2: R9 Marketing và R10.
  *
  * Đây là màn DUY NHẤT trong Office mà marketing mở được — nên nó không được phép
- * chạm vào bất cứ thứ gì ngoài chữ nghĩa của trang tin và trang tuyển dụng.
+ * chạm vào bất cứ thứ gì ngoài chữ nghĩa của trang tin, trang tuyển dụng và bộ
+ * ảnh hero trang chủ.
  */
 @Controller('api/admin/cms')
 export class SiteAdminController {
@@ -96,5 +106,33 @@ export class SiteAdminController {
   @RequirePermission('cms.edit')
   deleteJob(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
     return this.cms.deleteJob(id, req.actor!)
+  }
+
+  @Get('hero')
+  @RequirePermission('cms.edit')
+  heroImages() {
+    return this.cms.heroImages()
+  }
+
+  @Post('hero')
+  @RequirePermission('cms.edit')
+  createHeroImage(@Body() body: unknown, @Req() req: RequestWithActor) {
+    return this.cms.createHeroImage(HeroBody.parse(body), req.actor!)
+  }
+
+  @Patch('hero/:id')
+  @RequirePermission('cms.edit')
+  updateHeroImage(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    return this.cms.updateHeroImage(id, HeroBody.partial().parse(body), req.actor!)
+  }
+
+  @Delete('hero/:id')
+  @RequirePermission('cms.edit')
+  deleteHeroImage(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
+    return this.cms.deleteHeroImage(id, req.actor!)
   }
 }

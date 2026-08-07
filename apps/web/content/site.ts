@@ -31,7 +31,6 @@ export const SITE = {
 export const NAV = [
   { href: '/', label: 'Trang chủ' },
   { href: '/thuc-don', label: 'Thực đơn' },
-  { href: '/ve-chung-toi', label: 'Câu chuyện' },
   { href: '/khong-gian', label: 'Không gian' },
   { href: '/uu-dai', label: 'Ưu đãi' },
   { href: '/tin-tuc', label: 'Tin tức' },
@@ -51,6 +50,18 @@ export const PROMISES = [
     icon: 'room' as const,
     text: 'Sáu phòng riêng, cửa gỗ, khói không lẫn sang bàn khác.',
   },
+]
+
+/**
+ * Dải cam kết ngay dưới hero W1 — bốn việc khách cần yên tâm TRƯỚC khi bấm đặt.
+ *
+ * Khác ba lời hứa bên dưới: chỗ đó nói về bếp, chỗ này nói về dịch vụ đặt món.
+ */
+export const SERVICES = [
+  { icon: 'knife' as const, label: 'Bò cắt trong ngày' },
+  { icon: 'bolt' as const, label: 'Giao nhanh nội thành' },
+  { icon: 'shield' as const, label: 'Thanh toán an toàn' },
+  { icon: 'phone' as const, label: 'Tổng đài hỗ trợ' },
 ]
 
 /** Cách ăn Yakiniku — bốn bước trên W1 */
@@ -74,6 +85,36 @@ export const HOW_TO_EAT = [
     n: '4',
     title: 'Ăn nóng, chấm muối trước',
     desc: 'Muối tiêu chanh cho miếng đầu, tương cho miếng sau.',
+  },
+]
+
+/**
+ * Câu hỏi thường gặp ở cuối W1.
+ *
+ * Chỉ hỏi những việc hệ thống thật sự làm được, và trả lời không kèm con số cứng
+ * — phí giao, giờ mở, số phòng riêng đều đọc từ API và đổi theo chi nhánh, viết
+ * cứng ở đây là bảo đảm có ngày lệch với sự thật.
+ */
+export const FAQ = [
+  {
+    q: 'Đặt bàn trước có mất phí không?',
+    a: 'Không. Bạn chọn ngày, số khách và kiểu chỗ trên trang Đặt bàn, chúng tôi giữ bàn và gửi lại mã xác nhận.',
+  },
+  {
+    q: 'Quán có giao tận nơi không?',
+    a: 'Có, quanh mỗi chi nhánh. Chọn chi nhánh và phường của bạn ở bước đầu, phí giao cùng thời gian dự kiến hiện ra trước khi bạn gọi món.',
+  },
+  {
+    q: 'Thanh toán bằng cách nào?',
+    a: 'Chuyển khoản bằng mã VietQR, hoặc trả tiền mặt khi nhận hàng. Ăn tại quán thì thanh toán ở bàn khi xong bữa.',
+  },
+  {
+    q: 'Có phòng riêng cho nhóm không?',
+    a: 'Cả ba chi nhánh đều có phòng riêng, số phòng mỗi nơi một khác. Chọn "Phòng riêng" khi đặt bàn để xem chỗ còn trống.',
+  },
+  {
+    q: 'Đi trên mười khách thì đặt thế nào?',
+    a: 'Nhóm lớn và đặt tiệc xin gửi qua trang Liên hệ — chúng tôi xếp bàn và bàn trước thực đơn với bạn.',
   },
 ]
 

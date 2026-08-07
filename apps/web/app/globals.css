@@ -1,3 +1,93 @@
 @import 'tailwindcss';
 @import '@sora/tokens/tokens.css';
 @import '@sora/tokens/fonts.css';
+
+/**
+ * Chữ hero trườn vào từ trái mỗi lần sang ảnh khác.
+ *
+ * Nhoè rồi nét dần chứ không chỉ trượt: hai tên món trông như tan vào nhau, thay
+ * vì một dòng chữ bị đẩy đi rồi dòng khác nhảy vào chỗ trống.
+ *
+ * Để ở đây chứ không ở @sora/tokens vì chỉ hero của web dùng — POS, Bếp, Office
+ * không có băng chuyền nào, không việc gì phải mang thêm một keyframe.
+ */
+@keyframes sora-hero-in {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+/**
+ * Dải vàng chạy chữ — chỉ dùng ở khổ điện thoại.
+ *
+ * Track chứa ĐÚNG HAI bản nội dung giống hệt nhau, nên chạy hết -50% là bản thứ
+ * hai đứng đúng chỗ bản thứ nhất vừa rời đi: vòng lặp không có mối nối, không
+ * cần một dòng JavaScript nào.
+ *
+ * Không cần ngoại lệ giảm chuyển động, và KHÔNG được thêm `animation-fill-mode`.
+ * Quy tắc trong tokens.css rút animation về 0,01ms và MỘT vòng; hết vòng đó, vì
+ * không có fill-mode nên phần tử trả về trạng thái chưa hiệu ứng — `transform:
+ * none`, đứng đúng đầu bản thứ nhất. Người tắt hiệu ứng nhận một dải chữ đứng
+ * yên đọc từ đầu câu, không mất chữ nào. Thêm `forwards` là hỏng: nó ghim ở -50%
+ * và bản đứng yên bắt đầu từ giữa câu.
+ */
+@keyframes sora-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.sora-ticker {
+  animation: sora-ticker 24s linear infinite;
+}
+
+/**
+ * Bản đứng yên cho máy tắt hiệu ứng chuyển động.
+ *
+ * Dải chạy dài 1385 điểm ảnh trong khung 375 và khung thì `overflow: hidden` —
+ * đứng im nghĩa là người dùng chỉ đọc được đoạn đầu, còn SỐ TỔNG ĐÀI nằm ngoài
+ * khung và không cách nào tới được. Tắt hiệu ứng không được phép làm mất nội
+ * dung, nên ở chế độ đó ta đổi hẳn sang một hàng ngắn vừa khung.
+ */
+.sora-ticker-tinh {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sora-ticker-khung {
+    display: none;
+  }
+  .sora-ticker-tinh {
+    display: flex;
+  }
+}
+
+/**
+ * Ngoại lệ với quy tắc giảm chuyển động trong tokens.css.
+ *
+ * Quy tắc đó rút MỌI chuyển động về 0,01ms, kể cả hai cái này. Mà đây là chuyển
+ * động một lần, 480ms, không lặp, không nhấp nháy, không kéo cả màn hình —
+ * loại ít gây khó chịu nhất. Không có nó thì băng chuyền đổi cụp một cái, khách
+ * không kịp hiểu vì sao tên món vừa khác đi.
+ *
+ * Muốn tôn trọng tuyệt đối cài đặt của khách thì xoá khối này: hiệu ứng tắt,
+ * băng chuyền vẫn quay, nội dung không mất gì.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .sora-hero-morph {
+    animation-duration: var(--dur-reveal) !important;
+  }
+  .sora-hero-fade {
+    transition-duration: var(--dur-reveal) !important;
+  }
+}

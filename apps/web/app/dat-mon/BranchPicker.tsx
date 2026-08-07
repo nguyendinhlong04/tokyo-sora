@@ -52,7 +52,7 @@ export function BranchPicker({ branches }: { branches: Branch[] }) {
 
   return (
     <>
-      <p className="mt-7 text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
+      <p className="mt-5 text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase sm:mt-7">
         Chi nhánh
       </p>
       <div className="mt-3 grid gap-3">
@@ -64,18 +64,20 @@ export function BranchPicker({ branches }: { branches: Branch[] }) {
               type="button"
               onClick={() => set({ branchId: branch.id })}
               className={[
-                'rounded-md border p-4 text-left transition-colors',
+                /* p-3.5 và hai khoảng 2 bên dưới là phần còn lại của 28 điểm ảnh
+                   phải giành lại cho khối "Cách nhận" — ba thẻ nên mỗi điểm nhân ba */
+                'rounded-md border p-3.5 text-left transition-colors sm:p-4',
                 picked ? 'border-accent bg-surface-4' : 'border-line-3 hover:border-line-4',
               ].join(' ')}
             >
               <span className="text-[length:var(--fs-t2)] font-semibold text-ink-hi">
                 {branch.name}
               </span>
-              <span className="mt-2.5 block text-[length:var(--fs-b2)] leading-relaxed text-ink-body">
+              <span className="mt-2 block sm:mt-2.5 text-[length:var(--fs-b2)] leading-relaxed text-ink-body">
                 {branch.address}
               </span>
               {branch.openHours?.raw ? (
-                <span className="mt-2.5 block font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                <span className="mt-2 block sm:mt-2.5 font-mono text-[length:var(--fs-c1)] text-ink-mute">
                   {branch.openHours.raw}
                 </span>
               ) : null}
@@ -84,7 +86,7 @@ export function BranchPicker({ branches }: { branches: Branch[] }) {
         })}
       </div>
 
-      <p className="mt-7 text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
+      <p className="mt-5 text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase sm:mt-7">
         Cách nhận
       </p>
       <div className="mt-3 flex overflow-hidden rounded-sm border border-line-3">

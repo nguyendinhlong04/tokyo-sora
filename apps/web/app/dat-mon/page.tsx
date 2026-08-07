@@ -13,7 +13,10 @@ export default async function ChooseBranchPage() {
   const branches = await apiGet<Branch[]>('/api/online/branches').catch(() => [])
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pt-6 pb-32">
+    /* Đệm trên hẹp lại trên điện thoại: cả màn O1 phải nằm trọn TRÊN thanh "Xem
+       thực đơn" đang ghim đáy, không thì khách vừa vào đã thấy khối "Cách nhận"
+       bị che một nửa. Thiếu 28 điểm ảnh, chỗ này góp 8. */
+    <main className="mx-auto max-w-2xl px-4 pt-4 pb-32 sm:pt-6">
       <h1 className="font-display text-[length:var(--fs-d2)] leading-tight font-light text-ink-hi">
         Đặt món mang về
       </h1>

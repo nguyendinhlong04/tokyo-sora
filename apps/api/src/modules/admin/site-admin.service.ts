@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { asc, desc, eq, inArray } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import type { Db } from '../../db/client'
-import { branches, siteJobs, sitePosts, staff } from '../../db/schema'
+import { branches, siteHeroImages, siteJobs, sitePosts, staff } from '../../db/schema'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 
@@ -24,12 +24,22 @@ export interface JobInput {
   sort: number
 }
 
+export interface HeroImageInput {
+  imageUrl: string
+  /** null = khung ảnh tĩnh. Có video thì `imageUrl` thành ảnh chờ của nó. */
+  videoUrl: string | null
+  caption: string | null
+  captionJa: string | null
+  published: boolean
+  sort: number
+}
+
 /**
  * A8 — CMS website.
  *
- * Phạm vi cố ý HẸP: tin tức (W8) và tuyển dụng (W9). Đó đúng là hai khối mà
- * `apps/web/content/site.ts` đã hẹn sẵn sẽ chuyển sang đây, và cũng đúng là hai
- * khối duy nhất đổi theo tuần.
+ * Phạm vi cố ý HẸP: tin tức (W8), tuyển dụng (W9) và ảnh hero trang chủ (W1). Đó
+ * đúng là những khối mà `apps/web/content/site.ts` đã hẹn sẵn sẽ chuyển sang đây,
+ * và cũng đúng là những khối đổi theo tuần.
  *
  * Không kéo vào: giá và mô tả món (trung tâm sản phẩm M1 là nguồn duy nhất — §18.1),
  * địa chỉ và giờ mở (A10), câu chuyện bếp trưởng và lời hứa dưới hero (bản sắc
@@ -159,6 +169,69 @@ export class SiteAdminService {
     return { id, deleted: true }
   }
 
+  // ------------------------------------------------- Ảnh hero trang chủ
+
+  async heroImages() {
+    const rows = await this.db
+      .select({ h: siteHeroImages, byName: staff.fullName })
+      .from(siteHeroImages)
+      .leftJoin(staff, eq(staff.id, siteHeroImages.updatedBy))
+      .orderBy(asc(siteHeroImages.sort), asc(siteHeroImages.id))
+
+    return rows.map(({ h, byName }) => ({
+      id: h.id,
+      imageUrl: h.imageUrl,
+      videoUrl: h.videoUrl,
+      caption: h.caption,
+      captionJa: h.captionJa,
+      published: h.published,
+      sort: h.sort,
+      updatedAt: h.updatedAt,
+      updatedBy: byName,
+    }))
+  }
+
+  async createHeroImage(input: HeroImageInput, actor: Actor) {
+    assertHeroImage(input)
+    const [row] = await this.db
+      .insert(siteHeroImages)
+      .values({ ...normaliseHeroImage(input), updatedBy: staffIdOf(actor) })
+      .returning({ id: siteHeroImages.id })
+    await this.write(actor, 'cms.hero-created', 'hero-image', String(row!.id), {
+      imageUrl: input.imageUrl,
+    })
+    return this.heroImageView(row!.id)
+  }
+
+  async updateHeroImage(id: number, input: Partial<HeroImageInput>, actor: Actor) {
+    const [current] = await this.db
+      .select()
+      .from(siteHeroImages)
+      .where(eq(siteHeroImages.id, id))
+    if (!current) throw new NotFoundException('Không có ảnh hero này')
+
+    const next = { ...current, ...input } as HeroImageInput
+    assertHeroImage(next)
+    await this.db
+      .update(siteHeroImages)
+      .set({ ...normaliseHeroImage(next), updatedBy: staffIdOf(actor), updatedAt: new Date() })
+      .where(eq(siteHeroImages.id, id))
+    await this.write(actor, 'cms.hero-updated', 'hero-image', String(id), { ...input })
+    return this.heroImageView(id)
+  }
+
+  async deleteHeroImage(id: number, actor: Actor) {
+    const deleted = await this.db
+      .delete(siteHeroImages)
+      .where(eq(siteHeroImages.id, id))
+      .returning({ imageUrl: siteHeroImages.imageUrl })
+    if (deleted.length === 0) throw new NotFoundException('Không có ảnh hero này')
+    await this.write(actor, 'cms.hero-deleted', 'hero-image', String(id), {
+      imageUrl: deleted[0]!.imageUrl,
+    })
+    return { id, deleted: true }
+  }
+
   // ============================================================== phụ trợ
 
   private async assertJob(input: JobInput) {
@@ -182,6 +255,10 @@ export class SiteAdminService {
 
   private async jobView(id: number) {
     return (await this.jobs()).find((j) => j.id === id)!
+  }
+
+  private async heroImageView(id: number) {
+    return (await this.heroImages()).find((h) => h.id === id)!
   }
 
   private async write(
@@ -216,6 +293,23 @@ function normalisePost(input: PostInput) {
     excerpt: input.excerpt?.trim() || null,
     publishedOn: input.publishedOn,
     published: input.published,
+  }
+}
+
+function assertHeroImage(input: HeroImageInput) {
+  // Ảnh bắt buộc kể cả khi có video: nó là ảnh chờ trong lúc video tải, và là
+  // thứ khách thấy khi máy họ không phát được video.
+  if (!input.imageUrl.trim()) throw new BadRequestException('Ảnh hero phải có đường dẫn ảnh')
+}
+
+function normaliseHeroImage(input: HeroImageInput) {
+  return {
+    imageUrl: input.imageUrl.trim(),
+    videoUrl: input.videoUrl?.trim() || null,
+    caption: input.caption?.trim() || null,
+    captionJa: input.captionJa?.trim() || null,
+    published: input.published,
+    sort: input.sort,
   }
 }
 

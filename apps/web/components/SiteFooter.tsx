@@ -40,9 +40,13 @@ export async function SiteFooter() {
               </p>
             ) : null}
             {branch.phone ? (
+              /* Nới vùng chạm lên 44 mà KHÔNG đội bố cục lên: đệm dọc thêm 24,
+                 lề âm trừ lại đúng 24 (trên -6 vì đệm 12 đã thay cho `mt-1.5` cũ,
+                 dưới -12 để triệt tiêu hẳn). Số tổng đài là thứ khách bấm thật,
+                 không thể để nó là một dòng chữ cao 20. */
               <a
                 href={`tel:${branch.phone.replace(/\s/g, '')}`}
-                className="mt-1.5 block font-mono text-[length:var(--fs-c1)] text-accent-ink"
+                className="-mt-1.5 -mb-3 inline-flex items-center py-3 font-mono text-[length:var(--fs-c1)] text-accent-ink"
               >
                 {branch.phone}
               </a>
@@ -53,19 +57,27 @@ export async function SiteFooter() {
 
       <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 border-t border-surface-4 px-5 pt-6 pb-12 lg:px-10">
         <span className="text-[length:var(--fs-c1)] text-line-4">© 2026 Tokyo Sora</span>
+        {/* Cùng lối với số tổng đài bên trên: đệm dọc 12 nâng vùng chạm lên 44,
+            lề âm 12 trả lại chỗ nên hàng chân trang không cao thêm điểm nào.
+            GIỮ NGUYÊN `gap-6`: bốn mục này xuống dòng trên điện thoại, mà mỗi mục
+            đang ăn lấn 12 ra ngoài hộp của nó cả trên lẫn dưới — khoảng cách 24
+            là vừa đúng để hai hàng chạm nhau chứ không chồng vùng chạm. Rút gap
+            xuống là hai hàng đè lên nhau và bấm nhầm mục. */}
         <div className="flex flex-wrap gap-6">
-          <Link href="/lien-he" className="text-[length:var(--fs-c1)] text-ink-mute">
-            Liên hệ
-          </Link>
-          <Link href="/lien-he#tuyen-dung" className="text-[length:var(--fs-c1)] text-ink-mute">
-            Tuyển dụng
-          </Link>
-          <Link href="/dat-ban" className="text-[length:var(--fs-c1)] text-ink-mute">
-            Đặt bàn
-          </Link>
-          <Link href="/dat-mon" className="text-[length:var(--fs-c1)] text-ink-mute">
-            Đặt món mang về
-          </Link>
+          {[
+            { href: '/lien-he', label: 'Liên hệ' },
+            { href: '/lien-he#tuyen-dung', label: 'Tuyển dụng' },
+            { href: '/dat-ban', label: 'Đặt bàn' },
+            { href: '/dat-mon', label: 'Đặt món mang về' },
+          ].map((muc) => (
+            <Link
+              key={muc.href}
+              href={muc.href}
+              className="-my-3 inline-flex items-center py-3 text-[length:var(--fs-c1)] text-ink-mute"
+            >
+              {muc.label}
+            </Link>
+          ))}
         </div>
       </div>
     </footer>

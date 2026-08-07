@@ -10,8 +10,9 @@ import {
   type ReactNode,
 } from 'react'
 import type { OnlineDish } from '../../lib/api'
+import { ORDER_STORAGE_KEY, type ReceiveMode } from '../../lib/order-draft'
 
-export type ReceiveMode = 'takeaway' | 'delivery'
+export type { ReceiveMode }
 
 export interface CartLine {
   dishId: string
@@ -64,8 +65,6 @@ export function useOrder() {
   return value
 }
 
-const STORAGE_KEY = 'sora.web.order'
-
 /**
  * Giỏ và các lựa chọn của luồng đặt món, sống qua bốn màn O1 → O6.
  *
@@ -75,23 +74,28 @@ const STORAGE_KEY = 'sora.web.order'
  */
 export function OrderProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<OrderDraft>(EMPTY)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(STORAGE_KEY)
+      const raw = sessionStorage.getItem(ORDER_STORAGE_KEY)
       if (raw) setDraft({ ...EMPTY, ...(JSON.parse(raw) as OrderDraft) })
     } catch {
       // Trình duyệt chặn lưu trữ — luồng vẫn chạy, chỉ không sống qua lần tải lại
     }
+    setLoaded(true)
   }, [])
 
   useEffect(() => {
+    // Chưa đọc xong thì chưa được ghi: bản rỗng ban đầu mà ghi ra trước là xoá
+    // mất lựa chọn trang chủ vừa gửi sang qua `seedOrderDraft`.
+    if (!loaded) return
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+      sessionStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(draft))
     } catch {
       // như trên
     }
-  }, [draft])
+  }, [draft, loaded])
 
   const set = useCallback(
     (patch: Partial<OrderDraft>) => setDraft((current) => ({ ...current, ...patch })),

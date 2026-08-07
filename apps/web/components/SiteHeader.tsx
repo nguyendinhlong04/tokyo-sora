@@ -21,13 +21,20 @@ export function SiteHeader() {
     href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
-    <header className="sticky top-0 z-50 border-b border-accent/16 bg-canvas/94 backdrop-blur-md">
+    /* Dính ngay DƯỚI dải vàng (`SiteTopBar`, cao 32 · 40 · 44) chứ không lên tận
+       đỉnh: hai thanh cùng đòi `top-0` thì thanh này đè lên dải chữ chạy */
+    <header className="sticky top-8 z-50 border-b border-accent/16 bg-canvas/94 backdrop-blur-md sm:top-10 lg:top-11">
       <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-6 px-5 lg:h-20 lg:gap-10 lg:px-10">
         <Link href="/" className="flex flex-none items-baseline gap-2.5">
           <span className="text-[length:var(--fs-c1)] font-semibold tracking-[0.18em] text-ink-hi lg:tracking-[0.2em]">
             TOKYO SORA
           </span>
-          <span className="font-jp text-[length:var(--fs-c1)] text-accent">{SITE.kanji}</span>
+          {/* Máy dưới 360 điểm ảnh (iPhone SE đời đầu, màn ngoài máy gập) không đủ
+              chỗ cho chữ hiệu + hai nút + hamburger: thiếu 26 điểm và nút hamburger
+              lòi ra ngoài màn. Bỏ chữ Nhật ở đúng dải đó, giữ nguyên mọi khổ khác. */}
+          <span className="font-jp text-[length:var(--fs-c1)] text-accent max-[359px]:hidden">
+            {SITE.kanji}
+          </span>
         </Link>
 
         <nav className="mx-auto hidden items-center gap-7 lg:flex">
@@ -53,7 +60,9 @@ export function SiteHeader() {
           </Link>
           <Link
             href="/dat-ban"
-            className="inline-flex h-9 items-center rounded-sm bg-accent-strong px-3.5 text-[length:var(--fs-c1)] font-semibold text-on-accent transition-colors hover:bg-accent lg:h-11 lg:px-6 lg:text-[length:var(--fs-b2)]"
+            /* 44 chứ không 36 kể cả trên điện thoại: đây là nút bán hàng chính,
+               mà 36 thì dưới ngưỡng ngón tay của cả Apple lẫn Google */
+            className="inline-flex h-11 items-center rounded-sm bg-accent-strong px-4 text-[length:var(--fs-c1)] font-semibold text-on-accent transition-colors hover:bg-accent lg:px-6 lg:text-[length:var(--fs-b2)]"
           >
             Đặt bàn
           </Link>

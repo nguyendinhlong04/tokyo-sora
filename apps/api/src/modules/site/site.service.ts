@@ -10,6 +10,7 @@ import {
   dishes,
   setGroupItems,
   setGroups,
+  siteHeroImages,
   siteJobs,
   sitePosts,
   tables,
@@ -129,6 +130,29 @@ export class SiteService {
       .leftJoin(branches, eq(branches.id, siteJobs.branchId))
       .where(eq(siteJobs.published, true))
       .orderBy(asc(siteJobs.sort), asc(siteJobs.id))
+    return rows
+  }
+
+  /**
+   * W1 — ảnh và video hero trang chủ, xếp ở A8.
+   *
+   * Trần 8 khung: hero dựng sẵn mọi ảnh trong DOM rồi mờ chồng lên nhau, nên
+   * khung thứ chín trở đi chỉ làm trang nặng chứ khách không kịp xem tới. Danh
+   * sách rỗng thì trang chủ tự quay về ảnh năm món ký như trước khi có màn này.
+   */
+  async heroImages() {
+    const rows = await this.db
+      .select({
+        id: siteHeroImages.id,
+        imageUrl: siteHeroImages.imageUrl,
+        videoUrl: siteHeroImages.videoUrl,
+        caption: siteHeroImages.caption,
+        captionJa: siteHeroImages.captionJa,
+      })
+      .from(siteHeroImages)
+      .where(eq(siteHeroImages.published, true))
+      .orderBy(asc(siteHeroImages.sort), asc(siteHeroImages.id))
+      .limit(8)
     return rows
   }
 

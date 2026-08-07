@@ -44,7 +44,10 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
             <a
               key={group.id}
               href={`#nhom-${group.id}`}
-              className="flex h-9 flex-none items-center gap-1.5 rounded-pill border border-line-3 px-3.5 text-[length:var(--fs-b2)] text-ink-body"
+              /* 44 chứ không 36: đây là điều hướng chính của màn gọi món, mà 36
+                 dưới ngưỡng ngón tay. Thanh cao thêm 8 nên `scroll-mt` của các
+                 nhóm bên dưới phải nới theo, xem chú ở đó. */
+              className="flex h-11 flex-none items-center gap-1.5 rounded-pill border border-line-3 px-3.5 text-[length:var(--fs-b2)] text-ink-body"
             >
               {group.kanji ? <span className="font-jp text-accent">{group.kanji}</span> : null}
               {group.nameVi}
@@ -53,7 +56,10 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
         </nav>
 
         {groups.map((group) => (
-          <section key={group.id} id={`nhom-${group.id}`} className="scroll-mt-28">
+          /* 120 = thanh trên 56 + thanh nhóm 60 (chip 44 + đệm 8×2) + 4 thở.
+             Nhảy tới một nhóm mà dừng ở 112 như trước là tiêu đề nhóm chui xuống
+             dưới đúng cái thanh vừa bấm. */
+          <section key={group.id} id={`nhom-${group.id}`} className="scroll-mt-30">
             <header className="px-1 pt-8 pb-4 text-center">
               <h2 className="font-display text-[length:var(--fs-d3)] font-light text-ink-hi">
                 {group.nameVi}
@@ -73,7 +79,12 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
                 <button
                   type="button"
                   onClick={() => setOpen(dish)}
-                  className="flex flex-1 items-center gap-3.5 text-left"
+                  /* `min-w-0` là bắt buộc, không phải cho đẹp: mặc định flex-item
+                     có `min-width:auto` nên không co dưới bề rộng nội dung, mà
+                     `truncate` bên trong là `nowrap` — min-content của nó bằng CẢ
+                     câu mô tả. Thiếu một chữ này thì trên điện thoại hàng món đẩy
+                     nút + ra ngoài màn hình. */
+                  className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
                 >
                   <span className="grid h-22 w-22 flex-none place-items-center rounded-md border border-line-1 bg-[radial-gradient(120%_100%_at_50%_20%,var(--sora-line-1)_0%,var(--sora-surface-4)_74%)]">
                     <span className="font-jp text-[40px] leading-none text-gold-900">

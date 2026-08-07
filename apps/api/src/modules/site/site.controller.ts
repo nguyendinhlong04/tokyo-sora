@@ -34,4 +34,11 @@ export class SiteController {
   jobs() {
     return this.site.jobs()
   }
+
+  /** W1 — ảnh hero trang chủ, xếp ở A8 */
+  @Public()
+  @Get('hero')
+  hero() {
+    return this.site.heroImages()
+  }
 }

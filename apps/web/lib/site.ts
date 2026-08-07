@@ -126,6 +126,22 @@ export interface SitePost {
   publishedOn: string
 }
 
+/**
+ * W1 — một khung nền của hero trang chủ, xếp ở Office A8.
+ *
+ * Danh sách rỗng là trạng thái BÌNH THƯỜNG, không phải lỗi: trang chủ lùi về ảnh
+ * của năm món ký như trước khi A8 có màn này.
+ */
+export interface SiteHeroImage {
+  id: number
+  imageUrl: string
+  /** Video chiếu đè lên ảnh; null là khung ảnh tĩnh. Ảnh thành ảnh chờ của video. */
+  videoUrl: string | null
+  /** Chữ lớn của hero, chỗ trước đây in tên món. Bỏ trống thì trang chủ in tên quán. */
+  caption: string | null
+  captionJa: string | null
+}
+
 /** W9 — vị trí đang tuyển. `branchName` null nghĩa là tuyển cho cả ba chi nhánh. */
 export interface SiteJob {
   id: number
@@ -160,6 +176,10 @@ export function getPosts(): Promise<SitePost[]> {
 
 export function getJobs(): Promise<SiteJob[]> {
   return siteGet<SiteJob[]>('/api/site/jobs', [])
+}
+
+export function getHeroImages(): Promise<SiteHeroImage[]> {
+  return siteGet<SiteHeroImage[]>('/api/site/hero', [])
 }
 
 // ------------------------------------------------------------------ tiện ích

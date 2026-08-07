@@ -169,6 +169,20 @@
       "when": 1786008528310,
       "tag": "0023_minor_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786080488919,
+      "tag": "0024_sloppy_post",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786086428847,
+      "tag": "0025_smart_vulture",
+      "breakpoints": true
     }
   ]
 }
