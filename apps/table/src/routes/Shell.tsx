@@ -154,11 +154,11 @@ function ScanAgain({ ended }: { ended: boolean }) {
     <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-canvas px-8 text-center">
       <span className="font-jp text-[56px] leading-none text-gold-900">{ended ? '謝' : '空'}</span>
       <p className="text-[length:var(--fs-t2)] font-medium text-ink-hi">
-        {ended ? 'Cảm ơn quý khách.' : 'Chưa vào được bàn nào.'}
+        {ended ? 'Cảm ơn quý khách!' : 'Chưa vào được bàn nào.'}
       </p>
       <p className="text-[length:var(--fs-b1)] text-ink-body">
         {ended
-          ? 'Bàn đã được dọn và bữa ăn kết thúc. Hẹn gặp lại quý khách ở Tokyo Sora.'
+          ? 'Hẹn gặp lại quý khách ở Tokyo Sora lần sau.'
           : 'Quét mã QR dán trên bàn để bắt đầu. Nếu quét rồi mà vẫn thấy màn này, nhờ nhân viên mở bàn giúp bạn.'}
       </p>
       {ended ? null : (
