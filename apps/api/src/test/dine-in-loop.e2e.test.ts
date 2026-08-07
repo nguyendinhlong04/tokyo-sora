@@ -785,6 +785,53 @@ describe('7. Thu tiền, đóng bàn, đóng ca (P10 · P11 · P14)', () => {
     expect(reopen.statusCode).toBe(201)
   })
 
+  /**
+   * Bàn mở nhầm, hoặc khách ngồi xuống rồi bỏ đi trước khi gọi món: tổng 0đ,
+   * không nợ gì. Phải đóng được — không thì ô bàn kẹt "Có khách" vĩnh viễn,
+   * không ai xếp được khách mới, và mã QR của khách cũ vẫn sống.
+   *
+   * Bàn A4 vừa được mở lại ở bài ngay trên và chưa gọi món nào.
+   */
+  it('bàn chưa gọi món nào (0đ) vẫn đóng được', async () => {
+    const floor = await inject({
+      method: 'GET',
+      url: `/api/tables?branch=${fx.branchId}`,
+      headers: auth(cashier),
+    })
+    const session = floor
+      .json<{ code: string; session: { id: number; total: number } | null }[]>()
+      .find((t) => t.code === 'A4')!.session
+    expect(session, 'bàn A4 phải đang mở').not.toBeNull()
+    expect(session!.total).toBe(0)
+
+    const bill = (
+      await inject({
+        method: 'GET',
+        url: `/api/table-sessions/${session!.id}/bill`,
+        headers: auth(cashier),
+      })
+    ).json<{ total: number; outstanding: number }>()
+    expect(bill.total).toBe(0)
+    expect(bill.outstanding).toBe(0)
+
+    const res = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${session!.id}/close`,
+      headers: auth(cashier),
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+
+    const after = await inject({
+      method: 'GET',
+      url: `/api/tables?branch=${fx.branchId}`,
+      headers: auth(cashier),
+    })
+    const freed = after
+      .json<{ code: string; session: unknown | null }[]>()
+      .find((t) => t.code === 'A4')!
+    expect(freed.session, 'đóng xong bàn phải trống').toBeNull()
+  })
+
   it('đóng ca đối chiếu quỹ: đếm khớp thì lệch bằng 0', async () => {
     const shift = (
       await inject({ method: 'GET', url: '/api/shifts/open', headers: auth(cashier) })

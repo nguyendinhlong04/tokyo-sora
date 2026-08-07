@@ -57,7 +57,22 @@ export function Pay() {
   })
 
   const outstanding = bill.data?.outstanding ?? 0
-  const fullyPaid = bill.data ? bill.data.outstanding === 0 && bill.data.total > 0 : false
+  /**
+   * Bàn KHÔNG CÒN NỢ GÌ thì đóng được — không đòi phải có tiền.
+   *
+   * Điều kiện cũ đòi thêm `total > 0`. Hệ quả: bàn mở nhầm, hoặc khách ngồi
+   * xuống rồi bỏ đi trước khi gọi món (tổng 0đ), không hiện nút đóng ở đâu cả —
+   * mà đây là chỗ DUY NHẤT trong toàn hệ thống gọi được lệnh đóng bàn. Ô bàn
+   * đứng "Có khách" vĩnh viễn, không xếp được khách mới, và mã QR của khách cũ
+   * vẫn sống vì mã chỉ chết khi bàn đóng.
+   *
+   * Máy chủ vốn đã cho đóng bàn 0đ — nó chỉ chặn khi CÒN NỢ (floorplan.service
+   * `closeSession`). Nên đây là giao diện khớp lại với quy tắc sẵn có, không
+   * phải nới quy tắc ra.
+   */
+  const settled = bill.data ? bill.data.outstanding === 0 : false
+  /** Chưa gọi món nào — báo "đã thu đủ" ở đây là nói sai, chẳng thu gì cả */
+  const nothingOrdered = (bill.data?.total ?? 0) === 0
   /**
    * Số tiền một lượt thu riêng, do P9 "tách theo %" tính sẵn rồi đưa sang.
    * Kẹp theo số còn phải trả: bill có thể đã thu bớt trong lúc nhân viên chọn.
@@ -91,7 +106,7 @@ export function Pay() {
         </Card>
       ) : null}
 
-      {!fullyPaid ? (
+      {!settled ? (
         <Card className="flex flex-col gap-4 p-5">
           <SectionLabel>Tiền mặt</SectionLabel>
           <div className="flex items-baseline justify-between">
@@ -130,9 +145,13 @@ export function Pay() {
           </Button>
         </Card>
       ) : (
-        <Card className="flex flex-col gap-4 border-ok p-5">
-          <p className="text-[length:var(--fs-b1)] text-ok">
-            Đã thu đủ. Bàn đang ở trạng thái “chờ dọn” — dọn xong thì đóng bàn.
+        <Card className={`flex flex-col gap-4 p-5 ${nothingOrdered ? 'border-line-3' : 'border-ok'}`}>
+          <p
+            className={`text-[length:var(--fs-b1)] ${nothingOrdered ? 'text-ink-body' : 'text-ok'}`}
+          >
+            {nothingOrdered
+              ? 'Bàn này chưa gọi món nào. Đóng lại để trả bàn về trống.'
+              : 'Đã thu đủ. Bàn đang ở trạng thái “chờ dọn” — dọn xong thì đóng bàn.'}
           </p>
           <Button variant="primary" size="lg" block disabled={close.isPending} onClick={() => close.mutate()}>
             Đóng bàn {tableCode}
