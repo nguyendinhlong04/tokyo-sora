@@ -99,6 +99,28 @@ trên điện thoại riêng bằng link chuyển tiếp được, một bên l�
 | `sora-staff` | `apps/staff` | `nv.tokyosora.vn` — Kênh nhân viên (H8 · H9) |
 | `sora-kiosk` | `apps/kiosk` | `chamcong.tokyosora.vn` — kiosk chấm công (H10) |
 
+### Ignored Build Step — đường dẫn phải neo từ gốc repo
+
+Mỗi `vercel.json` có một `ignoreCommand` để commit chỉ dựng lại app thật sự thay đổi.
+Đường dẫn trong đó **bắt buộc mang tiền tố `:/`**:
+
+```json
+"ignoreCommand": "git diff --quiet HEAD^ HEAD -- ':/apps/web' ':/packages' ':/pnpm-lock.yaml' ':/pnpm-workspace.yaml' ':/package.json'"
+```
+
+Vercel chạy lệnh này **từ Root Directory của project** (`apps/web`), không phải từ gốc
+repo. Viết `apps/web` trần thì git hiểu là `apps/web/apps/web` — thư mục không tồn tại,
+git báo "không có gì đổi", lệnh trả về 0 và Vercel **bỏ build**. Tiền tố `:/` là cú pháp
+pathspec của git, nghĩa là "tính từ đỉnh cây làm việc", nên đúng ở mọi thư mục.
+
+> Lỗi này **im lặng và trông như thành công**: GitHub hiện đủ tám dấu tích xanh, chỉ có
+> dòng chữ nhỏ "Canceled by Ignored Build Step". Đã có một ngày mọi commit đều báo xanh
+> mà production không hề nhúc nhích. Kiểm nhanh sau khi sửa `ignoreCommand`:
+>
+> ```bash
+> cd apps/web && git diff --quiet HEAD^ HEAD -- ':/apps/web'; echo $?   # 1 = sẽ build
+> ```
+
 **Một giá trị bắt buộc phải sửa:** trong `vercel.json` của mọi SPA có dòng
 
 ```json
