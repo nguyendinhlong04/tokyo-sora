@@ -55,13 +55,31 @@ export function useMenu(branchId: string) {
     refetchInterval: 20_000,
   })
 
+  /**
+   * Món coi như HẾT gồm cả "còn N phần" đã tụt về 0.
+   *
+   * Máy chủ vẫn để trạng thái `limited` khi phần cuối được gọi — nó chỉ đổi khi
+   * bếp bấm. Chỉ lọc theo `sold_out` thì món hết sạch vẫn hiện bình thường,
+   * khách chọn xong bấm gửi bếp mới nhận lỗi từ chối.
+   */
   const soldOut = useMemo(
     () =>
       new Set(
-        (availability.data ?? []).filter((a) => a.status === 'sold_out').map((a) => a.dishId),
+        (availability.data ?? [])
+          .filter((a) => a.status === 'sold_out' || (a.remaining ?? 0) <= 0)
+          .map((a) => a.dishId),
       ),
     [availability.data],
   )
+
+  /** Còn mấy phần — chỉ cho món đang ở chế độ "còn N" và vẫn còn hàng */
+  const remainingOf = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const row of availability.data ?? []) {
+      if (row.status === 'limited' && (row.remaining ?? 0) > 0) map.set(row.dishId, row.remaining!)
+    }
+    return map
+  }, [availability.data])
 
   // Món tắt "cho gọi trên Sora Table" ở Office thì khách không thấy — có món chỉ
   // bán tại quầy hoặc chỉ phục vụ khi nhân viên tư vấn.
@@ -80,6 +98,7 @@ export function useMenu(branchId: string) {
     categories: config.data?.categories ?? [],
     dishes,
     soldOut,
+    remainingOf,
     /** Nhóm tuỳ chọn của một món, đúng thứ tự đã khai trong danh mục */
     groupsOf: (dish: Dish): ModifierGroup[] =>
       dish.modifierGroupIds

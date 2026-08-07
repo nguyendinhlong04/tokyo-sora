@@ -12,6 +12,7 @@ export function DishRow({
   dish,
   soldOut,
   needsChoice = false,
+  remaining = null,
   qty = 0,
   onOpen,
   onAdd,
@@ -20,6 +21,8 @@ export function DishRow({
   soldOut: boolean
   /** Món phải chọn vị / số người ăn — chấm vàng báo trước rằng nút + sẽ mở chi tiết */
   needsChoice?: boolean
+  /** Bếp đang giới hạn "còn N phần" — nói trước để khách khỏi gọi hụt */
+  remaining?: number | null
   /** Đã có mấy phần món này trong giỏ — 0 thì không hiện gì */
   qty?: number
   onOpen: () => void
@@ -51,6 +54,12 @@ export function DishRow({
           <span className="mt-1.5 flex flex-wrap items-center gap-2">
             <Money amount={dish.price} className="text-[length:var(--fs-b1)] text-accent-ink" />
             {soldOut ? <Badge tone="danger">Tạm hết</Badge> : null}
+            {/*
+              "Còn 12" chứ không phải "Còn 12 phần": đo trên màn 375px, nhãn dài
+              làm hàng giá xuống dòng thứ hai rồi tràn 15px khỏi dòng cao cố định
+              104px với món tên dài. Nhãn ngắn giữ nguyên mốc cũ.
+            */}
+            {!soldOut && remaining !== null ? <Badge tone="warn">Còn {remaining}</Badge> : null}
           </span>
         </span>
       </button>

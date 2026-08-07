@@ -278,6 +278,27 @@ export class OrderingService {
         children.map((c) => c.dishId),
         tx,
       )
+
+      /**
+       * Từng món TRONG SET cũng phải qua cửa 86.
+       *
+       * Kiểm ở trên chỉ soi mã của chính cái set, mà set thì gần như không bao
+       * giờ bị báo hết — bếp báo hết "nầm bò", không ai đi báo hết "Set Sora".
+       * Thiếu vòng này thì bếp báo hết nầm bò xong khách vẫn đặt được set có nầm
+       * bò, và vé nầm bò vẫn nhảy lên màn bếp.
+       *
+       * Gộp theo món trước khi trừ: một set có thể lấy cùng một món ở hai nhóm,
+       * trừ hai lần rời rạc thì lần sau tưởng còn hàng trong khi lần trước đã ăn
+       * hết phần.
+       */
+      const needByDish = new Map<string, number>()
+      for (const child of children) {
+        needByDish.set(child.dishId, (needByDish.get(child.dishId) ?? 0) + child.qty)
+      }
+      for (const [childDishId, need] of needByDish) {
+        await this.assertAvailable(tx, branchId, childDishId, need)
+      }
+
       for (const child of children) {
         const childDish = childCatalog.get(child.dishId)
         if (!childDish) throw new NotFoundException(`Set chứa món không tồn tại: ${child.dishId}`)
@@ -729,7 +750,7 @@ export class OrderingService {
         .where(eq(orderLines.id, lineId))
 
       // Dòng set cha bị huỷ thì các món thành phần đi theo
-      await tx
+      const voidedChildren = await tx
         .update(orderLines)
         .set({
           state: 'voided',
@@ -738,6 +759,31 @@ export class OrderingService {
           approvalId,
         })
         .where(and(eq(orderLines.parentLineId, lineId), sql`${orderLines.state} <> 'voided'`))
+        .returning({ dishId: orderLines.dishId, qty: orderLines.qty })
+
+      /**
+       * Trả phần đã trừ về trần "còn N phần" của K5.
+       *
+       * Lúc gọi món, mỗi dòng đã ăn vào `remaining`. Huỷ mà không cộng lại thì
+       * mỗi lần khách đổi ý là kho ảo hụt đi một phần, tới cuối ca bếp còn hàng
+       * trong tủ mà máy đã báo hết.
+       *
+       * Chỉ cộng cho món đang ở chế độ "còn N": món báo hết hẳn có `remaining`
+       * bằng null, và mở lại nó là quyết định của bếp chứ không phải hệ quả của
+       * một lượt huỷ món.
+       */
+      for (const back of [{ dishId: line.dishId, qty: line.qty }, ...voidedChildren]) {
+        await tx
+          .update(dishAvailability)
+          .set({ remaining: sql`${dishAvailability.remaining} + ${back.qty}` })
+          .where(
+            and(
+              eq(dishAvailability.branchId, order!.branchId),
+              eq(dishAvailability.dishId, back.dishId),
+              eq(dishAvailability.status, 'limited'),
+            ),
+          )
+      }
 
       const voidedItems = await tx
         .update(ticketItems)

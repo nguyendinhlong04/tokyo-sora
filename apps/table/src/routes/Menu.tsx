@@ -187,6 +187,7 @@ export function Menu() {
                         dish={dish}
                         soldOut={menu.soldOut.has(dish.id)}
                         needsChoice={needsChoice(menu.groupsOf(dish))}
+                        remaining={menu.remainingOf.get(dish.id) ?? null}
                         qty={cart.qtyOf(dish.id)}
                         onOpen={() => setOpen(dish)}
                         onAdd={() => addOrOpen(dish)}
@@ -200,6 +201,7 @@ export function Menu() {
                     dish={dish}
                     soldOut={menu.soldOut.has(dish.id)}
                     needsChoice={needsChoice(menu.groupsOf(dish))}
+                    remaining={menu.remainingOf.get(dish.id) ?? null}
                     qty={cart.qtyOf(dish.id)}
                     onOpen={() => setOpen(dish)}
                     onAdd={() => addOrOpen(dish)}
