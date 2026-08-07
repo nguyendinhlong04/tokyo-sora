@@ -52,9 +52,23 @@ type ScreenId = 'queue' | 'totals' | 'holding' | 'soldout' | 'expo'
 const SCREENS: { id: ScreenId; label: string; code: string }[] = [
   { id: 'queue', label: 'Hàng vé', code: 'K2' },
   { id: 'totals', label: 'Tổng món', code: 'K3' },
-  { id: 'holding', label: 'Chờ ra', code: 'K4' },
+  /**
+   * K4 Chờ ra TẠM ẨN — không xoá.
+   *
+   * Chưa màn nào cho chọn đợt lúc gọi món nên mọi món đều vào đợt 1 và xuống bếp
+   * ngay: khối "Đợt sau" gần như luôn rỗng. Còn vé hẹn giờ thì tới mốc là máy tự
+   * đẩy sang K2, bếp không phải mở tab này mới được nấu. Một tab trống quanh năm
+   * chỉ tổ chiếm chỗ trên thanh điều hướng.
+   *
+   * Bật lại: bỏ chú thích dòng dưới. Màn `Holding`, chip cam đếm vé và số "N chờ
+   * ra" ở đầu màn vẫn còn nguyên, không phải dựng lại gì.
+   */
+  // { id: 'holding', label: 'Chờ ra', code: 'K4' },
   { id: 'soldout', label: 'Hết món', code: 'K5' },
-  { id: 'expo', label: 'Expo', code: 'K6' },
+  // Nhãn là "Ra món" chứ không phải "Expo": không ai trong bếp hiểu chữ Expo.
+  // Tên trong code giữ nguyên `expo` — nó còn là tên đường dẫn API và phòng
+  // realtime, đổi theo chỉ tổ rước rủi ro mà nhân viên chẳng thấy khác gì.
+  { id: 'expo', label: 'Ra món', code: 'K6' },
 ]
 
 function Shell({ onUnpair }: { onUnpair: () => void }) {
@@ -82,6 +96,8 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
 
   useScreenWakeLock()
 
+  // Chỉ còn nuôi chip cam trên tab K4 — tab đang ẩn nên số này không hiện ở đâu.
+  // Giữ lại để bật lại K4 là xong, không phải dựng lại phép đếm.
   const waitingCount = (queue.data?.tickets ?? []).filter((t) => t.state === 'waiting').length
   // Vé `ready` còn nằm trên màn cho tới hết cửa sổ hoàn tác, nhưng nó KHÔNG còn
   // là việc đang chạy: đếm nó vào đây là vừa sai nhãn ở đầu màn, vừa hoãn bản
@@ -116,10 +132,7 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
           <span className="text-[length:var(--fs-t1)] font-semibold text-ink-hi">
             {queue.data?.station.name ?? 'Màn bếp'}
           </span>
-          <span className="text-[length:var(--fs-b2)] text-ink-mute">
-            {liveCount} vé đang chạy
-            {waitingCount > 0 ? ` · ${waitingCount} chờ ra` : ''}
-          </span>
+          <span className="text-[length:var(--fs-b2)] text-ink-mute">{liveCount} vé đang chạy</span>
         </div>
 
         <nav className="flex gap-1">

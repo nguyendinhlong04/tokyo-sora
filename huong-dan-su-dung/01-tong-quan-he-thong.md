@@ -12,7 +12,7 @@ chốt → sổ sách & báo cáo.
 | **Sora Web** | `tokyosora.vn` | `:3001` | Khách online — xem menu, đặt bàn, đặt món mang về/giao hàng | Điện thoại, máy tính của khách |
 | **Sora Table** | `ban.tokyosora.vn/t/<token>` | `:5173` | Khách tại bàn — quét QR gọi món, tự thanh toán | Điện thoại của khách |
 | **Sora POS** | `pos.tokyosora.vn` | `:5174` | Phục vụ, thu ngân, lễ tân | Tablet 11″ + máy thu ngân 22″ |
-| **Sora Kitchen (KDS)** | `kds.tokyosora.vn` | `:5175` | Đầu bếp từng trạm, expo | TV 32–43″ + Android box, treo trong bếp |
+| **Sora Kitchen (KDS)** | `kds.tokyosora.vn` | `:5175` | Đầu bếp từng trạm, người ra món | TV 32–43″ + Android box, treo trong bếp |
 | **Sora Office** | `admin.tokyosora.vn` | `:5176` | Chủ, quản lý chuỗi, kế toán, nhân sự, marketing | Máy tính văn phòng |
 | **Kênh nhân viên** | `nv.tokyosora.vn` | `:5178` | Mọi nhân viên — xem lịch, công, phiếu lương của chính mình | Điện thoại cá nhân |
 | **Kiosk chấm công** | `chamcong.tokyosora.vn` | `:5179` | Mọi nhân viên — chấm vào/ra ca | Tablet 10″ gắn cố định ở chi nhánh |
@@ -34,7 +34,7 @@ flowchart TD
     POS["SORA POS<br/>pos.tokyosora.vn<br/>phục vụ · thu ngân · điều phối"]
 
     ORDER["API — ORDER SERVICE<br/>nguồn sự thật của mọi đơn"]
-    KDS["SORA KITCHEN<br/>kds.tokyosora.vn<br/>vé bếp theo trạm + expo"]
+    KDS["SORA KITCHEN<br/>kds.tokyosora.vn<br/>vé bếp theo trạm + ra món"]
 
     STAFF["KÊNH NHÂN VIÊN<br/>nv.tokyosora.vn"]
     KIOSK["KIOSK CHẤM CÔNG<br/>chamcong.tokyosora.vn"]
@@ -128,7 +128,7 @@ dòng theo trạm và tạo một vé cho mỗi trạm** (không phải một v�
 | ST-05 | Quầy đồ uống | 酒 | Toàn bộ đồ uống |
 | ST-06 | Bếp nướng | 焼 | Nướng hộ, ra chín |
 
-**Expo** không phải một trạm — là màn K6 đọc vé của toàn chi nhánh để kiểm đủ
+**Ra món** không phải một trạm — là màn K6 đọc vé của toàn chi nhánh để kiểm đủ
 món trước khi ra.
 
 Ba quy tắc định tuyến cần nhớ khi vận hành:
@@ -151,7 +151,7 @@ flowchart LR
     E --> S3["Vé ST-03 Chiên xào hấp"]
     E --> S4["Vé ST-04 Lẩu cơm mì"]
     E --> S5["Vé ST-05 Quầy đồ uống"]
-    S1 --> X["Expo — gom theo bàn/đơn,<br/>kiểm đủ món trước khi ra"]
+    S1 --> X["Ra món — gom theo bàn/đơn,<br/>kiểm đủ món trước khi ra"]
     S2 --> X
     S6 --> X
     S3 --> X

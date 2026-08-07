@@ -7,7 +7,7 @@ cho một nhóm người dùng — in riêng chương cần thiết phát cho đ
 |---|---|---|
 | [1 · Tổng quan hệ thống](01-tong-quan-he-thong.md) | Mọi người — **đọc trước tiên** | 8 ứng dụng, sơ đồ kiến trúc, vòng đời đơn, 6 trạm bếp, vai trò & đăng nhập |
 | [2 · Sora POS](02-pos.md) | Phục vụ · thu ngân · lễ tân · quản lý ca | Mở bàn, gọi món, tính tiền, đóng ca, điều phối đơn online, đặt bàn |
-| [3 · Màn hình bếp (KDS)](03-man-hinh-bep.md) | Đầu bếp · expo · bếp trưởng | Nhận vé, báo xong, báo hết món, expo kiểm món |
+| [3 · Màn hình bếp (KDS)](03-man-hinh-bep.md) | Đầu bếp · người ra món · bếp trưởng | Nhận vé, báo xong, báo hết món, kiểm đủ món trước khi ra |
 | [4 · Sora Table](04-khach-goi-mon-tai-ban.md) | Phục vụ (hướng dẫn khách) | Khách quét QR gọi món, tự thanh toán VietQR, chia tiền |
 | [5 · Sora Web](05-website-dat-mon-dat-ban.md) | Quản lý · marketing | Website khách: đặt món online, đặt bàn, nội dung |
 | [6 · Sora Office](06-office.md) | Chủ · quản lý chuỗi · kế toán · thủ kho · nhân sự · marketing | Món & giá, kho, kinh doanh & CRM, nhân sự, chi phí, kế toán, quản trị |

@@ -1,4 +1,4 @@
-# 3 · Màn hình bếp (KDS) — đầu bếp · expo · bếp trưởng
+# 3 · Màn hình bếp (KDS) — đầu bếp · người ra món · bếp trưởng
 
 Màn bếp chạy tại `kds.tokyosora.vn` trên TV 32–43″ gắn Android box, treo ở từng
 trạm. Màn tự giữ sáng, chữ cỡ lớn, nút cao 72px để bấm được khi đeo găng.
@@ -16,8 +16,8 @@ ghim; mã sống 10 phút, dùng đúng một lần. Nhập đủ 6 số là t�
   góc trái trên ngay sau khi ghép (xem thêm bài kiểm 5 phút trong
   [THIET-BI.md](../THIET-BI.md)).
 
-Thanh điều hướng dưới tên trạm gồm 5 tab: **K2 Hàng vé · K3 Tổng món · K4 Chờ
-ra · K5 Hết món · K6 Expo** (tab Chờ ra có chip cam đếm số vé đang chờ).
+Thanh điều hướng dưới tên trạm gồm 4 tab: **K2 Hàng vé · K3 Tổng món · K5 Hết
+món · K6 Ra món**.
 
 ## 3.2 Hàng vé (K2) — màn làm việc chính
 
@@ -62,17 +62,17 @@ thời gian đã trôi so với thời gian chuẩn của món:
 Đồng hồ tính theo giờ máy chủ (TV box sai giờ không làm vé đỏ oan) và dừng lại
 khi bấm `Xong`.
 
-## 3.3 Tổng món (K3) & Chờ ra (K4)
+## 3.3 Tổng món (K3)
 
-- **K3 Tổng món** — gộp các vé đang chạy theo món: `7× CƠM CHIÊN HẢI SẢN`, dưới
-  liệt kê từng bàn `Bàn A4 ×2…` để nấu gộp một mẻ rồi chia. Ghi chú khách vẫn
-  hiện đầy đủ.
-- **K4 Chờ ra** — hai khối riêng:
-  - `Đơn hẹn giờ — đếm ngược tới lúc phải bắt đầu`: đồng hồ **chạy ngược** tới
-    giờ phải nấu (giờ hẹn trừ thời gian nấu). Còn hơn 5 phút viền xanh `Chưa tới
-    giờ nấu`; còn ≤5 phút số chuyển vàng; quá mốc viền đỏ nhấp nháy `Phải nấu
-    ngay`. Logic ngược với vé tại bàn — để đơn online không bị nấu sớm rồi nguội.
-  - `Đợt sau — chờ phục vụ bấm "Ra đợt tiếp"`: không chạy đồng hồ.
+**K3 Tổng món** gộp các vé đang chạy theo món: `7× CƠM CHIÊN HẢI SẢN`, dưới liệt
+kê từng bàn `Bàn A4 ×2…` để nấu gộp một mẻ rồi chia. Ghi chú khách vẫn hiện đầy
+đủ.
+
+> **Tab K4 Chờ ra đang ẩn.** Nó chỉ để *nhìn trước* các vé chưa được nấu, không
+> có nút nào bấm được, và hiện gần như luôn trống. Đơn hẹn giờ tới lúc phải nấu
+> là **tự vào K2**, không cần ai mở tab nào; đợt sau của bàn thì chờ phục vụ bấm
+> `Ra đợt tiếp` bên POS. Cần bật lại thì báo kỹ thuật — màn vẫn còn nguyên trong
+> máy.
 
 ## 3.4 Báo hết món (K5)
 
@@ -88,7 +88,11 @@ Hiệu lực **tức thì trên mọi kênh**: menu trên điện thoại khách
 POS và menu đặt online khoá món trong vài giây; khách có món đó trong giỏ sẽ
 thấy thông báo "vừa hết — đã bỏ khỏi giỏ". Mọi lượt báo hết đều ghi nhật ký.
 
-## 3.5 Expo (K6)
+## 3.5 Ra món (K6)
+
+Màn của người đứng **quầy ra món** — gom món của cùng một bàn từ mọi bếp về một
+chỗ, để biết bàn nào đã đủ món mà bưng đi. Các tab kia xem theo *trạm*, riêng tab
+này xem theo *bàn*.
 
 Màn **chỉ đọc** — không có nút "ra món". Hai khối:
 
