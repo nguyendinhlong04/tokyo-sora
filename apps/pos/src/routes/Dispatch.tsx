@@ -218,7 +218,13 @@ function OrderCard({
         ) : null}
       </button>
 
-      {order.status === 'new' ? (
+      {/*
+        Hỏi máy chủ chứ không xét `status === 'new'`: xác nhận đơn online là việc
+        của thu ngân · quản lý ca · điều phối · chủ. Phục vụ (R1) mở được bảng này
+        nhưng không được xác nhận, nên xét theo trạng thái là bày ra một cái nút
+        bấm vào chỉ nhận về "vai trò hiện tại không được phép".
+      */}
+      {order.nextStatuses.includes('confirmed') ? (
         <Button variant="primary" block className="mt-3" onClick={onConfirm}>
           Xác nhận · xuống bếp
         </Button>

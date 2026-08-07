@@ -140,8 +140,21 @@ export function DispatchRail() {
                 ) : null}
               </div>
 
+              {/*
+                Nút đổi bước hỏi MÁY CHỦ (`nextStatuses`), không tự suy từ `status`.
+
+                Bản cũ tự suy và sai hai chỗ, cả hai đều là nút bấm vào chỉ để nhận
+                thông báo lỗi:
+
+                · "Đóng gói xong" hiện ở cả `confirmed` — máy trạng thái không có
+                  đường đi thẳng sang `ready` — lẫn `cooking`, vốn là bước của bếp
+                  nên thu ngân bấm là bị chặn quyền. Mà bước này bếp bấm Xong là
+                  đơn tự sang, không cần ai bấm hộ.
+                · "Đã giao" hiện cho đơn GIAO đang `ready`, bỏ qua bước `delivering`
+                  mà nghiệp vụ bắt phải đi qua — có đi giao mới biết ai cầm đơn.
+              */}
               <div className="mt-3 flex flex-wrap gap-2">
-                {order.status === 'new' ? (
+                {order.nextStatuses.includes('confirmed') ? (
                   <Button
                     variant="primary"
                     onClick={() => step.mutate({ order, to: 'confirmed' })}
@@ -160,13 +173,13 @@ export function DispatchRail() {
                 {order.type === 'delivery' ? (
                   <Button onClick={() => setShipFor(order)}>Gán ship</Button>
                 ) : null}
-                {order.status === 'confirmed' || order.status === 'cooking' ? (
+                {order.nextStatuses.includes('ready') ? (
                   <Button onClick={() => step.mutate({ order, to: 'ready' })}>Đóng gói xong</Button>
                 ) : null}
-                {order.status === 'ready' && order.type === 'delivery' ? (
+                {order.nextStatuses.includes('delivering') ? (
                   <Button onClick={() => step.mutate({ order, to: 'delivering' })}>Đi giao</Button>
                 ) : null}
-                {order.status === 'ready' || order.status === 'delivering' ? (
+                {order.nextStatuses.includes('done') ? (
                   <Button onClick={() => step.mutate({ order, to: 'done' })}>
                     {order.type === 'delivery' ? 'Đã giao' : 'Khách đã lấy'}
                   </Button>

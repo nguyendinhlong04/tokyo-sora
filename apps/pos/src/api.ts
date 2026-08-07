@@ -200,6 +200,8 @@ export interface DispatchCard {
   address: string | null
   externalCode: string | null
   itemCount: number
+  /** Bước bấm được với vai trò đang đăng nhập — POS không tự đoán luật §3 */
+  nextStatuses: DispatchCard['status'][]
 }
 
 /** O9 — chi tiết đơn trong ngăn kéo bên phải */
@@ -219,8 +221,6 @@ export interface DispatchDetail extends DispatchCard {
     modifiers: { name: string }[] | null
     state: string
   }[]
-  /** Bước bấm được với vai trò đang đăng nhập — POS không tự đoán */
-  nextStatuses: DispatchCard['status'][]
 }
 
 /** P12 — một yêu cầu khách bấm từ bàn (T9) */

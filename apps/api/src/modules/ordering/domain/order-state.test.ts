@@ -156,6 +156,36 @@ describe('nextStatuses — nguồn để UI chỉ hiện nút bấm được', (
   })
 })
 
+/**
+ * Ba nút mà dải điều phối P16 và ngăn kéo O9 từng tự dựng lấy, mỗi cái đều bấm
+ * vào là báo lỗi. Luật ở đây vốn đã đúng — cái sai là màn hình đoán lại nó. Giữ
+ * mấy bài này để lần sau ai định dựng nút từ `status` thì thấy ngay vì sao không.
+ */
+describe('Nút bấm được — nguồn cho dải điều phối, không cho UI đoán lại', () => {
+  it('không có đường "Đóng gói xong" đi thẳng từ confirmed sang ready', () => {
+    expect(applyTransition('confirmed', 'ready', OWNER())).toMatchObject({
+      ok: false,
+      code: 'invalid-transition',
+    })
+  })
+
+  it('thu ngân ở bước confirmed KHÔNG thấy nút nào ngoài huỷ — đóng gói là việc bếp', () => {
+    expect(nextStatuses('confirmed', CASHIER)).toEqual(['cancelled'])
+  })
+
+  it('thu ngân ở bước cooking không còn nút nào: hết huỷ, mà đóng gói cũng không phải việc mình', () => {
+    expect(nextStatuses('cooking', CASHIER)).toEqual([])
+  })
+
+  it('đơn GIAO đang ready chỉ có "Đi giao", tuyệt đối không có "Đã giao"', () => {
+    expect(nextStatuses('ready', ctx('delivery', 'R2'))).toEqual(['delivering'])
+  })
+
+  it('đơn MANG VỀ đang ready thì ngược lại: chỉ có "Khách đã lấy"', () => {
+    expect(nextStatuses('ready', ctx('takeaway', 'R2'))).toEqual(['done'])
+  })
+})
+
 describe('Suy trạng thái đơn từ vé bếp — bếp bấm là đơn tự đổi bước', () => {
   it('vé đầu tiên bắt đầu nấu ⇒ đơn sang cooking', () => {
     expect(deriveStatusFromTickets('confirmed', ['cooking', 'queued'])).toBe('cooking')

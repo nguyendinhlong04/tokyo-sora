@@ -272,7 +272,16 @@ export function OrderDrawer({
               </Button>
             ))}
 
-          {order && order.status !== 'cancelled' && order.status !== 'done' ? (
+          {/*
+            Nút huỷ cũng hỏi máy chủ, y như mấy nút bước tiếp theo ngay trên.
+
+            Trước đây nó tự xét "chưa huỷ và chưa hoàn tất thì cho huỷ", trong khi
+            luật §3 khoá huỷ từ lúc món lên bếp. Hệ quả: đơn đang nấu vẫn hiện nút,
+            nhân viên mở hộp thoại, chọn lý do, bấm — rồi mới nhận "Không thể huỷ,
+            món đã lên bếp". Câu đó phải nói TRƯỚC khi họ gõ, mà cách nói đúng nhất
+            là đừng bày cái nút ra.
+          */}
+          {(order?.nextStatuses ?? []).includes('cancelled') ? (
             <Button variant="ghost" block className="text-danger" onClick={() => setCancelling(true)}>
               Huỷ đơn
             </Button>

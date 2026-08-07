@@ -43,7 +43,11 @@ export class DispatchService {
    * nằm sau đơn hẹn 12:00 đặt lúc 11:30. Đơn không hẹn giờ (tại bàn) xếp theo
    * giờ tạo.
    */
-  async board(branchId: string, filter: { businessDate?: string; status?: OrderStatus } = {}) {
+  async board(
+    branchId: string,
+    actor: Actor,
+    filter: { businessDate?: string; status?: OrderStatus } = {},
+  ) {
     const rows = await this.db
       .select()
       .from(orders)
@@ -60,10 +64,11 @@ export class DispatchService {
       .orderBy(asc(sql`coalesce(${orders.slotAt}, ${orders.createdAt})`))
 
     const itemCounts = await this.itemCountsOf(rows.map((o) => o.id))
+    const roles = this.rolesOf(actor)
 
     return {
       serverTime: new Date(),
-      orders: rows.map((o) => this.card(o, itemCounts.get(o.id) ?? 0)),
+      orders: rows.map((o) => this.card(o, itemCounts.get(o.id) ?? 0, roles)),
     }
   }
 
@@ -94,7 +99,7 @@ export class DispatchService {
       .orderBy(asc(orderLines.id))
 
     return {
-      ...this.card(order),
+      ...this.card(order, 0, this.rolesOf(actor)),
       customer: order.customer,
       shipper: order.shipper,
       cancelReason: order.cancelReason,
@@ -117,11 +122,6 @@ export class DispatchService {
         modifiers: l.modifiers,
         state: l.state,
       })),
-      /** Nút nào bấm được với vai trò hiện tại — POS không đoán, hỏi máy chủ */
-      nextStatuses: nextStatuses(order.status as OrderStatus, {
-        orderType: order.type as OrderType,
-        roles: this.rolesOf(actor),
-      }),
     }
   }
 
@@ -363,7 +363,14 @@ export class DispatchService {
     return rows.map((o) => this.card(o))
   }
 
-  private card(order: typeof orders.$inferSelect, itemCount = 0) {
+  /**
+   * Thẻ đơn.
+   *
+   * `nextStatuses` đi kèm THẺ chứ không chỉ nằm ở màn chi tiết: dải điều phối P16
+   * bày nút bấm ngay trên thẻ, và khi nó tự đoán luật thì đoán sai — sinh ra nút
+   * bấm vào là báo lỗi. Luật đi bước nào chỉ có một chỗ giữ, là máy trạng thái §3.
+   */
+  private card(order: typeof orders.$inferSelect, itemCount = 0, roles: ActorRole[] = []) {
     const customer = (order.customer ?? {}) as Record<string, unknown>
     return {
       id: order.id,
@@ -381,6 +388,11 @@ export class DispatchService {
       address: typeof customer.address === 'string' ? customer.address : null,
       externalCode: typeof customer.externalCode === 'string' ? customer.externalCode : null,
       itemCount,
+      /** Bước bấm được với vai trò đang đăng nhập — POS không tự đoán */
+      nextStatuses: nextStatuses(order.status as OrderStatus, {
+        orderType: order.type as OrderType,
+        roles,
+      }),
     }
   }
 

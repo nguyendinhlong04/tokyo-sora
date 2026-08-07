@@ -70,7 +70,7 @@ export class DispatchController {
     const actor = req.actor!
     if (actor.kind === 'system') throw new BadRequestException('Không đọc được')
     const parsed = status ? z.enum(ORDER_STATUSES).parse(status) : undefined
-    return this.dispatch.board(branch ?? actor.branchId, {
+    return this.dispatch.board(branch ?? actor.branchId, actor, {
       businessDate: date,
       status: parsed,
     })
