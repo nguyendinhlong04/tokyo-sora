@@ -316,7 +316,9 @@ export class ModifierAdminService {
    * đúng kênh mà món dùng — POS đang mở không tự biết bảng vị vừa đổi.
    */
   private async announce(tx: Tx, entityId: string) {
-    const targets = await this.db.select({ id: branches.id }).from(branches)
+    // Đọc bằng `tx`, KHÔNG bằng pool — xem ghi chú ở `catalog-admin.emitUpdate`:
+    // trên Vercel pool chỉ có một kết nối và transaction đang giữ nó.
+    const targets = await tx.select({ id: branches.id }).from(branches)
     for (const branch of targets) {
       await emit(tx, {
         branchId: branch.id,

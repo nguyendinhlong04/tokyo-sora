@@ -862,9 +862,12 @@ export class CatalogAdminService {
    * quán đều nghe.
    */
   private async emitUpdate(tx: Parameters<typeof emit>[0], dishId: string, branchId?: string) {
+    // Đọc bằng `tx`, KHÔNG bằng pool: hàm này luôn chạy trong transaction, mà trên
+    // Vercel pool chỉ có một kết nối — transaction đang giữ nó, nên xin thêm một
+    // cái nữa là ngồi chờ tới lúc timeout. Cùng loại lỗi đã làm chết đặt bàn.
     const targets = branchId
       ? [branchId]
-      : (await this.db.select({ id: branches.id }).from(branches)).map((b) => b.id)
+      : (await tx.select({ id: branches.id }).from(branches)).map((b) => b.id)
     for (const id of targets) {
       await emit(tx, {
         branchId: id,

@@ -143,9 +143,13 @@ export class ReservationsService {
     return this.params.getNumber(DEPOSIT_KEYS[seatKind], 0, branchId)
   }
 
-  /** Ngày quán không nhận đặt (R3 "chặn ngày") — kèm lý do để người trực trả lời khách */
-  private async blockedDay(branchId: string, date: string) {
-    const [row] = await this.db
+  /**
+   * Ngày quán không nhận đặt (R3 "chặn ngày") — kèm lý do để người trực trả lời khách.
+   *
+   * Nhận `db` để gọi được TỪ TRONG transaction: xem ghi chú ở `branch()`.
+   */
+  private async blockedDay(branchId: string, date: string, db: Db | Tx = this.db) {
+    const [row] = await db
       .select()
       .from(reservationBlockedDays)
       .where(and(eq(reservationBlockedDays.branchId, branchId), eq(reservationBlockedDays.day, date)))
@@ -562,18 +566,25 @@ export class ReservationsService {
     rules: SlotRules,
     ignoreHoldId?: number,
   ) {
-    const branch = await this.branch(query.branchId)
+    /*
+      MỌI truy vấn ở đây phải đi qua `tx`, không được chạm vào pool.
+
+      Hàm này luôn chạy bên trong transaction của `hold()` và `confirm()`. Xin
+      thêm một kết nối từ pool lúc đó là tự khoá chính mình khi pool chỉ có một
+      kết nối — xem ghi chú dài ở `branch()`.
+    */
+    const branch = await this.branch(query.branchId, tx)
     const now = new Date()
 
     // Lưới đã tô xám cả ngày bị chặn, nhưng không gì ngăn ai gọi thẳng API
-    const blocked = await this.blockedDay(query.branchId, businessDate)
+    const blocked = await this.blockedDay(query.branchId, businessDate, tx)
     if (blocked) {
       throw new ConflictException({
         code: 'blocked_day',
         message: `Ngày này chi nhánh không nhận đặt bàn — ${blocked.reason}`,
       })
     }
-    const capacity = await this.capacityFor(query.branchId, query.seatKind, query.guestCount)
+    const capacity = await this.capacityFor(query.branchId, query.seatKind, query.guestCount, tx)
     const existing = await this.liveBookings(tx, query, businessDate, dayStart, ignoreHoldId)
 
     const slots = buildReservationSlots({
@@ -595,8 +606,13 @@ export class ReservationsService {
    * Trần của R3 cắt bớt con số này chứ không thay nó: có trần mà không có bàn thì
    * vẫn là không có bàn.
    */
-  private async capacityFor(branchId: string, seatKind: SeatKind, guestCount: number) {
-    const [row] = await this.db
+  private async capacityFor(
+    branchId: string,
+    seatKind: SeatKind,
+    guestCount: number,
+    db: Db | Tx = this.db,
+  ) {
+    const [row] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(tables)
       .where(
@@ -711,8 +727,18 @@ export class ReservationsService {
     return date
   }
 
-  private async branch(branchId: string) {
-    const [branch] = await this.db.select().from(branches).where(eq(branches.id, branchId))
+  /**
+   * Nhận `db` để dùng được CẢ TRONG transaction.
+   *
+   * Gọi hàm này bằng pool trong khi một transaction đang chạy là tự khoá chính
+   * mình: transaction giữ một kết nối, truy vấn này xin kết nối THỨ HAI, và trên
+   * Vercel `DATABASE_POOL_MAX=1` nên không còn cái nào để cấp. Nó ngồi chờ tới
+   * khi hết hạn rồi ném "timeout exceeded when trying to connect" — chính là lỗi
+   * làm chức năng đặt bàn chết trên production trong khi máy lập trình vẫn chạy
+   * ngon (pool 10 kết nối, luôn còn dư).
+   */
+  private async branch(branchId: string, db: Db | Tx = this.db) {
+    const [branch] = await db.select().from(branches).where(eq(branches.id, branchId))
     if (!branch) throw new NotFoundException(`Không có chi nhánh ${branchId}`)
     return branch
   }
