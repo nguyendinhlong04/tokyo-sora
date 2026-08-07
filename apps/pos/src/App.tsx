@@ -1,8 +1,16 @@
 import { watchConnectivity } from '@sora/core'
 import { Button, OutboxBanner, ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router'
+import { useEffect, useState, type ReactNode } from 'react'
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router'
 import { api } from './api'
 import { usePwaUpdate } from './pwa'
 import { Dispatch } from './routes/Dispatch'
@@ -68,6 +76,45 @@ export function App() {
 
 /** Máy nào đang bật trạm thu ngân thì lần mở sau vẫn là trạm thu ngân */
 const STATION_KEY = 'sora.pos.station'
+
+/**
+ * Mục điều hướng có đánh dấu MÀN ĐANG MỞ.
+ *
+ * Trước đây mọi mục đều là `ghost` giống hệt nhau, nên nhìn thanh trên cùng
+ * không biết mình đang đứng ở đâu — nhân viên phải đoán qua nội dung bên dưới.
+ *
+ * Mục đang mở đổi hẳn nền và đậm chữ, kèm vạch vàng dưới chân, đúng cách màn
+ * bếp đánh dấu tab của nó. Nền vàng đặc (`primary`) KHÔNG dùng làm dấu "đang
+ * mở": ở thanh này nó đang mang nghĩa "có việc chờ xử lý", và một tín hiệu gánh
+ * hai nghĩa thì hỏng cả hai. Mục đang mở mà vốn là `primary` thì nhường lại dấu
+ * "đang mở" — số việc còn tồn vẫn nằm ngay trong nhãn, không mất thông tin.
+ */
+function NavButton({
+  to,
+  variant = 'ghost',
+  children,
+}: {
+  to: string
+  variant?: 'ghost' | 'primary'
+  children: ReactNode
+}) {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const active = pathname === to
+
+  return (
+    <Button
+      variant={active ? 'ghost' : variant}
+      aria-current={active ? 'page' : undefined}
+      onClick={() => void navigate(to)}
+      className={
+        active ? 'bg-surface-3 font-semibold text-ink-hi shadow-[inset_0_-2px_0_var(--t-accent)]' : ''
+      }
+    >
+      {children}
+    </Button>
+  )
+}
 
 /** Khung chung: chưa đăng nhập ca thì mọi màn vận hành đều đẩy về P1 */
 function Shell() {
@@ -138,24 +185,53 @@ function Shell() {
 
   return (
     <div className="min-h-dvh bg-canvas text-ink-body">
-      <header className="flex h-14 items-center justify-between border-b border-line-1 px-4">
-        <div className="flex items-center gap-3">
+      {/*
+        Ba khối, không phải hai.
+
+        Trước đây mọi thứ dồn hết vào khối phải: bảy mục điều hướng đứng lẫn với
+        Đóng ca, Đăng xuất và hai dải báo trạng thái. Đo trên màn POS 1366 thì chỉ
+        cần banner "có bản mới" hiện lên là thanh tràn 35px — mà banner đó bật lên
+        sau MỖI lần triển khai.
+
+        Tách ra: điều hướng nằm giữa và CUỘN NGANG khi chật, còn khối phải giữ
+        `shrink-0` nên Đóng ca với Đăng xuất không bao giờ bị đẩy khỏi màn — đó là
+        hai nút mà mất đi thì nhân viên kẹt hẳn trong ca.
+      */}
+      <header className="flex h-14 items-center gap-4 border-b border-line-1 px-4">
+        <div className="flex shrink-0 items-center gap-3">
           <span className="font-jp text-accent-ink">空</span>
           <span className="text-[length:var(--fs-b2)] text-ink-hi">{staff.fullName}</span>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" onClick={() => void navigate('/dieu-phoi')}>
+
+        <nav className="scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          {/*
+            Đường về sơ đồ bàn.
+
+            Thiếu nút này thì mọi nút còn lại đều là đường một chiều: bấm sang
+            Đặt bàn hay Đơn online xong là kẹt ở đó, phải gõ tay `/floor` vào
+            thanh địa chỉ mới ra được — mà máy POS ngoài sàn thường chạy toàn
+            màn hình, không có thanh địa chỉ để mà gõ.
+
+            Đứng ĐẦU dãy vì sơ đồ bàn là màn gốc của POS, không phải một mục
+            ngang hàng với mấy màn kia.
+          */}
+          <NavButton to="/floor">Sơ đồ bàn</NavButton>
+          <NavButton to="/dieu-phoi">
             Đơn online{liveOnline > 0 ? ` · ${liveOnline}` : ''}
-          </Button>
-          <Button variant="ghost" onClick={() => void navigate('/dat-cho')}>
+          </NavButton>
+          <NavButton to="/dat-cho">
             Đặt bàn{bookingsToday > 0 ? ` · ${bookingsToday}` : ''}
-          </Button>
-          <Button
-            variant={pendingRequests > 0 ? 'primary' : 'ghost'}
-            onClick={() => void navigate('/yeu-cau')}
-          >
+          </NavButton>
+          <NavButton to="/kenh-ngoai">Kênh ngoài</NavButton>
+          <NavButton to="/qua-gio">Quá giờ</NavButton>
+          <NavButton to="/doi-soat">Đối soát</NavButton>
+          <NavButton to="/yeu-cau" variant={pendingRequests > 0 ? 'primary' : 'ghost'}>
             Yêu cầu từ bàn{pendingRequests > 0 ? ` · ${pendingRequests}` : ''}
-          </Button>
+          </NavButton>
+        </nav>
+
+        <div className="flex shrink-0 items-center gap-3">
+          {/* Trạm thu ngân là CÔNG TẮC của máy này, không phải một màn để mở */}
           <Button variant={station ? 'primary' : 'ghost'} onClick={toggleStation}>
             Trạm thu ngân
           </Button>
@@ -170,9 +246,7 @@ function Shell() {
           ) : null}
           <OutboxBanner />
           {/* Đóng ca là ĐẾM KÉT rồi mới đăng xuất — không phải chỉ rời máy */}
-          <Button variant="ghost" onClick={() => void navigate('/dong-ca')}>
-            Đóng ca
-          </Button>
+          <NavButton to="/dong-ca">Đóng ca</NavButton>
           <Button
             variant="ghost"
             onClick={async () => {

@@ -6,3 +6,23 @@
    nên bị bỏ qua. Thiếu dòng này thì mọi class CHỈ xuất hiện trong package dùng chung
    không được sinh CSS — nút size lg tụt từ 55px xuống 24px, dưới sàn chạm 44px. */
 @source '../../../packages/ui/src';
+
+/*
+  Ẩn thanh cuộn NGANG của dãy điều hướng trên cùng, vẫn cuộn được bằng vuốt,
+  bánh xe và phím.
+
+  Thanh cuộn cao 15px trong một dải chỉ cao 56px sẽ ăn mất một phần tư chiều cao
+  và cắt ngang chữ. Ở đây ẩn được vì dãy này không phải vùng nội dung: mục nào
+  cũng nằm trong tầm với bằng một cú vuốt, và mục đang mở luôn được đánh dấu nên
+  không ai lạc chỗ. Đừng dùng cho vùng nội dung chính — ở đó thanh cuộn chính là
+  chỉ báo "còn nữa ở dưới".
+*/
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+}
