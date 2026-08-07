@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- apps/office packages pnpm-lock.yaml pnpm-workspace.yaml package.json",
   "framework": "vite",
   "buildCommand": "pnpm --filter @sora/contracts build && pnpm --filter @sora/office build",
   "installCommand": "pnpm install --frozen-lockfile",
