@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "git rev-parse --verify -q HEAD^ >/dev/null || exit 1; git diff --quiet HEAD^ HEAD -- ':/apps/pos' ':/packages' ':/pnpm-lock.yaml' ':/pnpm-workspace.yaml' ':/package.json'",
+  "ignoreCommand": "BASE=\"$VERCEL_GIT_PREVIOUS_SHA\"; if [ -z \"$BASE\" ] || ! git cat-file -e \"$BASE^{commit}\" 2>/dev/null; then BASE=$(git rev-parse --verify -q HEAD^) || exit 1; fi; git diff --quiet \"$BASE\" HEAD -- ':/apps/pos' ':/packages' ':/pnpm-lock.yaml' ':/pnpm-workspace.yaml' ':/package.json'",
   "framework": "vite",
   "buildCommand": "pnpm --filter @sora/contracts build && pnpm --filter @sora/pos build",
   "installCommand": "pnpm install --frozen-lockfile",
