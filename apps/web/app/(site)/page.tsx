@@ -253,54 +253,59 @@ export default async function HomePage() {
           aria-hidden
           className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,8,10,0.42),rgba(7,8,10,0.62))]"
         />
-        <div className="relative mx-auto grid max-w-[1280px] items-center gap-8 px-5 py-12 lg:grid-cols-[360px_1fr] lg:gap-20 lg:px-10 lg:py-24">
+        {/* Một hàng ngang trên laptop, ba dòng gọn trên điện thoại.
+            Bản trước ăn 467 điểm ảnh — 57% màn điện thoại — cho đúng một việc là
+            chọn hai ô rồi bấm. Phần lớn chỗ đó là nhãn thừa và đệm. */}
+        <div className="relative mx-auto flex max-w-[1280px] flex-col gap-5 px-5 py-9 lg:flex-row lg:items-center lg:justify-between lg:gap-14 lg:px-10 lg:py-20">
           <div>
-            <h2 className="font-display text-[30px] leading-tight font-light text-ink-hi lg:text-[length:var(--fs-d2)]">
+            <h2 className="font-display text-[26px] leading-tight font-light text-ink-hi lg:text-[length:var(--fs-d2)]">
               Còn bàn tối nay
             </h2>
-            <p className="mt-4 text-[length:var(--fs-b1)] leading-relaxed text-gold-200">
-              Chọn ngày và số khách, chúng tôi hiện giờ còn trống ngay.
+            <p className="mt-2 text-[length:var(--fs-b2)] text-gold-200 lg:mt-3 lg:text-[length:var(--fs-b1)]">
+              Chọn ngày và số khách, chỗ trống hiện ra ngay.
             </p>
           </div>
 
           {/* GET sang W6: không mang gì hơn ngày và số khách — thông tin cá nhân
-              không đi qua thanh địa chỉ */}
-          <form action="/dat-ban" className="grid gap-3.5 lg:grid-cols-[1fr_1fr_auto] lg:gap-4">
-            <label className="block">
-              <span className="mb-2 block text-[length:var(--fs-c2)] font-semibold tracking-[0.08em] text-gold-200 uppercase">
-                Ngày
-              </span>
-              <select
-                name="ngay"
-                defaultValue={dates[0]!.value}
-                className="h-13 w-full rounded-sm border border-ink-hi/28 bg-canvas/50 px-3.5 text-[length:var(--fs-b1)] text-ink-hi"
-              >
-                {dates.map((d) => (
-                  <option key={d.value} value={d.value}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-[length:var(--fs-c2)] font-semibold tracking-[0.08em] text-gold-200 uppercase">
-                Số khách
-              </span>
-              <select
-                name="khach"
-                defaultValue="4"
-                className="h-13 w-full rounded-sm border border-ink-hi/28 bg-canvas/50 px-3.5 text-[length:var(--fs-b1)] text-ink-hi"
-              >
-                {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
-                  <option key={n} value={n}>
-                    {n} khách
-                  </option>
-                ))}
-              </select>
-            </label>
+              không đi qua thanh địa chỉ.
+
+              KHÔNG còn nhãn nổi trên mỗi ô: ô ngày đọc thẳng "Hôm nay", ô khách
+              đọc "4 khách" — hai nhãn "NGÀY" và "SỐ KHÁCH" chỉ nói lại đúng thứ
+              ô bên dưới đang hiện, mà ngốn hai dòng. Tên cho trình đọc màn hình
+              chuyển sang `aria-label`, không mất gì. */}
+          <form
+            action="/dat-ban"
+            className="grid grid-cols-2 gap-2.5 lg:flex lg:flex-none lg:gap-3"
+          >
+            <select
+              name="ngay"
+              aria-label="Ngày"
+              defaultValue={dates[0]!.value}
+              className="h-12 w-full rounded-sm border border-ink-hi/28 bg-canvas/50 px-3.5 text-[length:var(--fs-b2)] text-ink-hi lg:w-[168px] lg:text-[length:var(--fs-b1)]"
+            >
+              {dates.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+            <select
+              name="khach"
+              aria-label="Số khách"
+              defaultValue="4"
+              className="h-12 w-full rounded-sm border border-ink-hi/28 bg-canvas/50 px-3.5 text-[length:var(--fs-b2)] text-ink-hi lg:w-[140px] lg:text-[length:var(--fs-b1)]"
+            >
+              {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
+                <option key={n} value={n}>
+                  {n} khách
+                </option>
+              ))}
+            </select>
+            {/* Trải hết bề ngang trên điện thoại: nút gửi là việc cuối, cho nó
+                một dòng riêng thì ngón cái không phải nhắm */}
             <button
               type="submit"
-              className="h-13 rounded-sm border border-ink-hi px-7 text-[length:var(--fs-b1)] font-semibold whitespace-nowrap text-ink-hi transition-colors hover:bg-ink-hi hover:text-canvas lg:self-end"
+              className="col-span-2 h-12 rounded-sm border border-ink-hi px-7 text-[length:var(--fs-b2)] font-semibold whitespace-nowrap text-ink-hi transition-colors hover:bg-ink-hi hover:text-canvas lg:col-auto lg:text-[length:var(--fs-b1)]"
             >
               Tìm bàn trống
             </button>

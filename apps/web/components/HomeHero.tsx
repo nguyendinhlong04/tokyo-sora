@@ -186,18 +186,30 @@ export function HomeHero({ slides, branches }: { slides: HeroSlide[]; branches: 
       {/* ------------------------------------------ Bước đầu của việc đặt món */}
       {/* Cụm chọn cố tình nhỏ và hẹp: nó là bước đầu của việc đặt, không phải nhân
           vật chính của màn — ảnh món mới là thứ phải được nhìn thấy trước */}
-      <div className="relative mx-auto w-full max-w-[400px] px-5 pt-5 lg:max-w-[520px] lg:pt-7">
-        <div className="mx-auto flex w-fit gap-1 rounded-pill border border-ink-hi/12 bg-canvas/70 p-[3px] backdrop-blur-md lg:p-1">
+      {/* Khung của cụm chọn. Trên điện thoại bó ở 272 chứ không thả theo bề ngang
+          màn: ô chi nhánh là `w-full` nên thả ra là nó dài 335 và biến thành một
+          thanh trắng vắt ngang hero, nặng hơn cả tên món. Bó lại còn 232 — vẫn
+          thừa chỗ cho tên chi nhánh dài nhất, mà ảnh món lấy lại được nền.
+          Cặp nút chọn cách nhận không ảnh hưởng vì nó `w-fit mx-auto`. */}
+      <div className="relative mx-auto w-full max-w-[272px] px-5 pt-5 sm:max-w-[400px] lg:max-w-[520px] lg:pt-7">
+        {/* Đệm 2 chứ không 3: nút 36 + đệm 4 + viền 2 = viên cao 42, ngang tầm ô
+            chi nhánh 40 ngay dưới. Đệm 1 thì ra đúng 40 nhưng viên trắng bên trong
+            gần như dính vào viền, xấu hơn là được 2 điểm ảnh. */}
+        <div className="mx-auto flex w-fit gap-1 rounded-pill border border-ink-hi/12 bg-canvas/70 p-0.5 backdrop-blur-md lg:p-1">
           {MODES.map((option) => (
             <button
               key={option.id}
               type="button"
               onClick={() => setMode(option.id)}
               aria-pressed={mode === option.id}
-              /* 38 trên điện thoại, 44 từ laptop. Dưới 38 thì cú chạm ĐẦU TIÊN
-                 của luồng đặt món bắt đầu khó trúng — đó là sàn, không phải chỗ
-                 để tiết kiệm thêm vài điểm ảnh */
-              className={`h-[38px] rounded-pill px-4 text-[length:var(--fs-c1)] font-semibold transition-colors lg:h-11 lg:px-6 ${
+              /* 36 trên điện thoại, 44 từ laptop. Cộng đệm và viền của viên bọc
+                 là 42 — ngang tầm ô chi nhánh 40 ngay dưới, nên hai thứ đọc ra
+                 như một bộ. Trước đây viên cao 46, tức cái phụ to hơn cái chính.
+
+                 36 vẫn bấm được thoải mái vì bề NGANG nút hơn trăm điểm ảnh:
+                 vùng chạm rộng, chỉ có chiều dọc là hẹp, và 36 vẫn trên ngưỡng
+                 24 của WCAG khá xa. Đừng hạ tiếp — dưới 32 thì bắt đầu trượt. */
+              className={`h-9 rounded-pill px-3.5 text-[length:var(--fs-c1)] font-semibold transition-colors lg:h-11 lg:px-6 ${
                 mode === option.id ? 'bg-ink-hi text-canvas' : 'text-ink-body hover:text-ink-hi'
               }`}
             >
