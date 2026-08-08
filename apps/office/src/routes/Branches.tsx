@@ -16,6 +16,7 @@ import { useSession } from '../session-context'
 export function Branches() {
   const { can } = useSession()
   const mayEdit = can('admin.manage-accounts-roles')
+  const [adding, setAdding] = useState(false)
 
   const branches = useQuery({ queryKey: ['admin-branches'], queryFn: api.branches })
 
@@ -24,8 +25,16 @@ export function Branches() {
       <PageHeader
         title="Chi nhánh"
         subtitle="Thông tin liên hệ đổ ra trang Không gian, trang Liên hệ, chân trang website và chân hoá đơn. Giờ mở cửa còn là nguồn dựng lưới đặt bàn."
+        action={
+          mayEdit && !adding ? (
+            <Button variant="primary" onClick={() => setAdding(true)}>
+              Thêm chi nhánh
+            </Button>
+          ) : null
+        }
       />
       <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-8 pb-8">
+        {adding ? <NewBranchCard onDone={() => setAdding(false)} /> : null}
         {branches.isPending ? (
           <p className="text-ink-mute">Đang tải…</p>
         ) : (
@@ -35,6 +44,121 @@ export function Branches() {
         )}
       </div>
     </>
+  )
+}
+
+const blankBranch = (): Omit<BranchRow, 'timezone'> => ({
+  id: '',
+  name: '',
+  address: null,
+  phone: null,
+  email: null,
+  openHours: null,
+  active: true,
+})
+
+/**
+ * Mở thêm chi nhánh.
+ *
+ * Chi nhánh dựng ra là RỖNG — chưa khu, chưa bàn, chưa vùng giao. Nói thẳng điều
+ * đó trên màn kèm chỗ phải đi tiếp, vì người vừa tạo xong sẽ mở website ra xem và
+ * thấy một chi nhánh không đặt bàn được, rồi tưởng hỏng.
+ */
+function NewBranchCard({ onDone }: { onDone: () => void }) {
+  const toast = useToast()
+  const queryClient = useQueryClient()
+  const [draft, setDraft] = useState(blankBranch())
+  const set = (patch: Partial<BranchRow>) => setDraft((d) => ({ ...d, ...patch }))
+
+  const create = useMutation({
+    mutationFn: () => api.createBranch(draft),
+    onSuccess: (row) => {
+      toast(`Đã mở chi nhánh ${row.name} — xếp bàn ở A3, khai vùng giao ở O10`, 'ok')
+      void queryClient.invalidateQueries({ queryKey: ['admin-branches'] })
+      onDone()
+    },
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+
+  const maHopLe = /^[a-z0-9-]{2,12}$/.test(draft.id.trim().toLowerCase())
+  const dayDu = maHopLe && draft.name.trim() !== ''
+
+  return (
+    <section className="rounded-md border border-accent bg-surface-1 p-6">
+      <h2 className="text-[length:var(--fs-t2)] font-semibold text-ink-hi">Chi nhánh mới</h2>
+      <p className="mt-1.5 max-w-[760px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+        Chi nhánh mở ra chưa có khu và bàn nào — xếp sơ đồ ở <b>A3 · Sơ đồ bàn</b>, khai vùng giao
+        và phí ở <b>O10 · Vùng giao &amp; phí</b>. Chừng nào chưa có bàn thì trang Đặt bàn chưa
+        hiện chỗ trống cho chi nhánh này.
+      </p>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <Field
+          label="Mã chi nhánh"
+          hint="Chữ thường không dấu, số và gạch ngang. Mã này đi vào đường dẫn công khai (/dat-mon/ma) nên đặt xong KHÔNG đổi được."
+        >
+          <input
+            value={draft.id}
+            onChange={(e) => set({ id: e.target.value })}
+            placeholder="ht"
+            className="h-10 w-full rounded-sm border border-line-1 bg-canvas px-3 font-mono text-[length:var(--fs-b2)] text-ink-hi"
+          />
+        </Field>
+        <Field label="Tên hiển thị">
+          <input
+            value={draft.name}
+            onChange={(e) => set({ name: e.target.value })}
+            placeholder="Hà Tĩnh"
+            className="h-10 w-full rounded-sm border border-line-1 bg-canvas px-3 text-[length:var(--fs-b2)] text-ink-hi"
+          />
+        </Field>
+        <Field label="Địa chỉ">
+          <input
+            value={draft.address ?? ''}
+            onChange={(e) => set({ address: e.target.value })}
+            className="h-10 w-full rounded-sm border border-line-1 bg-canvas px-3 text-[length:var(--fs-b2)] text-ink-hi"
+          />
+        </Field>
+        <Field label="Điện thoại">
+          <input
+            value={draft.phone ?? ''}
+            onChange={(e) => set({ phone: e.target.value })}
+            className="h-10 w-full rounded-sm border border-line-1 bg-canvas px-3 font-mono text-[length:var(--fs-b2)] text-ink-hi"
+          />
+        </Field>
+        <Field label="Email">
+          <input
+            type="email"
+            value={draft.email ?? ''}
+            onChange={(e) => set({ email: e.target.value })}
+            className="h-10 w-full rounded-sm border border-line-1 bg-canvas px-3 text-[length:var(--fs-b2)] text-ink-hi"
+          />
+        </Field>
+        <Field
+          label="Giờ mở cửa"
+          hint="Mẫu: 11:00–14:00 · 17:00–23:00 — bỏ trống cũng được, khai sau ở thẻ bên dưới"
+        >
+          <input
+            value={draft.openHours ?? ''}
+            onChange={(e) => set({ openHours: e.target.value })}
+            placeholder="11:00–14:00 · 17:00–23:00"
+            className="h-10 w-full rounded-sm border border-line-1 bg-canvas px-3 font-mono text-[length:var(--fs-b2)] text-ink-hi"
+          />
+        </Field>
+      </div>
+
+      <div className="mt-5 flex items-center gap-2">
+        <Button variant="primary" disabled={!dayDu || create.isPending} onClick={() => create.mutate()}>
+          Mở chi nhánh
+        </Button>
+        <Button onClick={onDone}>Bỏ</Button>
+        {draft.id.trim() !== '' && !maHopLe ? (
+          <span className="text-[length:var(--fs-c1)] text-danger">
+            Mã chỉ gồm chữ thường không dấu, số và gạch ngang, dài 2–12 ký tự
+          </span>
+        ) : null}
+      </div>
+    </section>
   )
 }
 

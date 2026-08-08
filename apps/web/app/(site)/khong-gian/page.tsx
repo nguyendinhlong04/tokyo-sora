@@ -7,7 +7,7 @@ import { getBranches } from '../../../lib/site'
 export const metadata: Metadata = {
   title: 'Không gian & chi nhánh',
   description:
-    'Ba chi nhánh Tokyo Sora: khu bếp than tại bàn, phòng riêng, giờ mở cửa và bản đồ từng nơi.',
+    'Chi nhánh Tokyo Sora: khu bếp than tại bàn, phòng riêng, giờ mở cửa và bản đồ từng nơi.',
   alternates: { canonical: '/khong-gian' },
 }
 
@@ -28,7 +28,7 @@ export default async function SpacesPage() {
           Không gian
         </h1>
         <p className="mt-5 max-w-[460px] text-[length:var(--fs-b1)] leading-relaxed text-ink-body">
-          Ba chi nhánh, ba kiểu khói. Chọn chỗ trước khi chọn món.
+          Mỗi chi nhánh một kiểu khói. Chọn chỗ trước khi chọn món.
         </p>
       </section>
 

@@ -2096,6 +2096,9 @@ export const api = {
 
   branches: () => apiFetch<BranchRow[]>('/api/admin/branches'),
 
+  createBranch: (input: Omit<BranchRow, 'timezone'>) =>
+    apiFetch<BranchRow>('/api/admin/branches', { method: 'POST', body: input }),
+
   updateBranch: (id: string, patch: Partial<Omit<BranchRow, 'id' | 'timezone'>>) =>
     apiFetch<BranchRow>(`/api/admin/branches/${id}`, { method: 'PATCH', body: patch }),
 

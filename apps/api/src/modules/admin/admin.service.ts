@@ -322,6 +322,53 @@ export class AdminService {
   }
 
   /**
+   * Mở thêm một chi nhánh.
+   *
+   * Mã do NGƯỜI NHẬP đặt chứ không sinh tự động: nó đi vào đường dẫn công khai
+   * (`/dat-mon/cg`), vào mã bàn in trên QR, vào tên kênh Realtime. Một chuỗi
+   * ngẫu nhiên thì đúng về kỹ thuật nhưng ai đọc log cũng phải tra ngược.
+   *
+   * Chi nhánh mới dựng ra là RỖNG — chưa có khu, chưa có bàn, chưa có vùng giao.
+   * Xếp sơ đồ bàn ở A3, khai vùng giao ở O10. Ở đây chỉ tạo cái tên và địa chỉ.
+   */
+  async createBranch(
+    input: {
+      id: string
+      name: string
+      address?: string | null
+      phone?: string | null
+      email?: string | null
+      openHours?: string | null
+      active?: boolean
+    },
+    actor: Actor,
+  ) {
+    const id = input.id.trim().toLowerCase()
+    if (!/^[a-z0-9-]{2,12}$/.test(id)) {
+      throw new BadRequestException(
+        'Mã chi nhánh chỉ gồm chữ thường không dấu, số và dấu gạch ngang, dài 2–12 ký tự',
+      )
+    }
+    const [trung] = await this.db.select({ id: branches.id }).from(branches).where(eq(branches.id, id))
+    if (trung) throw new BadRequestException(`Đã có chi nhánh mang mã ${id}`)
+
+    const gio = input.openHours?.trim() || ''
+    if (gio) assertOpenHours(gio)
+
+    await this.db.insert(branches).values({
+      id,
+      name: input.name.trim(),
+      address: input.address?.trim() || null,
+      phone: input.phone?.trim() || null,
+      email: input.email?.trim() || null,
+      openHours: gio ? { raw: gio } : null,
+      active: input.active ?? true,
+    })
+    await this.write(actor, 'branch.created', id, { name: input.name.trim() })
+    return this.branchView(id)
+  }
+
+  /**
    * Sửa thông tin chi nhánh.
    *
    * Giờ mở cửa KHÔNG chỉ là chữ trên trang Không gian: `parseOpenHours` đọc chính

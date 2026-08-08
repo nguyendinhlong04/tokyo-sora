@@ -18,7 +18,9 @@ export const SITE = {
   kanji: '東京空',
   tagline: 'Bầu trời Tokyo, trên bếp than.',
   lead: 'Nướng than hoa tại bàn. Bò cắt trong ngày, than đốt trước bốn mươi phút.',
-  blurb: 'Nhà hàng nướng than kiểu Nhật. Ba chi nhánh, một bếp than.',
+  /* Không đếm chi nhánh trong chữ: số chi nhánh nằm ở A10 và đổi được bất cứ lúc
+     nào, còn dòng này thì không ai nhớ ra để sửa theo. */
+  blurb: 'Nhà hàng nướng than kiểu Nhật. Than hoa tại bàn, thịt cắt trong ngày.',
   domain: 'tokyosora.vn',
   contactEmail: 'lienhe@tokyosora.vn',
   /** Page Facebook nhận ref đặt chỗ: m.me/{page}?ref=DATBAN_{mã} (§30.3) */
@@ -61,7 +63,7 @@ export const SERVICES = [
   { icon: 'knife' as const, label: 'Bò cắt trong ngày' },
   { icon: 'bolt' as const, label: 'Giao nhanh nội thành' },
   { icon: 'shield' as const, label: 'Thanh toán an toàn' },
-  { icon: 'phone' as const, label: 'Tổng đài hỗ trợ' },
+  { icon: 'calendar' as const, label: 'Giữ bàn miễn phí' },
 ]
 
 /** Cách ăn Yakiniku — bốn bước trên W1 */
@@ -110,7 +112,7 @@ export const FAQ = [
   },
   {
     q: 'Có phòng riêng cho nhóm không?',
-    a: 'Cả ba chi nhánh đều có phòng riêng, số phòng mỗi nơi một khác. Chọn "Phòng riêng" khi đặt bàn để xem chỗ còn trống.',
+    a: 'Chi nhánh nào cũng có phòng riêng, số phòng mỗi nơi một khác. Chọn "Phòng riêng" khi đặt bàn để xem chỗ còn trống.',
   },
   {
     q: 'Đi trên mười khách thì đặt thế nào?',

@@ -6,7 +6,7 @@ import { STORY } from '../../../content/site'
 export const metadata: Metadata = {
   title: 'Câu chuyện',
   description:
-    'Từ một quán mười hai ghế ở Nakameguro tới ba chi nhánh ở Việt Nam. Than đốt trước bốn mươi phút, thịt cắt trong ngày.',
+    'Từ một quán mười hai ghế ở Nakameguro tới Việt Nam. Than đốt trước bốn mươi phút, thịt cắt trong ngày.',
   alternates: { canonical: '/ve-chung-toi' },
 }
 

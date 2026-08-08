@@ -8,7 +8,7 @@ import { getBranches, getJobs } from '../../../lib/site'
 export const metadata: Metadata = {
   title: 'Liên hệ & tuyển dụng',
   description:
-    'Số điện thoại và địa chỉ ba chi nhánh Tokyo Sora, biểu mẫu liên hệ và các vị trí đang tuyển.',
+    'Số điện thoại và địa chỉ chi nhánh Tokyo Sora, biểu mẫu liên hệ và các vị trí đang tuyển.',
   alternates: { canonical: '/lien-he' },
 }
 
@@ -110,7 +110,7 @@ export default async function ContactPage() {
             ) : (
               <ul>
                 {jobs.map((job) => {
-                  const where = job.branchName ?? 'Cả ba chi nhánh'
+                  const where = job.branchName ?? 'Mọi chi nhánh'
                   return (
                     <li
                       key={job.id}

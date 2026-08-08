@@ -392,7 +392,7 @@ function formatDate(d: Date): string {
   return `${dow} ${d.getDate()}/${d.getMonth() + 1}`
 }
 
-function ServiceIcon({ kind }: { kind: 'knife' | 'bolt' | 'shield' | 'phone' }) {
+function ServiceIcon({ kind }: { kind: 'knife' | 'bolt' | 'shield' | 'calendar' }) {
   const common = {
     width: 22,
     height: 22,
@@ -426,7 +426,9 @@ function ServiceIcon({ kind }: { kind: 'knife' | 'bolt' | 'shield' | 'phone' }) 
   }
   return (
     <svg {...common}>
-      <path d="M21 16.9v2.6a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.5-3 19.3 19.3 0 0 1-6-6 19.6 19.6 0 0 1-3-8.6A2 2 0 0 1 3.3 2H6a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.4 2.1L7.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.4 1.8.6 2.8.8a2 2 0 0 1 1.7 2Z" />
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3 10h18" />
+      <path d="m9 15 2 2 4-4" />
     </svg>
   )
 }

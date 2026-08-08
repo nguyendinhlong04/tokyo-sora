@@ -32,6 +32,13 @@ const BranchBody = z.object({
   active: z.boolean().optional(),
 })
 
+/** Lúc TẠO thì mã và tên bắt buộc; các trường còn lại khai sau ở màn sửa cũng được */
+const BranchCreateBody = BranchBody.extend({
+  id: z.string().min(2).max(12),
+  name: z.string().min(1).max(120),
+  active: z.boolean().default(true),
+})
+
 const EinvoiceBody = z.object({
   branchId: z.string().min(1),
   /** Cấp chuỗi — §30.2: một mã số thuế, một hợp đồng HĐĐT */
@@ -124,6 +131,12 @@ export class AdminController {
   @RequirePermission('admin.manage-accounts-roles')
   branches() {
     return this.admin.branches()
+  }
+
+  @Post('branches')
+  @RequirePermission('admin.manage-accounts-roles')
+  createBranch(@Body() body: unknown, @Req() req: RequestWithActor) {
+    return this.admin.createBranch(BranchCreateBody.parse(body), req.actor!)
   }
 
   @Patch('branches/:id')
