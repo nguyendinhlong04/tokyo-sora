@@ -49,7 +49,7 @@ export function SiteHeader({ branches }: { branches: HeaderBranch[] }) {
   return (
     /* Dính ngay DƯỚI dải vàng (`SiteTopBar`, cao 32 · 40 · 44) chứ không lên tận
        đỉnh: hai thanh cùng đòi `top-0` thì thanh này đè lên dải chữ chạy */
-    <header className="sticky top-8 z-50 border-b border-accent/16 bg-canvas/94 backdrop-blur-md sm:top-10 lg:top-11">
+    <header className="sticky top-8 z-50 bg-canvas/94 backdrop-blur-md sm:top-10 lg:top-11">
       <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-6 px-5 lg:h-20 lg:gap-10 lg:px-10">
         <Link href="/" className="flex flex-none items-baseline gap-2.5">
           <span className="text-[length:var(--fs-c1)] font-semibold tracking-[0.18em] text-ink-hi lg:tracking-[0.2em]">
