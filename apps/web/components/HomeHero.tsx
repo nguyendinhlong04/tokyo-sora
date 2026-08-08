@@ -1,10 +1,10 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { SITE } from '../content/site'
 import { seedOrderDraft, type ReceiveMode } from '../lib/order-draft'
+import type { SiteWard } from '../lib/site'
 
 /**
  * Hero W1 — ảnh món chiếu vòng, và ngay trên nó là bước đầu của việc đặt món.
@@ -14,8 +14,9 @@ import { seedOrderDraft, type ReceiveMode } from '../lib/order-draft'
  * chọn. Lựa chọn ghi vào bản nháp đơn (`seedOrderDraft`) nên sang `/dat-mon` là
  * đã chọn sẵn, không phải khai lại.
  *
- * Chỉ chọn tới chi nhánh: địa chỉ giao và phí giao vẫn hỏi ở màn O1, nơi đã có
- * sẵn API vùng giao. Trang marketing không gọi ba API để giữ LCP dưới 2.5s.
+ * Hỏi đủ để BỎ HẲN màn O1: cách nhận, địa chỉ, phường (kèm phí giao hiện ngay),
+ * và chi nhánh — thứ cuối suy ra từ phường chứ không hỏi thêm câu nào. Trả lời
+ * xong ở đây là vào thẳng thực đơn. Chỉ khi thiếu mới rơi về O1.
  */
 
 /**
@@ -39,6 +40,52 @@ export interface HeroSlide {
 export interface HeroBranch {
   id: string
   name: string
+  address: string | null
+  /** Chuỗi giờ như nhân viên gõ ở A10: '11:30–14:00 · 17:00–23:00' */
+  openHours: string | null
+}
+
+/**
+ * Đang mở hay không, suy từ chuỗi giờ của A10.
+ *
+ * Chuỗi đó là CHỮ TỰ DO nhân viên gõ, không phải lịch có cấu trúc — nên đọc
+ * không ra khung giờ nào thì trả `null` và dòng chi nhánh không gắn nhãn gì.
+ * Thà không nói còn hơn dán "Đang mở" lên một quán đã đóng cửa.
+ */
+function dangMo(raw: string | null): boolean | null {
+  if (!raw) return null
+  const khung = [...raw.matchAll(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})/g)]
+  if (khung.length === 0) return null
+
+  const now = new Date()
+  const phut = now.getHours() * 60 + now.getMinutes()
+  return khung.some((m) => {
+    const dau = Number(m[1]) * 60 + Number(m[2])
+    const cuoi = Number(m[3]) * 60 + Number(m[4])
+    // Khung vắt qua nửa đêm (17:00–02:00): mở là sau giờ đầu HOẶC trước giờ cuối
+    return cuoi > dau ? phut >= dau && phut < cuoi : phut >= dau || phut < cuoi
+  })
+}
+
+/**
+ * Bỏ dấu để so khớp: khách gõ "nguyen du" phải ra "Nguyễn Du".
+ *
+ * `đ` phải xử riêng — nó là một CHỮ CÁI trong bảng chữ cái tiếng Việt chứ không
+ * phải `d` đội dấu, nên tách tổ hợp Unicode không đụng được tới nó.
+ */
+function khongDau(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim()
+}
+
+/** Đoạn sau dấu phẩy cuối cùng — chỗ khách đang gõ tên phường */
+function doanCuoi(s: string): string {
+  return (s.split(',').pop() ?? '').trim()
 }
 
 const MODES: { id: ReceiveMode; label: string }[] = [
@@ -56,10 +103,32 @@ const FALLBACK: HeroSlide = {
   videoUrl: null,
 }
 
-export function HomeHero({ slides, branches }: { slides: HeroSlide[]; branches: HeroBranch[] }) {
+export function HomeHero({
+  slides,
+  branches,
+  wards,
+}: {
+  slides: HeroSlide[]
+  branches: HeroBranch[]
+  wards: SiteWard[]
+}) {
   const router = useRouter()
   const [mode, setMode] = useState<ReceiveMode>('delivery')
-  const [branchId, setBranchId] = useState(branches[0]?.id ?? '')
+  /**
+   * KHÔNG chọn sẵn chi nhánh nào.
+   *
+   * Chọn sẵn `branches[0]` thì ô đến lấy mở ra đã ghi sẵn một tên quán — trông như
+   * khách đã chọn, mà thật ra chỉ là chi nhánh đầu danh sách. Để rỗng thì ô đọc ra
+   * lời mời "Chọn địa chỉ quán", cân với ô địa chỉ của chế độ giao ngay bên cạnh.
+   * Chưa chọn mà bấm đi thì O1 hứng: nó tự lấy chi nhánh đầu và bày cả danh sách.
+   */
+  const [branchId, setBranchId] = useState('')
+  const [address, setAddress] = useState('')
+  /** Phường khách đã CHỌN từ gợi ý — khác với chữ trong ô, thứ này khớp bảng vùng giao */
+  const [ward, setWard] = useState('')
+  /** Tấm danh sách chi nhánh đang bung hay không — chỉ dựng khi bung, xem chú ở chỗ dựng */
+  const [dangBung, setDangBung] = useState(false)
+  const oChon = useRef<HTMLDivElement>(null)
   const [at, setAt] = useState(0)
   /**
    * Độ dài đoạn phim của khung đang chiếu, đọc được lúc video tải xong phần đầu.
@@ -97,11 +166,95 @@ export function HomeHero({ slides, branches }: { slides: HeroSlide[]; branches: 
     return () => clearTimeout(timer)
   }, [total, at, current.id, current.videoUrl, videoLen])
 
+  /* Bấm ra ngoài hoặc Esc thì cụp tấm chi nhánh lại. Nghe ở `pointerdown` chứ
+     không `click`: bấm vào một nút khác trên trang thì tấm phải cụp TRƯỚC khi nút
+     đó xử lý, không thì khách bấm một lần mà thấy hai việc xảy ra. */
+  useEffect(() => {
+    if (!dangBung) return
+    const raNgoai = (e: PointerEvent) => {
+      if (!oChon.current?.contains(e.target as Node)) setDangBung(false)
+    }
+    const bamPhim = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDangBung(false)
+    }
+    window.addEventListener('pointerdown', raNgoai)
+    window.addEventListener('keydown', bamPhim)
+    return () => {
+      window.removeEventListener('pointerdown', raNgoai)
+      window.removeEventListener('keydown', bamPhim)
+    }
+  }, [dangBung])
+
+  /**
+   * Gợi ý phường khớp đoạn khách đang gõ.
+   *
+   * Chọn xong thì thôi gợi ý: chữ trong ô lúc đó ĐÚNG BẰNG tên phường vừa chọn,
+   * để tấm gợi ý nằm lại thì nó che mất nút "Đặt món ngay" ngay dưới.
+   */
+  const dangGo = doanCuoi(address)
+  const goiY =
+    dangGo !== '' && khongDau(dangGo) !== khongDau(ward)
+      ? wards.filter((w) => khongDau(w.name).includes(khongDau(dangGo))).slice(0, 6)
+      : []
+
+  function doiDiaChi(giaTri: string) {
+    setAddress(giaTri)
+    // Gõ tiếp sau khi đã chọn thì phường coi như bỏ chọn: giữ lại một giá trị mà
+    // chữ trong ô không còn nói tới nữa là gửi sang O1 một cái phường ma.
+    if (ward && khongDau(doanCuoi(giaTri)) !== khongDau(ward)) setWard('')
+  }
+
+  /**
+   * Chọn phường là ĐI LUÔN, không đợi bấm "Đặt món ngay".
+   *
+   * Chọn xong thì hero hết việc: cách nhận, địa chỉ, phường đã có, và chi nhánh
+   * suy ra từ phường. Bắt bấm thêm một nút nữa chỉ để đi tới chỗ chắc chắn phải
+   * tới là thêm một bước thừa giữa lúc khách đang muốn xem món.
+   */
+  function chonPhuong(w: SiteWard) {
+    const truoc = address.split(',').slice(0, -1).join(',').trim()
+    const diaChi = truoc ? `${truoc}, ${w.name}` : w.name
+    setAddress(diaChi)
+    setWard(w.name)
+    seedOrderDraft({ mode, address: diaChi, ward: w.name, branchId: w.branchId })
+    router.push(`/dat-mon/${w.branchId}`)
+  }
+
+  /**
+   * Đi thẳng vào thực đơn khi hero đã đủ thông tin, bỏ hẳn màn O1.
+   *
+   * O1 hỏi bốn thứ: chi nhánh, cách nhận, địa chỉ, phường. Hero hỏi xong cả bốn
+   * rồi thì đẩy khách qua đó nữa là bắt trả lời lại thứ vừa trả lời.
+   *
+   * Chọn giao mà đã CHỌN PHƯỜNG từ gợi ý là biết luôn chi nhánh — phường thuộc
+   * một vùng giao, vùng giao thuộc một chi nhánh (`branchId` về kèm trong gợi
+   * ý). Chọn đến lấy mà đã chọn quán thì cũng vậy.
+   *
+   * Còn thiếu thì mới về O1: gõ địa chỉ tay không chọn phường nào thì không suy
+   * ra được chi nhánh, và đoán bừa một chi nhánh để giao đồ ăn là sai kiểu tệ
+   * nhất — khách nhận hàng từ quán cách xa hơn, phí và giờ đều lệch.
+   */
   function startOrder() {
+    if (mode === 'delivery') {
+      /**
+       * Chọn phường từ gợi ý là đã đi thẳng vào thực đơn (`chonPhuong`), nên tới
+       * được đây nghĩa là khách gõ tay mà không chọn phường nào. Không suy ra
+       * được chi nhánh, và đoán bừa một quán để giao đồ ăn là sai kiểu tệ nhất —
+       * khách nhận hàng từ quán xa hơn, phí lẫn giờ đều lệch. Để O1 hỏi tiếp.
+       *
+       * KHÔNG ghi `branchId: ''` cho xong: O1 đọc bằng `??` nên chuỗi rỗng lọt
+       * qua chỗ đáng lẽ rơi về chi nhánh đầu, rồi `ready` cho qua vì
+       * `'' !== null` còn `onClick` lại chặn vì `''` là falsy — nút "Xem thực
+       * đơn" sáng đèn mà bấm không đi đâu cả.
+       */
+      const diaChi = address.trim()
+      seedOrderDraft(diaChi ? { mode, address: diaChi } : { mode })
+      router.push('/dat-mon')
+      return
+    }
+
     seedOrderDraft(branchId ? { mode, branchId } : { mode })
-    // Đến lấy thì đã đủ thông tin để vào thẳng thực đơn của chi nhánh; giao tận
-    // nơi thì còn phải nhập địa chỉ và kiểm vùng giao, việc đó của màn O1.
-    router.push(mode === 'takeaway' && branchId ? `/dat-mon/${branchId}` : '/dat-mon')
+    router.push(branchId ? `/dat-mon/${branchId}` : '/dat-mon')
   }
 
   // Hero cao đúng phần màn còn lại sau dải vàng (44) + thanh điều hướng (81) +
@@ -218,10 +371,15 @@ export function HomeHero({ slides, branches }: { slides: HeroSlide[]; branches: 
           ))}
         </div>
 
-        <div className="relative mt-2.5 lg:mt-3">
+        <div ref={oChon} className="relative mt-2.5 lg:mt-3">
+          {/* Cao ĐÚNG BẰNG ô chứ không `inset-y-0`: khung này còn chứa dòng phí
+              giao hiện ra sau khi chọn phường, mà căng theo cả khung thì khung
+              cao thêm bao nhiêu ghim tụt xuống một nửa bấy nhiêu — chọn xong là
+              ghim rơi khỏi ô. Neo vào chiều cao của ô thì dưới nó mọc thêm gì
+              cũng không xê dịch. */}
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 left-3.5 grid place-items-center text-gold-700 lg:left-4"
+            className="pointer-events-none absolute top-0 left-3.5 grid h-10 place-items-center text-gold-700 lg:left-4 lg:h-12"
           >
             <svg
               viewBox="0 0 24 24"
@@ -234,37 +392,162 @@ export function HomeHero({ slides, branches }: { slides: HeroSlide[]; branches: 
               <circle cx="12" cy="10" r="2.8" />
             </svg>
           </span>
-          <label htmlFor="hero-branch" className="sr-only">
-            Chi nhánh
-          </label>
-          <select
-            id="hero-branch"
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-            disabled={branches.length === 0}
-            className="h-10 w-full appearance-none rounded-pill bg-ink-hi pr-9 pl-9 text-[length:var(--fs-c1)] text-kraft-ink shadow-[0_14px_34px_rgba(0,0,0,0.5)] outline-none lg:h-12 lg:pr-11 lg:pl-11 lg:text-[length:var(--fs-b2)]"
-          >
-            {branches.length === 0 ? <option value="">Chưa tải được chi nhánh</option> : null}
-            {branches.map((branch) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-              </option>
-            ))}
-          </select>
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-4 grid place-items-center text-kraft-ink-2 lg:right-5"
-          >
-            <svg
-              viewBox="0 0 14 9"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              className="h-[7px] w-[10px] lg:h-2 lg:w-3"
-            >
-              <path d="m1 1 6 6 6-6" />
-            </svg>
-          </span>
+          {/* MỘT ô, đổi nội dung theo chế độ — giao thì hỏi địa chỉ, đến lấy thì
+              hỏi chi nhánh. Trước đây ô chi nhánh hiện ở cả hai chế độ, tức là
+              hỏi khách chọn quán trong lúc họ vừa nói muốn được giao tận nhà.
+
+              Hai nhánh KHÔNG dùng chung `id`: nhãn `sr-only` trỏ vào `htmlFor`
+              nào thì phần tử đó phải có mặt, mà mỗi lúc chỉ một trong hai có. */}
+          {mode === 'delivery' ? (
+            <>
+              <label htmlFor="hero-address" className="sr-only">
+                Địa chỉ giao
+              </label>
+              <input
+                id="hero-address"
+                value={address}
+                onChange={(e) => doiDiaChi(e.target.value)}
+                placeholder="Số nhà, đường, phường"
+                /* Tắt gợi ý của trình duyệt: nó bung một tấm riêng đè lên tấm
+                   gợi ý phường bên dưới, hai danh sách chồng nhau. */
+                autoComplete="off"
+                className="h-10 w-full rounded-pill bg-ink-hi pr-4 pl-9 text-[length:var(--fs-c1)] text-kraft-ink shadow-[0_14px_34px_rgba(0,0,0,0.5)] outline-none placeholder:text-kraft-ink-2 lg:h-12 lg:pr-5 lg:pl-11 lg:text-[length:var(--fs-b2)]"
+              />
+
+              {/* ------------------------------------------- Gợi ý phường
+                  Nguồn là BẢNG VÙNG GIAO của chính quán, không phải dịch vụ bản
+                  đồ nào. Nhờ vậy mỗi dòng hiện ra là một phường chắc chắn giao
+                  được, và phí kèm theo là phí thật lấy từ đúng hàng dữ liệu sẽ
+                  tính tiền — thứ mà một máy tra địa chỉ ngoài không biết. */}
+              {goiY.length > 0 ? (
+                <div
+                  role="listbox"
+                  className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-line-2 bg-canvas shadow-[0_18px_44px_rgba(0,0,0,0.6)]"
+                >
+                  {goiY.map((w) => (
+                    <button
+                      key={w.name}
+                      type="button"
+                      role="option"
+                      aria-selected={w.name === ward}
+                      onClick={() => chonPhuong(w)}
+                      className="block w-full border-b border-line-1 px-4 py-2.5 text-left text-[length:var(--fs-c1)] text-ink-hi transition-colors last:border-b-0 hover:bg-surface-2"
+                    >
+                      {w.name}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+            </>
+          ) : (
+            <>
+              {/* Nút mở tấm chứ không phải `<select>`: mỗi chi nhánh phải nói được
+                  ba dòng — tên, địa chỉ, còn mở hay đã đóng — mà `<option>` của
+                  trình duyệt chỉ chứa được một dòng chữ trơn. */}
+              <button
+                type="button"
+                onClick={() => setDangBung((v) => !v)}
+                disabled={branches.length === 0}
+                aria-haspopup="listbox"
+                aria-expanded={dangBung}
+                /* Chưa chọn thì chữ nhạt đúng bằng chữ mờ của ô địa chỉ bên chế độ
+                   giao (`placeholder:text-kraft-ink-2`) — hai chế độ dùng chung một
+                   ô, nên lời mời chọn và lời mời gõ phải nặng ngang nhau. Chọn rồi
+                   thì đậm lên, vì lúc đó nó là câu trả lời chứ không còn là lời mời. */
+                className={`h-10 w-full truncate rounded-pill bg-ink-hi pr-9 pl-9 text-left text-[length:var(--fs-c1)] shadow-[0_14px_34px_rgba(0,0,0,0.5)] outline-none lg:h-12 lg:pr-11 lg:pl-11 lg:text-[length:var(--fs-b2)] ${
+                  branchId ? 'text-kraft-ink' : 'text-kraft-ink-2'
+                }`}
+              >
+                {branches.length === 0
+                  ? 'Chưa tải được chi nhánh'
+                  : (branches.find((b) => b.id === branchId)?.name ?? 'Chọn địa chỉ quán')}
+              </button>
+              <span
+                aria-hidden
+                className={`pointer-events-none absolute inset-y-0 right-4 grid place-items-center text-kraft-ink-2 transition-transform lg:right-5 ${
+                  dangBung ? 'rotate-180' : ''
+                }`}
+              >
+                <svg
+                  viewBox="0 0 14 9"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="h-[7px] w-[10px] lg:h-2 lg:w-3"
+                >
+                  <path d="m1 1 6 6 6-6" />
+                </svg>
+              </span>
+
+              {/* Chỉ dựng khi bung — và đó cũng là thứ giữ cho nhãn "Đang mở"
+                  không lệch hydrate: nhãn tính theo GIỜ MÁY KHÁCH, mà máy chủ
+                  dựng HTML lúc khác thì hai bên ra hai kết quả. Tấm này không bao
+                  giờ có mặt trong HTML của máy chủ nên không có gì để lệch. */}
+              {dangBung ? (
+                <div
+                  role="listbox"
+                  className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-line-2 bg-canvas shadow-[0_18px_44px_rgba(0,0,0,0.6)]"
+                >
+                  {branches.map((branch) => {
+                    const mo = dangMo(branch.openHours)
+                    const dangChon = branch.id === branchId
+                    return (
+                      <button
+                        key={branch.id}
+                        type="button"
+                        role="option"
+                        aria-selected={dangChon}
+                        /* Bấm vào chi nhánh là ĐI LUÔN vào thực đơn của nó, không
+                           bắt bấm thêm "Đặt món ngay": chọn quán để đến lấy là câu
+                           hỏi CUỐI CÙNG của chế độ này — chi nhánh nào thì thực đơn
+                           ấy, không còn gì để khai thêm. Khác chế độ giao, nơi còn
+                           phải kiểm vùng giao theo phường trước khi vào thực đơn.
+
+                           Vẫn ghi `branchId` dù sắp rời trang: đi sang trang máy chủ
+                           mất một vòng mạng, trong lúc đó ô phải đọc ra tên quán vừa
+                           chọn chứ không nằm im ở "Chọn địa chỉ quán". */
+                        onClick={() => {
+                          setBranchId(branch.id)
+                          setDangBung(false)
+                          seedOrderDraft({ mode, branchId: branch.id })
+                          router.push(`/dat-mon/${branch.id}`)
+                        }}
+                        className={`block w-full border-b border-line-1 px-4 py-3 text-left last:border-b-0 transition-colors ${
+                          dangChon ? 'bg-surface-3' : 'hover:bg-surface-2'
+                        }`}
+                      >
+                        <span className="block text-[length:var(--fs-b2)] font-semibold text-ink-hi">
+                          {branch.name}
+                        </span>
+                        {branch.address ? (
+                          <span className="mt-0.5 block text-[length:var(--fs-c1)] leading-relaxed text-ink-body">
+                            {branch.address}
+                          </span>
+                        ) : null}
+                        <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                          {mo !== null ? (
+                            <span
+                              className={`text-[length:var(--fs-c2)] font-semibold ${
+                                mo ? 'text-ok' : 'text-danger'
+                              }`}
+                            >
+                              {mo ? 'Đang mở' : 'Đã đóng'}
+                            </span>
+                          ) : null}
+                          {branch.openHours ? (
+                            <span className="font-mono text-[length:var(--fs-c2)] text-ink-mute">
+                              {branch.openHours}
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       </div>
 
@@ -288,27 +571,27 @@ export function HomeHero({ slides, branches }: { slides: HeroSlide[]; branches: 
               {current.nameJa}
             </p>
           ) : null}
-        </div>
 
-        {/* Hai hành động ngang hàng — đúng nguyên tắc §19, chỉ đổi sang dáng viên */}
-        {/* `items-start` để nút co theo chữ: trên điện thoại nút trải hết bề ngang
-            sẽ chui xuống dưới hai mũi tên đang nổi ở góc phải */}
-        <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row lg:mt-7">
-          <button
-            type="button"
-            onClick={startOrder}
-            /* 48 và đệm 24 trên điện thoại; 56 với đệm 36 là cỡ của laptop, bê
-               nguyên xuống màn dọc thì hai nút xếp chồng ăn 124 điểm ảnh của hero */
-            className="inline-flex h-12 items-center justify-center rounded-pill bg-accent px-6 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-gold-300 lg:h-14 lg:px-9"
-          >
-            Đặt món ngay
-          </button>
-          <Link
-            href="/dat-ban"
-            className="inline-flex h-12 items-center justify-center rounded-pill border border-ink-hi/40 px-6 text-[length:var(--fs-b1)] font-medium text-ink-hi transition-colors hover:border-ink-hi hover:bg-ink-hi/8 lg:h-14 lg:px-9"
-          >
-            Đặt bàn
-          </Link>
+          {/* Nút NẰM TRONG khối `key={current.id}` chứ không ngoài như trước: có
+              nằm trong thì sang món khác React mới dựng lại nó, và hiệu ứng trườn
+              mới chạy lại. Để ngoài thì tên món trượt còn nút đứng chết một chỗ.
+
+              240ms là nhịp thứ ba: tên Việt vào ở 0, tên Nhật ở 120, nút ở 240 —
+              ba dòng nối đuôi nhau chứ không ập vào cùng lúc.
+
+              `items-start` cũ bỏ được vì chỉ còn một nút và nó `inline-flex`, tự
+              co theo chữ, không trải hết bề ngang để chui xuống dưới hai mũi tên
+              đang nổi ở góc phải. */}
+          <div className="sora-hero-morph mt-6 animate-[sora-hero-in_var(--dur-reveal)_var(--ease-sora)_240ms_both] lg:mt-7">
+            <button
+              type="button"
+              onClick={startOrder}
+              /* 48 và đệm 24 trên điện thoại; 56 với đệm 36 là cỡ của laptop */
+              className="inline-flex h-12 items-center justify-center rounded-pill bg-accent px-6 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-gold-300 lg:h-14 lg:px-9"
+            >
+              Đặt món ngay
+            </button>
+          </div>
         </div>
       </div>
 

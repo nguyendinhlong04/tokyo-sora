@@ -22,6 +22,20 @@ export interface SiteBranch {
   seats: { total: number; grill: number; standard: number; private: number }
 }
 
+/**
+ * Một phường website giao được tới — nguồn gợi ý cho ô địa chỉ ở hero W1.
+ *
+ * Gợi ý lấy từ chính bảng vùng giao chứ không từ dịch vụ bản đồ nào: phường nào
+ * hiện ra trong danh sách là phường CHẮC CHẮN giao được. Phí và thời gian thì
+ * KHÔNG mang về đây — hero không hiện chúng nữa, và màn giỏ tự tra lại từ
+ * `/api/online/quote` theo đúng chi nhánh khách sẽ đặt.
+ */
+export interface SiteWard {
+  name: string
+  /** Chi nhánh của vùng giao chứa phường này — chọn phường là đã chọn xong chi nhánh */
+  branchId: string
+}
+
 /** Một cột "độ cắt" trên W3 */
 export interface SiteDishCut {
   name: string
@@ -168,6 +182,10 @@ export function getMenu(): Promise<SiteMenu> {
 
 export function getBranches(): Promise<SiteBranch[]> {
   return siteGet<SiteBranch[]>('/api/site/branches', [])
+}
+
+export function getWards(): Promise<SiteWard[]> {
+  return siteGet<SiteWard[]>('/api/site/wards', [])
 }
 
 export function getPosts(): Promise<SitePost[]> {

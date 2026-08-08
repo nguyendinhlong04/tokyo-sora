@@ -33,7 +33,14 @@ export interface DraftLine {
  * Gọi TRƯỚC khi điều hướng sang `/dat-mon`: `OrderProvider` đọc `sessionStorage`
  * lúc gắn vào cây nên lựa chọn ở trang chủ có mặt ngay khi màn O1 hiện ra.
  */
-export function seedOrderDraft(patch: { mode?: ReceiveMode; branchId?: string }): void {
+export function seedOrderDraft(patch: {
+  mode?: ReceiveMode
+  branchId?: string
+  /** Địa chỉ khách gõ ở hero khi chọn giao tận nơi — O1 đổ sẵn vào ô của nó */
+  address?: string
+  /** Phường khách chọn từ gợi ý ở hero — O1 lấy nó tra ra phí giao ngay */
+  ward?: string
+}): void {
   try {
     const raw = sessionStorage.getItem(ORDER_STORAGE_KEY)
     const current = raw ? (JSON.parse(raw) as Record<string, unknown>) : {}

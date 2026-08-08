@@ -6,6 +6,7 @@ import {
   areas,
   branches,
   categories,
+  deliveryZones,
   dishStories,
   dishes,
   setGroupItems,
@@ -38,6 +39,50 @@ export class SiteService {
    * bảng chi nhánh; còn số bàn và số phòng riêng đếm từ sơ đồ bàn thật thay vì
    * gõ tay vào một câu quảng cáo rồi quên cập nhật.
    */
+  /**
+   * Phường/xã website GIAO ĐƯỢC TỚI — gộp mọi vùng đang bật của mọi chi nhánh.
+   *
+   * Có endpoint riêng vì hero W1 hỏi địa chỉ TRƯỚC khi khách chọn chi nhánh, nên
+   * `/api/online/zones?branch=…` không dùng được ở đó. Gộp sẵn phía máy chủ thay
+   * vì để trang chủ gọi một lượt cho mỗi chi nhánh: trang marketing phải giữ LCP
+   * dưới 2.5s (§18.1).
+   *
+   * Trả `branchId` chứ không trả phí: mỗi vùng giao thuộc về một chi nhánh, nên
+   * CHỌN PHƯỜNG LÀ ĐÃ CHỌN XONG CHI NHÁNH — nhờ vậy hero đẩy khách thẳng vào
+   * thực đơn thay vì ném qua màn O1 hỏi lại thứ vừa trả lời. Phí và thời gian
+   * thì màn giỏ tự tra lại bằng `/api/online/quote` theo đúng chi nhánh đó.
+   *
+   * Một phường có thể thuộc vùng của nhiều chi nhánh với phí khác nhau — chọn
+   * vùng RẺ NHẤT. Phí không đi ra ngoài, nhưng nó vẫn là thứ quyết định quán nào
+   * nhận đơn, và giao từ quán rẻ hơn thì khách trả ít hơn.
+   */
+  async wards() {
+    const rows = await this.db
+      .select({
+        branchId: deliveryZones.branchId,
+        wards: deliveryZones.wards,
+        feeVnd: deliveryZones.feeVnd,
+      })
+      .from(deliveryZones)
+      .innerJoin(branches, eq(branches.id, deliveryZones.branchId))
+      .where(and(eq(deliveryZones.active, true), eq(branches.active, true)))
+
+    // `feeVnd` giữ trong bản đồ chỉ để so xem vùng nào rẻ hơn, không trả ra ngoài
+    const goc = new Map<string, { name: string; branchId: string; feeVnd: number }>()
+    for (const row of rows) {
+      for (const ward of row.wards) {
+        const dang = goc.get(ward)
+        if (!dang || row.feeVnd < dang.feeVnd) {
+          goc.set(ward, { name: ward, branchId: row.branchId, feeVnd: row.feeVnd })
+        }
+      }
+    }
+
+    return [...goc.values()]
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+      .map((w) => ({ name: w.name, branchId: w.branchId }))
+  }
+
   async branches() {
     const [rows, seatRows, areaRows] = await Promise.all([
       this.db

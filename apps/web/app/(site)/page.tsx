@@ -6,16 +6,23 @@ import { HomeHero } from '../../components/HomeHero'
 import { AddDishButton, QuickAddProvider } from '../../components/QuickAdd'
 import { DishGlyph, SignatureBadge } from '../../components/visuals'
 import { FAQ, SERVICES, SITE } from '../../content/site'
-import { dishGlyph, getBranches, getHeroImages, getMenu } from '../../lib/site'
+import { dishGlyph, getBranches, getHeroImages, getMenu, getWards } from '../../lib/site'
 
 /**
  * W1 — Trang chủ.
  *
- * Hai nút hành động ngang hàng ngay trong hero, và một dải tìm bàn ở cuối trang:
- * website tồn tại để bán hai việc, đặt bàn và đặt món mang về (§19).
+ * Hero chỉ giữ một nút — "Đặt món ngay" — để nó đi cùng nhịp trườn của tên món.
+ * Việc thứ hai của website là đặt bàn, và nó vẫn có hai lối vào: nút vàng luôn
+ * dính trên thanh điều hướng, và dải tìm bàn ở cuối trang (§19).
  */
 export default async function HomePage() {
-  const [menu, branches, heroImages] = await Promise.all([getMenu(), getBranches(), getHeroImages()])
+  // Song song hết, không nối đuôi: bốn lượt gọi này nằm trên đường tới LCP
+  const [menu, branches, heroImages, wards] = await Promise.all([
+    getMenu(),
+    getBranches(),
+    getHeroImages(),
+    getWards(),
+  ])
   const plates = menu.dishes.filter((d) => d.kind !== 'set')
   const signatures = plates.filter((d) => d.signature).slice(0, 6)
 
@@ -105,11 +112,17 @@ export default async function HomePage() {
       {/* ---------------------------------------------------------- Hero */}
       <HomeHero
         slides={slides}
-        branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+        branches={branches.map((branch) => ({
+          id: branch.id,
+          name: branch.name,
+          address: branch.address,
+          openHours: branch.openHours,
+        }))}
+        wards={wards}
       />
 
       {/* ------------------------------------------------ Dải cam kết dịch vụ */}
-      <section className="border-y border-accent/12 bg-surface-1 px-5 py-5 md:py-6 lg:px-10">
+      <section className="bg-surface-1 px-5 py-5 md:py-6 lg:px-10">
         <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4 md:gap-6 lg:gap-10">
           {SERVICES.map((service) => (
             <div key={service.label} className="flex items-center gap-3.5">
@@ -192,7 +205,9 @@ export default async function HomePage() {
                    ngoài thẻ `a` — xem chú cùng chỗ ở W2. */
                 <div
                   key={dish.id}
-                  className="group relative overflow-hidden rounded-md border border-accent/16 bg-surface-2 transition-colors hover:border-accent/40"
+                  /* `rounded-lg` khớp với ô món ở W2 — xem chú ở đó về việc lệch
+                     khỏi mức `md` mà §10 dành cho thẻ */
+                  className="group relative overflow-hidden rounded-lg border border-accent/16 bg-surface-2 transition-colors hover:border-accent/40"
                 >
                   <Link href={`/thuc-don/${dish.id}`} className="block">
                     <div className="relative aspect-[4/3]">
@@ -346,9 +361,12 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="border-t border-accent/12">
+          <div>
             {FAQ.map((item) => (
-              <details key={item.q} className="group border-b border-accent/12 py-5">
+              /* Chỉ còn vạch NGĂN GIỮA hai câu — bỏ vạch bọc trên và vạch cuối
+                 khối. Vạch giữa giữ lại vì nó chia ranh vùng bấm của từng câu;
+                 bỏ nốt thì khối gập mở đọc ra một mảng chữ liền. */
+              <details key={item.q} className="group border-b border-accent/12 py-5 last:border-b-0">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-[length:var(--fs-b1)] font-medium text-ink-hi lg:text-[length:var(--fs-t2)] [&::-webkit-details-marker]:hidden">
                   {item.q}
                   <span

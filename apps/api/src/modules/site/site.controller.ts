@@ -14,6 +14,13 @@ export class SiteController {
     return this.site.branches()
   }
 
+  /** W1 — gợi ý phường ở ô địa chỉ của hero, khi chưa biết chi nhánh nào */
+  @Public()
+  @Get('wards')
+  wards() {
+    return this.site.wards()
+  }
+
   /** W2 · W3 · W7 */
   @Public()
   @Get('menu')
