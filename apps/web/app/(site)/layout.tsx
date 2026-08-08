@@ -13,7 +13,10 @@ import { getBranches } from '../../lib/site'
 export default async function SiteLayout({ children }: { children: ReactNode }) {
   // Chi nhánh đầu là chi nhánh gốc — giờ mở và số tổng đài của nó là thứ dải trên
   // cùng nói. Cùng lời gọi đã cache 60 giây với các trang, nên không tốn thêm vòng.
-  const [branch] = await getBranches()
+  // Thanh điều hướng lấy CẢ danh sách: nút Liên hệ của nó xổ ra số của từng chi
+  // nhánh, chứ dải trên cùng chỉ mang được một số.
+  const branches = await getBranches()
+  const branch = branches[0]
 
   return (
     <div className="relative min-h-dvh bg-canvas">
@@ -27,7 +30,9 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
         }}
       />
       <SiteTopBar openHours={branch?.openHours ?? null} phone={branch?.phone ?? null} />
-      <SiteHeader />
+      <SiteHeader
+        branches={branches.map((b) => ({ id: b.id, name: b.name, phone: b.phone }))}
+      />
       <main className="relative z-2">{children}</main>
       <SiteFooter />
     </div>
