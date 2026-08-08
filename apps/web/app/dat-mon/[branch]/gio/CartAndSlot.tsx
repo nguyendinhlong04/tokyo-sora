@@ -2,13 +2,15 @@
 
 import { formatVnd } from '@sora/contracts'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { apiGet, type Quote, type Slot } from '../../../../lib/api'
 import { useOrder } from '../../order-context'
 
 /** Giờ treo tường của một khung, theo múi giờ máy khách — khách và quán cùng ở VN */
 const hhmm = (iso: string) =>
   new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+
+const hourOf = (iso: string) => new Date(iso).getHours()
 
 /** O4 — giỏ và chọn giờ nhận */
 export function CartAndSlot({ branchId }: { branchId: string }) {
@@ -39,6 +41,41 @@ export function CartAndSlot({ branchId }: { branchId: string }) {
 
   const ship = quote?.inZone ? quote.feeVnd : 0
   const firstOpen = slots.find((s) => s.open)
+
+  /* Gom khung theo giờ treo tường. Giữ nguyên thứ tự máy chủ trả về — khung đầu
+     tiên của mảng là khung sớm nhất, nên `Map` cứ chèn tới đâu là đúng thứ tự
+     tới đó, không phải sắp lại. */
+  const hours = useMemo(() => {
+    const byHour = new Map<number, Slot[]>()
+    for (const slot of slots) {
+      const list = byHour.get(hourOf(slot.at))
+      if (list) list.push(slot)
+      else byHour.set(hourOf(slot.at), [slot])
+    }
+    return [...byHour].map(([hour, list]) => ({
+      hour,
+      slots: list,
+      open: list.some((s) => s.open),
+    }))
+  }, [slots])
+
+  /* Giờ đang mở tấm chọn phút. Tấm NỔI LÊN trên màn chứ không nhả thêm một hàng
+     bên dưới lưới giờ: hàng mọc thêm ở dưới thì khách bấm xong vẫn đang nhìn chỗ
+     cũ, không thấy gì đổi và tưởng nút hỏng. */
+  const [sheetHour, setSheetHour] = useState<number | null>(null)
+  const sheetSlots = hours.find((h) => h.hour === sheetHour)?.slots ?? []
+
+  const pickedHour = draft.slotAt ? hourOf(draft.slotAt) : null
+  const pickedLabel = draft.slotAt ? hhmm(draft.slotAt) : null
+
+  useEffect(() => {
+    if (sheetHour === null) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSheetHour(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sheetHour])
 
   if (draft.lines.length === 0) {
     return (
@@ -127,28 +164,32 @@ export function CartAndSlot({ branchId }: { branchId: string }) {
         </button>
 
         <p className="mt-4 text-[length:var(--fs-b2)] text-ink-mute">Hoặc chọn khung 15 phút</p>
-        <div className="mt-2.5 grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {slots.map((slot) => {
-            const picked = draft.slotAt === slot.at
+
+        {/* Chọn GIỜ trước, phút sau. Cả buổi bán là hơn bốn mươi khung 15 phút; đổ
+            thẳng ra lưới thì khách phải vuốt qua mười mấy hàng mới tới giờ mình
+            định lấy. Gom lại thì cả buổi nằm trong hai ba hàng, và mỗi lần chỉ
+            một giờ nhả ra bốn mốc phút của nó. */}
+        <div className="mt-2.5 grid grid-cols-4 gap-2 sm:grid-cols-6">
+          {hours.map((group) => {
+            /* Giờ nào đang giữ lựa chọn thì ô đó ĐỔI HẲN thành mốc phút đã chọn —
+               nhìn lưới là biết mình lấy 18:30, không phải mở lại tấm ra xem. */
+            const holds = pickedHour === group.hour && pickedLabel !== null
             return (
               <button
-                key={slot.at}
+                key={group.hour}
                 type="button"
-                disabled={!slot.open}
-                onClick={() => set({ slotAt: slot.at })}
+                disabled={!group.open}
+                onClick={() => setSheetHour(group.hour)}
                 className={[
-                  'flex h-14 flex-col items-center justify-center rounded-sm border text-[length:var(--fs-b2)]',
-                  picked
+                  'flex h-12 items-center justify-center rounded-sm border font-mono text-[length:var(--fs-b2)]',
+                  holds
                     ? 'border-accent bg-surface-4 text-gold-200'
-                    : slot.open
+                    : group.open
                       ? 'border-line-3 text-ink-body'
                       : 'border-line-2 text-ink-mute',
                 ].join(' ')}
               >
-                <span className="font-mono">{hhmm(slot.at)}</span>
-                {slot.closedReason === 'full' ? (
-                  <span className="text-[length:var(--fs-c2)]">Kín chỗ</span>
-                ) : null}
+                {holds ? pickedLabel : `${String(group.hour).padStart(2, '0')}h`}
               </button>
             )
           })}
@@ -188,6 +229,62 @@ export function CartAndSlot({ branchId }: { branchId: string }) {
           </Link>
         </div>
       </div>
+
+      {/* Tấm chọn phút — cùng lối với tấm chi tiết món ở O3: nền tối phủ kín, tấm
+          dựng từ đáy trên điện thoại và ra giữa màn từ 640 trở lên. Bấm nền, bấm
+          Esc hoặc chọn xong đều đóng. */}
+      {sheetHour !== null ? (
+        <div
+          className="fixed inset-0 z-100"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Chọn khung 15 phút lúc ${sheetHour} giờ`}
+        >
+          <button
+            type="button"
+            aria-label="Đóng"
+            onClick={() => setSheetHour(null)}
+            className="absolute inset-0 bg-canvas/72"
+          />
+          <div className="absolute inset-x-0 bottom-0 rounded-t-lg border-t border-line-2 bg-surface-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:inset-y-auto sm:top-1/2 sm:left-1/2 sm:w-[420px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg sm:border sm:pb-4">
+            <div className="flex justify-center pt-2.5 sm:hidden">
+              <span className="h-1 w-11 rounded-pill bg-line-3" />
+            </div>
+            <p className="px-4 pt-4 text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
+              Nhận trong khoảng {String(sheetHour).padStart(2, '0')} giờ
+            </p>
+            <div className="grid grid-cols-2 gap-2 p-4">
+              {sheetSlots.map((slot) => {
+                const picked = draft.slotAt === slot.at
+                return (
+                  <button
+                    key={slot.at}
+                    type="button"
+                    disabled={!slot.open}
+                    onClick={() => {
+                      set({ slotAt: slot.at })
+                      setSheetHour(null)
+                    }}
+                    className={[
+                      'flex h-14 flex-col items-center justify-center rounded-sm border text-[length:var(--fs-b2)]',
+                      picked
+                        ? 'border-accent bg-surface-4 text-gold-200'
+                        : slot.open
+                          ? 'border-line-3 text-ink-body'
+                          : 'border-line-2 text-ink-mute',
+                    ].join(' ')}
+                  >
+                    <span className="font-mono">{hhmm(slot.at)}</span>
+                    {slot.closedReason === 'full' ? (
+                      <span className="text-[length:var(--fs-c2)]">Kín chỗ</span>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }
