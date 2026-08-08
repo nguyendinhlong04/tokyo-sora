@@ -10,17 +10,12 @@ import {
   type ReactNode,
 } from 'react'
 import type { OnlineDish } from '../../lib/api'
-import { ORDER_STORAGE_KEY, type ReceiveMode } from '../../lib/order-draft'
+import { ORDER_STORAGE_KEY, type DraftLine, type ReceiveMode } from '../../lib/order-draft'
 
 export type { ReceiveMode }
 
-export interface CartLine {
-  dishId: string
-  name: string
-  price: number
-  qty: number
-  note: string
-}
+/** Hình dạng dòng giỏ ở `lib/order-draft` — trang thương hiệu cũng ghi vào đó */
+export type CartLine = DraftLine
 
 export interface OrderDraft {
   branchId: string | null
@@ -47,6 +42,8 @@ const EMPTY: OrderDraft = {
 
 interface OrderValue {
   draft: OrderDraft
+  /** Đã đọc xong bản nháp trong `sessionStorage` chưa — O2 phải đợi mới đối chiếu được */
+  loaded: boolean
   count: number
   sub: number
   set: (patch: Partial<OrderDraft>) => void
@@ -54,6 +51,8 @@ interface OrderValue {
   qtyOf: (dishId: string) => number
   add: (dish: OnlineDish, qty?: number, note?: string) => void
   setQty: (dishId: string, qty: number) => void
+  /** Bỏ món chi nhánh không bán và lấy lại giá của chi nhánh — xem chú ở chỗ dựng */
+  syncToBranch: (dishes: OnlineDish[]) => void
   clear: () => void
 }
 
@@ -105,6 +104,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const value = useMemo<OrderValue>(
     () => ({
       draft,
+      loaded,
       count: draft.lines.reduce((sum, l) => sum + l.qty, 0),
       sub: draft.lines.reduce((sum, l) => sum + l.price * l.qty, 0),
       // Gộp mọi dòng của cùng một món: khách dặn khác nhau thì thành hai dòng,
@@ -128,9 +128,31 @@ export function OrderProvider({ children }: { children: ReactNode }) {
             .map((l) => (l.dishId === dishId ? { ...l, qty } : l))
             .filter((l) => l.qty > 0),
         })),
+      /**
+       * Giỏ nhặt ở trang thương hiệu là giỏ CHƯA có chi nhánh: giá lấy từ thực
+       * đơn cấp chuỗi, và món nào chi nhánh này không bán thì ở đó không biết.
+       * Tới O2 mới biết sự thật, nên đối chiếu ngay tại đây — bỏ món chi nhánh
+       * không có hoặc đang hết, và lấy lại đúng giá online của chi nhánh.
+       *
+       * Máy chủ vẫn tính lại toàn bộ tiền lúc đặt, nhưng để khách nhìn một con số
+       * suốt bốn màn rồi hoá đơn ra số khác thì mất lòng tin, dù tổng vẫn đúng.
+       */
+      syncToBranch: (dishes) =>
+        setDraft((current) => {
+          const byId = new Map(dishes.map((d) => [d.id, d]))
+          return {
+            ...current,
+            lines: current.lines
+              .filter((l) => {
+                const dish = byId.get(l.dishId)
+                return dish !== undefined && !dish.soldOut
+              })
+              .map((l) => ({ ...l, price: byId.get(l.dishId)!.price })),
+          }
+        }),
       clear: () => setDraft((current) => ({ ...EMPTY, branchId: current.branchId, mode: current.mode })),
     }),
-    [draft, set],
+    [draft, loaded, set],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

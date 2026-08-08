@@ -1,6 +1,7 @@
 import { formatVnd } from '@sora/contracts'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { AddDishButton, QuickAddProvider } from '../../../components/QuickAdd'
 import { DishGlyph, Diamond, PhotoFrame, SignatureBadge } from '../../../components/visuals'
 import { CATEGORY_NOTES, ORDER_ADVICE, SITE } from '../../../content/site'
 import { dishGlyph, getMenu, groupByCategory, splitSubGroups } from '../../../lib/site'
@@ -24,7 +25,7 @@ export default async function MenuPage() {
   const signatureCount = menu.dishes.filter((d) => d.signature).length
 
   return (
-    <>
+    <QuickAddProvider>
       {/* ------------------------------------------------- Poster đầu trang */}
       <section className="mx-auto max-w-[1280px] px-5 pt-10 lg:px-10 lg:pt-14">
         <div className="grid border border-accent/30 bg-canvas lg:grid-cols-[380px_1fr]">
@@ -156,33 +157,45 @@ export default async function MenuPage() {
 
                 <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4 lg:gap-[18px]">
                   {sub.dishes.map((dish) => (
-                    <Link
+                    /* Thẻ ngoài là `div` chứ không còn là liên kết: nút cộng phải
+                       đứng NGOÀI thẻ `a` — nút lồng trong liên kết là HTML sai và
+                       bấm cộng sẽ nhảy sang trang món. */
+                    <div
                       key={dish.id}
-                      href={`/thuc-don/${dish.id}`}
-                      className="flex min-w-0 flex-col border border-accent/22 bg-surface-1 transition-colors hover:border-accent hover:bg-surface-3"
+                      className="relative flex min-w-0 flex-col border border-accent/22 bg-surface-1 transition-colors hover:border-accent hover:bg-surface-3"
                     >
-                      <div className="relative aspect-[4/3]">
-                        <DishGlyph glyph={dishGlyph(dish)} src={dish.imageUrl} alt={dish.nameVi} className="size-full" />
-                        {dish.signature ? (
-                          <span className="absolute top-2.5 right-2.5">
-                            <SignatureBadge compact />
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-4">
-                        <p className="font-display text-[length:var(--fs-t2)] leading-tight font-semibold tracking-[0.03em] text-gold-200 uppercase">
-                          {dish.nameVi}
-                        </p>
-                        {dish.nameJa ? (
-                          <p className="font-jp text-[length:var(--fs-c1)] tracking-[0.1em] text-ink-mute">
-                            {dish.nameJa}
+                      <Link href={`/thuc-don/${dish.id}`} className="flex min-w-0 flex-1 flex-col">
+                        <div className="relative aspect-[4/3]">
+                          <DishGlyph glyph={dishGlyph(dish)} src={dish.imageUrl} alt={dish.nameVi} className="size-full" />
+                          {dish.signature ? (
+                            <span className="absolute top-2.5 right-2.5">
+                              <SignatureBadge compact />
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-4">
+                          <p className="font-display text-[length:var(--fs-t2)] leading-tight font-semibold tracking-[0.03em] text-gold-200 uppercase">
+                            {dish.nameVi}
                           </p>
-                        ) : null}
-                        <p className="mt-auto font-mono text-[length:var(--fs-b1)] text-accent-ink">
-                          {formatVnd(dish.price)}
-                        </p>
-                      </div>
-                    </Link>
+                          {dish.nameJa ? (
+                            <p className="font-jp text-[length:var(--fs-c1)] tracking-[0.1em] text-ink-mute">
+                              {dish.nameJa}
+                            </p>
+                          ) : null}
+                          {/* `pr-11` chừa đúng chỗ nút cộng ghim ở góc phải dưới:
+                              giá là dòng cuối của ô, không nới lề phải thì món
+                              tiền triệu chui một nửa xuống dưới nút. */}
+                          <p className="mt-auto pr-11 font-mono text-[length:var(--fs-b1)] text-accent-ink">
+                            {formatVnd(dish.price)}
+                          </p>
+                        </div>
+                      </Link>
+                      {/* Món không bán online thì không có nút: bấm cộng rồi tới
+                          O2 mới biết không đặt được là hứa suông. */}
+                      {dish.onlineVisible ? (
+                        <AddDishButton dish={dish} className="absolute right-3 bottom-3" />
+                      ) : null}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -258,6 +271,6 @@ export default async function MenuPage() {
           }),
         }}
       />
-    </>
+    </QuickAddProvider>
   )
 }

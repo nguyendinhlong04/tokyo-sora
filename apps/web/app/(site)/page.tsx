@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ChapterRail } from '../../components/ChapterRail'
 import { DishRails } from '../../components/DishRails'
 import { HomeHero } from '../../components/HomeHero'
+import { AddDishButton, QuickAddProvider } from '../../components/QuickAdd'
 import { DishGlyph, SignatureBadge } from '../../components/visuals'
 import { FAQ, SERVICES, SITE } from '../../content/site'
 import { dishGlyph, getBranches, getHeroImages, getMenu } from '../../lib/site'
@@ -100,7 +101,7 @@ export default async function HomePage() {
   })
 
   return (
-    <>
+    <QuickAddProvider>
       {/* ---------------------------------------------------------- Hero */}
       <HomeHero
         slides={slides}
@@ -187,38 +188,44 @@ export default async function HomePage() {
 
             <div className="grid grid-cols-2 gap-4 lg:gap-5">
               {showcase.map((dish) => (
-                <Link
+                /* Thẻ ngoài là `div`, liên kết nằm trong: nút cộng phải đứng
+                   ngoài thẻ `a` — xem chú cùng chỗ ở W2. */
+                <div
                   key={dish.id}
-                  href={`/thuc-don/${dish.id}`}
-                  className="group overflow-hidden rounded-md border border-accent/16 bg-surface-2 transition-colors hover:border-accent/40"
+                  className="group relative overflow-hidden rounded-md border border-accent/16 bg-surface-2 transition-colors hover:border-accent/40"
                 >
-                  <div className="relative aspect-[4/3]">
-                    <DishGlyph
-                      glyph={dishGlyph(dish)}
-                      src={dish.imageUrl}
-                      alt={dish.nameVi}
-                      className="size-full"
-                    />
-                    {dish.signature ? (
-                      <span className="absolute top-2.5 left-2.5">
-                        <SignatureBadge compact />
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="p-3.5 lg:p-4">
-                    <p className="text-[length:var(--fs-b2)] font-semibold text-ink-hi lg:text-[length:var(--fs-t2)]">
-                      {dish.nameVi}
-                    </p>
-                    {dish.nameJa ? (
-                      <p className="mt-1.5 font-jp text-[length:var(--fs-c1)] tracking-[0.08em] text-ink-mute">
-                        {dish.nameJa}
+                  <Link href={`/thuc-don/${dish.id}`} className="block">
+                    <div className="relative aspect-[4/3]">
+                      <DishGlyph
+                        glyph={dishGlyph(dish)}
+                        src={dish.imageUrl}
+                        alt={dish.nameVi}
+                        className="size-full"
+                      />
+                      {dish.signature ? (
+                        <span className="absolute top-2.5 left-2.5">
+                          <SignatureBadge compact />
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="p-3.5 lg:p-4">
+                      <p className="text-[length:var(--fs-b2)] font-semibold text-ink-hi lg:text-[length:var(--fs-t2)]">
+                        {dish.nameVi}
                       </p>
-                    ) : null}
-                    <p className="mt-2.5 font-mono text-[length:var(--fs-b2)] text-accent-ink lg:text-[length:var(--fs-b1)]">
-                      {formatVnd(dish.price)}
-                    </p>
-                  </div>
-                </Link>
+                      {dish.nameJa ? (
+                        <p className="mt-1.5 font-jp text-[length:var(--fs-c1)] tracking-[0.08em] text-ink-mute">
+                          {dish.nameJa}
+                        </p>
+                      ) : null}
+                      <p className="mt-2.5 pr-11 font-mono text-[length:var(--fs-b2)] text-accent-ink lg:text-[length:var(--fs-b1)]">
+                        {formatVnd(dish.price)}
+                      </p>
+                    </div>
+                  </Link>
+                  {dish.onlineVisible ? (
+                    <AddDishButton dish={dish} className="absolute right-3 bottom-3" />
+                  ) : null}
+                </div>
               ))}
             </div>
           </div>
@@ -383,7 +390,7 @@ export default async function HomePage() {
           }),
         }}
       />
-    </>
+    </QuickAddProvider>
   )
 }
 

@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { SITE } from '../content/site'
 import { getBranches } from '../lib/site'
 
 /**
@@ -11,104 +10,59 @@ import { getBranches } from '../lib/site'
 export async function SiteFooter() {
   const branches = await getBranches()
 
-  /** Chi nhánh chưa khai địa chỉ thì không dựng bản đồ trỏ vào chỗ trống */
-  const mapped = branches.filter((b) => b.address)
-
   return (
     <footer className="border-t border-accent/16 bg-canvas">
-      <div className="mx-auto grid max-w-[1280px] gap-10 px-5 pt-16 pb-10 lg:grid-cols-[280px_1fr_1fr_1fr] lg:gap-14 lg:px-10 lg:pt-20">
-        <div>
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-[length:var(--fs-c1)] font-semibold tracking-[0.2em] text-ink-hi">
-              TOKYO SORA
-            </span>
-            <span className="font-jp text-[length:var(--fs-c1)] text-accent">{SITE.kanji}</span>
-          </div>
-          <p className="mt-5 text-[length:var(--fs-b2)] leading-relaxed text-ink-mute">
-            {SITE.blurb}
-          </p>
-        </div>
+      <div className="mx-auto max-w-[1280px] px-5 pt-16 pb-10 lg:px-10 lg:pt-20">
+        {/* Danh sách chi nhánh. `auto-fit` chứ không chia cột cứng: một chi nhánh
+            thì khối trải hết chỗ còn lại, thêm chi nhánh là tự xuống thành lưới —
+            không phải sửa mã mỗi lần mở thêm cơ sở. */}
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-8">
+          {branches.map((branch) => (
+            /* Chữ và bản đồ NẰM CẠNH nhau ngay từ 420 điểm ảnh. Bản đồ chỉ là ô
+               phụ trợ cho địa chỉ, nên nó bám sát địa chỉ và giữ đúng cỡ một ô
+               phụ trợ — tách thành khối riêng trải hết bề ngang thì nó to hơn cả
+               phần chữ mà nó đang minh hoạ. */
+            <div
+              key={branch.id}
+              /* `max-w` là phần quan trọng chứ không phải trang trí: một chi nhánh
+                 thì ô lưới rộng gần 900, cột chữ giãn hết cỡ và đẩy bản đồ ra tận
+                 mép phải — vẫn "cạnh" về mặt kỹ thuật nhưng mắt đọc ra là hai thứ
+                 rời nhau. Bó ở 520 thì bản đồ bám sát địa chỉ. Nhiều chi nhánh thì
+                 mỗi ô đã hẹp sẵn, mốc này không chạm tới. */
+              className="grid max-w-[520px] gap-4 min-[420px]:grid-cols-[1fr_auto]"
+            >
+              <div className="min-w-0">
+                <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
+                  {branch.name}
+                </p>
+                <p className="mt-3 text-[length:var(--fs-b2)] leading-relaxed text-ink-body">
+                  {branch.address}
+                </p>
+                {branch.openHours ? (
+                  <p className="mt-2.5 font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                    {branch.openHours}
+                  </p>
+                ) : null}
+                {branch.phone ? (
+                  /* Nới vùng chạm lên 44 mà KHÔNG đội bố cục lên: đệm dọc thêm 24,
+                     lề âm trừ lại đúng 24 (trên -6 vì đệm 12 đã thay cho `mt-1.5` cũ,
+                     dưới -12 để triệt tiêu hẳn). Số tổng đài là thứ khách bấm thật,
+                     không thể để nó là một dòng chữ cao 20. */
+                  <a
+                    href={`tel:${branch.phone.replace(/[^\d+]/g, '')}`}
+                    className="-mt-1 -mb-3 inline-flex items-center py-3 font-mono text-[length:var(--fs-c1)] text-accent-ink"
+                  >
+                    {branch.phone}
+                  </a>
+                ) : null}
+              </div>
 
-        {branches.map((branch) => (
-          <div key={branch.id}>
-            <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
-              {branch.name}
-            </p>
-            <p className="mt-4 text-[length:var(--fs-b2)] leading-relaxed text-ink-body">
-              {branch.address}
-            </p>
-            {branch.openHours ? (
-              <p className="mt-3 font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                {branch.openHours}
-              </p>
-            ) : null}
-            {branch.phone ? (
-              /* Nới vùng chạm lên 44 mà KHÔNG đội bố cục lên: đệm dọc thêm 24,
-                 lề âm trừ lại đúng 24 (trên -6 vì đệm 12 đã thay cho `mt-1.5` cũ,
-                 dưới -12 để triệt tiêu hẳn). Số tổng đài là thứ khách bấm thật,
-                 không thể để nó là một dòng chữ cao 20. */
-              <a
-                href={`tel:${branch.phone.replace(/\s/g, '')}`}
-                className="-mt-1.5 -mb-3 inline-flex items-center py-3 font-mono text-[length:var(--fs-c1)] text-accent-ink"
-              >
-                {branch.phone}
-              </a>
-            ) : null}
-          </div>
-        ))}
+              {branch.address ? <BranchMap name={branch.name} address={branch.address} /> : null}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* ------------------------------------------------ Bản đồ tìm đường
-          Một thẻ cho MỖI chi nhánh đang bật, nên mở thêm chi nhánh ở A10 là có
-          thêm bản đồ, không phải sửa mã. `auto-fit` để một chi nhánh thì thẻ trải
-          hết bề ngang, ba chi nhánh thì tự chia ba cột.
-
-          Khung bản đồ để `pointer-events-none` và phủ một thẻ liên kết lên trên:
-          chạm vào đâu trên bản đồ cũng mở thẳng Google Maps ở chế độ CHỈ ĐƯỜNG,
-          thay vì kéo thu phóng ngay trong khung rồi vẫn không biết đi lối nào. */}
-      {mapped.length > 0 ? (
-        <div className="mx-auto max-w-[1280px] border-t border-surface-4 px-5 pt-10 pb-2 lg:px-10 lg:pt-14">
-          <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
-            Tìm đường tới quán
-          </p>
-          <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-4">
-            {mapped.map((branch) => {
-              const diaChi = branch.address!
-              return (
-                <div
-                  key={branch.id}
-                  className="relative overflow-hidden rounded-md border border-line-2 bg-surface-2"
-                >
-                  <iframe
-                    title={`Bản đồ ${branch.name}`}
-                    src={`https://www.google.com/maps?q=${encodeURIComponent(diaChi)}&hl=vi&output=embed`}
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    className="pointer-events-none block h-[230px] w-full border-0 lg:h-[260px]"
-                  />
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(diaChi)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="absolute inset-0 flex flex-col justify-end bg-[linear-gradient(180deg,rgba(7,8,10,0)_40%,rgba(7,8,10,0.88)_100%)] p-4 transition-colors hover:bg-[linear-gradient(180deg,rgba(7,8,10,0.15)_40%,rgba(7,8,10,0.94)_100%)]"
-                  >
-                    <span className="text-[length:var(--fs-b2)] font-semibold text-ink-hi">
-                      {branch.name}
-                    </span>
-                    <span className="mt-0.5 text-[length:var(--fs-c1)] leading-relaxed text-ink-body">
-                      {diaChi}
-                    </span>
-                    <span className="mt-2.5 inline-flex items-center gap-1.5 text-[length:var(--fs-c1)] font-semibold text-accent-ink">
-                      <MapPinIcon />
-                      Chỉ đường trên Google Maps →
-                    </span>
-                  </a>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      ) : null}
 
       <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 border-t border-surface-4 px-5 pt-6 pb-12 lg:mt-10 lg:px-10">
         <span className="text-[length:var(--fs-c1)] text-line-4">© 2026 Tokyo Sora</span>
@@ -136,6 +90,44 @@ export async function SiteFooter() {
         </div>
       </div>
     </footer>
+  )
+}
+
+/**
+ * Ô bản đồ nhỏ nằm cạnh địa chỉ.
+ *
+ * Khung `pointer-events-none` và một thẻ liên kết phủ lên trên: chạm vào đâu
+ * cũng mở Google Maps ở chế độ CHỈ ĐƯỜNG. Để khung tự nhận cú chạm thì khách
+ * kéo thu phóng ngay trong ô 168 điểm ảnh — vừa khó vừa chẳng dẫn tới đâu.
+ *
+ * Cỡ bám theo khối chữ bên trái: 132 cao là xấp xỉ bốn dòng tên–địa chỉ–giờ–số,
+ * nên hai bên ngang nhau. Dưới 420 điểm ảnh thì không đủ chỗ cho hai cột, ô tụt
+ * xuống dưới và trải hết bề ngang nhưng vẫn thấp — nó là ô phụ trợ, không phải
+ * một khối riêng.
+ */
+function BranchMap({ name, address }: { name: string; address: string }) {
+  return (
+    <a
+      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Chỉ đường tới ${name} trên Google Maps`}
+      className="group relative block h-[116px] w-full overflow-hidden rounded-md border border-line-2 bg-surface-2 transition-colors hover:border-accent/50 min-[420px]:h-[132px] min-[420px]:w-[188px]"
+    >
+      <iframe
+        title=""
+        aria-hidden
+        tabIndex={-1}
+        src={`https://www.google.com/maps?q=${encodeURIComponent(address)}&hl=vi&z=16&output=embed`}
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+        className="pointer-events-none block size-full border-0"
+      />
+      <span className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 bg-[linear-gradient(180deg,rgba(7,8,10,0)_0%,rgba(7,8,10,0.92)_60%)] px-3 pt-6 pb-2.5 text-[length:var(--fs-c1)] font-semibold text-accent-ink">
+        <MapPinIcon />
+        Chỉ đường
+      </span>
+    </a>
   )
 }
 

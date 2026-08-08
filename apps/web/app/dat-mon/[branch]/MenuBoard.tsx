@@ -2,7 +2,7 @@
 
 import { formatVnd } from '@sora/contracts'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { OnlineDish, OnlineMenu } from '../../../lib/api'
 import { useOrder } from '../order-context'
 import { DishSheet } from './DishSheet'
@@ -14,13 +14,47 @@ import { DishSheet } from './DishSheet'
  * nằm ở thanh ghim đáy — ngón cái với tới được.
  */
 export function MenuBoard({ menu }: { menu: OnlineMenu }) {
-  const { draft, set, add, setQty, qtyOf, count, sub } = useOrder()
+  const { draft, loaded, set, add, setQty, qtyOf, syncToBranch, count, sub } = useOrder()
   const [open, setOpen] = useState<OnlineDish | null>(null)
+  const [dropped, setDropped] = useState<string[]>([])
 
-  // Vào thẳng /dat-mon/{chi-nhánh} từ kết quả tìm kiếm thì chưa qua O1
+  /**
+   * Vào thẳng /dat-mon/{chi-nhánh} từ kết quả tìm kiếm thì chưa qua O1.
+   *
+   * `loaded` không phải cho đẹp: effect của con chạy TRƯỚC effect của cha, nên
+   * không đợi thì câu này ghi chi nhánh xong `OrderProvider` mới đọc bản nháp cũ
+   * ra và đè lại `branchId` về null. Vòng dựng sau `draft.branchId` vẫn là null
+   * y như lúc đầu — deps không đổi, effect không chạy lại, và chi nhánh mất luôn.
+   */
   useEffect(() => {
+    if (!loaded) return
     if (draft.branchId !== menu.branch.id) set({ branchId: menu.branch.id })
-  }, [draft.branchId, menu.branch.id, set])
+  }, [loaded, draft.branchId, menu.branch.id, set])
+
+  /**
+   * Đối chiếu giỏ với thực đơn CHI NHÁNH này, một lần cho mỗi chi nhánh.
+   *
+   * Khách nhặt món bằng nút cộng ở W1/W2 lúc chưa chọn chi nhánh, nên tới đây mới
+   * biết chi nhánh có bán món đó không. Đợi `loaded` là bắt buộc: `OrderProvider`
+   * đọc `sessionStorage` trong effect, chạy sớm hơn là thấy giỏ rỗng, chốt "đã
+   * đối chiếu" rồi giỏ thật về sau không ai soát nữa.
+   */
+  const checked = useRef<string | null>(null)
+  useEffect(() => {
+    if (!loaded || checked.current === menu.branch.id) return
+    checked.current = menu.branch.id
+
+    const byId = new Map(menu.dishes.map((d) => [d.id, d]))
+    setDropped(
+      draft.lines
+        .filter((l) => {
+          const dish = byId.get(l.dishId)
+          return dish === undefined || dish.soldOut
+        })
+        .map((l) => l.name),
+    )
+    syncToBranch(menu.dishes)
+  }, [loaded, menu.branch.id, menu.dishes, draft.lines, syncToBranch])
 
   const groups = menu.categories
     .map((c) => ({ ...c, dishes: menu.dishes.filter((d) => d.categoryId === c.id) }))
@@ -38,6 +72,24 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
             {menu.branch.address}
           </p>
         </header>
+
+        {/* Món nhặt từ trang thương hiệu mà chi nhánh này không bán — nói tên ra
+            và nói đã bỏ, chứ không lẳng lặng rút khỏi giỏ rồi để khách tự phát
+            hiện thiếu món lúc nhận hàng. */}
+        {dropped.length > 0 ? (
+          <div className="mt-4 rounded-md border border-danger bg-danger/8 p-4">
+            <p className="text-[length:var(--fs-b1)] leading-relaxed text-ink-hi">
+              {menu.branch.name} không có {dropped.join(' · ')} — đã bỏ khỏi giỏ của bạn.
+            </p>
+            <button
+              type="button"
+              onClick={() => setDropped([])}
+              className="mt-3 h-11 rounded-sm border border-line-3 px-4 text-[length:var(--fs-b2)] text-ink-body"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        ) : null}
 
         <nav className="sticky top-14 z-40 -mx-4 mt-4 flex gap-1.5 overflow-x-auto border-b border-accent/16 bg-surface-2/96 px-4 py-2 backdrop-blur">
           {groups.map((group) => (
