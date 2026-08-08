@@ -134,9 +134,11 @@ export function SiteHeader({ branches }: { branches: HeaderBranch[] }) {
           </Link>
           <Link
             href="/dat-ban"
-            /* 44 chứ không 36 kể cả trên điện thoại: đây là nút bán hàng chính,
-               mà 36 thì dưới ngưỡng ngón tay của cả Apple lẫn Google */
-            className="inline-flex h-11 items-center rounded-sm bg-accent-strong px-4 text-[length:var(--fs-c1)] font-semibold text-on-accent transition-colors hover:bg-accent lg:px-6 lg:text-[length:var(--fs-b2)]"
+            /* 40 trên điện thoại, 44 từ laptop. 40 là cỡ chung của mọi ô bấm trên
+               thanh và trong hero (ô chi nhánh cũng 40), nên thanh đọc ra một khối
+               thay vì một nút vàng nhô lên. Đừng hạ tiếp: dưới 36 thì nút bán hàng
+               chính bắt đầu khó trúng bằng ngón cái. */
+            className="inline-flex h-10 items-center rounded-sm bg-accent-strong px-3.5 text-[length:var(--fs-c1)] font-semibold text-on-accent transition-colors hover:bg-accent lg:h-11 lg:px-6 lg:text-[length:var(--fs-b2)]"
           >
             Đặt bàn
           </Link>

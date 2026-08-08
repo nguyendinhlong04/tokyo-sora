@@ -276,11 +276,15 @@ export function HomeHero({ slides, branches }: { slides: HeroSlide[]; branches: 
         <div key={current.id}>
           {/* Ảnh không gian thường không có chú — lúc đó in tên quán, vì trang
               phải luôn có đúng một `h1` và nó không được rỗng */}
-          <h1 className="sora-hero-morph max-w-[620px] animate-[sora-hero-in_var(--dur-reveal)_var(--ease-sora)_both] font-display text-[44px] leading-[1.04] font-light text-ink-hi lg:text-[56px]">
+          {/* Bóng chữ chứ không tăng độ tối của lớp phủ: ảnh hero có khung lửa
+              sáng gần trắng đúng chỗ dòng này rơi vào, mà làm tối cả tấm để cứu
+              một khung thì mọi khung còn lại chịu chung. Bóng chỉ bám lấy chữ,
+              trên nền tối nó vô hình. */}
+          <h1 className="sora-hero-morph max-w-[620px] animate-[sora-hero-in_var(--dur-reveal)_var(--ease-sora)_both] font-display text-[44px] leading-[1.04] font-light text-ink-hi [text-shadow:0_1px_3px_rgba(7,8,10,0.55),0_10px_30px_rgba(7,8,10,0.65)] lg:text-[56px]">
             {current.nameVi || SITE.name}
           </h1>
           {current.nameJa ? (
-            <p className="sora-hero-morph mt-2 animate-[sora-hero-in_var(--dur-reveal)_var(--ease-sora)_120ms_both] font-jp text-[length:var(--fs-t2)] tracking-[0.14em] text-accent-ink">
+            <p className="sora-hero-morph mt-2 animate-[sora-hero-in_var(--dur-reveal)_var(--ease-sora)_120ms_both] font-jp text-[length:var(--fs-t2)] tracking-[0.14em] text-accent-ink [text-shadow:0_1px_3px_rgba(7,8,10,0.6)]">
               {current.nameJa}
             </p>
           ) : null}
@@ -293,13 +297,15 @@ export function HomeHero({ slides, branches }: { slides: HeroSlide[]; branches: 
           <button
             type="button"
             onClick={startOrder}
-            className="inline-flex h-14 items-center justify-center rounded-pill bg-accent px-9 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-gold-300"
+            /* 48 và đệm 24 trên điện thoại; 56 với đệm 36 là cỡ của laptop, bê
+               nguyên xuống màn dọc thì hai nút xếp chồng ăn 124 điểm ảnh của hero */
+            className="inline-flex h-12 items-center justify-center rounded-pill bg-accent px-6 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-gold-300 lg:h-14 lg:px-9"
           >
             Đặt món ngay
           </button>
           <Link
             href="/dat-ban"
-            className="inline-flex h-14 items-center justify-center rounded-pill border border-ink-hi/40 px-9 text-[length:var(--fs-b1)] font-medium text-ink-hi transition-colors hover:border-ink-hi hover:bg-ink-hi/8"
+            className="inline-flex h-12 items-center justify-center rounded-pill border border-ink-hi/40 px-6 text-[length:var(--fs-b1)] font-medium text-ink-hi transition-colors hover:border-ink-hi hover:bg-ink-hi/8 lg:h-14 lg:px-9"
           >
             Đặt bàn
           </Link>
@@ -319,7 +325,9 @@ export function HomeHero({ slides, branches }: { slides: HeroSlide[]; branches: 
               type="button"
               onClick={() => move(arrow.step)}
               aria-label={arrow.label}
-              className="grid size-11 place-items-center rounded-full border border-ink-hi/30 bg-canvas/30 text-ink-hi backdrop-blur-sm transition-colors hover:border-ink-hi hover:bg-ink-hi/10"
+              /* 40 trên điện thoại: hai mũi tên nổi trên ảnh, chỉ là lối đi phụ —
+                 khách vẫn xem hết băng chuyền dù không bấm lần nào */
+              className="grid size-10 place-items-center rounded-full border border-ink-hi/30 bg-canvas/30 text-ink-hi backdrop-blur-sm transition-colors hover:border-ink-hi hover:bg-ink-hi/10 lg:size-11"
             >
               <svg
                 width="9"
