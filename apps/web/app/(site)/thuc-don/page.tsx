@@ -132,11 +132,6 @@ export default async function MenuPage() {
                     {group.dishes.length} món
                   </span>
                 </div>
-                {CATEGORY_NOTES[group.id] ? (
-                  <p className="mt-3 max-w-[720px] text-[length:var(--fs-b1)] leading-relaxed text-ink-mute">
-                    {CATEGORY_NOTES[group.id]}
-                  </p>
-                ) : null}
               </div>
             </header>
 
@@ -160,9 +155,16 @@ export default async function MenuPage() {
                     /* Thẻ ngoài là `div` chứ không còn là liên kết: nút cộng phải
                        đứng NGOÀI thẻ `a` — nút lồng trong liên kết là HTML sai và
                        bấm cộng sẽ nhảy sang trang món. */
+                    /* `overflow-hidden` đi kèm `rounded-lg` chứ không phải cho vui:
+                       ảnh món nằm sát ba mép trên của ô, không cắt thì bốn góc
+                       vuông của ảnh vẫn thò ra ngoài đường viền đã bo.
+
+                       `lg` (12) chứ không `md` (8) mà §10 dành cho thẻ: đây là
+                       quyết định của quán, ô món phải cong rõ như mẫu họ đưa. Ô
+                       món ở W1 đổi theo cùng lúc để hai trang không lệch nhau. */
                     <div
                       key={dish.id}
-                      className="relative flex min-w-0 flex-col border border-accent/22 bg-surface-1 transition-colors hover:border-accent hover:bg-surface-3"
+                      className="relative flex min-w-0 flex-col overflow-hidden rounded-lg border border-accent/22 bg-surface-1 transition-colors hover:border-accent hover:bg-surface-3"
                     >
                       <Link href={`/thuc-don/${dish.id}`} className="flex min-w-0 flex-1 flex-col">
                         <div className="relative aspect-[4/3]">
