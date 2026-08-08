@@ -621,11 +621,15 @@ async function seed(db: Db) {
       prepSeconds: routing?.prepSeconds ?? 300,
       basePrice: d.priceVnd ?? 0,
       /**
-       * Bán online hay không, theo đúng mẫu O11 của bản thiết kế: set và lẩu tắt,
-       * còn lại bật. Nồi lẩu mang về là nước sánh ra hộp, còn set là mâm dọn theo
-       * nhịp tại bàn — hai thứ đó bán online là bán một trải nghiệm hỏng.
+       * Bán online hay không. Bản thiết kế O11 tắt set và lẩu — nồi lẩu mang về là
+       * nước sánh ra hộp, set là mâm dọn theo nhịp tại bàn. Quán quyết định bán cả
+       * hai, nên mọi món đều bật: thực đơn web có nút cộng ở KHẮP các ô, không có
+       * món nào khách nhìn thấy mà không đặt được.
+       *
+       * Muốn tắt lại từng món thì tắt ở Office (M2 · Món), đừng sửa chỗ này —
+       * seeder chỉ dựng nền cho lần chạy đầu.
        */
-      onlineVisible: !isSet && d.group !== 'lau',
+      onlineVisible: true,
       /** Huy hiệu 名物 trên W1/W2/W3 — cờ của bếp, không phải của người viết web */
       signature: d.isSignature,
       active: d.active,

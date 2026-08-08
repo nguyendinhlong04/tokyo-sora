@@ -217,13 +217,18 @@ export default async function HomePage() {
                           {dish.nameJa}
                         </p>
                       ) : null}
+                      {/* 44 = mép ngoài hộp vẽ 32 (ghim ở 8, đệm trong suốt 4 mỗi
+                          bên) cộng 4 thở. Giá là dòng cuối ô và là `font-mono`
+                          liền một cụm, không có chỗ nào xuống dòng — hụt lề là nó
+                          tràn thẳng qua nút chứ không tự xuống hàng. Đo ở khổ 375:
+                          ô rộng 160, chữ giá 67, còn dư 35. */}
                       <p className="mt-2.5 pr-11 font-mono text-[length:var(--fs-b2)] text-accent-ink lg:text-[length:var(--fs-b1)]">
                         {formatVnd(dish.price)}
                       </p>
                     </div>
                   </Link>
                   {dish.onlineVisible ? (
-                    <AddDishButton dish={dish} className="absolute right-3 bottom-3" />
+                    <AddDishButton dish={dish} className="absolute right-2 bottom-2" />
                   ) : null}
                 </div>
               ))}

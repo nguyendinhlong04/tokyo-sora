@@ -182,10 +182,10 @@ export default async function MenuPage() {
                               {dish.nameJa}
                             </p>
                           ) : null}
-                          {/* `pr-11` chừa đúng chỗ nút cộng ghim ở góc phải dưới:
-                              giá là dòng cuối của ô, không nới lề phải thì món
-                              tiền triệu chui một nửa xuống dưới nút. */}
-                          <p className="mt-auto pr-11 font-mono text-[length:var(--fs-b1)] text-accent-ink">
+                          {/* 48 = mép ngoài hộp vẽ 32 (ghim ở 12, đệm trong suốt 4
+                              mỗi bên) cộng 4 thở. Giá là dòng cuối ô, hụt lề là
+                              số chui xuống dưới nút — xem chú cùng chỗ ở W1. */}
+                          <p className="mt-auto pr-12 font-mono text-[length:var(--fs-b1)] text-accent-ink">
                             {formatVnd(dish.price)}
                           </p>
                         </div>

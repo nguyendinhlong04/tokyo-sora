@@ -125,18 +125,27 @@ export function AddDishButton({ dish, className = '' }: { dish: QuickDish; class
 
   const qty = quick.qtyOf(dish.id)
   return (
+    /**
+     * Thẻ `button` LUÔN là 44 dù ô vẽ chỉ 32: hộp có viền nằm trong nó, phần đệm
+     * còn lại trong suốt. Đây là nút bán hàng, thu hẳn vùng chạm xuống 32 là bấm
+     * trượt — cùng lối với số tổng đài ở chân trang và các nút của O2.
+     */
     <button
       type="button"
       aria-label={`Thêm ${dish.nameVi} vào giỏ`}
       onClick={() => quick.add(dish)}
-      className={`z-10 grid h-11 w-11 flex-none place-items-center rounded-sm border border-accent bg-canvas/85 text-[length:var(--fs-t1)] leading-none text-accent-ink transition-colors hover:bg-accent hover:text-on-accent ${className}`}
+      /* Di chuột lên đâu trong vùng 44 cũng sáng hộp bên trong, chứ không phải
+         phải trỏ trúng ô 36 mới thấy nút phản hồi */
+      className={`z-10 grid h-11 w-11 flex-none place-items-center hover:[&>span]:bg-accent hover:[&>span]:text-on-accent ${className}`}
     >
-      {qty > 0 ? (
-        <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-pill bg-accent-strong px-1 font-mono text-[length:var(--fs-c2)] font-semibold text-on-accent">
-          {qty}
-        </span>
-      ) : null}
-      +
+      <span className="relative grid h-8 w-8 place-items-center rounded-sm border border-accent bg-canvas/85 text-[length:var(--fs-t2)] leading-none text-accent-ink transition-colors">
+        {qty > 0 ? (
+          <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-pill bg-accent-strong px-1 font-mono text-[length:var(--fs-c2)] font-semibold text-on-accent">
+            {qty}
+          </span>
+        ) : null}
+        +
+      </span>
     </button>
   )
 }
