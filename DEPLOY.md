@@ -105,7 +105,19 @@ Mỗi `vercel.json` có một `ignoreCommand` để commit chỉ dựng lại ap
 Đường dẫn trong đó **bắt buộc mang tiền tố `:/`**:
 
 ```json
-"ignoreCommand": "git diff --quiet HEAD^ HEAD -- ':/apps/web' ':/packages' ':/pnpm-lock.yaml' ':/pnpm-workspace.yaml' ':/package.json'"
+"ignoreCommand": "git rev-parse --verify -q HEAD^ >/dev/null || exit 1; git diff --quiet HEAD^ HEAD -- ':/apps/web' ':/packages' ':/pnpm-lock.yaml' ':/pnpm-workspace.yaml' ':/package.json'"
+```
+
+Vế đầu **không phải để cho đẹp**. Vercel clone nông, có lúc bản sao không chứa
+commit cha; lúc đó `git diff HEAD^ HEAD` chết với mã 128 và Vercel hiểu là "bỏ
+build". Lỗi này **ngẫu nhiên**: cùng một cấu hình, commit này deploy còn commit
+kia rơi mất. Vế `rev-parse … || exit 1` biến "không tra được" thành "cứ build" —
+thà dựng thừa một lần còn hơn im lặng nuốt một commit.
+
+Kiểm bằng một bản sao nông:
+
+```bash
+git clone --depth=1 -q file://$PWD /tmp/t && cd /tmp/t && git diff --quiet HEAD^ HEAD -- ':/apps/web'; echo $?   # 128 — day la cai bay
 ```
 
 Vercel chạy lệnh này **từ Root Directory của project** (`apps/web`), không phải từ gốc
