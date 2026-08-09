@@ -25,10 +25,15 @@ export function MenuIndex({ chapters }: { chapters: MenuChapter[] }) {
 
     const tinh = () => {
       khung = 0
-      // Ngưỡng lấy từ chính đáy thanh này chứ không phải một số cứng: dải vàng
-      // và thanh điều hướng đều dính, thanh này lại đổi từ hai dòng xuống một
-      // dòng theo bề ngang — đo tại chỗ thì không có con số nào để lệch.
-      const nguong = (document.getElementById('muc-luc')?.getBoundingClientRect().bottom ?? 0) + 1
+      // Ngưỡng lấy từ `scroll-margin-top` của chương, KHÔNG phải đáy thanh này.
+      // Đó là mốc mà cú bấm vào mục lục đặt chương vào, nên bấm xong là chương
+      // đó lập tức tính vào diện đang đọc. Đo đáy thanh thì hụt 17: chỗ thở mà
+      // `scroll-mt` chừa ra để tiêu đề không dính thanh rơi đúng vào khe giữa
+      // hai mốc, và mục sáng vẫn nằm ở chương liền trước.
+      // Đọc một lần từ chương đầu: mười chương cùng một lớp nên cùng một mốc,
+      // mà `getComputedStyle` mỗi khung hình cho từng chương thì tốn.
+      const dau = document.getElementById(`chuong-${chapters[0]?.id ?? ''}`)
+      const nguong = (dau ? parseFloat(getComputedStyle(dau).scrollMarginTop) || 0 : 0) + 1
       let tim = chapters[0]?.id ?? ''
       for (const chuong of chapters) {
         const el = document.getElementById(`chuong-${chuong.id}`)
@@ -57,7 +62,6 @@ export function MenuIndex({ chapters }: { chapters: MenuChapter[] }) {
 
   return (
     <nav
-      id="muc-luc"
       /* Đáy phần đã ghim, theo `SiteTopBar` và `SiteHeader`: dải vàng cao
          32 · 40 · 44, thanh điều hướng dính ngay dưới nó và cao 64 · 64 · 80 —
          ra 96 · 104 · 124. Ba mức chứ không một: ghim cứng 96 thì trên laptop
