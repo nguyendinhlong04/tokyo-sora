@@ -39,7 +39,7 @@ export default async function OffersPage() {
           {OFFERS.map((offer) => (
             <div
               key={offer.title}
-              className="rounded-md border border-accent/16 bg-surface-2 p-7"
+              className="rounded-lg border border-accent/16 bg-surface-2 p-7"
             >
               <span className="font-jp text-[30px] leading-none text-gold-900">{offer.kanji}</span>
               <p className="mt-5 text-[length:var(--fs-t2)] leading-snug font-semibold text-ink-hi">
@@ -69,7 +69,7 @@ export default async function OffersPage() {
             return (
               <article
                 key={set.id}
-                className="flex flex-col overflow-hidden rounded-md border border-accent/16 bg-surface-2"
+                className="flex flex-col overflow-hidden rounded-lg border border-accent/16 bg-surface-2"
               >
                 <DishGlyph glyph={dishGlyph(set)} src={set.imageUrl} alt={set.nameVi} className="aspect-[4/3] w-full" />
                 <div className="flex flex-1 flex-col p-7">
@@ -98,13 +98,13 @@ export default async function OffersPage() {
                     <div className="flex flex-none gap-2">
                       <Link
                         href={`/thuc-don/${set.id}`}
-                        className="inline-flex h-11 items-center rounded-sm border border-line-3 px-4 text-[length:var(--fs-b2)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
+                        className="inline-flex h-11 items-center rounded-md border border-line-3 px-4 text-[length:var(--fs-b2)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
                       >
                         Xem set
                       </Link>
                       <Link
                         href="/dat-ban"
-                        className="inline-flex h-11 items-center rounded-sm bg-accent-strong px-4 text-[length:var(--fs-b2)] font-semibold text-on-accent transition-colors hover:bg-accent"
+                        className="inline-flex h-11 items-center rounded-md bg-accent-strong px-4 text-[length:var(--fs-b2)] font-semibold text-on-accent transition-colors hover:bg-accent"
                       >
                         Đặt set này
                       </Link>

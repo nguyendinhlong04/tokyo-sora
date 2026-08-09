@@ -223,7 +223,7 @@ export default async function HomePage() {
                         </span>
                       ) : null}
                     </div>
-                    <div className="p-3.5 lg:p-4">
+                    <div className="p-3 pb-0 xs:p-3.5 xs:pb-0 lg:p-4 lg:pb-0">
                       <p className="text-[length:var(--fs-b2)] font-semibold text-ink-hi lg:text-[length:var(--fs-t2)]">
                         {dish.nameVi}
                       </p>
@@ -232,19 +232,18 @@ export default async function HomePage() {
                           {dish.nameJa}
                         </p>
                       ) : null}
-                      {/* 44 = mép ngoài hộp vẽ 32 (ghim ở 8, đệm trong suốt 4 mỗi
-                          bên) cộng 4 thở. Giá là dòng cuối ô và là `font-mono`
-                          liền một cụm, không có chỗ nào xuống dòng — hụt lề là nó
-                          tràn thẳng qua nút chứ không tự xuống hàng. Đo ở khổ 375:
-                          ô rộng 160, chữ giá 67, còn dư 35. */}
-                      <p className="mt-2.5 pr-11 font-mono text-[length:var(--fs-b2)] text-accent-ink lg:text-[length:var(--fs-b1)]">
-                        {formatVnd(dish.price)}
-                      </p>
                     </div>
                   </Link>
-                  {dish.onlineVisible ? (
-                    <AddDishButton dish={dish} className="absolute right-2 bottom-2" />
-                  ) : null}
+                  {/* Giá và nút cùng một hàng, không còn nút ghim đè góc ô — xem
+                      chú cùng chỗ ở W2 về thanh đếm rộng 68 trên ô 160 */}
+                  {/* Giá và thanh đếm cùng thu lại dưới 480 mới đủ chỗ cho một
+                      hàng — xem phép đo ở W2 */}
+                  <div className="flex items-center justify-between gap-1 px-3 pt-2.5 pb-3 xs:gap-2 xs:px-3.5 xs:pb-3.5 lg:px-4 lg:pb-4">
+                    <p className="min-w-0 truncate font-mono text-[length:var(--fs-c1)] text-accent-ink xs:text-[length:var(--fs-b2)] lg:text-[length:var(--fs-b1)]">
+                      {formatVnd(dish.price)}
+                    </p>
+                    {dish.onlineVisible ? <AddDishButton dish={dish} /> : null}
+                  </div>
                 </div>
               ))}
             </div>
@@ -422,7 +421,7 @@ function formatDate(d: Date): string {
   return `${dow} ${d.getDate()}/${d.getMonth() + 1}`
 }
 
-function ServiceIcon({ kind }: { kind: 'knife' | 'bolt' | 'shield' | 'calendar' }) {
+function ServiceIcon({ kind }: { kind: 'leaf' | 'bolt' | 'shield' | 'calendar' }) {
   const common = {
     width: 22,
     height: 22,
@@ -431,11 +430,11 @@ function ServiceIcon({ kind }: { kind: 'knife' | 'bolt' | 'shield' | 'calendar' 
     stroke: 'currentColor',
     strokeWidth: 1.5,
   }
-  if (kind === 'knife') {
+  if (kind === 'leaf') {
     return (
       <svg {...common}>
-        <path d="M4 15 15 4l5 5L9 20H4v-5Z" />
-        <path d="M12.5 6.5 17.5 11.5" />
+        <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10Z" />
+        <path d="M2 21c0-3 1.9-5.4 5.1-6C9.5 14.5 12 13 13 12" />
       </svg>
     )
   }

@@ -36,6 +36,7 @@ export interface QuickDish {
 interface QuickValue {
   qtyOf: (dishId: string) => number
   add: (dish: QuickDish) => void
+  bot: (dishId: string) => void
 }
 
 const Ctx = createContext<QuickValue | null>(null)
@@ -69,12 +70,24 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  /** Bớt một phần; về 0 thì rút hẳn dòng khỏi giỏ chứ không để lại dòng qty 0 */
+  const bot = useCallback((dishId: string) => {
+    setLines((current) =>
+      current
+        // Đúng dòng mà `add` đã gộp vào — dòng không lời dặn. Trang thương hiệu
+        // không đặt lời dặn nào, nên ở đây luôn có đúng một dòng cho mỗi món.
+        .map((l) => (l.dishId === dishId && l.note === '' ? { ...l, qty: l.qty - 1 } : l))
+        .filter((l) => l.qty > 0),
+    )
+  }, [])
+
   const value = useMemo<QuickValue>(
     () => ({
       qtyOf: (dishId) => lines.reduce((sum, l) => (l.dishId === dishId ? sum + l.qty : sum), 0),
       add,
+      bot,
     }),
-    [lines, add],
+    [lines, add, bot],
   )
 
   const count = lines.reduce((sum, l) => sum + l.qty, 0)
@@ -114,38 +127,104 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** Dấu cộng và dấu trừ vẽ bằng nét, không phải ký tự — nét dày đều ở mọi cỡ */
+function IconCong({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M0 6h12" />
+      <path d="M6 0v12" />
+    </svg>
+  )
+}
+
+function IconTru({ size = 8 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 8 8" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M0 4h8" />
+    </svg>
+  )
+}
+
 /**
- * Ô món nào cũng là một thẻ liên kết sang trang chi tiết, nên nút này KHÔNG được
- * nằm trong thẻ đó — nút trong liên kết là HTML sai và bấm cộng sẽ nhảy trang.
- * Nơi gọi dựng nó thành anh em của liên kết rồi ghim bằng `absolute`.
+ * Nút nhặt món — hình tròn vàng khi giỏ chưa có, nở thành thanh đếm khi đã có.
+ *
+ * Hai trạng thái CÙNG CAO 32 và nơi gọi giữ chỗ cố định 68, nên lúc nở ra không
+ * có gì bị đẩy đi: chỉ hình tròn dài thành viên thuốc tại chỗ.
+ *
+ * Ô món là một thẻ liên kết sang trang chi tiết, nên nút này KHÔNG được nằm
+ * trong thẻ đó — nút trong liên kết là HTML sai và bấm cộng sẽ nhảy trang. Nơi
+ * gọi dựng nó thành anh em của liên kết.
  */
 export function AddDishButton({ dish, className = '' }: { dish: QuickDish; className?: string }) {
   const quick = useContext(Ctx)
   if (!quick) return null
 
   const qty = quick.qtyOf(dish.id)
+
+  /**
+   * Nền vàng ĐẶC, nét dấu cộng màu nền trang — đảo cực so với phần còn lại của ô
+   * món, nơi vàng chỉ là chữ và đường mảnh. Đo được 8,8:1, nút đọc ra ngay mà
+   * không cần một đường viền nào.
+   */
+  const vo = 'flex h-8 items-center rounded-pill bg-accent text-on-accent transition-colors'
+
+  /* Ô vẽ chỉ 32 nhưng vùng chạm phải 44: `-my-1.5` cho hai nút con trổ lên trên
+     và xuống dưới viên thuốc bằng phần đệm trong suốt. Đây là nút bán hàng, thu
+     vùng chạm xuống bằng đúng ô vẽ là bấm trượt.
+     Hẹp lại còn 20 dưới 480: ở đó thanh đếm phải nhường chỗ cho giá đứng cùng
+     hàng — xem phép đo ở khối giữ chỗ bên dưới. Chiều cao 44 giữ nguyên, nên
+     ngón tay mất bề ngang chứ không mất cả vùng chạm. */
+  const conBam = '-my-1.5 grid h-11 w-5 flex-none place-items-center xs:w-6.5'
+
   return (
-    /**
-     * Thẻ `button` LUÔN là 44 dù ô vẽ chỉ 32: hộp có viền nằm trong nó, phần đệm
-     * còn lại trong suốt. Đây là nút bán hàng, thu hẳn vùng chạm xuống 32 là bấm
-     * trượt — cùng lối với số tổng đài ở chân trang và các nút của O2.
-     */
-    <button
-      type="button"
-      aria-label={`Thêm ${dish.nameVi} vào giỏ`}
-      onClick={() => quick.add(dish)}
-      /* Di chuột lên đâu trong vùng 44 cũng sáng hộp bên trong, chứ không phải
-         phải trỏ trúng ô 36 mới thấy nút phản hồi */
-      className={`z-10 grid h-11 w-11 flex-none place-items-center hover:[&>span]:bg-accent hover:[&>span]:text-on-accent ${className}`}
+    /* Khối giữ chỗ LUÔN rộng bằng đúng thanh đếm lúc nở hết. Không có nó thì mỗi
+       lần khách bấm cộng ở món đầu tiên, dòng giá bên trái co lại một nhịp và cả
+       hàng giật.
+       52 dưới 480 chứ không 68: đo ở khổ 375 thì ô món rộng 161, trừ đệm 24 và
+       khoảng cách 4 còn 133; giá 13px cần 78, nên thanh chỉ được lấy 52. Giữ 68
+       ở đó là giá không còn chỗ và bị cắt đuôi.
+       `min-w` chứ không `w`: mười phần trở lên thì con số cần 17 chứ không 12 và
+       thanh phải nở thêm. Chặn cứng ở 52 là hai nút bị đẩy tràn ra đè lên giá. */
+    <div
+      className={`flex min-w-13 flex-none items-center justify-end xs:min-w-17 ${className}`}
     >
-      <span className="relative grid h-8 w-8 place-items-center rounded-sm border border-accent bg-canvas/85 text-[length:var(--fs-t2)] leading-none text-accent-ink transition-colors">
-        {qty > 0 ? (
-          <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-pill bg-accent-strong px-1 font-mono text-[length:var(--fs-c2)] font-semibold text-on-accent">
+      {qty === 0 ? (
+        <button
+          type="button"
+          aria-label={`Thêm ${dish.nameVi} vào giỏ`}
+          onClick={() => quick.add(dish)}
+          className="-my-1.5 grid h-11 w-8 place-items-center"
+        >
+          <span className={`${vo} w-8 justify-center hover:bg-gold-200`}>
+            <IconCong />
+          </span>
+        </button>
+      ) : (
+        <div className={vo}>
+          <button
+            type="button"
+            aria-label={`Bớt ${dish.nameVi}`}
+            onClick={() => quick.bot(dish.id)}
+            className={conBam}
+          >
+            <IconTru />
+          </button>
+          {/* `min-w-4` chứ không để chữ tự định bề rộng: 1 và 11 mà rộng khác
+              nhau thì hai nút hai bên xê dịch mỗi lần bấm, ngón tay đang đặt ở
+              đó bị trượt sang nút kia. */}
+          <span className="min-w-3 text-center font-mono text-[length:var(--fs-b2)] font-semibold xs:min-w-4">
             {qty}
           </span>
-        ) : null}
-        +
-      </span>
-    </button>
+          <button
+            type="button"
+            aria-label={`Thêm ${dish.nameVi} vào giỏ`}
+            onClick={() => quick.add(dish)}
+            className={conBam}
+          >
+            <IconCong size={8} />
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

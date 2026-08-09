@@ -60,7 +60,7 @@ export const PROMISES = [
  * Khác ba lời hứa bên dưới: chỗ đó nói về bếp, chỗ này nói về dịch vụ đặt món.
  */
 export const SERVICES = [
-  { icon: 'knife' as const, label: 'Bò cắt trong ngày' },
+  { icon: 'leaf' as const, label: 'Thịt tươi mỗi ngày' },
   { icon: 'bolt' as const, label: 'Giao nhanh nội thành' },
   { icon: 'shield' as const, label: 'Thanh toán an toàn' },
   { icon: 'calendar' as const, label: 'Giữ bàn miễn phí' },

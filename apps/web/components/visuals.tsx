@@ -63,14 +63,22 @@ export function PhotoFrame({
   alt,
   className = '',
   rounded = true,
+  bordered = true,
 }: {
   glyph?: string
   src?: string | null
   alt?: string
   className?: string
   rounded?: boolean
+  /**
+   * Tắt khi khung nằm `absolute` lấp đúng một ô đã có viền: bốn cạnh của nó rơi
+   * chồng lên bốn đường sẵn có, thành đường 2px đậm hơn phần còn lại của khung.
+   */
+  bordered?: boolean
 }) {
-  const frame = `overflow-hidden border border-accent/16 ${rounded ? 'rounded-md' : ''} ${className}`
+  // 12 chứ không 8: cùng một mức với ô món và mọi khung block khác trên trang —
+  // ảnh và ô nội dung đứng cạnh nhau ở W2, W5, W6 nên lệch mức là thấy ngay.
+  const frame = `overflow-hidden ${bordered ? 'border border-accent/16' : ''} ${rounded ? 'rounded-lg' : ''} ${className}`
 
   if (src) {
     return (

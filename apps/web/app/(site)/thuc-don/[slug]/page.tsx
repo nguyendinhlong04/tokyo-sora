@@ -96,14 +96,14 @@ export default async function DishPage({ params }: PageProps) {
         <div className="flex w-full gap-3 lg:ml-auto lg:w-auto lg:gap-3.5">
           <Link
             href="/dat-ban"
-            className="inline-flex h-14 flex-1 items-center justify-center rounded-sm bg-accent-strong px-7 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-accent lg:flex-none"
+            className="inline-flex h-14 flex-1 items-center justify-center rounded-md bg-accent-strong px-7 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-accent lg:flex-none"
           >
-            Đặt bàn để thưởng thức
+            Đặt bàn
           </Link>
           {dish.onlineVisible ? (
             <Link
               href="/dat-mon"
-              className="inline-flex h-14 flex-1 items-center justify-center rounded-sm border border-line-3 px-7 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi lg:flex-none"
+              className="inline-flex h-14 flex-1 items-center justify-center rounded-md border border-line-3 px-7 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi lg:flex-none"
             >
               Đặt mang về
             </Link>
@@ -114,7 +114,8 @@ export default async function DishPage({ params }: PageProps) {
       {/* ----------------------------------------------------------- Dùng kèm */}
       {pairings.length > 0 ? (
         <section className="mx-auto max-w-[1280px] px-5 py-16 lg:px-10 lg:py-32">
-          <div className="border-t border-accent/16 pt-10 lg:pt-16">
+          {/* 18 — cùng tầng khối với chân poster và khối "bữa ăn diễn ra" */}
+          <div className="border-t border-accent/18 pt-10 lg:pt-16">
             <h2 className="font-display text-[30px] font-light text-ink-hi lg:text-[length:var(--fs-d2)]">
               Dùng kèm
             </h2>
@@ -126,14 +127,17 @@ export default async function DishPage({ params }: PageProps) {
                 <Link
                   key={pair.id}
                   href={`/thuc-don/${pair.id}`}
-                  className="flex items-center gap-5 rounded-md border border-accent/16 bg-surface-2 p-5 transition-colors hover:border-accent hover:bg-surface-4"
+                  /* Ô giữ viền, hạ về tầng khối (14): `surface-2` trên nền trang
+                     chỉ đo 1,04:1, bỏ viền là ba ô này biến mất khỏi trang */
+                  className="flex items-center gap-5 rounded-lg border border-accent/14 bg-surface-2 p-5 transition-colors hover:border-accent hover:bg-surface-4"
                 >
+                  {/* Ảnh thì bỏ viền được: nó nằm sâu 20 trong một ô đã có viền */}
                   <DishGlyph
                     glyph={dishGlyph(pair)}
                     src={pair.imageUrl}
                     alt={pair.nameVi}
                     size="sm"
-                    className="size-22 flex-none rounded-md border border-accent/16"
+                    className="size-22 flex-none rounded-md"
                   />
                   <div className="min-w-0">
                     <p className="text-[length:var(--fs-b1)] font-semibold text-ink-hi">
@@ -189,7 +193,11 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
 
   return (
     <section className="mx-auto max-w-[1280px] px-5 pt-6 lg:px-10 lg:pt-7">
-      <div className="grid border border-accent/30 bg-canvas lg:grid-cols-[456px_1fr]">
+      {/* `overflow-hidden` bắt buộc đi kèm: ảnh món nằm `absolute inset-0` trong
+          cột trái, chạm cả ba mép — không cắt thì góc vuông của ảnh thò ra
+          ngoài đường viền đã bo. Ô ghép trong lưới poster (bảng thông số, dải
+          chân) cũng nhờ đó mà được xén tròn theo khung. */}
+      <div className="grid overflow-hidden rounded-lg border border-accent/30 bg-canvas lg:grid-cols-[456px_1fr]">
         {/* Cột trái: ảnh nguyên liệu, cách nướng, lưu ý */}
         <div className="flex min-w-0 flex-col border-accent/18 lg:border-r">
           <div className="p-6 pb-5 lg:p-8 lg:pb-5">
@@ -230,17 +238,25 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
 
           <div className="grid gap-5 p-6 lg:px-8 lg:pb-8">
             {story.fire || story.dip ? (
-              <div className="border border-accent/34 bg-[linear-gradient(180deg,#1A1408_0%,var(--sora-surface-2)_100%)]">
+              <div className="rounded-md border border-accent/18 bg-[linear-gradient(180deg,#1A1408_0%,var(--sora-surface-2)_100%)]">
                 <p className="px-6 pt-5 pb-4 text-center font-display text-[length:var(--fs-t1)] leading-tight font-semibold tracking-[0.02em] text-gold-200">
                   NGON THEO CÁCH
                   <br />
                   ĐƠN GIẢN NHẤT
                 </p>
                 {story.fire ? (
-                  <div className="flex items-center gap-4.5 border-t border-accent/20 px-6 py-4.5">
+                  <div className="flex items-center gap-4.5 border-t border-accent/14 px-6 py-4.5">
+                    {/* Ảnh trong khối đã có viền và kẻ ngăn: nền radial của nó
+                        đã sáng hơn nền khối, viền không phân tách thêm gì */}
+                    {/* `rounded={false}` để bo của riêng ô này có hiệu lực: mức
+                        mặc định của `PhotoFrame` là 12, mà đây là ảnh 66 nằm
+                        lồng trong khối đã bo 8 — bậc trong phải nhỏ hơn bậc
+                        ngoài, không thì hai đường cong chồng nhau. */}
                     <PhotoFrame
                       glyph="炭"
                       src={story.fireImageUrl}
+                      bordered={false}
+                      rounded={false}
                       className="size-16.5 flex-none rounded-sm"
                     />
                     <p className="min-w-0 text-[length:var(--fs-b1)] leading-relaxed text-ink-cream">
@@ -249,11 +265,16 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
                   </div>
                 ) : null}
                 {story.dip ? (
-                  <div className="flex items-center gap-4.5 border-t border-accent/20 px-6 py-4.5">
+                  <div className="flex items-center gap-4.5 border-t border-accent/14 px-6 py-4.5">
+                    {/* Cùng cỡ, cùng khối, ngay dưới ô than — nên cùng một bậc bo.
+                        Trước đây ô này khai `rounded-full` nhưng mức mặc định của
+                        `PhotoFrame` đè mất nên nó chưa bao giờ tròn. */}
                     <PhotoFrame
                       glyph="垂"
                       src={story.dipImageUrl}
-                      className="size-16.5 flex-none rounded-full"
+                      bordered={false}
+                      rounded={false}
+                      className="size-16.5 flex-none rounded-sm"
                     />
                     <p className="min-w-0 text-[length:var(--fs-b1)] leading-relaxed text-ink-cream">
                       {story.dip}
@@ -310,7 +331,10 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
                 <div className="grid min-w-0 gap-4">
                   {flavours.map((flavour, i) => (
                     <div key={flavour} className="flex min-w-0 items-center gap-4">
-                      <span className="grid size-8 flex-none place-items-center rounded-full border border-accent/55 font-jp text-[length:var(--fs-b2)] text-accent">
+                      {/* Khối nền thay vòng viền 55% — đường đậm nhất cả trang
+                          đang thuộc về ô nhỏ nhất cả trang. Cùng lối với ô kanji
+                          chặng và số chặng ở poster set. */}
+                      <span className="grid size-8 flex-none place-items-center rounded-full bg-accent/16 font-jp text-[length:var(--fs-b2)] text-accent">
                         {['旨', '甘', '香', '合'][i] ?? '味'}
                       </span>
                       <span className="text-[length:var(--fs-b1)] leading-snug text-ink-cream">
@@ -325,7 +349,7 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
                       glyph={story.originKanji || '部'}
                       src={story.originImageUrl}
                       rounded={false}
-                      className="h-[150px] border-accent/20"
+                      className="h-[150px] rounded-md"
                     />
                     <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
                       Vị trí:
@@ -345,9 +369,12 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
                 {cuts.map((cut) => (
                   <div
                     key={cut.name}
-                    className="flex min-w-0 flex-col border border-accent/28 bg-surface-1"
+                    /* Giữ viền nhưng hạ về tầng khối (14): ba ô này là thẻ dọc
+                       cao 343 đứng cạnh nhau, mà `surface-1` trên `canvas` chỉ
+                       đo 1,02:1 — bỏ viền là ba ô nhoè vào nhau thành một mảng. */
+                    className="flex min-w-0 flex-col rounded-md border border-accent/14 bg-surface-1"
                   >
-                    <div className="border-b border-accent/18 px-4 pt-4 pb-3.5 text-center">
+                    <div className="border-b border-accent/14 px-4 pt-4 pb-3.5 text-center">
                       <p className="font-display text-[length:var(--fs-t1)] font-semibold tracking-[0.08em] text-gold-200 uppercase">
                         {cut.name}
                       </p>
@@ -389,7 +416,7 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
           ) : null}
 
           {condiments.length > 0 ? (
-            <div className="min-w-0 bg-kraft p-6">
+            <div className="min-w-0 rounded-md bg-kraft p-6">
               <div className="flex items-center gap-3">
                 <span className="font-jp text-[length:var(--fs-b1)] text-kraft-ink-2">✿</span>
                 <span className="font-display text-[length:var(--fs-t1)] font-semibold tracking-[0.14em] text-kraft-ink uppercase">
@@ -399,7 +426,10 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
               <div className="mt-5 grid grid-cols-2 gap-4.5 lg:grid-cols-4">
                 {condiments.map((cond) => (
                   <div key={cond.name} className="min-w-0">
-                    <div className="mx-auto grid size-22 place-items-center rounded-full border border-kraft-ink/25 bg-kraft-ink/5 font-jp text-[30px] text-kraft-ink-2">
+                    {/* Nền đậm thay vòng viền: nền kraft sáng, ô tối — sắc độ đã
+                        tách sẵn, vẽ thêm đường viền là kể lại một ranh giới mắt
+                        đã nhìn thấy. Nâng 5→10 để ô không nhạt đi khi mất viền. */}
+                    <div className="mx-auto grid size-22 place-items-center rounded-full bg-kraft-ink/10 font-jp text-[30px] text-kraft-ink-2">
                       {cond.kanji}
                     </div>
                     <p className="mt-3.5 text-center text-[length:var(--fs-c1)] font-bold tracking-[0.06em] text-kraft-ink uppercase">
@@ -463,7 +493,11 @@ function SetPoster({
 
   return (
     <section className="mx-auto max-w-[1280px] px-5 pt-6 lg:px-10 lg:pt-7">
-      <div className="grid border border-accent/30 bg-canvas lg:grid-cols-[456px_1fr]">
+      {/* `overflow-hidden` bắt buộc đi kèm: ảnh món nằm `absolute inset-0` trong
+          cột trái, chạm cả ba mép — không cắt thì góc vuông của ảnh thò ra
+          ngoài đường viền đã bo. Ô ghép trong lưới poster (bảng thông số, dải
+          chân) cũng nhờ đó mà được xén tròn theo khung. */}
+      <div className="grid overflow-hidden rounded-lg border border-accent/30 bg-canvas lg:grid-cols-[456px_1fr]">
         <div className="flex min-w-0 flex-col border-accent/18 lg:border-r">
           <div className="p-6 pb-5 lg:p-8 lg:pb-5">
             <p className="font-display text-[28px] font-semibold tracking-[0.06em] text-ink-hi lg:text-[34px]">
@@ -496,7 +530,10 @@ function SetPoster({
 
           <div className="grid flex-none gap-5 p-6 lg:px-8 lg:pb-8">
             {facts.length > 0 ? (
-              <div className="grid grid-cols-2 border border-accent/20">
+              /* Chỉ còn KẺ TRONG, bỏ viền ngoài: kẻ trong phân tách bốn ô nên có
+                 nghĩa, còn viền ngoài chỉ là lưới vẽ trong một cột poster vốn đã
+                 có viền của nó. */
+              <div className="grid grid-cols-2">
                 {facts.map((cell, i) => (
                   <div
                     key={cell.l}
@@ -518,16 +555,18 @@ function SetPoster({
             ) : null}
 
             {flow.length > 0 ? (
-              <div className="border border-accent/34 bg-[linear-gradient(180deg,#1A1408_0%,var(--sora-surface-2)_100%)]">
+              <div className="rounded-md border border-accent/18 bg-[linear-gradient(180deg,#1A1408_0%,var(--sora-surface-2)_100%)]">
                 <p className="px-6 pt-5 pb-4 text-center font-display text-[length:var(--fs-t1)] leading-tight font-semibold text-gold-200">
                   BỮA ĂN DIỄN RA
                   <br />
                   THEO THỨ TỰ NÀY
                 </p>
-                <ol className="grid gap-3.5 border-t border-accent/20 px-6 py-4.5">
+                <ol className="grid gap-3.5 border-t border-accent/14 px-6 py-4.5">
                   {flow.map((step, i) => (
                     <li key={step} className="flex min-w-0 items-start gap-3.5">
-                      <span className="mt-0.5 grid size-6.5 flex-none place-items-center rounded-full border border-accent/50 font-mono text-[length:var(--fs-c2)] text-accent">
+                      {/* Số chặng: khối nền thay vòng viền 50% — xem chú ở ô
+                          kanji chặng về phân cấp ngược */}
+                      <span className="mt-0.5 grid size-6.5 flex-none place-items-center rounded-full bg-accent/16 font-mono text-[length:var(--fs-c2)] text-accent">
                         {i + 1}
                       </span>
                       <p className="min-w-0 text-[length:var(--fs-b2)] leading-relaxed text-ink-cream">
@@ -606,7 +645,10 @@ function SetPoster({
                 {courses.map((course) => (
                   <div key={course.label} className="min-w-0">
                     <div className="flex items-center gap-3 pb-3">
-                      <span className="grid size-7.5 flex-none place-items-center border border-accent/45 font-jp text-[length:var(--fs-b2)] text-accent-ink">
+                      {/* Khối nền thay hộp viền 45%: ô kanji 30×30 là chi tiết
+                          nhỏ nhất màn hình mà đang có đường đậm hơn cả viền
+                          poster bao quanh cả trang (30%) — phân cấp ngược */}
+                      <span className="grid size-7.5 flex-none place-items-center bg-accent/14 font-jp text-[length:var(--fs-b2)] text-accent-ink">
                         {course.kanji ?? '膳'}
                       </span>
                       <span className="text-[length:var(--fs-c1)] font-semibold tracking-[0.18em] text-accent-ink uppercase">
@@ -625,14 +667,24 @@ function SetPoster({
                           <Link
                             key={item.dishId}
                             href={`/thuc-don/${item.dishId}`}
-                            className="flex min-w-0 items-center gap-4 border border-accent/18 bg-surface-1 px-3.5 py-3 transition-colors hover:border-accent hover:bg-surface-3"
+                            /* MỘT vạch thay bốn cạnh. Mười lăm dòng món là sáu
+                               mươi cạnh — gần một phần tư số đường của cả trang,
+                               mà mỗi hộp lại nằm lồng trong cột poster đã có
+                               viền của nó.
+                               Vạch chứ không phải bỏ trắng: `surface-1` trên nền
+                               `canvas` của poster chỉ đo 1,02:1, bỏ hết viền thì
+                               dòng món biến mất sạch. Vạch trái 45% vừa đủ rõ,
+                               vừa cho danh sách một nhịp dọc như thực đơn in. */
+                            className="flex min-w-0 items-center gap-4 rounded-md border-l border-accent/45 bg-surface-1 px-3.5 py-3 transition-colors hover:border-accent hover:bg-surface-3"
                           >
+                            {/* Ảnh KHÔNG viền: nó nằm sâu 14 trong một khối đã
+                                tách khỏi nền, viền của nó không phân tách gì */}
                             <DishGlyph
                               glyph={dishGlyph(itemDish)}
                               src={itemDish.imageUrl}
                               alt={itemDish.nameVi}
                               size="sm"
-                              className="size-15.5 flex-none border border-accent/20"
+                              className="size-15.5 flex-none rounded-sm"
                             />
                             <div className="min-w-0 flex-1">
                               <p className="text-[length:var(--fs-b1)] leading-snug font-semibold text-ink-cream">
@@ -663,7 +715,7 @@ function SetPoster({
           ) : null}
 
           {extras.length > 0 ? (
-            <div className="min-w-0 bg-kraft p-6">
+            <div className="min-w-0 rounded-md bg-kraft p-6">
               <div className="flex items-center gap-3">
                 <span className="font-jp text-[length:var(--fs-b1)] text-kraft-ink-2">✿</span>
                 <span className="font-display text-[length:var(--fs-t1)] font-semibold tracking-[0.14em] text-kraft-ink uppercase">
@@ -679,10 +731,12 @@ function SetPoster({
                         src={extra.imageUrl}
                         alt={extra.nameVi}
                         size="sm"
-                        className="size-15.5 flex-none border border-kraft-ink/25"
+                        className="size-15.5 flex-none rounded-sm"
                       />
                     ) : (
-                      <div className="grid size-15.5 flex-none place-items-center border border-kraft-ink/25 bg-kraft-ink/5 font-jp text-[26px] text-kraft-ink-2">
+                      /* Nền kraft sáng, ô chữ tối — đã tách nhau bằng sắc độ,
+                         thêm viền chỉ là vẽ lại ranh giới đã nhìn thấy */
+                      <div className="grid size-15.5 flex-none place-items-center rounded-sm bg-kraft-ink/8 font-jp text-[26px] text-kraft-ink-2">
                         {dishGlyph(extra)}
                       </div>
                     )}
@@ -718,7 +772,9 @@ function SetPoster({
 function PlainPoster({ dish }: { dish: SiteDish }) {
   return (
     <section className="mx-auto max-w-[1280px] px-5 pt-6 lg:px-10 lg:pt-7">
-      <div className="grid border border-accent/22 bg-canvas lg:grid-cols-[560px_1fr]">
+      {/* 30 như hai poster kia: đây là cùng một khung, không có cớ gì món thường
+          vẽ nhạt hơn món có bài viết */}
+      <div className="grid overflow-hidden rounded-lg border border-accent/30 bg-canvas lg:grid-cols-[560px_1fr]">
         <div className="relative min-h-[260px] border-accent/16 lg:min-h-[420px] lg:border-r">
           <DishGlyph
             glyph={dishGlyph(dish)}
@@ -765,7 +821,7 @@ function PlainPoster({ dish }: { dish: SiteDish }) {
 /** Khối viền đỏ "Lưu ý" — cùng một khối ở cả poster món và poster set */
 function NoteBox({ note, kanji }: { note: string; kanji: string }) {
   return (
-    <div className="flex gap-4 border border-danger-line-2 px-5 py-4.5">
+    <div className="flex gap-4 rounded-md border border-danger-line-2 px-5 py-4.5">
       <div className="min-w-0 flex-1">
         <p className="text-[length:var(--fs-c1)] font-semibold tracking-[0.2em] text-danger uppercase">
           Lưu ý

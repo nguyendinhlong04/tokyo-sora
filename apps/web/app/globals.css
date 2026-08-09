@@ -3,6 +3,19 @@
 @import '@sora/tokens/fonts.css';
 
 /**
+ * Điểm gãy riêng của ô món, 480.
+ *
+ * Khai ở đây chứ KHÔNG viết thẳng `min-[480px]:` trong lớp: biến thể tuỳ ý đó
+ * được sinh ra trước các lớp không điều kiện, nên `min-w-13` đứng sau vẫn thắng
+ * `min-[480px]:min-w-17` ngay trong khoảng media của nó — cả trang desktop chạy
+ * bằng cấu hình khổ hẹp mà không có lỗi nào báo ra. Khai vào thang điểm gãy thì
+ * Tailwind xếp `xs` đúng chỗ, trước `sm`, sau lớp gốc.
+ */
+@theme {
+  --breakpoint-xs: 30rem;
+}
+
+/**
  * Chữ hero trườn vào từ trái mỗi lần sang ảnh khác.
  *
  * Nhoè rồi nét dần chứ không chỉ trượt: hai tên món trông như tan vào nhau, thay

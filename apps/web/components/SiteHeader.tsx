@@ -85,7 +85,7 @@ export function SiteHeader({ branches }: { branches: HeaderBranch[] }) {
                 type="button"
                 onClick={() => setContactOpen((v) => !v)}
                 aria-expanded={contactOpen}
-                className="inline-flex h-11 items-center gap-2 rounded-sm border border-ink-hi/24 px-4 text-[length:var(--fs-b2)] font-medium text-ink-body transition-colors hover:border-ink-hi hover:text-ink-hi"
+                className="inline-flex h-11 items-center gap-2 rounded-md border border-ink-hi/24 px-4 text-[length:var(--fs-b2)] font-medium text-ink-body transition-colors hover:border-ink-hi hover:text-ink-hi"
               >
                 <PhoneIcon />
                 Liên hệ
@@ -128,7 +128,7 @@ export function SiteHeader({ branches }: { branches: HeaderBranch[] }) {
 
           <Link
             href="/dat-mon"
-            className="hidden h-11 items-center rounded-sm border border-accent px-5 text-[length:var(--fs-b2)] font-medium text-accent-ink transition-colors hover:border-gold-300 hover:text-gold-200 lg:inline-flex"
+            className="hidden h-11 items-center rounded-md border border-accent px-5 text-[length:var(--fs-b2)] font-medium text-accent-ink transition-colors hover:border-gold-300 hover:text-gold-200 lg:inline-flex"
           >
             Đặt món mang về
           </Link>
@@ -138,7 +138,7 @@ export function SiteHeader({ branches }: { branches: HeaderBranch[] }) {
                thanh và trong hero (ô chi nhánh cũng 40), nên thanh đọc ra một khối
                thay vì một nút vàng nhô lên. Đừng hạ tiếp: dưới 36 thì nút bán hàng
                chính bắt đầu khó trúng bằng ngón cái. */
-            className="inline-flex h-10 items-center rounded-sm bg-accent-strong px-3.5 text-[length:var(--fs-c1)] font-semibold text-on-accent transition-colors hover:bg-accent lg:h-11 lg:px-6 lg:text-[length:var(--fs-b2)]"
+            className="inline-flex h-10 items-center rounded-md bg-accent-strong px-3.5 text-[length:var(--fs-c1)] font-semibold text-on-accent transition-colors hover:bg-accent lg:h-11 lg:px-6 lg:text-[length:var(--fs-b2)]"
           >
             Đặt bàn
           </Link>
@@ -177,7 +177,7 @@ export function SiteHeader({ branches }: { branches: HeaderBranch[] }) {
           <Link
             href="/dat-mon"
             onClick={() => setOpen(false)}
-            className="mt-4 flex h-12 items-center justify-center rounded-sm border border-accent text-[length:var(--fs-b1)] font-medium text-accent-ink"
+            className="mt-4 flex h-12 items-center justify-center rounded-md border border-accent text-[length:var(--fs-b1)] font-medium text-accent-ink"
           >
             Đặt món mang về
           </Link>

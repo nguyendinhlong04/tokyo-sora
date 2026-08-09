@@ -96,7 +96,7 @@ export default async function SpacesPage() {
 
                   <Link
                     href={`/dat-ban?chi-nhanh=${branch.id}`}
-                    className="mt-9 inline-flex h-13 items-center rounded-sm border border-accent px-7 text-[length:var(--fs-b1)] font-medium text-accent-ink transition-colors hover:border-gold-300 hover:text-gold-200"
+                    className="mt-9 inline-flex h-13 items-center rounded-md border border-accent px-7 text-[length:var(--fs-b1)] font-medium text-accent-ink transition-colors hover:border-gold-300 hover:text-gold-200"
                   >
                     Đặt bàn tại đây
                   </Link>

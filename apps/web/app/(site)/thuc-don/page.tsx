@@ -1,6 +1,7 @@
 import { formatVnd } from '@sora/contracts'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { MenuIndex } from '../../../components/MenuIndex'
 import { AddDishButton, QuickAddProvider } from '../../../components/QuickAdd'
 import { DishGlyph, Diamond, PhotoFrame, SignatureBadge } from '../../../components/visuals'
 import { CATEGORY_NOTES, ORDER_ADVICE, SITE } from '../../../content/site'
@@ -28,7 +29,10 @@ export default async function MenuPage() {
     <QuickAddProvider>
       {/* ------------------------------------------------- Poster đầu trang */}
       <section className="mx-auto max-w-[1280px] px-5 pt-10 lg:px-10 lg:pt-14">
-        <div className="grid border border-accent/30 bg-canvas lg:grid-cols-[380px_1fr]">
+        {/* Bo 12 bằng đúng ô món bên dưới, và `overflow-hidden` vì ảnh ở cột
+            trái chạm hai mép khung — không cắt thì góc vuông của ảnh thò ra
+            ngoài đường viền đã bo. */}
+        <div className="grid overflow-hidden rounded-lg border border-accent/30 bg-canvas lg:grid-cols-[380px_1fr]">
           <div className="flex min-w-0 flex-col border-accent/18 lg:border-r">
             <div className="p-6 pb-5 lg:p-7">
               <p className="font-display text-[26px] font-semibold tracking-[0.06em] text-ink-hi lg:text-[30px]">
@@ -44,7 +48,7 @@ export default async function MenuPage() {
               </div>
             </div>
             <div className="relative min-h-[220px] flex-1 border-t border-accent/16 lg:min-h-[280px]">
-              <PhotoFrame rounded={false} className="absolute inset-0" />
+              <PhotoFrame rounded={false} bordered={false} className="absolute inset-0" />
               <span className="pointer-events-none absolute top-5 left-6 font-jp text-[30px] tracking-[0.18em] text-ink-hi [writing-mode:vertical-rl]">
                 御献立
               </span>
@@ -86,25 +90,12 @@ export default async function MenuPage() {
         </div>
       </section>
 
-      {/* ------------------------------------------------ Thanh chương dính
-          Dừng dưới cả dải vàng (32 · 40 · 44) lẫn thanh điều hướng (64 · 64 · 80)
-          — hai thanh đó đều dính, nên 96 · 104 · 124 mới là mép dưới phần đã ghim */}
-      <nav className="sticky top-24 z-40 mt-8 border-y border-accent/22 bg-canvas/94 backdrop-blur-md sm:top-26 lg:top-31 lg:mt-10">
-        <div className="mx-auto flex max-w-[1280px] gap-1.5 overflow-x-auto px-5 py-3 lg:h-[70px] lg:items-center lg:px-10 lg:py-0">
-          {groups.map((group) => (
-            <a
-              key={group.id}
-              href={`#chuong-${group.id}`}
-              className="inline-flex h-11 flex-none items-center gap-2.5 border border-accent/20 px-4 whitespace-nowrap text-ink-mute transition-colors hover:border-accent hover:text-gold-200"
-            >
-              {group.kanji ? <span className="font-jp text-[length:var(--fs-b1)]">{group.kanji}</span> : null}
-              <span className="text-[length:var(--fs-c1)] font-medium tracking-[0.04em]">
-                {group.nameVi}
-              </span>
-            </a>
-          ))}
-        </div>
-      </nav>
+      {/* ------------------------------------------------------ Mục lục chương
+          Dính dưới thanh điều hướng (đáy 96) và tự sáng chương đang đọc — xem
+          `MenuIndex`. Mười tên chảy thành hai dòng chữ trần chứ không cuộn
+          ngang: thanh cuộn cũ chỉ hở ba chương trong mười trên máy 375, bảy
+          chương còn lại nằm sau một cử chỉ không có dấu hiệu nào báo là có. */}
+      <MenuIndex chapters={groups} />
 
       {/* ---------------------------------------------------- Từng chương */}
       <div className="mx-auto max-w-[1280px] px-5 pt-12 lg:px-10 lg:pt-16">
@@ -112,9 +103,22 @@ export default async function MenuPage() {
           <section
             key={group.id}
             id={`chuong-${group.id}`}
-            className="scroll-mt-32 pb-14 lg:scroll-mt-44 lg:pb-18"
+            /* 192 = phần ghim dày nhất cộng chỗ thở. Ba thanh chồng nhau, và
+               hai vế của nó đổi ngược chiều nhau nên tổng gần như đứng yên: máy
+               nhỏ thì dải vàng cộng thanh điều hướng chỉ 96 nhưng mười tên phải
+               xuống hai dòng (86) → 182; màn rộng thì chúng dày lên 124 còn mục
+               lục gom một dòng (50) → 174. Một con số cho cả dải, không chia
+               mức: chênh nhau 8, mà chia mức thì mỗi lần một trong hai thanh
+               kia đổi chiều cao là phải dò lại từng ngưỡng.
+               Thiếu chỗ này thì tiêu đề chương nhảy tới nằm gọn dưới thanh mục
+               lục, khách bấm xong không thấy mình vừa tới đâu. */
+            className="scroll-mt-48 pb-14 lg:pb-18"
           >
-            <header className="flex items-start gap-5 border-b border-accent/24 pb-6 lg:gap-6 lg:pb-7">
+            {/* 32 chứ không 24: đây là ranh giới CHƯƠNG, đường có nghĩa nhất
+                trang. Ngang bằng viền ô món như trước thì mắt không tách được
+                tầng nào với tầng nào — chương 24, ô món 22, chênh hai phần trăm.
+                Giữ khoảng cách này với alpha của ô món bên dưới. */}
+            <header className="flex items-start gap-5 border-b border-accent/32 pb-6 lg:gap-6 lg:pb-7">
               <div className="mt-1 hidden lg:mx-2 lg:block">
                 <Diamond>{String(index + 1).padStart(2, '0')}</Diamond>
               </div>
@@ -164,7 +168,11 @@ export default async function MenuPage() {
                        món ở W1 đổi theo cùng lúc để hai trang không lệch nhau. */
                     <div
                       key={dish.id}
-                      className="relative flex min-w-0 flex-col overflow-hidden rounded-lg border border-accent/22 bg-surface-1 transition-colors hover:border-accent hover:bg-surface-3"
+                    /* 16 chứ không 22: lùi xuống dưới đường chương (32) để lưới
+                       món đọc ra là nội dung của chương chứ không phải một tầng
+                       ngang hàng. Cũng là đúng alpha của ô món ở W1 — hai trang
+                       vẽ cùng một thứ thì không có cớ gì đậm nhạt khác nhau. */
+                      className="relative flex min-w-0 flex-col overflow-hidden rounded-lg border border-accent/16 bg-surface-1 transition-colors hover:border-accent hover:bg-surface-3"
                     >
                       <Link href={`/thuc-don/${dish.id}`} className="flex min-w-0 flex-1 flex-col">
                         <div className="relative aspect-[4/3]">
@@ -175,7 +183,7 @@ export default async function MenuPage() {
                             </span>
                           ) : null}
                         </div>
-                        <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-4">
+                        <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 pb-0 xs:p-4 xs:pb-0">
                           <p className="font-display text-[length:var(--fs-t2)] leading-tight font-semibold tracking-[0.03em] text-gold-200 uppercase">
                             {dish.nameVi}
                           </p>
@@ -184,19 +192,27 @@ export default async function MenuPage() {
                               {dish.nameJa}
                             </p>
                           ) : null}
-                          {/* 48 = mép ngoài hộp vẽ 32 (ghim ở 12, đệm trong suốt 4
-                              mỗi bên) cộng 4 thở. Giá là dòng cuối ô, hụt lề là
-                              số chui xuống dưới nút — xem chú cùng chỗ ở W1. */}
-                          <p className="mt-auto pr-12 font-mono text-[length:var(--fs-b1)] text-accent-ink">
-                            {formatVnd(dish.price)}
-                          </p>
                         </div>
                       </Link>
-                      {/* Món không bán online thì không có nút: bấm cộng rồi tới
-                          O2 mới biết không đặt được là hứa suông. */}
-                      {dish.onlineVisible ? (
-                        <AddDishButton dish={dish} className="absolute right-3 bottom-3" />
-                      ) : null}
+                      {/* Giá và nút đứng CÙNG MỘT HÀNG, không còn nút ghim đè lên
+                          góc ô: thanh đếm lúc nở ra rộng 68, mà trên máy 375 ô
+                          món chỉ rộng 160 — ghim đè thì nó phủ mất đuôi con số.
+                          Hàng này nằm ngoài `Link` vì nút không được lồng trong
+                          liên kết, nên tên món ở trên mới là phần bấm sang trang. */}
+                      {/* Một hàng ở MỌI khổ, và dưới 480 thì cả ba thứ cùng thu
+                          lại mới đủ chỗ: giá 16 → 13, thanh đếm 68 → 52, đệm 16
+                          → 12. Đo ở khổ 375: ô 161 − đệm 24 − thanh 52 − khoảng
+                          cách 6 = 79 cho giá, mà "3.200.000₫" ở 13px cần 78. Sát
+                          một điểm ảnh, nên `truncate` ở lại phòng khi bảng giá
+                          lên tám chữ số. */}
+                      <div className="flex items-center justify-between gap-1 px-3 pt-2.5 pb-3 xs:gap-2 xs:px-4 xs:pb-4">
+                        <p className="min-w-0 truncate font-mono text-[length:var(--fs-c1)] text-accent-ink xs:text-[length:var(--fs-b1)]">
+                          {formatVnd(dish.price)}
+                        </p>
+                        {/* Món không bán online thì không có nút: bấm cộng rồi tới
+                            O2 mới biết không đặt được là hứa suông. */}
+                        {dish.onlineVisible ? <AddDishButton dish={dish} /> : null}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -208,7 +224,7 @@ export default async function MenuPage() {
 
       {/* ---------------------------------------------- Panel kraft cuối trang */}
       <section className="mx-auto max-w-[1280px] px-5 pb-20 lg:px-10 lg:pb-32">
-        <div className="grid gap-8 bg-kraft p-7 lg:grid-cols-[1fr_300px] lg:gap-9 lg:px-9">
+        <div className="grid gap-8 rounded-lg bg-kraft p-7 lg:grid-cols-[1fr_300px] lg:gap-9 lg:px-9">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <span className="font-jp text-[length:var(--fs-b1)] text-kraft-ink-2">✿</span>
@@ -232,13 +248,13 @@ export default async function MenuPage() {
           <div className="grid min-w-0 content-start gap-3">
             <Link
               href="/dat-ban"
-              className="flex h-13 items-center justify-center bg-kraft-ink text-[length:var(--fs-b1)] font-semibold text-gold-200"
+              className="flex h-13 items-center justify-center rounded-md bg-kraft-ink text-[length:var(--fs-b1)] font-semibold text-gold-200"
             >
               Đặt bàn để thưởng thức
             </Link>
             <Link
               href="/dat-mon"
-              className="flex h-13 items-center justify-center border border-kraft-ink text-[length:var(--fs-b1)] font-semibold text-kraft-ink"
+              className="flex h-13 items-center justify-center rounded-md border border-kraft-ink text-[length:var(--fs-b1)] font-semibold text-kraft-ink"
             >
               Đặt món mang về
             </Link>
