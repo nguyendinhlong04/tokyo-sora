@@ -2,6 +2,7 @@ import { formatVnd } from '@sora/contracts'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { AddDishButton, QuickAddProvider } from '../../../../components/QuickAdd'
 import {
   DishGlyph,
   Diamond,
@@ -63,7 +64,10 @@ export default async function DishPage({ params }: PageProps) {
   const pairings = dish.kind === 'set' ? [] : pairingsFor(menu, dish)
 
   return (
-    <>
+    /* Bọc cả trang chứ không riêng khối "Dùng kèm": khách nhặt món ở W2 rồi bấm
+       vào một món là sang đây, thanh đếm đáy phải theo sang cùng chứ không tắt
+       ngúm rồi hiện lại. Kho của nó nằm ở `sessionStorage`, chung với W2. */
+    <QuickAddProvider>
       <div className="mx-auto max-w-[1280px] px-5 pt-8 lg:px-10 lg:pt-12">
         <Link href="/thuc-don" className="text-[length:var(--fs-b2)] text-ink-mute">
           ← Thực đơn
@@ -124,35 +128,45 @@ export default async function DishPage({ params }: PageProps) {
             </p>
             <div className="mt-8 grid gap-4 lg:mt-12 lg:grid-cols-3 lg:gap-8">
               {pairings.map((pair) => (
-                <Link
+                /* Thẻ ngoài là `div` chứ không còn là liên kết: nút cộng phải
+                   đứng NGOÀI thẻ `a` — nút lồng trong liên kết là HTML sai và
+                   bấm cộng sẽ nhảy sang trang món. Đúng cách ô món ở W2 dựng. */
+                <div
                   key={pair.id}
-                  href={`/thuc-don/${pair.id}`}
                   /* Ô giữ viền, hạ về tầng khối (14): `surface-2` trên nền trang
                      chỉ đo 1,04:1, bỏ viền là ba ô này biến mất khỏi trang */
                   className="flex items-center gap-5 rounded-lg border border-accent/14 bg-surface-2 p-5 transition-colors hover:border-accent hover:bg-surface-4"
                 >
-                  {/* Ảnh thì bỏ viền được: nó nằm sâu 20 trong một ô đã có viền */}
-                  <DishGlyph
-                    glyph={dishGlyph(pair)}
-                    src={pair.imageUrl}
-                    alt={pair.nameVi}
-                    size="sm"
-                    className="size-22 flex-none rounded-md"
-                  />
-                  <div className="min-w-0">
-                    <p className="text-[length:var(--fs-b1)] font-semibold text-ink-hi">
-                      {pair.nameVi}
-                    </p>
-                    {pair.nameJa ? (
-                      <p className="mt-1.5 font-jp text-[length:var(--fs-c1)] text-ink-mute">
-                        {pair.nameJa}
+                  <Link
+                    href={`/thuc-don/${pair.id}`}
+                    className="flex min-w-0 flex-1 items-center gap-5"
+                  >
+                    {/* Ảnh thì bỏ viền được: nó nằm sâu 20 trong một ô đã có viền */}
+                    <DishGlyph
+                      glyph={dishGlyph(pair)}
+                      src={pair.imageUrl}
+                      alt={pair.nameVi}
+                      size="sm"
+                      className="size-22 flex-none rounded-md"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[length:var(--fs-b1)] font-semibold text-ink-hi">
+                        {pair.nameVi}
                       </p>
-                    ) : null}
-                    <p className="mt-2.5 font-mono text-[length:var(--fs-b1)] text-accent-ink">
-                      {formatVnd(pair.price)}
-                    </p>
-                  </div>
-                </Link>
+                      {pair.nameJa ? (
+                        <p className="mt-1.5 font-jp text-[length:var(--fs-c1)] text-ink-mute">
+                          {pair.nameJa}
+                        </p>
+                      ) : null}
+                      <p className="mt-2.5 font-mono text-[length:var(--fs-b1)] text-accent-ink">
+                        {formatVnd(pair.price)}
+                      </p>
+                    </div>
+                  </Link>
+                  {/* Món không bán online thì không có nút: bấm cộng rồi tới O2
+                      mới biết không đặt được là hứa suông — cùng luật với W2. */}
+                  {pair.onlineVisible ? <AddDishButton dish={pair} /> : null}
+                </div>
               ))}
             </div>
           </div>
@@ -178,7 +192,7 @@ export default async function DishPage({ params }: PageProps) {
           }),
         }}
       />
-    </>
+    </QuickAddProvider>
   )
 }
 
@@ -722,33 +736,45 @@ function SetPoster({
                   Gọi thêm cho vừa miệng
                 </span>
               </div>
-              <div className="mt-5 grid gap-4 lg:grid-cols-3">
+              {/* Hai cột chứ không ba: ba cột chia ô còn 186, mà ảnh 62 và thanh
+                  đếm 68 đã ăn 144 — tên món chỉ còn 28 để đứng. Hai cột trả lại
+                  129 cho tên, vừa đủ cho "Sò điệp Hokkaido" xuống hai dòng. */}
+              <div className="mt-5 grid gap-4 lg:grid-cols-2">
                 {extras.map((extra) => (
-                  <Link key={extra.id} href={`/thuc-don/${extra.id}`} className="flex min-w-0 items-center gap-3.5">
-                    {extra.imageUrl ? (
-                      <DishGlyph
-                        glyph={dishGlyph(extra)}
-                        src={extra.imageUrl}
-                        alt={extra.nameVi}
-                        size="sm"
-                        className="size-15.5 flex-none rounded-sm"
-                      />
-                    ) : (
-                      /* Nền kraft sáng, ô chữ tối — đã tách nhau bằng sắc độ,
-                         thêm viền chỉ là vẽ lại ranh giới đã nhìn thấy */
-                      <div className="grid size-15.5 flex-none place-items-center rounded-sm bg-kraft-ink/8 font-jp text-[26px] text-kraft-ink-2">
-                        {dishGlyph(extra)}
+                  /* Thẻ ngoài là `div`: nút cộng phải đứng NGOÀI thẻ `a` — nút
+                     lồng trong liên kết là HTML sai và bấm cộng sẽ nhảy trang. */
+                  <div key={extra.id} className="flex min-w-0 items-center gap-3.5">
+                    <Link
+                      href={`/thuc-don/${extra.id}`}
+                      className="flex min-w-0 flex-1 items-center gap-3.5"
+                    >
+                      {extra.imageUrl ? (
+                        <DishGlyph
+                          glyph={dishGlyph(extra)}
+                          src={extra.imageUrl}
+                          alt={extra.nameVi}
+                          size="sm"
+                          className="size-15.5 flex-none rounded-sm"
+                        />
+                      ) : (
+                        /* Nền kraft sáng, ô chữ tối — đã tách nhau bằng sắc độ,
+                           thêm viền chỉ là vẽ lại ranh giới đã nhìn thấy */
+                        <div className="grid size-15.5 flex-none place-items-center rounded-sm bg-kraft-ink/8 font-jp text-[26px] text-kraft-ink-2">
+                          {dishGlyph(extra)}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-[length:var(--fs-b2)] leading-snug font-bold text-kraft-ink">
+                          {extra.nameVi}
+                        </p>
+                        <p className="mt-1.5 font-mono text-[length:var(--fs-c1)] text-kraft-ink-2">
+                          {formatVnd(extra.price)}
+                        </p>
                       </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-[length:var(--fs-b2)] leading-snug font-bold text-kraft-ink">
-                        {extra.nameVi}
-                      </p>
-                      <p className="mt-1.5 font-mono text-[length:var(--fs-c1)] text-kraft-ink-2">
-                        {formatVnd(extra.price)}
-                      </p>
-                    </div>
-                  </Link>
+                    </Link>
+                    {/* Món không bán online thì không có nút — cùng luật với W2 */}
+                    {extra.onlineVisible ? <AddDishButton dish={extra} tone="kraft" /> : null}
+                  </div>
                 ))}
               </div>
             </div>

@@ -2,7 +2,9 @@
 
 import { formatVnd } from '@sora/contracts'
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { DishCounter } from '../../../components/DishCounter'
+import { MenuIndex } from '../../../components/MenuIndex'
 import type { OnlineDish, OnlineMenu } from '../../../lib/api'
 import { useOrder } from '../order-context'
 import { DishSheet } from './DishSheet'
@@ -56,9 +58,16 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
     syncToBranch(menu.dishes)
   }, [loaded, menu.branch.id, menu.dishes, draft.lines, syncToBranch])
 
-  const groups = menu.categories
-    .map((c) => ({ ...c, dishes: menu.dishes.filter((d) => d.categoryId === c.id) }))
-    .filter((c) => c.dishes.length > 0)
+  // `useMemo` vì `MenuIndex` nhận thẳng mảng này vào deps của effect cuộn: dựng
+  // mảng mới mỗi lần vẽ thì cứ thêm một phần vào giỏ là thanh mục lục tháo ra
+  // lắp lại bộ nghe cuộn của nó.
+  const groups = useMemo(
+    () =>
+      menu.categories
+        .map((c) => ({ ...c, dishes: menu.dishes.filter((d) => d.categoryId === c.id) }))
+        .filter((c) => c.dishes.length > 0),
+    [menu.categories, menu.dishes],
+  )
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-32 lg:grid lg:grid-cols-[1fr_320px] lg:gap-8 lg:pb-12">
@@ -91,27 +100,22 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
           </div>
         ) : null}
 
-        <nav className="sticky top-14 z-40 -mx-4 mt-4 flex gap-1.5 overflow-x-auto border-b border-accent/16 bg-surface-2/96 px-4 py-2 backdrop-blur">
-          {groups.map((group) => (
-            <a
-              key={group.id}
-              href={`#nhom-${group.id}`}
-              /* 44 chứ không 36: đây là điều hướng chính của màn gọi món, mà 36
-                 dưới ngưỡng ngón tay. Thanh cao thêm 8 nên `scroll-mt` của các
-                 nhóm bên dưới phải nới theo, xem chú ở đó. */
-              className="flex h-11 flex-none items-center gap-1.5 rounded-pill border border-line-3 px-3.5 text-[length:var(--fs-b2)] text-ink-body"
-            >
-              {group.kanji ? <span className="font-jp text-accent">{group.kanji}</span> : null}
-              {group.nameVi}
-            </a>
-          ))}
-        </nav>
+        {/* Cùng một thanh mục lục với W2, không còn dải chip cuộn ngang: mười
+            danh mục mà chỉ hở ba, bảy cái còn lại nằm sau một cử chỉ không có
+            dấu hiệu nào báo là có. Ghim ở 56 — đúng chiều cao thanh đầu trang
+            của luồng đặt món, xem `OrderLayout`. Dòng bám lề cột chữ (`px-4`) và
+            trổ ra hai mép (`-mx-4`) như dải chip cũ. */}
+        <MenuIndex chapters={groups} navClass="top-14 -mx-4 mt-4" rowClass="px-4" />
 
         {groups.map((group) => (
-          /* 120 = thanh trên 56 + thanh nhóm 60 (chip 44 + đệm 8×2) + 4 thở.
-             Nhảy tới một nhóm mà dừng ở 112 như trước là tiêu đề nhóm chui xuống
-             dưới đúng cái thanh vừa bấm. */
-          <section key={group.id} id={`nhom-${group.id}`} className="scroll-mt-30">
+          /* 144 = thanh trên 56 + thanh mục lục lúc dày nhất 84 (hai dòng tên) +
+             4 thở. Một con số cho mọi khổ: màn rộng thì mười tên gom một dòng và
+             thanh chỉ còn 44, dư ra 40 — chia mức thì mỗi lần dòng tên đổi số
+             dòng là phải dò lại từng ngưỡng.
+             Con số này còn là mốc "đang đọc" của chính thanh mục lục: nó đọc
+             `scroll-margin-top` của chương đầu ra dùng, nên sửa ở đây là hai bên
+             đổi cùng lúc. */
+          <section key={group.id} id={`chuong-${group.id}`} className="scroll-mt-36">
             <header className="px-1 pt-8 pb-4 text-center">
               <h2 className="font-display text-[length:var(--fs-d3)] font-light text-ink-hi">
                 {group.nameVi}
@@ -167,23 +171,15 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
                     </span>
                   </span>
                 </button>
-                <button
-                  type="button"
-                  aria-label={`Thêm ${dish.nameVi}`}
+                {/* Đúng cái nút của W1 · W2 · W3: số phần nằm TRONG thanh đếm
+                    chứ không còn là nhãn dán chồng lên góc nút vuông. */}
+                <DishCounter
+                  name={dish.nameVi}
+                  qty={qtyOf(dish.id)}
+                  onAdd={() => add(dish)}
+                  onBot={() => setQty(dish.id, qtyOf(dish.id) - 1)}
                   disabled={dish.soldOut}
-                  onClick={() => add(dish)}
-                  className="relative h-11 w-11 flex-none rounded-sm border border-accent text-[length:var(--fs-t1)] text-accent-ink disabled:border-line-4 disabled:text-ink-mute"
-                >
-                  {/* Đã chọn mấy phần, gắn thẳng lên nút. Không đặt xuống hàng giá:
-                      hàng đó nằm trong dòng cao cố định và món tên dài sẽ bị đẩy
-                      xuống dòng thứ hai rồi tràn ra ngoài. */}
-                  {qtyOf(dish.id) > 0 ? (
-                    <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-pill bg-accent-strong px-1 font-mono text-[length:var(--fs-c2)] font-semibold text-on-accent">
-                      {qtyOf(dish.id)}
-                    </span>
-                  ) : null}
-                  +
-                </button>
+                />
               </div>
             ))}
           </section>
