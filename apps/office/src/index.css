@@ -2,6 +2,12 @@
 @import '@sora/tokens/tokens.css';
 @import '@sora/tokens/fonts.css';
 
+/* Tailwind v4 chỉ dò class trong cây thư mục của app; @sora/ui đi qua node_modules
+   nên bị bỏ qua. Thiếu dòng này thì mọi class CHỈ xuất hiện trong package dùng chung
+   không được sinh CSS — thanh báo `Toast` mất cả `right-6`, `bottom-6` lẫn `z`, nên
+   nó rơi xuống đáy tài liệu và không ai từng thấy một lời báo nào ở Office. */
+@source '../../../packages/ui/src';
+
 /**
  * Cuộn được nhưng không chiếm chỗ.
  *

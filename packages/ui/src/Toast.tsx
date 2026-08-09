@@ -39,7 +39,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed right-6 bottom-6 z-[60] flex flex-col gap-2">
+      {/* Trên MỌI thứ, kể cả ngăn kéo và tấm phủ: ngăn kéo sửa món ở Office và
+          tấm trượt ở Table đều ghim z-100, tấm phủ thực đơn Table còn 110. Ở 60
+          thì lời báo nằm sau chúng — mà "đã lưu" thì luôn được bấm từ trong ngăn
+          kéo, tức là đúng lúc cần báo nhất lại là lúc không thấy gì. */}
+      <div className="pointer-events-none fixed right-6 bottom-6 z-[200] flex flex-col gap-2">
         {items.map((item) => (
           <div
             key={item.id}
