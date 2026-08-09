@@ -88,6 +88,7 @@ export default async function HomePage() {
           glyph: '空',
           imageUrl: image.imageUrl,
           videoUrl: image.videoUrl,
+          mobileFocus: `${phanTram(image.mobileFocusX)}% ${phanTram(image.mobileFocusY)}%`,
         }))
       : signatures.slice(0, 5).map((dish) => ({
           id: dish.id,
@@ -96,6 +97,9 @@ export default async function HomePage() {
           glyph: dish.nameJa?.trim().charAt(0) || '空',
           imageUrl: dish.imageUrl,
           videoUrl: null,
+          // Ảnh món lấy từ M1, không đi qua A8 nên không ai đặt tâm cho chúng —
+          // giữ đúng tâm ảnh như `object-fit` vẫn làm.
+          mobileFocus: '50% 50%',
         }))
 
   const today = new Date()
@@ -414,6 +418,18 @@ export default async function HomePage() {
       />
     </QuickAddProvider>
   )
+}
+
+/**
+ * Chốt chặn cho hai số tâm ảnh của A8 — thiếu hoặc rác thì về 50.
+ *
+ * Kiểu khai là `number`, nhưng đây là dữ liệu QUA MẠNG: web lên trước API là
+ * chuyện thường, và bản API chưa có hai cột này thì trường về `undefined`. Nội
+ * suy thẳng vào chuỗi sẽ ra `'undefined% undefined%'` — CSS bỏ cả khai báo, ảnh
+ * hero nhảy về mặc định ở mọi khung. Trả 50 là đúng thứ trình duyệt vẫn làm.
+ */
+function phanTram(n: number): number {
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 50
 }
 
 function formatDate(d: Date): string {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { SITE } from '../content/site'
 import { seedOrderDraft, type ReceiveMode } from '../lib/order-draft'
 import type { SiteWard } from '../lib/site'
@@ -35,6 +35,15 @@ export interface HeroSlide {
   imageUrl: string | null
   /** Video chiếu đè lên ảnh; null là khung ảnh tĩnh. `imageUrl` là ảnh chờ của nó. */
   videoUrl: string | null
+  /**
+   * Điểm giữ lại giữa khung khi hero lên điện thoại, dạng `'62% 35%'` — đặt ở A8.
+   *
+   * Chỉ áp dưới 1024. Trên laptop hero nằm ngang nên ảnh ngang lấp gần vừa khung,
+   * cắt không đáng kể; xuống điện thoại khung dựng đứng, cùng tấm ảnh đó bị xén
+   * mất hai bên và chủ thể lệch tâm biến mất. `'50% 50%'` là đúng thứ trình duyệt
+   * vẫn làm, nên khung chưa ai đặt tâm thì y như cũ.
+   */
+  mobileFocus: string
 }
 
 export interface HeroBranch {
@@ -101,6 +110,7 @@ const FALLBACK: HeroSlide = {
   glyph: '空',
   imageUrl: null,
   videoUrl: null,
+  mobileFocus: '50% 50%',
 }
 
 export function HomeHero({
@@ -272,7 +282,16 @@ export function HomeHero({
           {slide.imageUrl ? (
             /* `<img>` chứ không `next/image`: đường dẫn ảnh do người nhập khai ở
                Office nên không biết trước miền */
-            <img src={slide.imageUrl} alt="" className="size-full object-cover" />
+            /* Tâm đi qua biến CSS chứ không viết thẳng vào `style`: giá trị là
+               của riêng từng khung nên phải nội tuyến, nhưng chỉ được áp dưới
+               1024 — mà `style` thì không có điểm gãy. Biến nội tuyến, lớp quyết
+               định khổ nào dùng nó. */
+            <img
+              src={slide.imageUrl}
+              alt=""
+              style={{ '--tieu-diem': slide.mobileFocus } as CSSProperties}
+              className="size-full object-cover [object-position:var(--tieu-diem)] lg:[object-position:50%_50%]"
+            />
           ) : (
             <div className="grid size-full place-items-center bg-[radial-gradient(120%_90%_at_74%_36%,var(--sora-line-1)_0%,var(--sora-bg-base)_70%)]">
               <span className="font-jp text-[200px] leading-none text-gold-900 opacity-45 lg:text-[340px]">
@@ -302,7 +321,8 @@ export function HomeHero({
                   setVideoLen({ id: slide.id, ms: secs * 1000 })
                 }
               }}
-              className="absolute inset-0 size-full object-cover"
+              style={{ '--tieu-diem': slide.mobileFocus } as CSSProperties}
+              className="absolute inset-0 size-full object-cover [object-position:var(--tieu-diem)] lg:[object-position:50%_50%]"
             />
           ) : null}
         </div>

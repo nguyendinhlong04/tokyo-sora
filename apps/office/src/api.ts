@@ -238,6 +238,13 @@ export interface CmsHeroImage {
   /** Chữ lớn đè lên ảnh — bỏ trống thì hero in tên quán */
   caption: string | null
   captionJa: string | null
+  /**
+   * Điểm của tấm ảnh phải nằm giữa khung khi hero lên ĐIỆN THOẠI, tính bằng %
+   * bề ngang và bề cao của chính nó. 50/50 là giữa ảnh — đúng thứ trình duyệt
+   * vẫn làm. Trang chủ chỉ áp dưới 1024; từ laptop trở lên luôn giữ tâm ảnh.
+   */
+  mobileFocusX: number
+  mobileFocusY: number
   published: boolean
   sort: number
   updatedAt: string

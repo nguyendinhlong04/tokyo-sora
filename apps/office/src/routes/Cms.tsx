@@ -63,6 +63,8 @@ const blankHero = (sort: number): HeroDraft => ({
   videoUrl: null,
   caption: null,
   captionJa: null,
+  mobileFocusX: 50,
+  mobileFocusY: 50,
   published: false,
   sort,
 })
@@ -681,6 +683,65 @@ function HeroTab() {
             />
           </div>
 
+          {/* --------------------------------------- Tâm ảnh trên điện thoại */}
+          <div className="mt-5 border-t border-line-1 pt-5">
+            <p className="text-[length:var(--fs-c1)] font-semibold tracking-[0.12em] text-ink-hi uppercase">
+              Tâm ảnh trên điện thoại
+            </p>
+            <p className="mt-1.5 max-w-[620px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+              Màn điện thoại dựng đứng nên tấm ảnh ngang bị xén bớt hai bên. Bấm vào chỗ phải giữ
+              lại — mặt người, miếng thịt, ngọn lửa — rồi khung sáng sẽ cho thấy phần còn lại.
+            </p>
+            <div className="mt-3 grid items-start gap-4 lg:grid-cols-[300px_200px]">
+              <HeroFocusPicker
+                url={draft.input.imageUrl}
+                x={draft.input.mobileFocusX}
+                y={draft.input.mobileFocusY}
+                onChange={(x, y) =>
+                  setDraft({ ...draft, input: { ...draft.input, mobileFocusX: x, mobileFocusY: y } })
+                }
+              />
+              <div className="grid gap-3">
+                <Field label="Ngang %" hint="0 sát mép trái · 100 sát mép phải">
+                  <Input
+                    type="number"
+                    value={String(draft.input.mobileFocusX)}
+                    onChange={(v) =>
+                      setDraft({
+                        ...draft,
+                        input: { ...draft.input, mobileFocusX: gioiHanPhanTram(v) },
+                      })
+                    }
+                    mono
+                  />
+                </Field>
+                <Field label="Dọc %" hint="0 sát mép trên · 100 sát mép dưới">
+                  <Input
+                    type="number"
+                    value={String(draft.input.mobileFocusY)}
+                    onChange={(v) =>
+                      setDraft({
+                        ...draft,
+                        input: { ...draft.input, mobileFocusY: gioiHanPhanTram(v) },
+                      })
+                    }
+                    mono
+                  />
+                </Field>
+                <Button
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      input: { ...draft.input, mobileFocusX: 50, mobileFocusY: 50 },
+                    })
+                  }
+                >
+                  Về giữa ảnh
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <div className="mt-4 flex items-center gap-3">
             <Toggle
               onChange={() =>
@@ -875,12 +936,127 @@ function HeroPreview({
   )
 }
 
+/**
+ * Tỉ lệ ngang/dọc của hero trên điện thoại — khung cao 520 trên màn rộng 390.
+ *
+ * Con số này phải đi cùng `min-h-[520px]` của `HomeHero`: khung xem thử vẽ sai
+ * tỉ lệ thì người xếp ảnh đặt tâm theo một khung không có thật.
+ */
+const KHUNG_DIEN_THOAI = 390 / 520
+
+/**
+ * Kẹp về 0–100 và chặn `NaN`.
+ *
+ * Ô số của trình duyệt trả chuỗi rỗng khi người nhập xoá hết chữ, và `Number('')`
+ * ra 0 chứ không phải `NaN` — nhưng gõ dấu trừ hay chữ thì ra `NaN` thật, mà
+ * `NaN` lọt xuống API là zod chặn sau khi người ta đã bấm Lưu.
+ */
+function gioiHanPhanTram(raw: string): number {
+  const n = Math.round(Number(raw))
+  if (!Number.isFinite(n)) return 50
+  return Math.min(100, Math.max(0, n))
+}
+
+/**
+ * Đặt điểm trung tâm cho khung hero trên điện thoại.
+ *
+ * Ảnh vẽ NGUYÊN TẤM, và khung viền chồng lên chỉ ra phần điện thoại thật sự
+ * thấy — đó là thứ người xếp ảnh cần nhìn, vì cái mất đi mới là cái phải cân
+ * nhắc. Bấm chỗ nào thì chỗ đó thành tâm, khung nhảy theo ngay.
+ *
+ * Ảnh ngang thì bị xén hai bên nên chỉ số ngang có tác dụng; ảnh dọc hơn khung
+ * thì ngược lại. Khung xem thử tự tính điều đó từ tỉ lệ thật của tấm ảnh, nên
+ * kéo số theo chiều không bị cắt sẽ thấy khung đứng im — đúng như trang chủ.
+ */
+function HeroFocusPicker({
+  url,
+  x,
+  y,
+  onChange,
+}: {
+  url: string
+  x: number
+  y: number
+  onChange: (x: number, y: number) => void
+}) {
+  const [tyLe, setTyLe] = useState<number | null>(null)
+  const [hong, setHong] = useState(false)
+  const src = url.trim()
+
+  if (src === '' || hong) {
+    return (
+      <div className="grid aspect-[3/2] w-full place-items-center rounded-sm border border-line-1 bg-surface-3 text-center text-[length:var(--fs-c1)] text-ink-mute">
+        {src === '' ? 'Dán đường dẫn ảnh để đặt tâm' : 'Không tải được ảnh này'}
+      </div>
+    )
+  }
+
+  // Phần ảnh lọt vào khung điện thoại, tính bằng % của chính tấm ảnh. Ảnh ngang
+  // hơn khung thì cao lấp đầy và ngang bị xén; dọc hơn thì ngược lại.
+  const cua =
+    tyLe === null
+      ? null
+      : tyLe > KHUNG_DIEN_THOAI
+        ? { w: (KHUNG_DIEN_THOAI / tyLe) * 100, h: 100 }
+        : { w: 100, h: (tyLe / KHUNG_DIEN_THOAI) * 100 }
+
+  return (
+    <div className="grid gap-2">
+      <button
+        type="button"
+        onClick={(e) => {
+          const o = e.currentTarget.getBoundingClientRect()
+          onChange(
+            Math.round(((e.clientX - o.left) / o.width) * 100),
+            Math.round(((e.clientY - o.top) / o.height) * 100),
+          )
+        }}
+        className="relative block w-full cursor-crosshair overflow-hidden rounded-sm border border-line-1"
+        title="Bấm vào chỗ muốn giữ lại giữa khung"
+      >
+        <img
+          src={src}
+          alt=""
+          onLoad={(e) => setTyLe(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
+          onError={() => setHong(true)}
+          className="block w-full"
+        />
+        {/* Ngoài khung tối đi chứ không vẽ mỗi đường viền: phần bị xén phải đọc
+            ra là "mất", không phải "có viền quanh" */}
+        {cua ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 shadow-[0_0_0_9999px_rgba(7,8,10,0.55)_inset]"
+            style={{
+              left: `${((100 - cua.w) * x) / 100}%`,
+              top: `${((100 - cua.h) * y) / 100}%`,
+              right: `${((100 - cua.w) * (100 - x)) / 100}%`,
+              bottom: `${((100 - cua.h) * (100 - y)) / 100}%`,
+              outline: '1px solid var(--sora-accent)',
+            }}
+          />
+        ) : null}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-accent bg-canvas/70"
+          style={{ left: `${x}%`, top: `${y}%` }}
+        />
+      </button>
+      <p className="text-[length:var(--fs-c2)] leading-relaxed text-ink-mute">
+        Khung sáng là phần điện thoại thấy. Laptop luôn lấy giữa ảnh, không đổi theo.
+      </p>
+    </div>
+  )
+}
+
 function toHeroDraft(row: CmsHeroImage): HeroDraft {
   return {
     imageUrl: row.imageUrl,
     videoUrl: row.videoUrl,
     caption: row.caption,
     captionJa: row.captionJa,
+    mobileFocusX: row.mobileFocusX,
+    mobileFocusY: row.mobileFocusY,
     published: row.published,
     sort: row.sort,
   }

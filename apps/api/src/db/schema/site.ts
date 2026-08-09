@@ -107,6 +107,20 @@ export const siteHeroImages = pgTable(
     caption: text('caption'),
     /** Dòng chữ Nhật in nhạt cạnh `caption`, đúng chỗ tên tiếng Nhật của món */
     captionJa: text('caption_ja'),
+    /**
+     * Điểm phải nằm giữa khung khi hero hiển thị trên ĐIỆN THOẠI, tính bằng phần
+     * trăm bề ngang và bề cao của chính tấm ảnh.
+     *
+     * Hero trên laptop nằm ngang, ảnh ngang lấp vừa khung nên không cắt mấy. Trên
+     * điện thoại khung dựng đứng, cùng tấm ảnh đó bị xén mất hai bên — mặc định
+     * trình duyệt giữ đúng tâm ảnh, nên chủ thể nằm lệch một bên là mất. Hai số
+     * này nói cho trình duyệt biết giữ chỗ nào lại.
+     *
+     * 50/50 là đúng hành vi mặc định, nên khung cũ không đổi gì khi cột này thêm
+     * vào. Chỉ áp dưới 1024 — từ laptop trở lên vẫn giữ nguyên tâm ảnh.
+     */
+    mobileFocusX: integer('mobile_focus_x').notNull().default(50),
+    mobileFocusY: integer('mobile_focus_y').notNull().default(50),
     sort: integer('sort').notNull().default(0),
     published: boolean('published').notNull().default(false),
     updatedBy: bigint('updated_by', { mode: 'number' }).references(() => staff.id),

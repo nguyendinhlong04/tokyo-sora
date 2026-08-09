@@ -30,6 +30,9 @@ export interface HeroImageInput {
   videoUrl: string | null
   caption: string | null
   captionJa: string | null
+  /** Điểm giữ lại giữa khung khi hero lên điện thoại, tính theo % của tấm ảnh */
+  mobileFocusX: number
+  mobileFocusY: number
   published: boolean
   sort: number
 }
@@ -184,6 +187,8 @@ export class SiteAdminService {
       videoUrl: h.videoUrl,
       caption: h.caption,
       captionJa: h.captionJa,
+      mobileFocusX: h.mobileFocusX,
+      mobileFocusY: h.mobileFocusY,
       published: h.published,
       sort: h.sort,
       updatedAt: h.updatedAt,
@@ -308,6 +313,8 @@ function normaliseHeroImage(input: HeroImageInput) {
     videoUrl: input.videoUrl?.trim() || null,
     caption: input.caption?.trim() || null,
     captionJa: input.captionJa?.trim() || null,
+    mobileFocusX: input.mobileFocusX,
+    mobileFocusY: input.mobileFocusY,
     published: input.published,
     sort: input.sort,
   }

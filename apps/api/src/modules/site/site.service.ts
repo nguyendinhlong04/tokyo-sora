@@ -193,6 +193,8 @@ export class SiteService {
         videoUrl: siteHeroImages.videoUrl,
         caption: siteHeroImages.caption,
         captionJa: siteHeroImages.captionJa,
+        mobileFocusX: siteHeroImages.mobileFocusX,
+        mobileFocusY: siteHeroImages.mobileFocusY,
       })
       .from(siteHeroImages)
       .where(eq(siteHeroImages.published, true))

@@ -37,6 +37,10 @@ const HeroBody = z.object({
   videoUrl: z.string().max(600).nullish().transform((v) => v ?? null),
   caption: z.string().max(120).nullish().transform((v) => v ?? null),
   captionJa: z.string().max(60).nullish().transform((v) => v ?? null),
+  // Phần trăm bề ngang/bề cao của chính tấm ảnh — xem chú ở cột trong schema.
+  // 50/50 là hành vi mặc định của `object-fit`, nên khung không khai gì vẫn y cũ.
+  mobileFocusX: z.number().int().min(0).max(100).default(50),
+  mobileFocusY: z.number().int().min(0).max(100).default(50),
   published: z.boolean().default(false),
   sort: z.number().int().min(0).max(999).default(0),
 })

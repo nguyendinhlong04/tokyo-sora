@@ -154,6 +154,12 @@ export interface SiteHeroImage {
   /** Chữ lớn của hero, chỗ trước đây in tên món. Bỏ trống thì trang chủ in tên quán. */
   caption: string | null
   captionJa: string | null
+  /**
+   * Điểm của tấm ảnh phải nằm giữa khung khi hero lên điện thoại, tính bằng %
+   * bề ngang và bề cao của chính nó. Đặt ở A8, chỉ áp dưới 1024 — xem `HomeHero`.
+   */
+  mobileFocusX: number
+  mobileFocusY: number
 }
 
 /** W9 — vị trí đang tuyển. `branchName` null nghĩa là tuyển cho cả ba chi nhánh. */

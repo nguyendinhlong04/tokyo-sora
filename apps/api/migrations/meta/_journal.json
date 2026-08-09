@@ -183,6 +183,13 @@
       "when": 1786086428847,
       "tag": "0025_smart_vulture",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786253314331,
+      "tag": "0026_famous_the_watchers",
+      "breakpoints": true
     }
   ]
 }
