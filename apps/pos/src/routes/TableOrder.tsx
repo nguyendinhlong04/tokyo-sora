@@ -682,10 +682,6 @@ function TableQrDialog({
         <div className="rounded-md bg-[var(--sora-washi-100)] p-4">
           <QrCode value={url} size={240} label={`Mã QR vào bàn ${tableCode}`} />
         </div>
-        <p className="text-center text-[length:var(--fs-b2)] text-ink-body">
-          In mã này dán cố định tại bàn — nó không đổi giữa các bữa. Khách quét để tự gọi món;
-          bàn chưa mở thì mã không mở ra gì cả.
-        </p>
       </div>
     </Modal>
   )
