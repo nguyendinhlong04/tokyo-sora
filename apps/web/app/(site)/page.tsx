@@ -311,7 +311,7 @@ export default async function HomePage() {
               name="ngay"
               aria-label="Ngày"
               defaultValue={dates[0]!.value}
-              className="h-12 w-full rounded-sm border border-ink-hi/28 bg-canvas/50 px-3.5 text-[length:var(--fs-b2)] text-ink-hi lg:w-[168px] lg:text-[length:var(--fs-b1)]"
+              className="h-12 w-full rounded-md border border-ink-hi/28 bg-canvas/50 px-3.5 text-[length:var(--fs-b2)] text-ink-hi lg:w-[168px] lg:text-[length:var(--fs-b1)]"
             >
               {dates.map((d) => (
                 <option key={d.value} value={d.value}>
@@ -323,7 +323,7 @@ export default async function HomePage() {
               name="khach"
               aria-label="Số khách"
               defaultValue="4"
-              className="h-12 w-full rounded-sm border border-ink-hi/28 bg-canvas/50 px-3.5 text-[length:var(--fs-b2)] text-ink-hi lg:w-[140px] lg:text-[length:var(--fs-b1)]"
+              className="h-12 w-full rounded-md border border-ink-hi/28 bg-canvas/50 px-3.5 text-[length:var(--fs-b2)] text-ink-hi lg:w-[140px] lg:text-[length:var(--fs-b1)]"
             >
               {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
                 <option key={n} value={n}>
@@ -335,7 +335,7 @@ export default async function HomePage() {
                 một dòng riêng thì ngón cái không phải nhắm */}
             <button
               type="submit"
-              className="col-span-2 h-12 rounded-sm border border-ink-hi px-7 text-[length:var(--fs-b2)] font-semibold whitespace-nowrap text-ink-hi transition-colors hover:bg-ink-hi hover:text-canvas lg:col-auto lg:text-[length:var(--fs-b1)]"
+              className="col-span-2 h-12 rounded-md border border-ink-hi px-7 text-[length:var(--fs-b2)] font-semibold whitespace-nowrap text-ink-hi transition-colors hover:bg-ink-hi hover:text-canvas lg:col-auto lg:text-[length:var(--fs-b1)]"
             >
               Tìm bàn trống
             </button>

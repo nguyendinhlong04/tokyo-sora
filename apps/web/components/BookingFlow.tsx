@@ -15,7 +15,7 @@ import { BRANCH_EXTRAS, SEAT_KINDS, SITE, type SeatKindId } from '../content/sit
 import type { SiteBranch } from '../lib/site'
 
 const DAY_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
-const HORIZON_DAYS = 14
+const HORIZON_DAYS = 10
 
 interface Props {
   branches: SiteBranch[]
@@ -268,7 +268,7 @@ export function BookingFlow({ branches, initial }: Props) {
       </ol>
 
       {error ? (
-        <p className="mt-8 rounded-md border border-warn bg-warn/8 px-5 py-4 text-[length:var(--fs-b1)] text-gold-200">
+        <p className="mt-8 rounded-lg border border-warn bg-warn/8 px-5 py-4 text-[length:var(--fs-b1)] text-gold-200">
           {error}
         </p>
       ) : null}
@@ -288,7 +288,7 @@ export function BookingFlow({ branches, initial }: Props) {
                     setMinute(null)
                     setStep(2)
                   }}
-                  className={`rounded-md border p-6 text-left transition-colors hover:border-accent ${
+                  className={`rounded-lg border p-6 text-left transition-colors hover:border-accent ${
                     b.id === branchId ? 'border-accent bg-surface-3' : 'border-line-3 bg-surface-2'
                   }`}
                 >
@@ -330,7 +330,7 @@ export function BookingFlow({ branches, initial }: Props) {
                     setBranchId(b.id)
                     setMinute(null)
                   }}
-                  className={`inline-flex h-11 items-center rounded-sm border px-4 text-[length:var(--fs-b2)] transition-colors ${
+                  className={`inline-flex h-11 items-center rounded-md border px-4 text-[length:var(--fs-b2)] transition-colors ${
                     b.id === branchId
                       ? 'border-accent bg-gold-900 text-gold-200'
                       : 'border-line-3 text-ink-body hover:border-accent'
@@ -356,7 +356,7 @@ export function BookingFlow({ branches, initial }: Props) {
                       setDate(day)
                       setMinute(null)
                     }}
-                    className={`flex size-19 flex-none flex-col items-center justify-center gap-0.5 rounded-sm border transition-colors ${
+                    className={`flex size-19 flex-none flex-col items-center justify-center gap-0.5 rounded-md border transition-colors ${
                       active
                         ? 'border-accent bg-gold-900 text-gold-200'
                         : 'border-line-3 text-ink-body hover:border-accent'
@@ -379,7 +379,7 @@ export function BookingFlow({ branches, initial }: Props) {
                 <p className="mb-3.5 text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
                   Số khách
                 </p>
-                <div className="flex h-14 w-50 items-center rounded-sm border border-line-3">
+                <div className="flex h-14 w-50 items-center rounded-md border border-line-3">
                   <button
                     type="button"
                     aria-label="Bớt một khách"
@@ -406,17 +406,6 @@ export function BookingFlow({ branches, initial }: Props) {
                     +
                   </button>
                 </div>
-                <p className="mt-3 text-[length:var(--fs-c1)] text-ink-mute">
-                  Trên 10 khách,{' '}
-                  {branch?.phone ? (
-                    <a href={`tel:${branch.phone.replace(/\s/g, '')}`} className="text-accent-ink">
-                      gọi giúp chúng tôi
-                    </a>
-                  ) : (
-                    'gọi giúp chúng tôi'
-                  )}
-                  .
-                </p>
               </div>
 
               <div>
@@ -483,13 +472,13 @@ export function BookingFlow({ branches, initial }: Props) {
                   {Array.from({ length: 14 }, (_, i) => (
                     <div
                       key={i}
-                      className="h-14 animate-[sora-pulse_1.6s_ease-in-out_infinite] rounded-sm bg-surface-4"
+                      className="h-14 animate-[sora-pulse_1.6s_ease-in-out_infinite] rounded-md bg-surface-4"
                     />
                   ))}
                 </div>
               ) : availability?.blocked ? (
                 /* Ngày quán đóng cửa nhận đặt (R3) — nói lý do, đừng để lưới xám câm lặng */
-                <div className="mt-6 rounded-md border border-warn bg-warn/8 p-8">
+                <div className="mt-6 rounded-lg border border-warn bg-warn/8 p-8">
                   <p className="text-[length:var(--fs-b1)] font-medium text-ink-hi">
                     {longDate(date)} chi nhánh không nhận đặt bàn.
                   </p>
@@ -498,7 +487,7 @@ export function BookingFlow({ branches, initial }: Props) {
                   </p>
                 </div>
               ) : seatUnavailable ? (
-                <div className="mt-6 rounded-md border border-warn bg-warn/8 p-8">
+                <div className="mt-6 rounded-lg border border-warn bg-warn/8 p-8">
                   <p className="text-[length:var(--fs-b1)] font-medium text-ink-hi">
                     {seatLabel(seatKind)} ở {branch?.name} không có chỗ nào đủ cho {guestCount}{' '}
                     khách.
@@ -508,7 +497,7 @@ export function BookingFlow({ branches, initial }: Props) {
                   </p>
                 </div>
               ) : freeCount === 0 ? (
-                <div className="mt-6 rounded-md border border-warn bg-warn/8 p-8">
+                <div className="mt-6 rounded-lg border border-warn bg-warn/8 p-8">
                   <p className="text-[length:var(--fs-b1)] font-medium text-ink-hi">
                     Ngày này đã kín chỗ với {guestCount} khách.
                   </p>
@@ -526,7 +515,7 @@ export function BookingFlow({ branches, initial }: Props) {
                         type="button"
                         disabled={!slot.open}
                         onClick={() => setMinute(slot.minute)}
-                        className={`flex h-14 flex-col items-center justify-center rounded-sm border font-mono text-[17px] transition-colors ${
+                        className={`flex h-14 flex-col items-center justify-center rounded-md border font-mono text-[17px] transition-colors ${
                           active
                             ? 'border-accent bg-gold-900 text-gold-200'
                             : slot.open
@@ -546,7 +535,7 @@ export function BookingFlow({ branches, initial }: Props) {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="h-14 rounded-sm border border-line-3 px-7 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
+                className="h-14 rounded-md border border-line-3 px-7 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
               >
                 Quay lại
               </button>
@@ -554,7 +543,7 @@ export function BookingFlow({ branches, initial }: Props) {
                 type="button"
                 disabled={minute === null || saving}
                 onClick={goToForm}
-                className="h-14 rounded-sm bg-accent-strong px-8 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-4 disabled:text-line-4"
+                className="h-14 rounded-md bg-accent-strong px-8 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-4 disabled:text-line-4"
               >
                 {picked ? `Tiếp tục · ${picked.label}` : 'Chọn một giờ trống'}
               </button>
@@ -580,7 +569,7 @@ export function BookingFlow({ branches, initial }: Props) {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Nguyễn Minh"
-                    className="h-14 w-full rounded-sm border border-line-3 bg-surface-2 px-4 text-[length:var(--fs-b1)] text-ink-hi placeholder:text-ink-mute focus:border-accent focus:outline-none"
+                    className="h-14 w-full rounded-md border border-line-3 bg-surface-2 px-4 text-[length:var(--fs-b1)] text-ink-hi placeholder:text-ink-mute focus:border-accent focus:outline-none"
                   />
                 </label>
                 <label className="block">
@@ -595,7 +584,7 @@ export function BookingFlow({ branches, initial }: Props) {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="09xx xxx xxx"
-                    className="h-14 w-full rounded-sm border border-line-3 bg-surface-2 px-4 font-mono text-[length:var(--fs-b1)] text-ink-hi placeholder:text-ink-mute focus:border-accent focus:outline-none"
+                    className="h-14 w-full rounded-md border border-line-3 bg-surface-2 px-4 font-mono text-[length:var(--fs-b1)] text-ink-hi placeholder:text-ink-mute focus:border-accent focus:outline-none"
                   />
                 </label>
                 <label className="block">
@@ -608,7 +597,7 @@ export function BookingFlow({ branches, initial }: Props) {
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Sinh nhật, dị ứng, cần ghế em bé…"
-                    className="w-full resize-y rounded-sm border border-line-3 bg-surface-2 px-4 py-3.5 text-[length:var(--fs-b1)] leading-relaxed text-ink-hi placeholder:text-ink-mute focus:border-accent focus:outline-none"
+                    className="w-full resize-y rounded-md border border-line-3 bg-surface-2 px-4 py-3.5 text-[length:var(--fs-b1)] leading-relaxed text-ink-hi placeholder:text-ink-mute focus:border-accent focus:outline-none"
                   />
                 </label>
               </div>
@@ -616,21 +605,21 @@ export function BookingFlow({ branches, initial }: Props) {
                 <button
                   type="button"
                   onClick={backToSlots}
-                  className="h-14 rounded-sm border border-line-3 px-7 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
+                  className="h-14 rounded-md border border-line-3 px-7 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
                 >
                   Quay lại
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="h-14 rounded-sm bg-accent-strong px-8 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-accent disabled:bg-surface-4 disabled:text-line-4"
+                  className="h-14 rounded-md bg-accent-strong px-8 text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-accent disabled:bg-surface-4 disabled:text-line-4"
                 >
                   {saving ? 'Đang giữ bàn…' : 'Xác nhận đặt bàn'}
                 </button>
               </div>
             </form>
 
-            <aside className="rounded-md border border-accent/16 bg-surface-2 p-7">
+            <aside className="rounded-lg border border-accent/16 bg-surface-2 p-7">
               <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
                 Tóm tắt
               </p>
@@ -643,7 +632,7 @@ export function BookingFlow({ branches, initial }: Props) {
               </dl>
               {availability?.depositVnd ? (
                 /* Cọc phải nói TRƯỚC khi khách điền, không phải sau khi bấm xác nhận */
-                <p className="mt-5 rounded-sm border border-warn bg-warn/8 px-4 py-3 text-[length:var(--fs-c1)] leading-relaxed text-gold-200">
+                <p className="mt-5 rounded-md border border-warn bg-warn/8 px-4 py-3 text-[length:var(--fs-c1)] leading-relaxed text-gold-200">
                   {seatLabel(seatKind)} cần đặt cọc {formatVnd(availability.depositVnd)}. Nhà hàng
                   sẽ gọi để thu cọc và xác nhận suất này.
                 </p>
@@ -709,7 +698,7 @@ function DoneScreen({
           {reservation.displayCode}
         </p>
 
-        <div className="mt-10 rounded-md border border-accent/16 bg-surface-2 p-7">
+        <div className="mt-10 rounded-lg border border-accent/16 bg-surface-2 p-7">
           <dl className="grid gap-4 text-[length:var(--fs-b1)]">
             <SummaryRow label="Chi nhánh" value={`Tokyo Sora — ${summary.branchName}`} />
             <SummaryRow
@@ -732,7 +721,7 @@ function DoneScreen({
             href={`https://m.me/${SITE.messengerPage}?ref=DATBAN_${reservation.displayCode}`}
             target="_blank"
             rel="noreferrer"
-            className="flex h-14 items-center justify-center gap-3 rounded-sm bg-accent-strong text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-accent"
+            className="flex h-14 items-center justify-center gap-3 rounded-md bg-accent-strong text-[length:var(--fs-b1)] font-semibold text-on-accent transition-colors hover:bg-accent"
           >
             <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.3 2 2 6.2 2 11.4c0 2.9 1.4 5.5 3.6 7.2v3.1l3.2-1.7c.9.2 1.9.4 3 .4 5.7 0 10-4.2 10-9.4C21.8 6.2 17.6 2 12 2Zm1 12.4-2.4-2.6-4.6 2.6 5-5.4 2.5 2.5 4.4-2.5-4.9 5.4Z" />
@@ -742,7 +731,7 @@ function DoneScreen({
           <a
             href={icsHref(reservation, summary)}
             download={`tokyo-sora-${reservation.displayCode}.ics`}
-            className="flex h-14 items-center justify-center rounded-sm border border-line-3 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
+            className="flex h-14 items-center justify-center rounded-md border border-line-3 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
           >
             Thêm vào lịch
           </a>
@@ -750,7 +739,7 @@ function DoneScreen({
               và xác nhận lại được kể cả khi không bấm Messenger */}
           <a
             href={`/dat-ban/xac-nhan/${reservation.guestToken}`}
-            className="flex h-14 items-center justify-center rounded-sm border border-line-3 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
+            className="flex h-14 items-center justify-center rounded-md border border-line-3 text-[length:var(--fs-b1)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
           >
             Xem lại &amp; xác nhận đặt chỗ
           </a>

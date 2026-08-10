@@ -91,20 +91,31 @@ export default async function OffersPage() {
                   <p className="mt-3.5 flex-1 text-[length:var(--fs-b1)] leading-relaxed text-ink-body">
                     {set.shortDesc ?? story?.intro}
                   </p>
-                  <div className="mt-6 flex items-baseline justify-between gap-4 border-t border-line-1 pt-5">
-                    <span className="font-mono text-[length:var(--fs-t2)] text-accent-ink lg:text-[length:var(--fs-t1)]">
+                  {/* Giá và hai nút vừa đúng một hàng từ 1280 trở lên — chỗ lưới
+                      ba cột đứng yên vì khung đã chạm `max-w-1280`: lòng ô 322,
+                      cụm này ăn 311 nhờ giá về 18 và nút bớt đệm còn 12 mỗi bên.
+                      Giữ giá 22 thì riêng nó đã đội thêm 24 và nút "Đặt set này"
+                      thò ra ngoài, bị `overflow-hidden` của thẻ cắt cụt.
+
+                      Dưới 1280 lòng ô hẹp dần — 1024 chỉ còn 237, không cách nào
+                      nhét một hàng mà không bóp nút — nên `flex-wrap` cho cụm nút
+                      rớt xuống, `ml-auto` giữ nó dính mép phải. Không ép
+                      `nowrap`: set nào lên tám chữ số thì hàng tự tách, chứ không
+                      tràn ra ngoài thẻ. */}
+                  <div className="mt-6 flex flex-wrap items-baseline justify-between gap-4 border-t border-line-1 pt-5 xl:gap-3">
+                    <span className="font-mono text-[length:var(--fs-t2)] text-accent-ink">
                       {formatVnd(set.price)}
                     </span>
-                    <div className="flex flex-none gap-2">
+                    <div className="ml-auto flex flex-none gap-2">
                       <Link
                         href={`/thuc-don/${set.id}`}
-                        className="inline-flex h-11 items-center rounded-md border border-line-3 px-4 text-[length:var(--fs-b2)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi"
+                        className="inline-flex h-11 items-center rounded-md border border-line-3 px-4 text-[length:var(--fs-b2)] text-ink-body transition-colors hover:border-accent hover:text-ink-hi xl:px-3"
                       >
                         Xem set
                       </Link>
                       <Link
                         href="/dat-ban"
-                        className="inline-flex h-11 items-center rounded-md bg-accent-strong px-4 text-[length:var(--fs-b2)] font-semibold text-on-accent transition-colors hover:bg-accent"
+                        className="inline-flex h-11 items-center rounded-md bg-accent-strong px-4 text-[length:var(--fs-b2)] font-semibold text-on-accent transition-colors hover:bg-accent xl:px-3"
                       >
                         Đặt set này
                       </Link>
@@ -116,9 +127,6 @@ export default async function OffersPage() {
           })}
         </div>
 
-        <p className="mt-12 max-w-[640px] text-[length:var(--fs-b2)] leading-relaxed text-ink-mute">
-          Set không đổi món lẻ. Nếu bạn muốn thay, gọi riêng từng món từ thực đơn sẽ hợp hơn.
-        </p>
       </section>
     </>
   )
