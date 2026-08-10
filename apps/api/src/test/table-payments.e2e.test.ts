@@ -180,6 +180,64 @@ describe('1. Quét mã QR dán bàn (T1)', () => {
     expect(body.isHost).toBe(false)
   })
 
+  /** Quét lại mã bàn từ một địa chỉ khác, mang theo cookie của máy cũ */
+  const quetLai = (ip: string, cookie: string) =>
+    inject({
+      method: 'POST',
+      url: '/api/table-devices/join',
+      headers: { 'x-forwarded-for': ip, cookie },
+      payload: { branchId: fx.branchId, tableCode: GRILL_TABLE_CODE },
+    })
+
+  /**
+   * Lối thoát mà chính màn chờ mời khách đi: "kết nối Wi-Fi của quán rồi quét
+   * lại mã". Nhánh trả về sớm cho máy đã biết từng bỏ qua bước hỏi đường mạng,
+   * nên khách quét lần đầu bằng 4G phải chờ duyệt tới hết bữa dù có đổi mạng.
+   */
+  it('máy đang chờ bắt Wi-Fi quán rồi quét lại thì vào thẳng', async () => {
+    const ngoai = await joinTable('198.51.100.8')
+    const truoc = ngoai.json<{ state: string; deviceId: number }>()
+    expect(truoc.state).toBe('waiting')
+
+    const sau = (await quetLai(TRONG_QUAN, cookieOf(ngoai))).json<{
+      state: string
+      deviceId: number
+    }>()
+    expect(sau.state).toBe('admitted')
+    // Vẫn là máy cũ — không đẻ thêm một máy nữa vào bàn
+    expect(sau.deviceId).toBe(truoc.deviceId)
+  })
+
+  /**
+   * Chiều ngược lại phải đứng yên: điện thoại rơi Wi-Fi giữa bữa rồi quét lại
+   * mã là chuyện thường, đẩy người đang ăn ra ngoài mới là hỏng.
+   */
+  it('rời Wi-Fi quán KHÔNG đẩy máy đã vào bàn ra ngoài', async () => {
+    const body = (await quetLai('198.51.100.9', phoneA)).json<{
+      state: string
+      isHost: boolean
+    }>()
+    expect(body.state).toBe('admitted')
+    expect(body.isHost).toBe(true)
+  })
+
+  /** Từ chối vẫn dứt điểm cho cả bữa — Wi-Fi quán không phải cửa sau */
+  it('máy đã bị từ chối thì bắt Wi-Fi quán cũng không vào được', async () => {
+    const ngoai = await joinTable('198.51.100.10')
+    const deviceId = ngoai.json<{ deviceId: number }>().deviceId
+
+    const tuChoi = await inject({
+      method: 'POST',
+      url: '/api/table-devices/decide',
+      headers: { cookie: phoneA },
+      payload: { deviceId, approve: false },
+    })
+    expect(tuChoi.statusCode).toBe(201)
+
+    const res = await quetLai(TRONG_QUAN, cookieOf(ngoai))
+    expect(res.statusCode).toBe(403)
+  })
+
   it('quét mã của bàn chưa mở thì không mở ra gì cả', async () => {
     const res = await inject({
       method: 'POST',

@@ -90,13 +90,39 @@ export class TableDeviceService {
           'Máy này đã bị từ chối ở bàn. Nhờ nhân viên mở giúp nếu bạn ngồi tại bàn.',
         )
       }
+
+      /**
+       * Đang chờ mà quét lại từ Wi-Fi quán thì vào thẳng, khỏi chờ ai.
+       *
+       * Đây chính là lối thoát mà màn chờ mời khách đi: "kết nối Wi-Fi của quán
+       * rồi quét lại mã". Không có đoạn này thì lời mời đó là lời hứa suông —
+       * máy đã quét bằng 4G mang trạng thái chờ tới hết bữa, đổi mạng cũng vô
+       * ích, vì nhánh trả về sớm ở trên không bao giờ hỏi lại đường mạng.
+       *
+       * Chỉ nâng MỘT CHIỀU. Máy đã vào bàn không bao giờ bị xét lại — điện thoại
+       * nhảy qua lại giữa Wi-Fi và 4G giữa bữa là chuyện thường, xét lại sẽ đẩy
+       * khách đang ăn ra ngoài (LUONG-QR-BAN.md mục 3). Máy bị từ chối cũng
+       * không mở lại được: nó đã thoát ở nhánh trên, trước khi tới đây.
+       */
+      let state = known.state as DeviceState
+      let isHost = known.isHost
+      if (state === 'waiting' && (await this.isInside(input.branchId, input.forwardedFor))) {
+        await this.db
+          .update(tableDevices)
+          .set({ state: 'admitted', admittedVia: 'wifi', admittedAt: new Date() })
+          .where(eq(tableDevices.id, known.deviceId))
+        state = 'admitted'
+        // Vào được thật thì cũng đủ tư cách nhận vai chủ bàn nếu bàn chưa có ai
+        isHost = await this.claimHost(row.session.id, known.deviceId)
+      }
+
       return {
         token: input.existingToken!,
         deviceId: known.deviceId,
         sessionId: known.sessionId,
         branchId: known.branchId,
-        state: known.state as DeviceState,
-        isHost: known.isHost,
+        state,
+        isHost,
         tableCode: row.table.code,
       }
     }

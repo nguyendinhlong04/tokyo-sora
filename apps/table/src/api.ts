@@ -143,6 +143,28 @@ export interface PendingList {
   waiting: { deviceId: number; since: string }[]
 }
 
+/**
+ * Bàn mà máy này vừa quét, để màn chờ hỏi lại đường mạng được.
+ *
+ * `join` cần biết chi nhánh và mã bàn, mà đường `/cho-duyet` thì không mang hai
+ * thứ đó. Dùng `sessionStorage` chứ không phải state của router: khách đổi Wi-Fi
+ * xong hay mở lại trang, và state của router chết theo lần tải đó.
+ */
+const BAN_DANG_CHO = 'sora-table-ban-dang-cho'
+
+export function nhoBanDangCho(branchId: string, tableCode: string) {
+  sessionStorage.setItem(BAN_DANG_CHO, JSON.stringify({ branchId, tableCode }))
+}
+
+export function banDangCho(): { branchId: string; tableCode: string } | null {
+  try {
+    const raw = sessionStorage.getItem(BAN_DANG_CHO)
+    return raw ? (JSON.parse(raw) as { branchId: string; tableCode: string }) : null
+  } catch {
+    return null
+  }
+}
+
 export const api = {
   /**
    * T1: quét mã dán bàn.

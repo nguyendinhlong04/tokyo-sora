@@ -2,7 +2,7 @@ import { Button } from '@sora/ui'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { api } from '../api'
+import { api, nhoBanDangCho } from '../api'
 
 /**
  * Cửa vào từ mã QR dán bàn: `/t/<chi-nhánh>/<mã-bàn>`.
@@ -26,6 +26,8 @@ export function Enter() {
       .then(async (result) => {
         if (cancelled) return
         await queryClient.invalidateQueries()
+        // Màn chờ cần hai thứ này để hỏi lại đường mạng khi khách đổi sang Wi-Fi quán
+        if (result.state !== 'admitted') nhoBanDangCho(branchId, tableCode)
         // `replace` để nút Quay lại không ném khách về màn trắng này
         void navigate(result.state === 'admitted' ? '/' : '/cho-duyet', { replace: true })
       })

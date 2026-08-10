@@ -2,7 +2,7 @@ import { Button } from '@sora/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { api } from '../api'
+import { api, banDangCho } from '../api'
 
 /** Chờ quá lâu thì thôi trông vào chủ bàn — họ đang gắp thịt hoặc úp máy xuống bàn */
 const NHO_NHAN_VIEN_SAU_GIAY = 45
@@ -38,6 +38,15 @@ export function Waiting() {
 
   const admitted = state.data?.state === 'admitted'
   const rejected = state.data?.state === 'rejected'
+
+  async function kiemTraLai() {
+    const ban = banDangCho()
+    if (ban) {
+      // Lỗi ở đây không đáng làm hỏng nút: rơi xuống hỏi trạng thái như thường
+      await api.join(ban.branchId, ban.tableCode).catch(() => null)
+    }
+    await state.refetch()
+  }
 
   useEffect(() => {
     if (!admitted) return
@@ -82,7 +91,11 @@ export function Waiting() {
         </p>
       ) : null}
 
-      <Button size="lg" onClick={() => void state.refetch()}>
+      {/* Hỏi lại CẢ đường mạng chứ không chỉ hỏi "đã ai duyệt chưa": người vừa
+          bấm nút này thường vừa đổi xong sang Wi-Fi quán, và `join` là chỗ duy
+          nhất xét lại chỗ ngồi. Không nhớ được bàn nào thì đành hỏi mỗi trạng
+          thái, đúng như trước. */}
+      <Button size="lg" onClick={() => void kiemTraLai()}>
         Kiểm tra lại
       </Button>
     </Frame>
