@@ -1,7 +1,8 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
+import { hash } from '@node-rs/argon2'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../../db/client'
-import { devices } from '../../db/schema'
+import { branches, devices, staff, staffRoles } from '../../db/schema'
 import { bootTestApp, type Fixtures } from '../../test/harness'
 import { DEVICE_HEADER } from './auth.guard'
 import { IdentityService } from './identity.service'
@@ -182,6 +183,70 @@ describe('Đăng nhập ca bằng PIN (P1)', () => {
       headers: { [DEVICE_HEADER]: device.token },
     })
     expect(after.statusCode).toBe(401)
+  })
+})
+
+/**
+ * Lưới này phải kể ĐÚNG những người `loginWithPin` sẽ nhận. Lệch một bên là màn
+ * hình nói dối: hoặc giấu người vào ca được, hoặc mời chạm vào một ngõ cụt.
+ */
+describe('Lưới chọn nhân viên vào ca (P1)', () => {
+  const staffAt = async (branchId: string) => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/auth/staff?branchId=${branchId}`,
+      headers: { [DEVICE_HEADER]: SEED_DEVICE_TOKEN },
+    })
+    expect(res.statusCode).toBe(200)
+    return res.json<{ id: number; fullName: string; roles: string[] }[]>()
+  }
+
+  it('người giữ vai trò TOÀN CHUỖI hiện ở mọi chi nhánh', async () => {
+    const [row] = await db
+      .insert(staff)
+      .values({ code: 'CHUOI-T1', fullName: 'Quản lý chuỗi', pinHash: await hash('4411') })
+      .returning({ id: staff.id })
+    await db.insert(staffRoles).values({ staffId: row!.id, roleCode: 'R11', branchId: null })
+
+    const found = (await staffAt(fx.branchId)).find((p) => p.id === row!.id)
+    expect(found).toBeDefined()
+    expect(found!.roles).toEqual(['R11'])
+  })
+
+  it('cùng một vai trò gán cả ở chi nhánh lẫn toàn chuỗi chỉ kể một lần', async () => {
+    const [row] = await db
+      .insert(staff)
+      .values({ code: 'KIEM-T2', fullName: 'Kiêm hai phạm vi', pinHash: await hash('4412') })
+      .returning({ id: staff.id })
+    await db.insert(staffRoles).values([
+      { staffId: row!.id, roleCode: 'R2', branchId: null },
+      { staffId: row!.id, roleCode: 'R2', branchId: fx.branchId },
+    ])
+
+    const found = (await staffAt(fx.branchId)).find((p) => p.id === row!.id)
+    expect(found!.roles).toEqual(['R2'])
+  })
+
+  it('người CHƯA đặt PIN không hiện — chạm vào ô của họ là ngõ cụt', async () => {
+    const [row] = await db
+      .insert(staff)
+      .values({ code: 'KETOAN-T3', fullName: 'Kế toán chỉ có mật khẩu', pinHash: null })
+      .returning({ id: staff.id })
+    await db.insert(staffRoles).values({ staffId: row!.id, roleCode: 'R8', branchId: fx.branchId })
+
+    expect((await staffAt(fx.branchId)).some((p) => p.id === row!.id)).toBe(false)
+  })
+
+  it('người của chi nhánh KHÁC không lọt sang', async () => {
+    await db.insert(branches).values({ id: 'zz', name: 'Chi nhánh khác' })
+    const [row] = await db
+      .insert(staff)
+      .values({ code: 'KHAC-T4', fullName: 'Người chi nhánh khác', pinHash: await hash('4413') })
+      .returning({ id: staff.id })
+    await db.insert(staffRoles).values({ staffId: row!.id, roleCode: 'R1', branchId: 'zz' })
+
+    expect((await staffAt(fx.branchId)).some((p) => p.id === row!.id)).toBe(false)
+    expect((await staffAt('zz')).some((p) => p.id === row!.id)).toBe(true)
   })
 })
 

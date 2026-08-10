@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import type { Role } from '@sora/contracts'
-import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, isNotNull, isNull, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
 import type { Db } from '../../db/client'
@@ -149,7 +149,13 @@ export class IdentityService {
 
   // ------------------------------------------------------------ Đăng nhập ca
 
-  /** Danh sách nhân viên để POS hiện lưới chọn người trước khi nhập PIN (P1) */
+  /**
+   * Danh sách nhân viên để POS hiện lưới chọn người trước khi nhập PIN (P1).
+   *
+   * Điều kiện phải TRÙNG với thứ `loginWithPin` chấp nhận, nếu không lưới sẽ nói
+   * dối: vai trò toàn chuỗi cũng làm việc được ở mọi chi nhánh (xem `rolesOf`),
+   * còn người chưa đặt PIN thì chạm vào ô của mình xong là ngõ cụt.
+   */
   async staffForBranch(branchId: string): Promise<{ id: number; fullName: string; roles: Role[] }[]> {
     const rows = await this.db
       .select({
@@ -159,12 +165,20 @@ export class IdentityService {
       })
       .from(staff)
       .innerJoin(staffRoles, eq(staffRoles.staffId, staff.id))
-      .where(and(eq(staff.active, true), eq(staffRoles.branchId, branchId)))
+      .where(
+        and(
+          eq(staff.active, true),
+          isNotNull(staff.pinHash),
+          sql`(${staffRoles.branchId} = ${branchId} OR ${staffRoles.branchId} IS NULL)`,
+        ),
+      )
 
     const byId = new Map<number, { id: number; fullName: string; roles: Role[] }>()
     for (const row of rows) {
       const entry = byId.get(row.id) ?? { id: row.id, fullName: row.fullName, roles: [] }
-      entry.roles.push(row.roleCode as Role)
+      const role = row.roleCode as Role
+      // Một vai trò có thể được gán cả ở chi nhánh lẫn toàn chuỗi — chỉ kể một lần
+      if (!entry.roles.includes(role)) entry.roles.push(role)
       byId.set(row.id, entry)
     }
     return [...byId.values()]

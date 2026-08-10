@@ -72,6 +72,16 @@ export function ShiftLogin() {
                 </p>
                 <Button onClick={() => void navigate('/ghep-may')}>Ghép lại máy</Button>
               </div>
+            ) : staffQuery.data?.length === 0 ? (
+              /* Lưới rỗng trước đây là màn hình trắng: máy chạy đúng, chỉ là chưa
+                 ai đủ điều kiện đứng ở đây. Nói ra mã chi nhánh vì đó chính là
+                 chỗ lệch — máy ghép chi nhánh này, người lại được phân ở chi
+                 nhánh khác. */
+              <p className="text-ink-mute">
+                Chi nhánh <span className="font-mono text-ink-hi">{branchId}</span> chưa có ai vừa
+                được phân vai trò vừa đặt PIN. Vào Sora Office → Tài khoản, tick chi nhánh này
+                trong lưới vai trò rồi bấm “Lưu vai trò”.
+              </p>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {staffQuery.data?.map((person) => (
