@@ -11,6 +11,7 @@ import {
   Req,
   UseInterceptors,
 } from '@nestjs/common'
+import { PHONE_ERROR, isPhone, normalizePhone } from '@sora/contracts'
 import { z } from 'zod'
 import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
 import type { RequestWithActor } from '../identity/auth.guard'
@@ -36,7 +37,9 @@ const StaffCreateBody = z.object({
   guestCount: z.number().int().min(1).max(50),
   seatKind: z.enum(['standard', 'grill', 'private']),
   name: z.string().min(1).max(120),
-  phone: z.string().min(8).max(20),
+  // Cùng một luật với khách tự đặt ở W6 — lễ tân gõ hộ qua điện thoại cũng phải
+  // ra đúng dạng đó, không thì Sổ khách tách làm hai người
+  phone: z.string().max(30).transform(normalizePhone).refine(isPhone, PHONE_ERROR),
   note: z.string().max(300).nullish(),
 })
 

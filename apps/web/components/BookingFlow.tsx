@@ -1,6 +1,6 @@
 'use client'
 
-import { formatVnd } from '@sora/contracts'
+import { PHONE_ERROR, formatVnd, isPhone } from '@sora/contracts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../lib/api'
 import {
@@ -49,6 +49,7 @@ export function BookingFlow({ branches, initial }: Props) {
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState<Reservation | null>(null)
@@ -120,6 +121,27 @@ export function BookingFlow({ branches, initial }: Props) {
     return () => window.removeEventListener('pagehide', handler)
   }, [holdToken])
 
+  /**
+   * Đổi bước là đổi màn, phải kéo lên đầu.
+   *
+   * Nút sang bước sau nằm cuối bước trước, nên lúc bấm là khách đang ở đáy
+   * trang: bước 2 cao 1754, cuộn 954. Bước 3 chỉ còn 1494 nên trình duyệt kẹp
+   * chỗ cuộn xuống 694 — vẫn dính đáy, mà đáy giờ là chân trang. Form đã trôi
+   * lên trên 228 điểm ảnh và đồng hồ giữ chỗ thì mất hẳn khỏi màn, đúng thứ
+   * khách cần thấy nhất khi mười phút bắt đầu chạy.
+   *
+   * Bỏ qua lần dựng đầu: chưa có bước nào đổi, mà cuộn thì đè mất chỗ trình
+   * duyệt vừa khôi phục cho người quay lại trang.
+   */
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
+      return
+    }
+    window.scrollTo({ top: 0 })
+  }, [step, done])
+
   // ----------------------------------------------------------------- hành động
   async function goToForm() {
     if (minute === null || !branchId) return
@@ -151,6 +173,12 @@ export function BookingFlow({ branches, initial }: Props) {
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     if (minute === null || !branchId) return
+    // Bắt ngay tại ô, không để API trả lỗi rồi khách phải tìm xem sai chỗ nào.
+    // Nói cùng một câu với API vì cùng một luật (`isPhone` ở @sora/contracts).
+    if (!isPhone(phone)) {
+      setPhoneError(PHONE_ERROR)
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -576,16 +604,34 @@ export function BookingFlow({ branches, initial }: Props) {
                   <span className="mb-2.5 block text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
                     Số điện thoại
                   </span>
+                  {/* Không dùng `pattern` của trình duyệt: luật thật gồm cả đầu
+                      số và độ dài khác nhau giữa di động với cố định, viết ra
+                      biểu thức thì dài mà lời báo lỗi lại là câu mặc định của
+                      trình duyệt. Để `isPhone` phán và tự nói bằng tiếng Việt. */}
                   <input
                     type="tel"
                     required
                     inputMode="tel"
-                    pattern="[\d\s+.()-]{8,20}"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value)
+                      if (phoneError) setPhoneError(null)
+                    }}
+                    onBlur={() => setPhoneError(!phone || isPhone(phone) ? null : PHONE_ERROR)}
+                    aria-invalid={phoneError ? true : undefined}
+                    aria-describedby={phoneError ? 'loi-sdt' : undefined}
                     placeholder="09xx xxx xxx"
-                    className="h-14 w-full rounded-md border border-line-3 bg-surface-2 px-4 font-mono text-[length:var(--fs-b1)] text-ink-hi placeholder:text-ink-mute focus:border-accent focus:outline-none"
+                    className={`h-14 w-full rounded-md border bg-surface-2 px-4 font-mono text-[length:var(--fs-b1)] text-ink-hi placeholder:text-ink-mute focus:outline-none ${
+                      phoneError
+                        ? 'border-danger focus:border-danger'
+                        : 'border-line-3 focus:border-accent'
+                    }`}
                   />
+                  {phoneError ? (
+                    <p id="loi-sdt" className="mt-2 text-[length:var(--fs-c1)] text-danger">
+                      {phoneError}
+                    </p>
+                  ) : null}
                 </label>
                 <label className="block">
                   <span className="mb-2.5 block text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, UseInterceptors } from '@nestjs/common'
+import { PHONE_ERROR, isPhone, normalizePhone } from '@sora/contracts'
 import { z } from 'zod'
 import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
 import { Public } from '../identity/auth.guard'
@@ -16,13 +17,18 @@ const SlotRef = z.object({
 
 const HoldBody = SlotRef
 
+/**
+ * Chuẩn hoá TRƯỚC khi kiểm, nên thứ xuống tới bảng là một dạng duy nhất.
+ *
+ * CRM ghép lịch sử khách bằng chính chuỗi này sau khi bỏ ký tự không phải số
+ * (`customers.service`), nên `0912 345 678` và `+84912345678` mà lưu nguyên văn
+ * là hai bản ghi cho một người.
+ */
+const PhoneField = z.string().max(30).transform(normalizePhone).refine(isPhone, PHONE_ERROR)
+
 const ConfirmBody = SlotRef.extend({
   name: z.string().min(1).max(120),
-  phone: z
-    .string()
-    .min(8)
-    .max(20)
-    .regex(/^[\d\s+.()-]+$/, 'Số điện thoại chỉ gồm chữ số và dấu ngăn cách'),
+  phone: PhoneField,
   note: z.string().max(300).nullish(),
   holdToken: z.string().max(200).nullish(),
 })
