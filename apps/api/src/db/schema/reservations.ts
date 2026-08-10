@@ -28,7 +28,7 @@ export const reservations = pgTable(
   {
     id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
     /** Mã khách đọc qua điện thoại: DB-2608-0041 */
-    displayCode: text('display_code').notNull().unique(),
+    displayCode: text('display_code').notNull(),
     branchId: text('branch_id')
       .notNull()
       .references(() => branches.id),
@@ -74,6 +74,8 @@ export const reservations = pgTable(
     check('reservations_window_check', sql`${t.endAt} > ${t.slotAt}`),
     // Truy vấn nóng: mọi suất còn hiệu lực của một chi nhánh trong một ngày
     index('reservations_branch_day_idx').on(t.branchId, t.businessDate, t.seatKind),
+    // Duy nhất TRONG MỘT CHI NHÁNH, cùng lý do với `orders` — xem chú thích ở đó.
+    uniqueIndex('reservations_branch_display_code_unique').on(t.branchId, t.displayCode),
   ],
 )
 

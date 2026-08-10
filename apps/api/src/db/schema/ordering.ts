@@ -12,6 +12,7 @@ import {
   smallint,
   text,
   timestamp,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import { dishes } from './catalog'
 import { branches, staff } from './identity'
@@ -30,7 +31,7 @@ export const orders = pgTable(
   'orders',
   {
     id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
-    displayCode: text('display_code').notNull().unique(),
+    displayCode: text('display_code').notNull(),
     branchId: text('branch_id')
       .notNull()
       .references(() => branches.id),
@@ -106,6 +107,21 @@ export const orders = pgTable(
       .where(sql`status NOT IN ('done','cancelled')`),
     index('orders_branch_date_idx').on(t.branchId, t.businessDate),
     index('orders_table_session_idx').on(t.tableSessionId),
+    /**
+     * Mã đơn duy nhất TRONG MỘT CHI NHÁNH, không phải toàn hệ thống.
+     *
+     * Sổ số đếm chạy riêng cho từng chi nhánh (`display_counters` khoá theo
+     * branch_id) nhưng mã in ra chỉ có kỳ và số thứ tự — `ON-2608-0001`. Ràng
+     * buộc duy nhất toàn cục vì thế chặn đúng cái đơn ĐẦU TIÊN của chi nhánh thứ
+     * hai trong tháng: nó xin số 1, mà số 1 của tháng đó đã thuộc về chi nhánh
+     * mở hàng trước. Đo trên bản chạy thật ngày 10-08-2026: Hà Tĩnh không gọi
+     * món được vì `ON-2608-0001` đã là đơn của Cầu Giấy từ ngày 02-08.
+     *
+     * Buộc mã mang chi nhánh thì khách phải đọc một chuỗi dài hơn qua điện
+     * thoại, mà hai quán thì không bao giờ đứng cạnh nhau: mã chỉ cần phân biệt
+     * được các đơn TRONG một quán.
+     */
+    uniqueIndex('orders_branch_display_code_unique').on(t.branchId, t.displayCode),
   ],
 )
 
