@@ -64,6 +64,8 @@ export interface OnlineDish {
   nameJa: string | null
   kana: string | null
   shortDesc: string | null
+  /** Ảnh khai ở Office M1 — chưa có thì ô món rơi về chữ kanji */
+  imageUrl: string | null
   allergens: string[] | null
   tags: string[] | null
   price: number

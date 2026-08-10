@@ -125,6 +125,7 @@ export function Search() {
           qty={cart.qtyOf(dish.id)}
           onOpen={() => setOpen(dish)}
           onAdd={() => addOrOpen(dish)}
+          onBot={() => cart.botOf(dish.id)}
         />
       ))}
 

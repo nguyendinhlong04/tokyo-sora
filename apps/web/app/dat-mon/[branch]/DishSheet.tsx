@@ -33,10 +33,19 @@ export function DishSheet({ dish, onClose }: { dish: OnlineDish; onClose: () => 
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pt-4">
-          <div className="grid aspect-3/2 w-full place-items-center rounded-md border border-line-1 bg-[radial-gradient(120%_100%_at_50%_18%,var(--sora-line-1)_0%,var(--sora-surface-4)_76%)]">
-            <span className="font-jp text-[104px] leading-none text-gold-900">
-              {dish.kana ?? '空'}
-            </span>
+          <div className="grid aspect-3/2 w-full place-items-center overflow-hidden rounded-md border border-line-1 bg-[radial-gradient(120%_100%_at_50%_18%,var(--sora-line-1)_0%,var(--sora-surface-4)_76%)]">
+            {dish.imageUrl ? (
+              <img
+                src={dish.imageUrl}
+                alt={dish.nameVi}
+                loading="lazy"
+                className="size-full object-cover"
+              />
+            ) : (
+              <span className="font-jp text-[104px] leading-none text-gold-900">
+                {dish.kana ?? '空'}
+              </span>
+            )}
           </div>
 
           <p className="mt-5 text-[length:var(--fs-t1)] font-semibold text-ink-hi">{dish.nameVi}</p>

@@ -1,5 +1,6 @@
 import { Badge, Money } from '@sora/ui'
 import type { Dish } from '../api'
+import { DishCounter } from './DishCounter'
 import { Plate } from './Plate'
 
 /**
@@ -16,6 +17,7 @@ export function DishRow({
   qty = 0,
   onOpen,
   onAdd,
+  onBot,
 }: {
   dish: Dish
   soldOut: boolean
@@ -23,10 +25,11 @@ export function DishRow({
   needsChoice?: boolean
   /** Bếp đang giới hạn "còn N phần" — nói trước để khách khỏi gọi hụt */
   remaining?: number | null
-  /** Đã có mấy phần món này trong giỏ — 0 thì không hiện gì */
+  /** Đã có mấy phần món này trong giỏ — 0 thì thanh đếm thu về một nút cộng */
   qty?: number
   onOpen: () => void
   onAdd: () => void
+  onBot: () => void
 }) {
   return (
     <div className="flex h-26 items-center gap-3.5 border-b border-surface-4 px-4">
@@ -41,7 +44,12 @@ export function DishRow({
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
       >
-        <Plate kanji={dish.kana} className="h-22 w-22 flex-none" />
+        <Plate
+          kanji={dish.kana}
+          src={dish.imageUrl}
+          alt={dish.nameVi}
+          className="h-22 w-22 flex-none"
+        />
         <span className="min-w-0 flex-1">
           <span className="block text-[length:var(--fs-t2)] font-semibold text-ink-hi">
             {dish.nameVi}
@@ -63,33 +71,24 @@ export function DishRow({
           </span>
         </span>
       </button>
-      <button
-        type="button"
-        aria-label={needsChoice ? `Chọn kiểu cho ${dish.nameVi}` : `Thêm ${dish.nameVi}`}
+      {/*
+        Cùng một thanh đếm với màn đặt món online: số phần nằm TRONG thanh chứ
+        không còn là nhãn dán chồng lên góc một nút vuông. Khách gọi món ở nhà
+        rồi tới quán ngồi ăn phải gặp lại đúng cái nút họ đã quen.
+
+        Số ở đây KHÔNG được rơi xuống hàng giá bên trái: hàng đó `flex-wrap` nằm
+        trong dòng cao cố định 104px, và đo thật cho thấy chỉ cần thêm một huy
+        hiệu là món tên dài (hoặc món vừa hết vừa có trong giỏ) bị đẩy xuống dòng
+        thứ hai rồi tràn ra ngoài dòng.
+      */}
+      <DishCounter
+        name={dish.nameVi}
+        qty={qty}
+        onAdd={onAdd}
+        onBot={onBot}
         disabled={soldOut}
-        onClick={onAdd}
-        className="relative h-[var(--hit-target)] w-[var(--hit-target)] flex-none rounded-sm border border-accent text-[length:var(--fs-t1)] text-accent-ink disabled:border-line-4 disabled:text-ink-mute"
-      >
-        {/*
-          Số phần đã có trong giỏ, gắn thẳng lên nút thêm.
-
-          KHÔNG đặt nó xuống hàng giá bên trái: hàng đó `flex-wrap` nằm trong dòng
-          cao cố định 104px, và đo thật cho thấy chỉ cần thêm một huy hiệu là món
-          tên dài (hoặc món vừa hết vừa có trong giỏ) bị đẩy xuống dòng thứ hai
-          rồi tràn ra ngoài dòng.
-
-          Có số thì số thay chỗ chấm vàng: chấm chỉ là lời báo trước rằng bấm +
-          sẽ mở màn chọn kiểu, mà khách đã chọn món này rồi thì họ biết điều đó.
-        */}
-        {qty > 0 ? (
-          <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-pill bg-accent-strong px-1 font-mono text-[length:var(--fs-c2)] font-semibold text-on-accent">
-            {qty}
-          </span>
-        ) : needsChoice && !soldOut ? (
-          <span className="absolute -top-1 -right-1 h-2 w-2 rounded-pill bg-accent" />
-        ) : null}
-        +
-      </button>
+        choice={needsChoice}
+      />
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { BottomBar, BottomBarSpacer } from '../components/BottomBar'
 import { DishRow } from '../components/DishRow'
 import { DishSheet } from '../components/DishSheet'
 import { FilterSheet } from '../components/FilterSheet'
+import { MenuIndex } from '../components/MenuIndex'
 import { useCart } from '../cart-context'
 import {
   applyFilters,
@@ -115,18 +116,7 @@ export function Menu() {
 
   return (
     <main>
-      <nav className="sticky top-12 z-40 flex gap-1.5 overflow-x-auto border-b border-accent/16 bg-surface-2/96 px-4 py-2 backdrop-blur">
-        {groups.map((c) => (
-          <a
-            key={c.id}
-            href={`#nhom-${c.id}`}
-            className="flex h-9 flex-none items-center gap-1.5 rounded-pill border border-line-3 px-3.5 text-[length:var(--fs-b2)] text-ink-body"
-          >
-            {c.kanji ? <span className="font-jp text-accent">{c.kanji}</span> : null}
-            {c.nameVi}
-          </a>
-        ))}
-      </nav>
+      <MenuIndex chapters={groups} />
 
       <div className="flex items-center justify-between gap-3 px-4 pt-4">
         <Button
@@ -158,7 +148,14 @@ export function Menu() {
         />
       ) : (
         groups.map((group) => (
-          <section key={group.id} id={`nhom-${group.id}`} className="scroll-mt-24">
+          /* Thanh trên 48 + mục lục (tự đo, xem `MenuIndex`) + 4 thở. Mốc này còn
+             là mốc "đang đọc" của chính thanh mục lục: nó đọc `scroll-margin-top`
+             của nhóm đầu ra dùng, nên hai bên không bao giờ lệch. */
+          <section
+            key={group.id}
+            id={`chuong-${group.id}`}
+            className="scroll-mt-[calc(3rem+var(--sora-muc-luc,86px)+4px)]"
+          >
             <header className="px-4 pt-8 pb-5 text-center">
               <h2 className="font-display text-[length:var(--fs-d3)] font-light text-ink-hi">
                 {group.nameVi}
@@ -173,7 +170,10 @@ export function Menu() {
             {group.subs.length > 0
               ? group.subs.map((sub) => (
                   <div key={sub.key}>
-                    <div className="sticky top-23 z-30 flex items-center gap-2.5 border-y border-accent/16 bg-surface-2 px-4 py-2.5">
+                    {/* Dính KHÍT ngay dưới mục lục: cùng biến chiều cao, nên thanh
+                        mục lục xuống thêm một dòng thì dải này tụt theo, không hở
+                        khe cho nội dung chạy qua giữa hai dải. */}
+                    <div className="sticky top-[calc(3rem+var(--sora-muc-luc,86px))] z-30 flex items-center gap-2.5 border-y border-accent/16 bg-surface-2 px-4 py-2.5">
                       <span className="font-jp text-[length:var(--fs-t2)] leading-none text-accent">
                         {sub.kanji}
                       </span>
@@ -191,6 +191,7 @@ export function Menu() {
                         qty={cart.qtyOf(dish.id)}
                         onOpen={() => setOpen(dish)}
                         onAdd={() => addOrOpen(dish)}
+                        onBot={() => cart.botOf(dish.id)}
                       />
                     ))}
                   </div>
@@ -205,6 +206,7 @@ export function Menu() {
                     qty={cart.qtyOf(dish.id)}
                     onOpen={() => setOpen(dish)}
                     onAdd={() => addOrOpen(dish)}
+                    onBot={() => cart.botOf(dish.id)}
                   />
                 ))}
           </section>

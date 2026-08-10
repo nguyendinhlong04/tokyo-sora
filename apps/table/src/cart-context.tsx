@@ -31,6 +31,15 @@ interface CartValue {
    * miso). Đứng ở màn thực đơn thì khách chỉ cần biết đã chọn tất cả mấy phần.
    */
   qtyOf: (dishId: string) => number
+  /**
+   * Bớt một phần của MỘT món ngay tại thực đơn, nơi không có dòng giỏ nào để chỉ.
+   *
+   * Bớt ở dòng THÊM SAU CÙNG của món đó. Một món nằm nhiều dòng khi khách dặn
+   * khác nhau, mà nút trừ ở thực đơn thì không hỏi được "bỏ phần chấm muối hay
+   * chấm miso" — hoàn tác đúng thao tác vừa làm là câu trả lời khách đoán được.
+   * Muốn bỏ đích danh một dòng thì vào giỏ, ở đó mỗi dòng có nút riêng.
+   */
+  botOf: (dishId: string) => void
   setQty: (index: number, qty: number) => void
   remove: (index: number) => void
   clear: () => void
@@ -124,6 +133,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
             return current.map((l, i) => (i === at ? { ...l, qty: l.qty + qty } : l))
           }
           return [...current, { ...item, qty }]
+        }),
+
+      botOf: (dishId) =>
+        update((current) => {
+          const at = current.findLastIndex((l) => l.dishId === dishId)
+          if (at < 0) return current
+          return current
+            .map((l, i) => (i === at ? { ...l, qty: l.qty - 1 } : l))
+            .filter((l) => l.qty > 0)
         }),
 
       setQty: (index, qty) =>

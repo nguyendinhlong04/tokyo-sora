@@ -112,6 +112,7 @@ export class ConfigBundleService {
           nameJa: d.nameJa,
           kana: d.kana,
           shortDesc: d.shortDesc,
+          imageUrl: d.imageUrl,
           allergens: d.allergens,
           tags: d.tags,
           modifierGroupIds: modifierGroupsByDish.get(d.id) ?? [],

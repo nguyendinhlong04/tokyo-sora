@@ -58,7 +58,13 @@ export function DishSheet({
   return (
     <Sheet open onClose={onClose} full>
       <div className="flex-1 overflow-y-auto px-4 pt-4">
-        <Plate kanji={dish.kana} className="aspect-3/2 w-full" textClassName="text-[104px]" />
+        <Plate
+          kanji={dish.kana}
+          src={dish.imageUrl}
+          alt={dish.nameVi}
+          className="aspect-3/2 w-full"
+          textClassName="text-[104px]"
+        />
 
         <p className="mt-5 text-[length:var(--fs-t1)] font-semibold text-ink-hi">{dish.nameVi}</p>
         {dish.nameJa ? (

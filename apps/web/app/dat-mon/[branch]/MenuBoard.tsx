@@ -142,10 +142,25 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
                      nút + ra ngoài màn hình. */
                   className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
                 >
-                  <span className="grid h-22 w-22 flex-none place-items-center rounded-md border border-line-1 bg-[radial-gradient(120%_100%_at_50%_20%,var(--sora-line-1)_0%,var(--sora-surface-4)_74%)]">
-                    <span className="font-jp text-[40px] leading-none text-gold-900">
-                      {dish.kana ?? '空'}
-                    </span>
+                  {/* Có ảnh thì hiện ảnh, chưa có thì ô chữ kanji như cũ — đường
+                      dẫn khai ở Office M1 nên bổ sung ảnh cho một món là chỗ này
+                      tự đổi, không phải sửa mã.
+                      `<span>` chứ không phải `<div>` như `DishGlyph`: cả ô nằm
+                      TRONG một `<button>`, mà button chỉ được chứa phrasing
+                      content. */}
+                  <span className="grid h-22 w-22 flex-none place-items-center overflow-hidden rounded-md border border-line-1 bg-[radial-gradient(120%_100%_at_50%_20%,var(--sora-line-1)_0%,var(--sora-surface-4)_74%)]">
+                    {dish.imageUrl ? (
+                      <img
+                        src={dish.imageUrl}
+                        alt=""
+                        loading="lazy"
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <span className="font-jp text-[40px] leading-none text-gold-900">
+                        {dish.kana ?? '空'}
+                      </span>
+                    )}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[length:var(--fs-t2)] font-semibold text-ink-hi">

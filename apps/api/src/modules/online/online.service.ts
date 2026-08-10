@@ -142,6 +142,7 @@ export class OnlineService {
         nameJa: d.nameJa,
         kana: d.kana,
         shortDesc: d.shortDesc,
+        imageUrl: d.imageUrl,
         allergens: d.allergens,
         tags: d.tags,
         /**
