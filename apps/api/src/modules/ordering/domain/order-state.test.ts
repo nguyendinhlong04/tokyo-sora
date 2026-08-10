@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ORDER_STATUSES,
   applyTransition,
+  deriveSetParentState,
   deriveStatusFromTickets,
   isTerminal,
   nextStatuses,
@@ -220,5 +221,43 @@ describe('Suy trạng thái đơn từ vé bếp — bếp bấm là đơn tự 
   it('đơn chưa có vé nào (tất cả đã huỷ) giữ nguyên trạng thái', () => {
     expect(deriveStatusFromTickets('confirmed', ['voided'])).toBe('confirmed')
     expect(deriveStatusFromTickets('confirmed', [])).toBe('confirmed')
+  })
+})
+
+describe('Trạng thái dòng set cha suy từ món thành phần', () => {
+  it('ra hết món của set ⇒ set là "Đã ra" — ca đã gặp trên bản chạy thật', () => {
+    expect(deriveSetParentState(Array(16).fill('served'))).toBe('served')
+  })
+
+  it('còn đúng một chặng chưa ra ⇒ "Đang làm", KHÔNG lùi về "Bếp đã nhận"', () => {
+    expect(deriveSetParentState([...Array(15).fill('served'), 'queued'])).toBe('cooking')
+  })
+
+  it('chưa món nào động tới ⇒ vẫn "Bếp đã nhận"', () => {
+    expect(deriveSetParentState(['queued', 'queued', 'queued'])).toBe('queued')
+  })
+
+  it('món đầu tiên lên bếp là set đã "Đang làm"', () => {
+    expect(deriveSetParentState(['cooking', 'queued', 'queued'])).toBe('cooking')
+  })
+
+  it('mọi món xong ở bếp nhưng chưa bưng ra ⇒ "Sắp ra"', () => {
+    expect(deriveSetParentState(['ready', 'ready', 'served'])).toBe('ready')
+  })
+
+  it('món đã huỷ không tính — phần còn lại ra hết vẫn là "Đã ra"', () => {
+    expect(deriveSetParentState(['served', 'voided', 'served'])).toBe('served')
+  })
+
+  it('huỷ sạch món thành phần ⇒ set cũng huỷ theo', () => {
+    expect(deriveSetParentState(['voided', 'voided'])).toBe('voided')
+  })
+
+  it('set chưa gửi bếp thì vẫn là bản nháp', () => {
+    expect(deriveSetParentState(['draft', 'draft'])).toBe('draft')
+  })
+
+  it('set chưa nổ ra món nào ⇒ không kết luận gì', () => {
+    expect(deriveSetParentState([])).toBeNull()
   })
 })

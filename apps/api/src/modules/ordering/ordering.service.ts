@@ -35,6 +35,7 @@ import { ApprovalService, type ApprovalInput } from '../identity/approval.servic
 import { AuditService } from '../identity/audit.service'
 import { explodeSet, SetSelectionError, type SetSelection } from '../kitchen/domain/explode'
 import type { ServiceContext } from '../kitchen/domain/routing'
+import { syncSetParents } from './set-parent'
 import {
   buildTickets,
   type OrderChannel,
@@ -760,6 +761,11 @@ export class OrderingService {
         })
         .where(and(eq(orderLines.parentLineId, lineId), sql`${orderLines.state} <> 'voided'`))
         .returning({ dishId: orderLines.dishId, qty: orderLines.qty })
+
+      // Huỷ MỘT món trong set thì phần còn lại có thể đã ra hết — lúc đó cả set
+      // là đã xong, đừng để nó treo ở "Bếp đã nhận". Huỷ chính dòng set cha thì
+      // câu này không đụng tới nó nữa (`syncSetParents` chừa dòng đã huỷ).
+      await syncSetParents(tx, line.orderId)
 
       /**
        * Trả phần đã trừ về trần "còn N phần" của K5.

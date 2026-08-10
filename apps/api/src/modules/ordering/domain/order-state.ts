@@ -199,3 +199,35 @@ export function deriveStatusFromTickets(
   const anyStarted = live.some((s) => s === 'cooking' || s === 'ready' || s === 'closed')
   return anyStarted ? 'cooking' : current
 }
+
+export type LineState = 'draft' | 'queued' | 'cooking' | 'ready' | 'served' | 'voided'
+
+/**
+ * Suy trạng thái DÒNG SET CHA từ các món thành phần của nó.
+ *
+ * Dòng set cha chỉ giữ giá, không xuống bếp, nên nó không nằm trong vé nào —
+ * `syncOrderLines` kéo trạng thái từ vé về dòng món sẽ không bao giờ chạm tới nó.
+ * Thiếu mắt xích này thì set đứng nguyên ở "Bếp đã nhận" tới hết bữa: đo trên bản
+ * chạy thật ngày 10-08-2026, một Set Kiwami có đủ 16/16 món con `served` mà dòng
+ * cha vẫn `queued`, và màn "Đơn của bàn" của khách chỉ đọc dòng cha.
+ *
+ * Mốc "đang làm" lấy theo món ĐẦU TIÊN động đậy, không phải món chậm nhất — khác
+ * hẳn cách suy của một dòng món đa trạm. Set là bữa ăn nhiều chặng kéo dài cả
+ * tiếng: lấy mức chậm nhất thì khách đã ăn xong chặng thứ năm mà màn hình vẫn báo
+ * "Bếp đã nhận", vì chặng tráng miệng chưa ai đụng tới.
+ *
+ * Trả `null` khi không có gì để nói: set chưa nổ ra món con nào.
+ */
+export function deriveSetParentState(children: readonly LineState[]): LineState | null {
+  if (children.length === 0) return null
+
+  const live = children.filter((s) => s !== 'voided')
+  // Huỷ sạch món thành phần thì cái set không còn là món đang bán nữa
+  if (live.length === 0) return 'voided'
+
+  if (live.every((s) => s === 'draft')) return 'draft'
+  if (live.every((s) => s === 'served')) return 'served'
+  if (live.every((s) => s === 'ready' || s === 'served')) return 'ready'
+  if (live.some((s) => s === 'cooking' || s === 'ready' || s === 'served')) return 'cooking'
+  return 'queued'
+}

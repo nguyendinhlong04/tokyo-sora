@@ -20,6 +20,7 @@ import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 import { InventoryService } from '../inventory/inventory.service'
 import { deriveStatusFromTickets, type TicketRollupState } from '../ordering/domain/order-state'
+import { syncSetParents } from '../ordering/set-parent'
 
 /** Trạng thái vé mà bếp bấm được (K2) */
 export type TicketAction = 'start' | 'done' | 'undo'
@@ -450,6 +451,14 @@ export class KitchenService {
          AND ol.state NOT IN ('served', 'voided')
          AND ol.state <> sub.new_state
     `)
+
+    // Món thành phần vừa đổi bước thì dòng SET CHA phải đổi theo — nó không nằm
+    // trong vé nào nên câu trên không bao giờ chạm tới nó.
+    const [ticket] = await tx
+      .select({ orderId: tickets.orderId })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+    if (ticket) await syncSetParents(tx, ticket.orderId)
   }
 
   /**
@@ -597,6 +606,8 @@ export class KitchenService {
       }
 
       await tx.update(orderLines).set({ state: 'served' }).where(eq(orderLines.id, lineId))
+      // Món cuối của một set rời quầy là cả set đã ra — xem `syncSetParents`
+      await syncSetParents(tx, line.orderId)
 
       /**
        * Vé nào đã mang ra HẾT thì đóng lại.
@@ -670,9 +681,19 @@ export class KitchenService {
           and(
             eq(orderLines.orderId, orderId),
             eq(orderLines.batchNo, batchNo),
+            /**
+             * Dòng set cha đứng ngoài phép cập nhật theo ĐỢT.
+             *
+             * Nó mang đợt của chặng đầu, mà món thành phần trải ra bảy đợt: bưng
+             * xong đợt 1 mà đóng luôn dòng set thì khách đọc "Đã ra" trong khi
+             * sáu chặng sau còn chưa lên bếp. Trạng thái của nó suy từ các con
+             * ngay bên dưới.
+             */
+            sql`${orderLines.kind} <> 'set_parent'`,
             sql`${orderLines.state} NOT IN ('draft', 'served', 'voided')`,
           ),
         )
+      await syncSetParents(tx, orderId)
 
       await tx
         .update(tickets)
