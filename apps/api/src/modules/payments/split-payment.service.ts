@@ -25,6 +25,8 @@ import {
 import { CustomersService } from '../crm/customers.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
+import { prepayDueOf } from '../ordering/domain/prepay'
+import { OrderingService } from '../ordering/ordering.service'
 import { MockBankProvider, PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider'
 
 /** Lượt trả sống 15 phút — đủ để khách mở app ngân hàng và chuyển xong */
@@ -37,6 +39,7 @@ export class SplitPaymentService {
     @Inject(PAYMENT_PROVIDER) private readonly bank: PaymentProvider,
     private readonly audit: AuditService,
     private readonly customers: CustomersService,
+    private readonly ordering: OrderingService,
   ) {}
 
   /**
@@ -135,6 +138,9 @@ export class SplitPaymentService {
    * Cùng một cơ chế VA với tại bàn (§23.2 "cùng cơ chế tại bàn"): mỗi lượt trả
    * một VA riêng, và chỉ webhook ngân hàng mới đóng khoản. Khác một điểm: đơn
    * online trả TRỌN số tiền, không có chuyện chia bill giữa mấy điện thoại.
+   *
+   * Số tiền của mã là phần phải trả TRƯỚC, không phải cả đơn: đơn giao thì phí
+   * ship do shipper thu tận tay, quét luôn cả phí ở đây là thu hai lần.
    */
   async createOrderVietQr(orderId: number, actor: Actor) {
     return this.db.transaction(async (tx) => {
@@ -142,8 +148,19 @@ export class SplitPaymentService {
       if (!order) throw new NotFoundException('Không có đơn này')
       if (order.status === 'cancelled') throw new ConflictException('Đơn đã huỷ')
 
-      const { outstanding } = await this.outstandingWithin(tx, order.id, order.moneyTotal)
-      if (outstanding <= 0) throw new ConflictException('Đơn đã trả đủ')
+      const prepay = prepayDueOf(order)
+      const { outstanding } = await this.outstandingWithin(
+        tx,
+        order.id,
+        prepay > 0 ? prepay : order.moneyTotal,
+      )
+      if (outstanding <= 0) {
+        throw new ConflictException(
+          prepay > 0 && order.moneyShip > 0
+            ? 'Tiền món đã trả đủ — còn phí giao thì trả cho người giao khi nhận hàng'
+            : 'Đơn đã trả đủ',
+        )
+      }
 
       const [row] = await tx
         .insert(payments)
@@ -265,6 +282,7 @@ export class SplitPaymentService {
       })
 
       const paymentState = await this.refreshOrderPaymentState(tx, payment.orderId!)
+      const tickets = await this.fireIfPrepaid(tx, payment.orderId!)
 
       await emit(tx, {
         branchId: payment.branchId,
@@ -276,7 +294,7 @@ export class SplitPaymentService {
         payload: { paymentId: payment.id, amount: payment.amount, paymentState },
       })
 
-      return { matched: true, paymentId: payment.id, paymentState }
+      return { matched: true, paymentId: payment.id, paymentState, tickets }
     })
   }
 
@@ -399,6 +417,57 @@ export class SplitPaymentService {
 
     const held = Number(rows[0]?.held ?? 0)
     return { outstanding: Math.max(0, total - held), held, total }
+  }
+
+  /**
+   * Tiền món về đủ thì đơn tự xuống bếp — không đợi ai bấm.
+   *
+   * Khách đã trả trước, giờ mà đơn vẫn nằm chờ một cái bấm tay ở POS thì mỗi
+   * phút nhân viên bận là một phút bếp không biết có đơn. Chốt `status = 'new'`
+   * lặp lại trong WHERE là chống đua: webhook gửi lặp hoặc nhân viên bấm xác nhận
+   * đúng lúc đó thì chỉ một bên đổi được trạng thái, bên kia không ăn dòng nào và
+   * bỏ qua — nếu không, vé sẽ sinh hai lần cho một đơn.
+   */
+  private async fireIfPrepaid(tx: Tx, orderId: number) {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
+    if (!order || order.status !== 'new') return 0
+
+    const due = prepayDueOf(order)
+    if (due <= 0) return 0
+
+    const rows = await tx
+      .select({ paid: sql<number>`coalesce(sum(${payments.amount}), 0)::int` })
+      .from(payments)
+      .where(and(eq(payments.orderId, orderId), eq(payments.state, 'paid')))
+    if (Number(rows[0]?.paid ?? 0) < due) return 0
+
+    const now = new Date()
+    const updated = await tx
+      .update(orders)
+      .set({ status: 'confirmed', confirmedAt: now, version: sql`${orders.version} + 1` })
+      .where(and(eq(orders.id, orderId), eq(orders.status, 'new')))
+      .returning({ id: orders.id })
+    if (updated.length === 0) return 0
+
+    const actor: Actor = { kind: 'system' }
+    const tickets = await this.ordering.fireOnlineOrder(tx, order, actor)
+
+    await this.audit.write(tx, {
+      actor,
+      action: 'order.status.confirmed',
+      entity: 'order',
+      entityId: String(orderId),
+      payload: { from: 'new', to: 'confirmed', reason: 'prepaid' },
+    })
+
+    await emit(tx, {
+      branchId: order.branchId,
+      topic: 'order.updated',
+      rooms: [rooms.orders(order.branchId)],
+      payload: { orderId, displayCode: order.displayCode, status: 'confirmed' },
+    })
+
+    return tickets
   }
 
   private async refreshOrderPaymentState(tx: Tx, orderId: number) {

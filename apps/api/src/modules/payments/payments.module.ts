@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { CrmModule } from '../crm/crm.module'
+import { OrderingModule } from '../ordering/ordering.module'
 import { MockBankProvider, PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider'
 import { PaymentsController } from './payments.controller'
 import { PaymentsService } from './payments.service'
@@ -27,10 +28,11 @@ function createProvider(): PaymentProvider {
 }
 
 // CrmModule để tích điểm ngay trong transaction thu tiền — §25 B14 "điểm chỉ
-// sinh từ sự kiện thanh-toan.nhan". Chiều phụ thuộc một hướng: CRM không biết gì
-// về thanh toán, nên không có vòng.
+// sinh từ sự kiện thanh-toan.nhan". OrderingModule để đơn online trả trước xong
+// là xuống bếp ngay trong chính transaction đó. Chiều phụ thuộc một hướng: CRM và
+// Ordering đều không biết gì về thanh toán, nên không có vòng.
 @Module({
-  imports: [CrmModule],
+  imports: [CrmModule, OrderingModule],
   controllers: [PaymentsController, SplitPaymentController],
   providers: [
     PaymentsService,

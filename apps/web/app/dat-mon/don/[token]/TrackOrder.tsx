@@ -57,12 +57,17 @@ export function TrackOrder({ token }: { token: string }) {
     }
   }, [token])
 
-  // Khách chọn trả trước ở O6 thì mở thẳng mã, không bắt bấm thêm một nút nữa
+  // Vừa đặt xong thì mở thẳng mã, không bắt bấm thêm một nút nữa
   useEffect(() => {
-    if (params.get('tra-ngay') === '1' && order?.paymentState === 'unpaid' && !ticket) {
+    if (
+      params.get('tra-ngay') === '1' &&
+      order?.paymentState === 'unpaid' &&
+      order.status !== 'cancelled' &&
+      !ticket
+    ) {
       void createQr()
     }
-  }, [params, order?.paymentState, ticket, createQr])
+  }, [params, order?.paymentState, order?.status, ticket, createQr])
 
   if (notFound) {
     return (
@@ -82,7 +87,15 @@ export function TrackOrder({ token }: { token: string }) {
     return <main className="grid min-h-[60dvh] place-items-center text-ink-mute">Đang tải…</main>
   }
 
-  const paid = order.paymentState === 'paid'
+  /**
+   * "Xong phần của khách" chứ không phải "đơn đã trả đủ".
+   *
+   * Đơn giao trả trước tiền món thì vẫn còn nợ phí giao, nên `paymentState` đứng
+   * ở `partial` cho tới khi shipper nộp tiền về quán. Nhìn theo cột đó thì khách
+   * đã chuyển khoản xong vẫn thấy màn hình đòi tiền.
+   */
+  const prepaid = order.money.paid >= order.money.prepay
+  const shipDue = prepaid && order.money.paid < order.money.total ? order.money.ship : 0
   const current = ORDER.indexOf(order.status)
 
   return (
@@ -106,8 +119,8 @@ export function TrackOrder({ token }: { token: string }) {
         </p>
       ) : (
         <>
-          {/* O13 · O14 — chỉ hiện khi còn nợ tiền */}
-          {!paid ? (
+          {/* O13 · O14 — chỉ hiện khi phần của khách còn thiếu */}
+          {!prepaid ? (
             <section className="mt-7 rounded-md border border-accent/16 bg-surface-4 p-5">
               {ticket && !waiting ? (
                 <>
@@ -116,6 +129,9 @@ export function TrackOrder({ token }: { token: string }) {
                   </p>
                   <p className="mt-2 text-[length:var(--fs-b2)] text-ink-mute">
                     Quét bằng app ngân hàng bất kỳ. Đơn xuống bếp khi ngân hàng báo có.
+                    {order.money.ship > 0
+                      ? ` Phí giao ${formatVnd(order.money.ship)} trả tiền mặt cho người giao.`
+                      : ''}
                   </p>
                   <div className="mt-4 flex justify-center">
                     <div className="rounded-md bg-[var(--sora-washi-100)] p-4">
@@ -158,10 +174,11 @@ export function TrackOrder({ token }: { token: string }) {
               ) : (
                 <>
                   <p className="text-[length:var(--fs-t2)] font-semibold text-ink-hi">
-                    Còn phải trả {formatVnd(order.money.total)}
+                    Còn phải trả {formatVnd(order.money.prepay - order.money.paid)}
                   </p>
                   <p className="mt-2 text-[length:var(--fs-b2)] text-ink-mute">
-                    Trả trước bằng VietQR, hoặc trả khi nhận hàng.
+                    Đơn chỉ xuống bếp khi tiền món về tới quán. Quá 15 phút chưa nhận được thì đơn
+                    tự huỷ.
                   </p>
                   <button
                     type="button"
@@ -176,6 +193,14 @@ export function TrackOrder({ token }: { token: string }) {
                 </>
               )}
             </section>
+          ) : shipDue > 0 ? (
+            /* Đơn giao đã trả xong tiền món: nói rõ còn phải cầm sẵn bao nhiêu
+               tiền mặt lúc mở cửa, chứ không báo "đã nhận đủ" rồi để shipper đòi
+               thêm một khoản khách không chờ đợi. */
+            <p className="mt-7 rounded-md border border-ok bg-ok/8 p-4 text-[length:var(--fs-b1)] leading-relaxed text-ink-hi">
+              Đã nhận {formatVnd(order.money.paid)} tiền món. Còn {formatVnd(shipDue)} phí giao —
+              trả tiền mặt cho người giao khi nhận hàng.
+            </p>
           ) : (
             <p className="mt-7 rounded-md border border-ok bg-ok/8 p-4 text-[length:var(--fs-b1)] text-ink-hi">
               Đã nhận {formatVnd(order.money.total)}. Cảm ơn bạn!

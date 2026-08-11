@@ -9,9 +9,10 @@
  */
 import { createHmac } from 'node:crypto'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
-import { deliveryZones, devices, dishes, tickets } from '../db/schema'
+import { deliveryZones, devices, dishes, orders, tickets } from '../db/schema'
 import { ParamsService } from '../common/params.service'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
@@ -56,6 +57,40 @@ async function placeTakeaway(lines: { dishId: string; qty: number }[] = [{ dishI
     },
   })
   return res
+}
+
+/** Đặt một đơn giao "nhận ngay" trong Vòng 1 */
+async function placeDelivery(lines: { dishId: string; qty: number }[] = [{ dishId: 'thanbo', qty: 1 }]) {
+  return inject({
+    method: 'POST',
+    url: '/api/online/orders',
+    payload: {
+      branchId: fx.branchId,
+      type: 'delivery',
+      customer: {
+        name: 'Khách giao',
+        phone: '0900000009',
+        address: '12 Trần Duy Hưng',
+        ward: 'Dịch Vọng',
+      },
+      lines,
+      slotMode: 'asap',
+    },
+  })
+}
+
+/**
+ * Khách trả trước trọn phần của mình: mở mã rồi để ngân hàng báo có.
+ * Trả về số tiền đã chuyển — đơn giao thì đây là tiền món, không gồm phí ship.
+ */
+async function prepay(trackToken: string, bankRef: string) {
+  const ticket = await inject({
+    method: 'POST',
+    url: `/api/online/track/${trackToken}/pay/vietqr`,
+  })
+  const { amount, vaNumber } = ticket.json<{ amount: number; vaNumber: string }>()
+  await bankWebhook({ bankRef, vaNumber, amount })
+  return amount
 }
 
 beforeAll(async () => {
@@ -365,15 +400,36 @@ describe('5. Điều phối trên POS (O8 · O9)', () => {
     expect(types).not.toContain('dinein')
   })
 
-  it('xác nhận đơn thì món xuống bếp, kèm mốc phải bắt đầu nấu', async () => {
+  /**
+   * Đơn web chưa có tiền thì bếp không được thấy — kể cả nhân viên bấm tay. Nếu
+   * nút này vẫn mở thì quy tắc trả trước chỉ là lời khuyên.
+   */
+  it('đơn chưa trả tiền món thì bấm xác nhận cũng không xuống bếp được', async () => {
     const res = await inject({
       method: 'POST',
       url: `/api/orders/${orderId}/status`,
       headers: staffAuth(),
       payload: { to: 'confirmed' },
     })
-    expect(res.statusCode, res.payload).toBe(201)
-    expect(res.json<{ tickets: number }>().tickets).toBeGreaterThan(0)
+    expect(res.statusCode).toBe(409)
+    expect(res.json<{ code: string }>().code).toBe('prepay_required')
+
+    const rows = (await db.select().from(tickets)).filter((t) => t.orderId === orderId)
+    expect(rows.length).toBe(0)
+  })
+
+  it('tiền món về là đơn tự xuống bếp, kèm mốc phải bắt đầu nấu', async () => {
+    await prepay(trackToken, `FT-XUONG-BEP-${orderId}`)
+
+    const board = await inject({
+      method: 'GET',
+      url: `/api/orders?branch=${fx.branchId}`,
+      headers: staffAuth(),
+    })
+    const card = board.json<{ orders: { id: number; status: string }[] }>().orders.find(
+      (o) => o.id === orderId,
+    )
+    expect(card?.status).toBe('confirmed')
 
     const rows = await db.select().from(tickets)
     const mine = rows.filter((t) => t.orderId === orderId)
@@ -431,13 +487,8 @@ describe('5. Điều phối trên POS (O8 · O9)', () => {
    * tiếp một đơn không còn ai lấy.
    */
   it('huỷ đơn đã xác nhận thì rút luôn vé khỏi bếp', async () => {
-    const fresh = (await placeTakeaway()).json<{ id: number }>()
-    await inject({
-      method: 'POST',
-      url: `/api/orders/${fresh.id}/status`,
-      headers: staffAuth(),
-      payload: { to: 'confirmed' },
-    })
+    const fresh = (await placeTakeaway()).json<{ id: number; trackToken: string }>()
+    await prepay(fresh.trackToken, `FT-RUT-VE-${fresh.id}`)
 
     const before = (await db.select().from(tickets)).filter((t) => t.orderId === fresh.id)
     expect(before.length).toBeGreaterThan(0)
@@ -570,5 +621,147 @@ describe('6. Kênh ngoài nhập tay (O12)', () => {
       },
     })
     expect(created.json<{ money: { ship: number } }>().money.ship).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Đơn web trả trước, người giao chỉ cầm phí giao.
+ *
+ * Hai chuyện tách bạch: tiền món vào tài khoản quán TRƯỚC khi bếp làm, còn phí
+ * giao là khoản duy nhất shipper thu tận tay. Trước đây shipper ôm cả tổng đơn.
+ */
+describe('7. Trả trước và phần của người giao (O6 · O13 · P16)', () => {
+  let orderId: number
+  let trackToken: string
+  let ship = 0
+
+  beforeAll(async () => {
+    const body = (await placeDelivery()).json<{ id: number; trackToken: string; money: { ship: number } }>()
+    orderId = body.id
+    trackToken = body.trackToken
+    ship = body.money.ship
+  })
+
+  it('mã VietQR của đơn giao chỉ gồm tiền món, không gồm phí giao', async () => {
+    const before = await inject({ method: 'GET', url: `/api/online/track/${trackToken}` })
+    const money = before.json<{ money: { total: number; ship: number; prepay: number } }>().money
+    expect(money.prepay).toBe(money.total - money.ship)
+
+    const ticket = await inject({
+      method: 'POST',
+      url: `/api/online/track/${trackToken}/pay/vietqr`,
+    })
+    expect(ticket.statusCode, ticket.payload).toBe(201)
+    expect(ticket.json<{ amount: number }>().amount).toBe(money.total - money.ship)
+  })
+
+  it('tiền món về là đơn tự xuống bếp, phần còn nợ đúng bằng phí giao', async () => {
+    const payment = await db.query.payments.findFirst({
+      where: (p, { and, eq }) => and(eq(p.orderId, orderId), eq(p.state, 'pending')),
+    })
+    await bankWebhook({
+      bankRef: `FT-GIAO-${orderId}`,
+      vaNumber: payment!.vaNumber!,
+      amount: payment!.amount,
+    })
+
+    const after = await inject({ method: 'GET', url: `/api/online/track/${trackToken}` })
+    const body = after.json<{
+      status: string
+      paymentState: string
+      money: { total: number; paid: number }
+    }>()
+    expect(body.status).toBe('confirmed')
+    // Còn nợ phí giao nên chưa phải 'paid' — shipper nộp về mới đóng hẳn
+    expect(body.paymentState).toBe('partial')
+    expect(body.money.total - body.money.paid).toBe(ship)
+  })
+
+  it('sổ COD chỉ đòi shipper phí giao, không đòi tiền món', async () => {
+    const manager = (
+      await inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { [DEVICE_HEADER]: SEED_DEVICE },
+        payload: { branchId: fx.branchId, staffId: fx.managerId, pin: fx.pins[fx.managerId] },
+      })
+    ).json<{ token: string }>().token
+    const managerAuth = () => ({
+      authorization: `Bearer ${manager}`,
+      [DEVICE_HEADER]: SEED_DEVICE,
+    })
+
+    for (const to of ['cooking', 'ready', 'delivering']) {
+      const step = await inject({
+        method: 'POST',
+        url: `/api/orders/${orderId}/status`,
+        // Bếp mới đẩy được sang "đang làm" — thu ngân không bấm hộ được
+        headers: to === 'cooking' || to === 'ready' ? managerAuth() : staffAuth(),
+        payload: { to },
+      })
+      expect(step.statusCode, `${to}: ${step.payload}`).toBe(201)
+    }
+
+    await inject({
+      method: 'POST',
+      url: `/api/orders/${orderId}/assign-shipper`,
+      headers: staffAuth(),
+      payload: { name: 'Người giao trả trước', phone: '0912000222' },
+    })
+
+    const book = await inject({
+      method: 'GET',
+      url: `/api/orders/cod?branch=${fx.branchId}`,
+      headers: staffAuth(),
+    })
+    const shipper = book
+      .json<{ shippers: { name: string; due: number; orders: { id: number }[] }[] }>()
+      .shippers.find((s) => s.name === 'Người giao trả trước')
+    expect(shipper?.due).toBe(ship)
+    expect(shipper?.orders.map((o) => o.id)).toContain(orderId)
+  })
+
+  /**
+   * Đơn không có tiền không được nằm mãi trên bảng điều phối, cũng không được
+   * giữ chỗ trong khung giờ của bếp.
+   */
+  it('quá cửa sổ trả tiền mà không có mã nào còn hạn thì đơn tự huỷ', async () => {
+    const fresh = (await placeTakeaway()).json<{ id: number; trackToken: string }>()
+
+    await db
+      .update(orders)
+      .set({ createdAt: new Date(Date.now() - 20 * 60_000) })
+      .where(eq(orders.id, fresh.id))
+
+    const tracked = await inject({ method: 'GET', url: `/api/online/track/${fresh.trackToken}` })
+    expect(tracked.json<{ status: string; cancelReason: string }>()).toMatchObject({
+      status: 'cancelled',
+      cancelReason: 'Quá 15 phút chưa nhận được tiền',
+    })
+
+    const late = await inject({
+      method: 'POST',
+      url: `/api/online/track/${fresh.trackToken}/pay/vietqr`,
+    })
+    expect(late.statusCode).toBe(409)
+  })
+
+  it('mã VietQR còn hạn thì đơn vẫn sống, dù đã quá cửa sổ', async () => {
+    const fresh = (await placeTakeaway()).json<{ id: number; trackToken: string }>()
+    const ticket = await inject({
+      method: 'POST',
+      url: `/api/online/track/${fresh.trackToken}/pay/vietqr`,
+    })
+    expect(ticket.statusCode).toBe(201)
+
+    await db
+      .update(orders)
+      .set({ createdAt: new Date(Date.now() - 20 * 60_000) })
+      .where(eq(orders.id, fresh.id))
+
+    const tracked = await inject({ method: 'GET', url: `/api/online/track/${fresh.trackToken}` })
+    expect(tracked.json<{ status: string }>().status).toBe('new')
   })
 })

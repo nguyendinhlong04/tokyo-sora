@@ -26,7 +26,6 @@ export interface OrderDraft {
   /** ISO khung giờ khách chọn; rỗng = nhận sớm nhất */
   slotAt: string | null
   customer: { name: string; phone: string; note: string }
-  payment: 'vietqr' | 'cod'
 }
 
 const EMPTY: OrderDraft = {
@@ -37,7 +36,6 @@ const EMPTY: OrderDraft = {
   lines: [],
   slotAt: null,
   customer: { name: '', phone: '', note: '' },
-  payment: 'vietqr',
 }
 
 interface OrderValue {

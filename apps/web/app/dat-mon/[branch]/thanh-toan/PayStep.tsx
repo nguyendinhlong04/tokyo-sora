@@ -6,22 +6,15 @@ import { useEffect, useState } from 'react'
 import { ApiError, apiGet, apiPost, type CreatedOrder, type Quote } from '../../../../lib/api'
 import { useOrder } from '../../order-context'
 
-const METHODS = [
-  {
-    id: 'vietqr' as const,
-    name: 'Chuyển khoản VietQR',
-    hint: 'Quét mã bằng app ngân hàng. Đơn xuống bếp ngay khi ngân hàng báo có.',
-  },
-  {
-    id: 'cod' as const,
-    name: 'Trả khi nhận',
-    hint: 'Trả tiền mặt cho shipper hoặc tại quầy khi tới lấy.',
-  },
-]
-
-/** O6 — chọn cách trả rồi đặt đơn */
+/**
+ * O6 — đặt đơn rồi trả trước.
+ *
+ * Không còn chọn cách trả: mọi đơn web đều trả trước bằng VietQR. Đơn giao chỉ
+ * trả trước TIỀN MÓN, phí giao để shipper thu tận tay — người giao đi đường không
+ * cầm theo cả tiền món của khách.
+ */
 export function PayStep({ branchId }: { branchId: string }) {
-  const { draft, sub, set, clear } = useOrder()
+  const { draft, sub, clear } = useOrder()
   const router = useRouter()
   const [quote, setQuote] = useState<Quote | null>(null)
   const [busy, setBusy] = useState(false)
@@ -68,8 +61,9 @@ export function PayStep({ branchId }: { branchId: string }) {
       })
 
       clear()
-      const suffix = draft.payment === 'vietqr' ? '?tra-ngay=1' : ''
-      router.replace(`/dat-mon/don/${created.trackToken}${suffix}`)
+      // Sang thẳng mã QR: đơn chưa có tiền là đơn chưa xuống bếp, đừng bắt khách
+      // bấm thêm một nút nữa mới thấy chỗ trả
+      router.replace(`/dat-mon/don/${created.trackToken}?tra-ngay=1`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Không đặt được đơn, thử lại giúp bạn')
       setBusy(false)
@@ -84,35 +78,36 @@ export function PayStep({ branchId }: { branchId: string }) {
         {draft.mode === 'delivery' ? ` (gồm ${formatVnd(ship)} phí giao)` : ''}
       </p>
 
-      <div className="mt-6 grid gap-3">
-        {METHODS.map((method) => {
-          const picked = draft.payment === method.id
-          return (
-            <button
-              key={method.id}
-              type="button"
-              onClick={() => {
-                set({ payment: method.id })
-                setError(null)
-              }}
-              className={[
-                'rounded-md border p-4 text-left',
-                picked ? 'border-accent bg-surface-4' : 'border-line-3',
-              ].join(' ')}
-            >
-              <span className="flex items-baseline justify-between gap-3">
-                <span className="text-[length:var(--fs-t2)] font-semibold text-ink-hi">
-                  {method.name}
-                </span>
-                {picked ? <span className="text-accent">✓</span> : null}
-              </span>
-              <span className="mt-2 block text-[length:var(--fs-b2)] leading-relaxed text-ink-body">
-                {method.hint}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+      {/* Chia đôi con số ngay tại đây, trước khi khách bấm: người giao chỉ cầm phí
+          giao, nên khách phải biết mình sắp chuyển khoản bao nhiêu và sẽ còn phải
+          cầm sẵn bao nhiêu tiền mặt lúc mở cửa. */}
+      <section className="mt-6 rounded-md border border-accent/16 bg-surface-4 p-5">
+        <p className="text-[length:var(--fs-t2)] font-semibold text-ink-hi">
+          Chuyển khoản trước bằng VietQR
+        </p>
+        <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-line-1 pt-3.5">
+          <span className="text-[length:var(--fs-b1)] text-ink-body">
+            {draft.mode === 'delivery' ? 'Tiền món — trả ngay bước sau' : 'Tiền món'}
+          </span>
+          <span className="font-mono text-[length:var(--fs-t2)] text-accent-ink">
+            {formatVnd(sub)}
+          </span>
+        </div>
+        {draft.mode === 'delivery' ? (
+          <div className="mt-2 flex items-baseline justify-between gap-3">
+            <span className="text-[length:var(--fs-b1)] text-ink-body">
+              Phí giao — trả tiền mặt cho người giao
+            </span>
+            <span className="font-mono text-[length:var(--fs-t2)] text-ink-hi">
+              {formatVnd(ship)}
+            </span>
+          </div>
+        ) : null}
+        <p className="mt-4 text-[length:var(--fs-b2)] leading-relaxed text-ink-mute">
+          Bấm đặt đơn là hiện mã QR. Đơn xuống bếp ngay khi ngân hàng báo có; quá 15 phút chưa
+          nhận được tiền thì đơn tự huỷ.
+        </p>
+      </section>
 
       {error ? (
         <p className="mt-5 rounded-md border border-danger bg-danger/8 p-4 text-[length:var(--fs-b1)] text-ink-hi">
@@ -128,7 +123,7 @@ export function PayStep({ branchId }: { branchId: string }) {
             onClick={submit}
             className="h-14 w-full rounded-sm bg-accent-strong text-[length:var(--fs-b1)] font-semibold text-on-accent disabled:bg-transparent disabled:text-ink-mute disabled:outline disabled:outline-line-4"
           >
-            {busy ? 'Đang gửi đơn…' : `Đặt đơn · ${formatVnd(sub + ship)}`}
+            {busy ? 'Đang gửi đơn…' : `Đặt đơn và trả ${formatVnd(sub)}`}
           </button>
         </div>
       </div>

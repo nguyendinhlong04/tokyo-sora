@@ -6,15 +6,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { rooms } from '@sora/contracts'
+import { formatVnd, rooms } from '@sora/contracts'
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
 import type { Db } from '../../db/client'
-import { orderLines, orders, ticketItems, tickets } from '../../db/schema'
+import { orderLines, orders, payments, ticketItems, tickets } from '../../db/schema'
 import { CustomersService } from '../crm/customers.service'
 import { actorRoles, type Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
+import { prepayDueOf } from '../ordering/domain/prepay'
 import { OrderingService } from '../ordering/ordering.service'
 import {
   applyTransition,
@@ -26,6 +27,9 @@ import {
 
 /** Trạng thái còn phải làm gì đó — bảng O8 chỉ quan tâm mấy cột này */
 const LIVE_STATUSES: OrderStatus[] = ['new', 'confirmed', 'cooking', 'ready', 'delivering']
+
+/** Đơn web chờ tiền quá ngần này phút thì tự huỷ — bằng đúng đời của một mã VietQR */
+const PREPAY_WINDOW_MINUTES = 15
 
 @Injectable()
 export class DispatchService {
@@ -48,6 +52,10 @@ export class DispatchService {
     actor: Actor,
     filter: { businessDate?: string; status?: OrderStatus } = {},
   ) {
+    // Dọn đơn chết trước khi đọc bảng: đơn quá hạn trả tiền không được nằm lẫn
+    // với đơn thật trên dải điều phối
+    await this.cancelExpiredUnpaid({ branchId })
+
     const rows = await this.db
       .select()
       .from(orders)
@@ -149,6 +157,31 @@ export class DispatchService {
         throw new ConflictException({ code: result.code, message: result.message })
       }
       if (!result.changed) return { orderId, status: order.status, changed: false }
+
+      /**
+       * Đơn web chưa trả tiền món thì không xuống bếp được, kể cả bấm tay.
+       *
+       * Đường thường của đơn trả trước là tự xuống bếp lúc ngân hàng báo có (xem
+       * `fireIfPrepaid`). Nút xác nhận trên POS vẫn còn cho đơn kênh ngoài và đơn
+       * nhập tay — nhưng nếu nó mở luôn cho đơn web thì quy tắc trả trước chỉ là
+       * lời khuyên, và bếp sẽ nấu những đơn không ai trả tiền.
+       */
+      if (to === 'confirmed') {
+        const due = prepayDueOf(order)
+        if (due > 0) {
+          const [row] = await tx
+            .select({ paid: sql<number>`coalesce(sum(${payments.amount}), 0)::int` })
+            .from(payments)
+            .where(and(eq(payments.orderId, orderId), eq(payments.state, 'paid')))
+          const missing = due - Number(row?.paid ?? 0)
+          if (missing > 0) {
+            throw new ConflictException({
+              code: 'prepay_required',
+              message: `Đơn còn thiếu ${formatVnd(missing)} tiền món — đơn web phải trả trước mới xuống bếp`,
+            })
+          }
+        }
+      }
 
       const now = new Date()
       await tx
@@ -270,6 +303,96 @@ export class DispatchService {
       })
 
       return { orderId, changed: true }
+    })
+  }
+
+  /**
+   * Đơn web đặt xong mà tiền không về thì tự huỷ.
+   *
+   * API chạy serverless nên không có tiến trình nền để cắm cron (xem cùng lý do ở
+   * `fireDueScheduledTickets` của bếp). Nhịp ở đây là bảng điều phối — POS hỏi nó
+   * suốt giờ bán — cộng thêm chính màn theo dõi của khách, để người đang nhìn đơn
+   * của mình thấy đúng sự thật chứ không phải "đã nhận đơn" của một đơn chết.
+   *
+   * Chỉ huỷ đơn CHƯA trả đồng nào. Đơn trả dở dang thì tiền của khách đang nằm
+   * trong đó, và quyết định hoàn hay gọi lại là của người thật.
+   *
+   * Mã VietQR còn hạn thì đơn còn sống, kể cả đã quá cửa sổ: khách bấm tạo mã ở
+   * phút thứ 14 vẫn có đủ 15 phút của mã đó để chuyển tiền.
+   */
+  async cancelExpiredUnpaid(scope: { branchId: string } | { orderId: number }) {
+    const stale = await this.db
+      .select({
+        id: orders.id,
+        branchId: orders.branchId,
+        displayCode: orders.displayCode,
+        businessDate: orders.businessDate,
+      })
+      .from(orders)
+      .where(
+        and(
+          'branchId' in scope
+            ? eq(orders.branchId, scope.branchId)
+            : eq(orders.id, scope.orderId),
+          eq(orders.channel, 'web'),
+          eq(orders.status, 'new'),
+          eq(orders.paymentState, 'unpaid'),
+          inArray(orders.type, ['takeaway', 'delivery']),
+          sql`${orders.createdAt} < now() - make_interval(mins => ${PREPAY_WINDOW_MINUTES})`,
+          sql`not exists (
+            select 1 from ${payments}
+            where ${payments.orderId} = ${orders.id}
+              and ${payments.state} = 'pending'
+              and (${payments.expiresAt} is null or ${payments.expiresAt} > now())
+          )`,
+        ),
+      )
+    if (stale.length === 0) return { cancelled: 0 }
+
+    const actor: Actor = { kind: 'system' }
+    const reason = `Quá ${PREPAY_WINDOW_MINUTES} phút chưa nhận được tiền`
+
+    return this.db.transaction(async (tx) => {
+      let cancelled = 0
+      for (const order of stale) {
+        // `status = 'new'` lặp lại trong WHERE: hai màn cùng quét, hoặc tiền về
+        // đúng lúc này, thì chỉ một bên đổi được trạng thái
+        const updated = await tx
+          .update(orders)
+          .set({
+            status: 'cancelled',
+            cancelReason: reason,
+            cancelledAt: new Date(),
+            version: sql`${orders.version} + 1`,
+          })
+          .where(and(eq(orders.id, order.id), eq(orders.status, 'new')))
+          .returning({ id: orders.id })
+        if (updated.length === 0) continue
+        cancelled++
+
+        // Mã QR của đơn đã chết thì đóng luôn, đừng để một lượt trả treo mãi ở
+        // "đang chờ" trên màn đối soát
+        await tx
+          .update(payments)
+          .set({ state: 'expired' })
+          .where(and(eq(payments.orderId, order.id), eq(payments.state, 'pending')))
+
+        await this.audit.write(tx, {
+          actor,
+          action: 'order.cancelled',
+          entity: 'order',
+          entityId: String(order.id),
+          payload: { reason, from: 'new' },
+        })
+
+        await emit(tx, {
+          branchId: order.branchId,
+          topic: 'order.cancelled',
+          rooms: [rooms.orders(order.branchId)],
+          payload: { orderId: order.id, displayCode: order.displayCode, reason },
+        })
+      }
+      return { cancelled }
     })
   }
 

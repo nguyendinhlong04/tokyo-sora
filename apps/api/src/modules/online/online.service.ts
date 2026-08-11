@@ -24,12 +24,15 @@ import {
   dishes,
   orderLines,
   orders,
+  payments,
 } from '../../db/schema'
 import { isOnSale, scheduleOf } from '../catalog/domain/sale-window'
 import type { Actor } from '../identity/actor'
 import { hashToken, newToken } from '../identity/tokens'
 import { CustomersService } from '../crm/customers.service'
+import { prepayDueOf } from '../ordering/domain/prepay'
 import { OrderingService, type AddLineInput } from '../ordering/ordering.service'
+import { DispatchService } from './dispatch.service'
 import { buildSlots, checkSlot, earliestOpenSlot, slotStart, type SlotOptions } from './domain/slots'
 
 export type OnlineOrderType = 'takeaway' | 'delivery'
@@ -63,6 +66,7 @@ export class OnlineService {
     private readonly params: ParamsService,
     private readonly ordering: OrderingService,
     private readonly customers: CustomersService,
+    private readonly dispatch: DispatchService,
   ) {}
 
   // ------------------------------------------------------ O1 chọn chi nhánh
@@ -528,11 +532,29 @@ export class OnlineService {
   }
 
   async track(token: string) {
-    const [order] = await this.db
+    let [order] = await this.db
       .select()
       .from(orders)
       .where(eq(orders.trackTokenHash, hashToken(token)))
     if (!order) throw new NotFoundException('Không tìm thấy đơn với mã theo dõi này')
+
+    /**
+     * Khách đang nhìn đơn của mình là một nhịp quét nữa cho đơn quá hạn trả tiền
+     * (xem `cancelExpiredUnpaid`). Chỉ hỏi khi đơn còn đang ở diện đó — mọi đơn
+     * khác thì đây là một truy vấn thừa.
+     */
+    if (order.status === 'new' && order.paymentState === 'unpaid') {
+      const { cancelled } = await this.dispatch.cancelExpiredUnpaid({ orderId: order.id })
+      if (cancelled > 0) {
+        const [fresh] = await this.db.select().from(orders).where(eq(orders.id, order.id))
+        if (fresh) order = fresh
+      }
+    }
+
+    const [received] = await this.db
+      .select({ paid: sql<number>`coalesce(sum(${payments.amount}), 0)::int` })
+      .from(payments)
+      .where(and(eq(payments.orderId, order.id), eq(payments.state, 'paid')))
 
     const lines = await this.db
       .select()
@@ -554,6 +576,9 @@ export class OnlineService {
         vat: order.moneyVat,
         ship: order.moneyShip,
         total: order.moneyTotal,
+        /** Phần khách trả trước — đơn giao thì phí ship không nằm trong đây */
+        prepay: prepayDueOf(order),
+        paid: Number(received?.paid ?? 0),
       },
       lines: lines.map((l) => ({
         nameSnapshot: l.nameSnapshot,

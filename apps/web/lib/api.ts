@@ -118,7 +118,8 @@ export interface TrackedOrder {
   slotMode: 'asap' | 'scheduled' | null
   slotAt: string | null
   etaMinutes: number
-  money: { sub: number; vat: number; ship: number; total: number }
+  /** `prepay` là phần phải trả trước — đơn giao thì phí ship KHÔNG nằm trong đó */
+  money: { sub: number; vat: number; ship: number; total: number; prepay: number; paid: number }
   lines: { nameSnapshot: string; qty: number; priceTotal: number; state: string }[]
   cancelReason: string | null
 }
