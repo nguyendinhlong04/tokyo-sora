@@ -204,9 +204,22 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
       {/* Giỏ dính phải trên desktop */}
       <aside className="hidden lg:block">
         <div className="sticky top-20 mt-6 rounded-md border border-line-2 bg-surface-1 p-5">
-          <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
-            Giỏ của bạn
-          </p>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.16em] text-ink-mute uppercase">
+              Giỏ của bạn
+            </p>
+            {/* Đổi ý cả giỏ thì bớt từng món là mười lần bấm. Nút chỉ mọc ra khi
+                đã có món, và nằm ở hàng tiêu đề — xa nút "Tiếp tục" bên dưới. */}
+            {draft.lines.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => set({ lines: [] })}
+                className="text-[length:var(--fs-c1)] text-ink-mute underline underline-offset-4 hover:text-danger"
+              >
+                Xoá tất cả
+              </button>
+            ) : null}
+          </div>
           {draft.lines.length === 0 ? (
             <p className="mt-4 text-[length:var(--fs-b2)] text-ink-mute">
               Chưa có món nào. Bấm dấu cộng ở mỗi món là thêm được ngay.
@@ -265,18 +278,29 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
             </p>
             <p className="font-mono text-[length:var(--fs-c1)] text-ink-mute">{formatVnd(sub)}</p>
           </div>
-          <Link
-            href={`/dat-mon/${menu.branch.id}/gio`}
-            aria-disabled={count === 0}
-            className={[
-              'flex h-13 items-center rounded-sm px-6 text-[length:var(--fs-b1)] font-semibold',
-              count === 0
-                ? 'pointer-events-none border border-line-4 text-ink-mute'
-                : 'bg-accent-strong text-on-accent',
-            ].join(' ')}
-          >
-            Xem giỏ
-          </Link>
+          <div className="flex flex-none items-center gap-2">
+            {count > 0 ? (
+              <button
+                type="button"
+                onClick={() => set({ lines: [] })}
+                className="h-13 flex-none rounded-sm border border-line-3 px-3 text-[length:var(--fs-b2)] text-ink-body"
+              >
+                Xoá tất cả
+              </button>
+            ) : null}
+            <Link
+              href={`/dat-mon/${menu.branch.id}/gio`}
+              aria-disabled={count === 0}
+              className={[
+                'flex h-13 items-center rounded-sm px-6 text-[length:var(--fs-b1)] font-semibold',
+                count === 0
+                  ? 'pointer-events-none border border-line-4 text-ink-mute'
+                  : 'bg-accent-strong text-on-accent',
+              ].join(' ')}
+            >
+              Xem giỏ
+            </Link>
+          </div>
         </div>
       </div>
 

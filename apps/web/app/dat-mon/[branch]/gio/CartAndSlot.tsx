@@ -96,9 +96,20 @@ export function CartAndSlot({ branchId }: { branchId: string }) {
 
   return (
     <main className="mx-auto max-w-2xl px-4 pt-6 pb-32">
-      <h1 className="font-display text-[length:var(--fs-d3)] font-light text-ink-hi">
-        Giỏ của bạn
-      </h1>
+      {/* Tới được đây là giỏ chắc chắn có món — nhánh rỗng đã trả về ở trên, nên
+          nút không cần điều kiện hiện/ẩn như ở O2. */}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-display text-[length:var(--fs-d3)] font-light text-ink-hi">
+          Giỏ của bạn
+        </h1>
+        <button
+          type="button"
+          onClick={() => set({ lines: [] })}
+          className="h-11 flex-none rounded-sm border border-line-3 px-3 text-[length:var(--fs-b2)] text-ink-body"
+        >
+          Xoá tất cả
+        </button>
+      </div>
 
       <div className="mt-3">
         {draft.lines.map((line) => (
