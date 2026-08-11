@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { SITE } from '../content/site'
+import { apiGet } from '../lib/api'
 import { seedOrderDraft, type ReceiveMode } from '../lib/order-draft'
 import type { SiteWard } from '../lib/site'
 
@@ -92,9 +93,46 @@ function khongDau(s: string): string {
     .trim()
 }
 
-/** Đoạn sau dấu phẩy cuối cùng — chỗ khách đang gõ tên phường */
+/**
+ * Đoạn sau dấu phẩy cuối cùng — phần địa chỉ khách ĐANG gõ dở.
+ *
+ * Tra cả chuỗi thì hỏng ngay ở bước thứ hai: "12 Hàm Nghi, Thành Sen" đòi một
+ * dòng vừa mang tên đường vừa mang tên phường, mà chỉ mục không có dòng nào như
+ * thế — đường lấy từ bản đồ mở thì chưa gán được phường. Cắt theo dấu phẩy thì
+ * mỗi bước tra đúng một thứ: bước đầu ra con đường, bước sau ra cái phường.
+ *
+ * Chuỗi chưa có dấu phẩy thì đoạn cuối chính là cả chuỗi, nên "12 Hàm Nghi" vẫn
+ * tra bình thường.
+ */
 function doanCuoi(s: string): string {
   return (s.split(',').pop() ?? '').trim()
+}
+
+/**
+ * Số nhà khách đã gõ ở đầu chuỗi — giữ lại khi thay phần còn lại bằng gợi ý.
+ *
+ * Khách gõ "12 Hàm Nghi" rồi bấm gợi ý "Hàm Nghi": ghi đè cả ô bằng nhãn gợi ý
+ * là xoá mất số nhà họ vừa gõ, và bắt gõ lại đúng thứ vừa gõ xong.
+ *
+ * Bắt cả "4/21" — kiểu đánh số ngách rất thường gặp — và cả chữ "Số"/"số nhà"
+ * đứng trước, viết CÓ DẤU HAY KHÔNG đều được: gần nửa số người gõ địa chỉ trên
+ * điện thoại bỏ dấu, mà "so 7 Phan Đình Phùng" mất số 7 thì shipper tới đầu phố
+ * rồi đứng đó gọi điện.
+ *
+ * Không hạ dấu cả chuỗi rồi mới dò, vì làm thế thì "12A" trả về "12a".
+ */
+function soNhaDauChuoi(s: string): string {
+  return /^\s*(?:s[oố]\s*(?:nh[aà]\s*)?)?(\d+[a-zA-Z]?(?:\/\d+[a-zA-Z]?)*)\b/i.exec(s)?.[1] ?? ''
+}
+
+/** Một dòng gợi ý từ `/api/site/address` */
+interface GoiYDiaChi {
+  id: number
+  /** 'ward' phường/xã · 'street' đường/ngõ — quyết định bấm vào thì đi đâu */
+  kind: string
+  name: string
+  ward: string
+  label: string
 }
 
 const MODES: { id: ReceiveMode; label: string }[] = [
@@ -136,6 +174,9 @@ export function HomeHero({
   const [address, setAddress] = useState('')
   /** Phường khách đã CHỌN từ gợi ý — khác với chữ trong ô, thứ này khớp bảng vùng giao */
   const [ward, setWard] = useState('')
+  const [goiY, setGoiY] = useState<GoiYDiaChi[]>([])
+  /** Nhãn vừa bấm. Chữ trong ô còn đúng bằng nó thì thôi gợi ý — khách đã chọn xong. */
+  const [daChon, setDaChon] = useState('')
   /** Tấm danh sách chi nhánh đang bung hay không — chỉ dựng khi bung, xem chú ở chỗ dựng */
   const [dangBung, setDangBung] = useState(false)
   const oChon = useRef<HTMLDivElement>(null)
@@ -196,38 +237,90 @@ export function HomeHero({
   }, [dangBung])
 
   /**
-   * Gợi ý phường khớp đoạn khách đang gõ.
+   * Gợi ý địa chỉ, hỏi thẳng `/api/site/address`.
    *
-   * Chọn xong thì thôi gợi ý: chữ trong ô lúc đó ĐÚNG BẰNG tên phường vừa chọn,
-   * để tấm gợi ý nằm lại thì nó che mất nút "Đặt món ngay" ngay dưới.
+   * Trước đây gợi ý là bộ lọc trên danh sách PHƯỜNG tải sẵn, nên gõ tên đường —
+   * cách gần như ai cũng bắt đầu — thì không ra dòng nào. Giờ nguồn là chỉ mục
+   * địa chỉ của tỉnh: đường, ngõ và phường đều tra được.
+   *
+   * Đợi 250ms mới hỏi, và huỷ lượt hỏi cũ mỗi lần khách gõ tiếp. Huỷ là thứ giữ
+   * cho câu trả lời về CHẬM của một lượt cũ không đè lên câu trả lời mới hơn —
+   * lỗi này chỉ hiện ra khi mạng chập chờn, đúng lúc khó lần nhất.
    */
-  const dangGo = doanCuoi(address)
-  const goiY =
-    dangGo !== '' && khongDau(dangGo) !== khongDau(ward)
-      ? wards.filter((w) => khongDau(w.name).includes(khongDau(dangGo))).slice(0, 6)
-      : []
+  useEffect(() => {
+    const q = doanCuoi(address)
+    // Chọn xong thì thôi gợi ý: để tấm gợi ý nằm lại thì nó che mất nút bên dưới
+    if (mode !== 'delivery' || q.length < 2 || address.trim() === daChon) {
+      setGoiY([])
+      return
+    }
+    const bo = new AbortController()
+    const cho = setTimeout(() => {
+      apiGet<GoiYDiaChi[]>(`/api/site/address?q=${encodeURIComponent(q)}`, { signal: bo.signal })
+        .then(setGoiY)
+        // Bị huỷ thì im lặng — lượt mới đang trên đường về. Hỏng thật thì dọn ô
+        // gợi ý: để lại danh sách của chữ CŨ còn tệ hơn là không gợi ý gì.
+        .catch(() => !bo.signal.aborted && setGoiY([]))
+    }, 250)
+    return () => {
+      clearTimeout(cho)
+      bo.abort()
+    }
+  }, [address, mode, daChon])
 
   function doiDiaChi(giaTri: string) {
     setAddress(giaTri)
-    // Gõ tiếp sau khi đã chọn thì phường coi như bỏ chọn: giữ lại một giá trị mà
-    // chữ trong ô không còn nói tới nữa là gửi sang O1 một cái phường ma.
-    if (ward && khongDau(doanCuoi(giaTri)) !== khongDau(ward)) setWard('')
+    if (giaTri === daChon) return
+    // Gõ tiếp sau khi đã chọn thì bỏ luôn cả dấu đã chọn lẫn phường: giữ lại một
+    // giá trị mà chữ trong ô không còn nói tới nữa là gửi sang O1 một phường ma.
+    setDaChon('')
+    if (ward) setWard('')
   }
 
   /**
-   * Chọn phường là ĐI LUÔN, không đợi bấm "Đặt món ngay".
+   * Bấm một dòng gợi ý.
    *
-   * Chọn xong thì hero hết việc: cách nhận, địa chỉ, phường đã có, và chi nhánh
-   * suy ra từ phường. Bắt bấm thêm một nút nữa chỉ để đi tới chỗ chắc chắn phải
-   * tới là thêm một bước thừa giữa lúc khách đang muốn xem món.
+   * Chọn PHƯỜNG là đi luôn vào thực đơn, không đợi bấm "Đặt món ngay": lúc đó
+   * hero hết việc — cách nhận, địa chỉ, phường đã có, và chi nhánh suy ra được từ
+   * phường. Bắt bấm thêm một nút nữa chỉ để tới chỗ chắc chắn phải tới là một
+   * bước thừa giữa lúc khách đang muốn xem món.
+   *
+   * Chọn ĐƯỜNG thì ở lại. Chỉ mục lấy tên đường từ bản đồ mở, mà bản đồ đó chưa
+   * có ranh giới phường mới nên không nói được con đường này thuộc phường nào —
+   * chưa có phường thì chưa ra chi nhánh, chưa ra phí giao. Đẩy khách đi lúc này
+   * là đẩy sang một màn hỏi lại đúng câu vừa hỏi.
    */
-  function chonPhuong(w: SiteWard) {
+  function chonGoiY(row: GoiYDiaChi) {
+    /* Gợi ý chỉ thay ĐOẠN ĐANG GÕ, không ghi đè cả ô: bấm "Thành Sen" ở bước hai
+       mà nuốt mất "12 Hàm Nghi" của bước một thì khách phải gõ lại từ đầu. Chưa
+       có dấu phẩy nào thì phần giữ lại là số nhà họ vừa gõ. */
     const truoc = address.split(',').slice(0, -1).join(',').trim()
-    const diaChi = truoc ? `${truoc}, ${w.name}` : w.name
+    /* Số ở đầu chỉ là số NHÀ khi nhãn gợi ý không mang sẵn nó. Gõ "4/21 nguyễn
+       công trứ" rồi bấm "Ngách 4/21 Đường Nguyễn Công Trứ" thì "4/21" là tên
+       ngách chứ không phải nhà — ghép thêm lần nữa ra "4/21 Ngách 4/21 …". */
+    const so = soNhaDauChuoi(address)
+    const soRieng = so !== '' && !row.label.includes(so)
+    const diaChi = truoc
+      ? `${truoc}, ${row.label}`
+      : soRieng
+        ? `${so} ${row.label}`
+        : row.label
     setAddress(diaChi)
-    setWard(w.name)
-    seedOrderDraft({ mode, address: diaChi, ward: w.name, branchId: w.branchId })
-    router.push(`/dat-mon/${w.branchId}`)
+    setDaChon(diaChi)
+
+    const tenPhuong = row.kind === 'ward' ? row.name : row.ward
+    setWard(tenPhuong)
+
+    /* Phường nào thì vùng giao ấy, vùng giao nào thì chi nhánh ấy. Không tra ra
+       thì phường đó nằm ngoài mọi vùng đang giao — để O1 nói chuyện đó tử tế,
+       đoán bừa một chi nhánh ở đây là khách nhận hàng từ quán xa hơn. */
+    const vung = tenPhuong
+      ? wards.find((w) => khongDau(w.name) === khongDau(tenPhuong))
+      : undefined
+    if (!vung) return
+
+    seedOrderDraft({ mode, address: diaChi, ward: vung.name, branchId: vung.branchId })
+    router.push(`/dat-mon/${vung.branchId}`)
   }
 
   /**
@@ -434,31 +527,47 @@ export function HomeHero({
                 className="h-10 w-full rounded-pill bg-ink-hi pr-4 pl-9 text-[length:var(--fs-c1)] text-kraft-ink shadow-[0_14px_34px_rgba(0,0,0,0.5)] outline-none placeholder:text-kraft-ink-2 lg:h-12 lg:pr-5 lg:pl-11 lg:text-[length:var(--fs-b2)]"
               />
 
-              {/* ------------------------------------------- Gợi ý phường
-                  Nguồn là BẢNG VÙNG GIAO của chính quán, không phải dịch vụ bản
-                  đồ nào. Nhờ vậy mỗi dòng hiện ra là một phường chắc chắn giao
-                  được, và phí kèm theo là phí thật lấy từ đúng hàng dữ liệu sẽ
-                  tính tiền — thứ mà một máy tra địa chỉ ngoài không biết. */}
+              {/* --------------------------------------------- Gợi ý địa chỉ
+                  Nguồn là CHỈ MỤC ĐỊA CHỈ của chính hệ thống (`address_points`),
+                  dựng từ danh mục hành chính và bản đồ mở — không gọi ra dịch vụ
+                  bản đồ nào, nên không tốn tiền theo phím gõ và không có khoá API
+                  nào phải giấu trong bundle này.
+
+                  Dòng phường và dòng đường bấm vào ra hai kết quả khác nhau, nên
+                  phải nhìn ra được khác nhau: dòng phường có nhãn phụ. */}
               {goiY.length > 0 ? (
                 <div
                   role="listbox"
                   className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-line-2 bg-canvas shadow-[0_18px_44px_rgba(0,0,0,0.6)]"
                 >
-                  {goiY.map((w) => (
+                  {goiY.map((row) => (
                     <button
-                      key={w.name}
+                      key={row.id}
                       type="button"
                       role="option"
-                      aria-selected={w.name === ward}
-                      onClick={() => chonPhuong(w)}
-                      className="block w-full border-b border-line-1 px-4 py-2.5 text-left text-[length:var(--fs-c1)] text-ink-hi transition-colors last:border-b-0 hover:bg-surface-2"
+                      aria-selected={row.label === daChon}
+                      onClick={() => chonGoiY(row)}
+                      className="flex w-full items-center justify-between gap-3 border-b border-line-1 px-4 py-2.5 text-left text-[length:var(--fs-c1)] text-ink-hi transition-colors last:border-b-0 hover:bg-surface-2"
                     >
-                      {w.name}
+                      <span className="truncate">{row.label}</span>
+                      {row.kind === 'ward' ? (
+                        <span className="shrink-0 text-[length:var(--fs-c2)] text-ink-mute">
+                          phường/xã
+                        </span>
+                      ) : null}
                     </button>
                   ))}
                 </div>
               ) : null}
 
+              {/* Chọn đường xong mà chưa có phường thì luồng đứng lại ở đây, và
+                  ô không tự nói ra điều đó — khách bấm một dòng, thấy chữ đổi,
+                  rồi không có gì xảy ra nữa. Một dòng nhắc là chỗ nói ra. */}
+              {daChon !== '' && ward === '' ? (
+                <p className="mt-2 px-1 text-[length:var(--fs-c2)] text-ink-hi/75">
+                  Gõ dấu phẩy rồi tên phường/xã để xem phí giao.
+                </p>
+              ) : null}
             </>
           ) : (
             <>

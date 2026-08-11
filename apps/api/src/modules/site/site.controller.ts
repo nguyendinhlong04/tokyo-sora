@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common'
+import { Controller, Get, Query } from '@nestjs/common'
 import { Public } from '../identity/auth.guard'
 import { SiteService } from './site.service'
 
@@ -19,6 +19,18 @@ export class SiteController {
   @Get('wards')
   wards() {
     return this.site.wards()
+  }
+
+  /**
+   * W1 · O1 — gợi ý địa chỉ (đường, phường/xã) cho ô "Giao tận nơi".
+   *
+   * Chữ rỗng trả mảng rỗng chứ không phải toàn bảng: ô địa chỉ gọi endpoint này
+   * theo từng phím gõ, và phím đầu tiên không được kéo về vài nghìn dòng.
+   */
+  @Public()
+  @Get('address')
+  address(@Query('q') q?: string) {
+    return this.site.addressSuggest(q ?? '')
   }
 
   /** W2 · W3 · W7 */

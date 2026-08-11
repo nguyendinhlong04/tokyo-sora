@@ -1,8 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
+import { foldWard } from '../../common/ward'
 import type { Db } from '../../db/client'
 import {
+  addressPoints,
   areas,
   branches,
   categories,
@@ -81,6 +83,88 @@ export class SiteService {
     return [...goc.values()]
       .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
       .map((w) => ({ name: w.name, branchId: w.branchId }))
+  }
+
+  /**
+   * Gợi ý địa chỉ cho ô "Giao tận nơi" — tra trên chỉ mục `address_points`.
+   *
+   * Khác `wards()` ở chỗ nó tra được cả TÊN ĐƯỜNG, thứ mà bảng vùng giao không
+   * bao giờ biết. Trước đây khách gõ "hàm nghi" thì không ra dòng nào, vì danh
+   * sách gợi ý duy nhất của trang chủ là danh sách phường đang giao được.
+   *
+   * Khớp theo TỪNG TỪ chứ không theo cả chuỗi: khách gõ "ham nghi thanh sen" là
+   * đang tả một chỗ, không phải gõ sai một tên. Đòi cả chuỗi khớp liền nhau thì
+   * mọi cách gõ ghép đường với phường đều rơi về không kết quả.
+   *
+   * Ba mức xếp hạng, hẹp trước rộng sau: bắt đầu bằng đúng chữ khách gõ → chỗ
+   * khách hay chọn (`hits`) → tên ngắn hơn. Mức cuối là để "Kỳ Anh" đứng trước
+   * "Kỳ Anh mở rộng" khi cả hai cùng khớp.
+   */
+  async addressSuggest(q: string, limit = 8) {
+    /**
+     * Bỏ `% _ \` khỏi chữ khách gõ.
+     *
+     * Ba ký tự đó là ký tự ĐIỀU KHIỂN của LIKE: để lọt một dấu `%` là câu tra
+     * khớp mọi dòng trong bảng và gợi ý trả về ngẫu nhiên tám địa chỉ.
+     */
+    /**
+     * "Số" và "số nhà" là chữ NHÃN chứ không phải tên, y như "Đường" — và chỉ khi
+     * chúng đứng trước một con số. Ràng buộc `(?=\d)` là thứ giữ cho "Sơn Kim 1"
+     * và mọi tên bắt đầu bằng "So…" không bị cắt mất chữ đầu.
+     */
+    const sach = foldWard(q)
+      .replace(/[%_\\]/g, ' ')
+      /* Dấu ngăn giữa các phần của địa chỉ — khách viết "12, Hàm Nghi" thì "12,"
+         dính liền nhau và không còn là một con số nữa. Chừa `-` và `/`: chúng
+         nằm TRONG tên thật ("Ngách 4/21", "Bãi Vọt - Hàm Nghi"). */
+      .replace(/[,;.]/g, ' ')
+      .replace(/^\s*so(\s+nha)?\s+(?=\d)/, '')
+    const tu = sach.split(' ').filter(Boolean)
+    if (tu.length === 0) return []
+
+    /**
+     * Số nhà KHÔNG bắt buộc phải khớp.
+     *
+     * Khách gõ "12 Hàm Nghi" — kiểu gõ thường gặp nhất — mà đòi cả "12" lẫn "hàm"
+     * lẫn "nghi" cùng có mặt thì không dòng nào qua được: chỉ mục biết con phố,
+     * không biết số nhà nào trên phố đó (cả tỉnh chỉ 12 điểm có số nhà trong OSM).
+     * Bỏ hẳn nhóm số đi cũng sai — "ngõ 12" mà chỉ tra "ngõ" thì ra mọi con ngõ.
+     * Nên: chữ phải khớp, số chỉ để xếp hạng qua mức so đầu chuỗi bên dưới.
+     *
+     * Gõ toàn số thì lại đòi số khớp — lúc đó nó là tất cả những gì khách cho.
+     *
+     * "Số nhà" ở Việt Nam không chỉ là chữ số: `12A` và `4/21` đều rất thường
+     * gặp. Chỉ nhận `^\d+$` thì "12A Hàm Nghi" trượt sạch, vì "12a" thành một từ
+     * bắt buộc phải khớp mà không con phố nào mang nó.
+     */
+    const chu = tu.filter((t) => !/^\d+[a-z]?(\/\d+[a-z]?)*$/.test(t))
+    const batBuoc = chu.length > 0 ? chu : tu
+
+    const kho = sql`${addressPoints.nameFolded} || ' ' || ${addressPoints.wardFolded}`
+
+    const rows = await this.db
+      .select({
+        id: addressPoints.id,
+        kind: addressPoints.kind,
+        name: addressPoints.name,
+        ward: addressPoints.ward,
+        lat: addressPoints.lat,
+        lng: addressPoints.lng,
+      })
+      .from(addressPoints)
+      .where(and(...batBuoc.map((t) => sql`${kho} LIKE ${`%${t}%`}`)))
+      .orderBy(
+        sql`(${addressPoints.nameFolded} LIKE ${`${sach.trim()}%`}) DESC`,
+        desc(addressPoints.hits),
+        sql`length(${addressPoints.name}) ASC`,
+      )
+      .limit(Math.min(Math.max(limit, 1), 20))
+
+    return rows.map((r) => ({
+      ...r,
+      // Đường đã biết phường thì đọc đủ chỗ; phường thì tên nó là đủ rồi
+      label: r.ward && r.ward !== r.name ? `${r.name}, ${r.ward}` : r.name,
+    }))
   }
 
   async branches() {

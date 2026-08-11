@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -247,6 +248,51 @@ export const deliveryZones = pgTable(
     check('delivery_zones_eta_positive', sql`${t.etaMinutes} > 0`),
     check('delivery_zones_wards_not_empty', sql`array_length(${t.wards}, 1) > 0`),
     index('delivery_zones_branch_idx').on(t.branchId, t.sort),
+  ],
+)
+
+/**
+ * Chỉ mục địa chỉ tra được của vùng quán giao — nguồn gợi ý cho ô địa chỉ.
+ *
+ * Vì sao TỰ DỰNG thay vì gọi một dịch vụ bản đồ: đo trên OSM ngày 11-08-2026,
+ * khu lõi thành phố Hà Tĩnh có 252 đoạn đường mang tên nhưng chỉ **12 điểm có số
+ * nhà**. Không nguồn nào — miễn phí hay trả tiền — biết số nhà ở đây, nên số nhà
+ * dù sao cũng phải để khách gõ. Thứ còn lại cần tra chỉ là đường, phường và
+ * thôn/xóm: với một tỉnh, một quán thì đó là bảng vài nghìn dòng, nằm gọn trong
+ * chính CSDL này. Đổi lại được ba thứ mà một API ngoài không cho: không tốn
+ * tiền, không phụ thuộc ai, và **thêm tay được** những chỗ dân địa phương gọi
+ * bằng tên riêng ("cổng chợ", "ngõ cạnh trường").
+ *
+ * `ward` RỖNG chứ không NULL khi chưa biết phường. Postgres coi mọi NULL là khác
+ * nhau, nên để NULL thì chỉ mục duy nhất bên dưới hết chặn: chạy lại script nạp
+ * là mỗi con đường nhân đôi một lần.
+ */
+export const addressPoints = pgTable(
+  'address_points',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    /** 'ward' phường/xã · 'street' đường/phố/ngõ · 'hamlet' thôn/xóm/TDP · 'poi' mốc quen gọi */
+    kind: text('kind').notNull(),
+    name: text('name').notNull(),
+    /** Bản bỏ dấu của `name` — ĐÂY mới là cột được tra, sinh bằng `foldWard()` lúc nạp */
+    nameFolded: text('name_folded').notNull(),
+    /** Phường/xã chứa điểm này. Rỗng = chưa biết — xem chú của bảng. */
+    ward: text('ward').notNull().default(''),
+    wardFolded: text('ward_folded').notNull().default(''),
+    /**
+     * Điểm đại diện, lấy từ OSM lúc nạp. Với một con đường đây là điểm GIỮA
+     * đường chứ không phải cửa nhà khách — đủ để tính phí theo bậc khoảng cách,
+     * không đủ để chỉ đường cho shipper. Rỗng được: phường và thôn/xóm nạp từ
+     * danh mục hành chính nên không kèm toạ độ nào.
+     */
+    lat: doublePrecision('lat'),
+    lng: doublePrecision('lng'),
+    /** Số lần khách chọn dòng này — quán càng chạy, gợi ý càng đúng chỗ hay đặt */
+    hits: integer('hits').notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex('address_points_unique').on(t.kind, t.nameFolded, t.wardFolded),
+    index('address_points_search_idx').on(t.nameFolded),
   ],
 )
 
