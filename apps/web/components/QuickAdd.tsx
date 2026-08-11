@@ -108,11 +108,8 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
               <p className="text-[length:var(--fs-b1)] font-semibold text-ink-hi">
                 {count} phần đã chọn
               </p>
-              {/* Nói thẳng giá còn đổi, ngay chỗ khách nhìn thấy con số: thực đơn
-                  thương hiệu in giá tại quán, còn đơn online tính theo giá của
-                  chi nhánh. Giấu chuyện này tới bước thanh toán là bội tín. */}
               <p className="truncate font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                {formatVnd(sub)} · tính lại theo chi nhánh bạn chọn
+                {formatVnd(sub)}
               </p>
             </div>
             <Link
