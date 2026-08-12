@@ -432,6 +432,30 @@ export class CatalogAdminService {
           `Chặng "${course.label}" cho chọn ${course.pickCount} món nhưng chỉ liệt kê ${course.items.length}`,
         )
       }
+      /**
+       * CHỐT TẠM: chưa cho khai chặng "chọn N trong M".
+       *
+       * Máy chủ nổ set được kiểu này từ lâu (`explodeSet` nhận `setSelections`,
+       * cả hai controller đều khai trường đó), nhưng KHÔNG máy khách nào gửi
+       * được: app bàn lẫn luồng đặt món online đều không có màn cho khách chọn.
+       * Khai một chặng như vậy là mọi lượt gọi set đó chết ở bước cuối với lỗi
+       * "cần chọn đúng N món, đang có 0" — ở bàn thì lỗi rơi đúng lúc khách bấm
+       * "Gửi bếp", sau khi họ đã tưởng mình gọi xong.
+       *
+       * Chặn ở đây chứ không ở giao diện Office: màn hình chặn được thì lời gọi
+       * thẳng vào API vẫn lọt, mà đây là ràng buộc về việc BÁN ĐƯỢC hay không,
+       * không phải chuyện trình bày.
+       *
+       * GỠ khi app gọi món dựng xong màn chọn — gỡ đúng khối này, không còn chỗ
+       * nào khác giữ luật.
+       */
+      if (course.pickCount !== null) {
+        throw new BadRequestException(
+          `Chặng "${course.label}" đang khai cho khách chọn ${course.pickCount} món. ` +
+            'Màn chọn ở app gọi món chưa dựng nên set này sẽ không gọi được — ' +
+            'để trống ô số lượng chọn (chặng lấy hết) cho tới khi có màn đó.',
+        )
+      }
     }
 
     return this.db.transaction(async (tx) => {

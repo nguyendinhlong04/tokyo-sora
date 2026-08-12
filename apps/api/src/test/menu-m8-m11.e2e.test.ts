@@ -14,11 +14,11 @@
  */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { hash } from '@node-rs/argon2'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
-import { devices, dishes, staff, staffRoles } from '../db/schema'
+import { devices, dishes, setGroupItems, setGroups, staff, staffRoles } from '../db/schema'
 import { ALL_DAYS, dayBitOf } from '../modules/catalog/domain/sale-window'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
@@ -456,7 +456,7 @@ describe('M11 — Set & Combo', () => {
     expect(set.costMaxVnd).toBe(100_000)
   })
 
-  it('nhóm "chọn N" cho dải, và trần là N LẦN món đắt nhất vì khách chọn trùng được', async () => {
+  it('chặn khai chặng "chọn N trong M" chừng nào app gọi món chưa có màn chọn', async () => {
     const res = await inject({
       method: 'PUT',
       url: '/api/admin/dishes/setsora/courses',
@@ -464,17 +464,10 @@ describe('M11 — Set & Combo', () => {
       payload: {
         courses: [
           {
-            label: 'Mở bữa',
-            kanji: null,
-            pickCount: null,
-            batchOffset: 0,
-            items: [{ dishId: 'duamuoi', qty: 1, portionLabel: '1 phần' }],
-          },
-          {
             label: 'Bò trên than',
             kanji: null,
             pickCount: 2,
-            batchOffset: 1,
+            batchOffset: 0,
             items: [
               { dishId: 'bachibo', qty: 1, portionLabel: '100g' },
               { dishId: 'thanbo', qty: 1, portionLabel: '100g' },
@@ -483,7 +476,28 @@ describe('M11 — Set & Combo', () => {
         ],
       },
     })
-    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.statusCode, res.payload).toBe(400)
+    expect(res.json<{ message: string }>().message).toContain('chưa dựng')
+  })
+
+  it('nhóm "chọn N" cho dải, và trần là N LẦN món đắt nhất vì khách chọn trùng được', async () => {
+    /**
+     * Dựng thẳng ở CSDL chứ không qua endpoint: cửa khai chặng đã chốt tạm không
+     * cho `pickCount` (xem test trên). Phép tính dải giá vốn thì vẫn phải đúng —
+     * dữ liệu cũ có thể đang mang chặng kiểu này, và cửa khai sẽ mở lại khi app
+     * gọi món dựng xong màn chọn.
+     */
+    await db.delete(setGroupItems).where(inArray(setGroupItems.groupId, ['sora-mo-bua', 'sora-bo', 'sora-ngot']))
+    await db.delete(setGroups).where(eq(setGroups.setDishId, 'setsora'))
+    await db.insert(setGroups).values([
+      { id: 'sora-mo-bua', setDishId: 'setsora', label: 'Mở bữa', batchOffset: 0, sort: 0 },
+      { id: 'sora-bo', setDishId: 'setsora', label: 'Bò trên than', pickCount: 2, batchOffset: 1, sort: 1 },
+    ])
+    await db.insert(setGroupItems).values([
+      { groupId: 'sora-mo-bua', dishId: 'duamuoi', qty: 1, portionLabel: '1 phần' },
+      { groupId: 'sora-bo', dishId: 'bachibo', qty: 1, portionLabel: '100g' },
+      { groupId: 'sora-bo', dishId: 'thanbo', qty: 1, portionLabel: '100g' },
+    ])
 
     const list = await inject({ method: 'GET', url: setUrl(), headers: asOwner() })
     const set = list
