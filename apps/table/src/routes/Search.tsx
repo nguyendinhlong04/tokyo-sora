@@ -149,6 +149,9 @@ export function Search() {
           key={open.id}
           dish={open}
           groups={menu.groupsOf(open)}
+          courses={menu.coursesOf(open)}
+          extras={menu.extrasOf(open)}
+          onPickExtra={addOrOpen}
           soldOut={menu.soldOut.has(open.id)}
           hasGrill={session.table.hasGrill}
           onClose={() => setOpen(null)}

@@ -13,6 +13,7 @@ import {
   configBundles,
   dishBranchOverrides,
   dishModifierGroups,
+  dishStories,
   dishes,
   modifierGroups,
   modifierOptions,
@@ -57,6 +58,7 @@ export class ConfigBundleService {
       modifierGroupRows,
       modifierOptionRows,
       dishModifierRows,
+      storyRows,
     ] = await Promise.all([
       this.db.select().from(stations).orderBy(stations.sort),
       this.db.select().from(categories).orderBy(categories.sort),
@@ -69,6 +71,9 @@ export class ConfigBundleService {
       this.db.select().from(modifierGroups),
       this.db.select().from(modifierOptions).orderBy(modifierOptions.sort),
       this.db.select().from(dishModifierGroups).orderBy(dishModifierGroups.sort),
+      // Chỉ lấy cột gợi ý gọi thêm: bản ghi giới thiệu còn có ảnh, bài viết dài,
+      // bảng độ cắt — thứ của trang web, nhét cả vào đây là bundle phình vô ích.
+      this.db.select({ dishId: dishStories.dishId, extraDishIds: dishStories.extraDishIds }).from(dishStories),
     ])
 
     const overrideByDish = new Map(overrideRows.map((o) => [o.dishId, o]))
@@ -136,11 +141,15 @@ export class ConfigBundleService {
       })
       .filter((d): d is NonNullable<typeof d> => d !== null)
 
+    const extrasBySet = new Map(storyRows.map((s) => [s.dishId, s.extraDishIds ?? []]))
+
     const sets = dishRows
       .filter((d) => d.kind === 'set')
       .map((d) => ({
         setDishId: d.id,
         label: d.nameVi,
+        /** Món gợi ý gọi thêm cho vừa miệng — cùng nguồn với trang web (W3) */
+        extraDishIds: extrasBySet.get(d.id) ?? [],
         groups: (groupsBySet.get(d.id) ?? []).map((g) => ({
           id: g.id,
           label: g.label,

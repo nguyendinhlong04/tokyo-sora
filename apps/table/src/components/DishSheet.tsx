@@ -1,7 +1,9 @@
 import { Badge, Button, Money, SectionLabel } from '@sora/ui'
 import { useState } from 'react'
 import type { Dish, ModifierGroup } from '../api'
+import type { SetCourse, SetExtra } from '../menu'
 import { useCart } from '../cart-context'
+import { DishCounter } from './DishCounter'
 import { Plate } from './Plate'
 import { Sheet } from './Sheet'
 
@@ -15,12 +17,25 @@ import { Sheet } from './Sheet'
 export function DishSheet({
   dish,
   groups,
+  courses,
+  extras,
+  onPickExtra,
   soldOut,
   hasGrill,
   onClose,
 }: {
   dish: Dish
   groups: ModifierGroup[]
+  /** Chặng của set; rỗng với món thường — xem `coursesOf` */
+  courses: SetCourse[]
+  /** Món gợi ý gọi thêm kèm set — xem `extrasOf` */
+  extras: SetExtra[]
+  /**
+   * Bấm + ở một món gợi ý. KHÔNG tự thêm vào giỏ tại đây: món phải chọn vị thì
+   * luật là mở chi tiết của chính nó, y như ở thực đơn — nơi gọi giữ đúng một
+   * bản của luật đó (`addOrOpen`).
+   */
+  onPickExtra: (dish: Dish) => void
   soldOut: boolean
   hasGrill: boolean
   onClose: () => void
@@ -91,6 +106,99 @@ export function DishSheet({
                 {a}
               </Badge>
             ))}
+          </div>
+        ) : null}
+
+        {/*
+          Đặt SAU bảng dị ứng: set nhiều chặng đẩy dòng dị ứng xuống cả màn hình
+          cuộn, mà người lọc dị ứng thì đang tìm đúng dòng đó.
+
+          Set là món đắt nhất thực đơn và cái tên thì không nói được gì. Khách
+          ngồi bàn không có đường nào sang trang thực đơn của trang web để đọc —
+          không hiện ở đây là họ gọi mù.
+        */}
+        {courses.length > 0 ? (
+          <div className="mt-7">
+            <SectionLabel>Trong set có gì</SectionLabel>
+            <div className="mt-3 grid gap-5">
+              {courses.map((course) => (
+                <div key={course.id}>
+                  <div className="flex items-baseline gap-2.5">
+                    <span className="text-[length:var(--fs-b1)] font-semibold text-accent-ink">
+                      {course.label}
+                    </span>
+                    {/*
+                      Chặng "chọn N trong M" KHÔNG được kể như thể khách được cả
+                      M — đây là danh sách để chọn. Máy khách chưa gửi được lựa
+                      chọn nên chặng kiểu này phải nhờ nhân viên gọi hộ.
+                    */}
+                    <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                      {course.pickCount === null
+                        ? `${course.items.length} món`
+                        : `chọn ${course.pickCount} trong ${course.items.length}`}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid gap-2 border-l border-accent/45 pl-3.5">
+                    {course.items.map((item) => (
+                      <div key={item.dishId} className="flex items-baseline justify-between gap-3">
+                        <span className="min-w-0 text-[length:var(--fs-b1)] text-ink-body">
+                          {item.name}
+                        </span>
+                        <span className="flex-none font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                          {item.portion}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/*
+          Gợi ý gọi thêm — nằm NGAY DƯỚI danh sách chặng, đúng lúc khách vừa đọc
+          xong set có gì và đang tự hỏi "thế đã đủ chưa".
+
+          Chỉ mọc ra khi có món thật sự gọi được: `extrasOf` đã bỏ món hết hàng
+          và món không cho gọi ở bàn, nên khối rỗng nghĩa là không còn gì để mời.
+        */}
+        {extras.length > 0 ? (
+          <div className="mt-7">
+            <SectionLabel>Gọi thêm cho vừa miệng</SectionLabel>
+            <div className="mt-3">
+              {extras.map((extra) => (
+                <div
+                  key={extra.dish.id}
+                  className="flex items-center gap-3.5 border-b border-surface-4 py-2.5 last:border-b-0"
+                >
+                  <Plate
+                    kanji={extra.dish.kana}
+                    src={extra.dish.imageUrl}
+                    alt={extra.dish.nameVi}
+                    className="h-14 w-14 flex-none"
+                  />
+                  {/* `min-w-0` như ở dòng món ngoài thực đơn: thiếu nó là món tên
+                      dài đẩy thanh đếm ra ngoài mép tấm trượt */}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[length:var(--fs-b1)] leading-snug text-ink-hi">
+                      {extra.dish.nameVi}
+                    </p>
+                    <Money
+                      amount={extra.dish.price}
+                      className="mt-1 text-[length:var(--fs-b2)] text-accent-ink"
+                    />
+                  </div>
+                  <DishCounter
+                    name={extra.dish.nameVi}
+                    qty={cart.qtyOf(extra.dish.id)}
+                    onAdd={() => onPickExtra(extra.dish)}
+                    onBot={() => cart.botOf(extra.dish.id)}
+                    choice={extra.needsChoice}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
 

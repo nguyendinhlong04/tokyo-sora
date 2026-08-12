@@ -45,11 +45,35 @@ export interface ModifierGroup {
   options: ModifierOption[]
 }
 
+/**
+ * Một chặng của set — "Mở bữa · Bò trên than · Chốt bữa" (đấu nối §9.1).
+ *
+ * Chỉ khai những trường T3 vẽ ra. `batchOffset` (chặng ra ở đợt thứ mấy) là nhịp
+ * bếp mang món, không phải thứ khách cần biết trước khi gọi.
+ */
+export interface SetGroup {
+  id: string
+  label: string
+  /** null = cả chặng đều nằm trong set; số = "chọn N trong danh sách" */
+  pickCount: number | null
+  items: { dishId: string; qty: number; portionLabel: string | null }[]
+}
+
+export interface SetDefinition {
+  setDishId: string
+  label: string
+  /** Món gợi ý gọi thêm cho vừa miệng — người nhập khai ở Office M1 */
+  extraDishIds: string[]
+  groups: SetGroup[]
+}
+
 export interface ConfigBundle {
   version: string
   branch: { id: string; name: string; address: string | null; phone: string | null }
   categories: { id: string; nameVi: string; kanji: string | null }[]
   dishes: Dish[]
+  /** Chặng của từng set — bundle vẫn phát sẵn, T3 đọc để nói "trong set có gì" */
+  sets: SetDefinition[]
   modifiers: ModifierGroup[]
 }
 

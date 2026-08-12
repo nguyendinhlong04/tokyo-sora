@@ -27,6 +27,20 @@ export const FILTER_LABELS: { key: keyof Filters; label: string }[] = [
   { key: 'conHang', label: 'Đang có sẵn' },
 ]
 
+/** Một chặng của set đã tra xong tên món — T3 chỉ việc vẽ ra */
+export interface SetCourse {
+  id: string
+  label: string
+  pickCount: number | null
+  items: { dishId: string; name: string; portion: string }[]
+}
+
+/** Món gợi ý gọi thêm kèm set — kèm sẵn câu trả lời "bấm + có mở chi tiết không" */
+export interface SetExtra {
+  dish: Dish
+  needsChoice: boolean
+}
+
 /** Nhãn chặng trong nhóm — dữ liệu là mã ngắn, chữ hiển thị nằm ở đây */
 export const SUB_LABELS: Record<string, { name: string; kanji: string }> = {
   beef: { name: 'Bò', kanji: '牛' },
@@ -93,12 +107,73 @@ export function useMenu(branchId: string) {
     [config.data],
   )
 
+  /**
+   * Tra tên món thành phần của set — đọc danh sách CHƯA lọc `tableOrderable`.
+   *
+   * Cơm trắng kèm hay nước chấm chỉ đi theo set, chi nhánh tắt "cho gọi ở bàn"
+   * để khách không gọi lẻ được; nhưng chúng vẫn phải có tên trong danh sách
+   * "trong set có gì", nếu không set mười lăm món hiện ra còn mười.
+   */
+  const dishById = useMemo(
+    () => new Map((config.data?.dishes ?? []).map((d) => [d.id, d])),
+    [config.data],
+  )
+
+  const setById = useMemo(
+    () => new Map((config.data?.sets ?? []).map((s) => [s.setDishId, s])),
+    [config.data],
+  )
+
   return {
     branch: config.data?.branch ?? null,
     categories: config.data?.categories ?? [],
     dishes,
     soldOut,
     remainingOf,
+    /**
+     * Các chặng của một set, đã tra tên; mảng rỗng nếu món không phải set.
+     *
+     * Món thành phần bị tắt hẳn ở chi nhánh thì không có trong bundle — bỏ dòng
+     * đó chứ không vẽ ra một chỗ trống không tên. Việc gọi món không phụ thuộc
+     * vào đây: máy chủ nổ set từ danh mục gốc chứ không đọc bundle.
+     */
+    coursesOf: (dish: Dish): SetCourse[] =>
+      (setById.get(dish.id)?.groups ?? [])
+        .map((g) => ({
+          id: g.id,
+          label: g.label,
+          pickCount: g.pickCount,
+          items: g.items.flatMap((i) => {
+            const found = dishById.get(i.dishId)
+            if (!found) return []
+            return [
+              {
+                dishId: i.dishId,
+                name: found.nameVi,
+                portion: i.portionLabel ?? `${i.qty} phần`,
+              },
+            ]
+          }),
+        }))
+        .filter((c) => c.items.length > 0),
+    /**
+     * Món gợi ý gọi thêm kèm một set.
+     *
+     * Lọc thẳng tay: gợi ý chỉ có nghĩa khi bấm + là gọi được NGAY tại đây. Món
+     * chỉ bán ở quầy (`tableOrderable` tắt) hay vừa hết thì bỏ hẳn dòng, chứ
+     * không mời khách rồi chặn họ lại ở nút.
+     */
+    extrasOf: (dish: Dish): SetExtra[] =>
+      (setById.get(dish.id)?.extraDishIds ?? []).flatMap((id) => {
+        const found = dishById.get(id)
+        if (!found || !found.tableOrderable || soldOut.has(id)) return []
+        return [
+          {
+            dish: found,
+            needsChoice: found.modifierGroupIds.some((g) => modifiers.get(g)?.required === true),
+          },
+        ]
+      }),
     /** Nhóm tuỳ chọn của một món, đúng thứ tự đã khai trong danh mục */
     groupsOf: (dish: Dish): ModifierGroup[] =>
       dish.modifierGroupIds
