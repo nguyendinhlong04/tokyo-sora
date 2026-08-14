@@ -1,3 +1,4 @@
+import { Button } from '@sora/ui'
 import type { ChangeEvent, ReactNode } from 'react'
 
 /**
@@ -335,6 +336,189 @@ export function FilterBar({ children }: { children: ReactNode }) {
     <section className="flex flex-wrap items-end gap-x-4 gap-y-3 rounded-md border border-line-1 bg-surface-1 px-5 py-4">
       {children}
     </section>
+  )
+}
+
+/**
+ * Đầu một khối danh sách: nhãn, câu giải thích, nút thêm nằm bên phải.
+ *
+ * `items-start` chứ không `items-center`: câu giải thích dài hai dòng thì nút
+ * vẫn đứng ngang nhãn, không trôi xuống giữa khối.
+ */
+export function ListHead({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children?: ReactNode
+}) {
+  return (
+    <div className="mb-2 flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+          {label}
+        </p>
+        {hint ? (
+          <p className="mt-1 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">{hint}</p>
+        ) : null}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/** Nút Bỏ cố định bề rộng để hàng nhãn của `RecordList` khớp đúng hàng dữ liệu */
+const DROP_WIDTH = 'w-[56px]'
+
+/** Danh sách dòng chữ đơn giản: dụng cụ, mẹo, tiêu chí cảm quan */
+export function LineList({
+  label,
+  hint,
+  placeholder,
+  value,
+  disabled,
+  max,
+  empty = 'Chưa có dòng nào.',
+  onChange,
+}: {
+  label: string
+  hint?: string
+  placeholder?: string
+  value: string[]
+  disabled: boolean
+  max: number
+  empty?: string
+  onChange: (next: string[]) => void
+}) {
+  return (
+    <div>
+      <ListHead label={label} hint={hint}>
+        <Button size="sm" disabled={disabled || value.length >= max} onClick={() => onChange([...value, ''])}>
+          + Thêm dòng
+        </Button>
+      </ListHead>
+      <div className="grid gap-2">
+        {value.map((row, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <span className="w-5 flex-none text-center font-mono text-[length:var(--fs-c1)] text-ink-mute">
+              {index + 1}
+            </span>
+            <TextInput
+              value={row}
+              disabled={disabled}
+              placeholder={placeholder}
+              onChange={(v) => onChange(value.map((r, i) => (i === index ? v : r)))}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              className={`${DROP_WIDTH} flex-none`}
+              disabled={disabled}
+              onClick={() => onChange(value.filter((_, i) => i !== index))}
+            >
+              Bỏ
+            </Button>
+          </div>
+        ))}
+        {value.length === 0 ? (
+          <p className="text-[length:var(--fs-c1)] text-ink-mute">{empty}</p>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Danh sách bản ghi nhiều ô — điểm kiểm soát, lỗi thường gặp, tiêu chí đo được.
+ *
+ * Cột khai bằng dữ liệu chứ không dựng tay ở từng chỗ gọi: bốn khối trong màn
+ * quy trình có hình dạng giống hệt nhau, chỉ khác tên cột, và bốn bản sao của
+ * cùng một lưới sẽ trôi lệch nhau đúng như 14 ô nhập ngày trước.
+ */
+export function RecordList<T extends { [K in keyof T]: string }>({
+  label,
+  hint,
+  columns,
+  blank,
+  value,
+  disabled,
+  max,
+  empty = 'Chưa khai dòng nào.',
+  onChange,
+}: {
+  label: string
+  hint?: string
+  columns: { key: keyof T & string; label: string; placeholder?: string; grow?: number }[]
+  /** Bản ghi rỗng khi bấm thêm — giữ đủ khoá để React không nhận nhầm ô */
+  blank: T
+  value: T[]
+  disabled: boolean
+  max: number
+  empty?: string
+  onChange: (next: T[]) => void
+}) {
+  const grid = columns.map((c) => `minmax(0, ${c.grow ?? 1}fr)`).join(' ')
+
+  return (
+    <div>
+      <ListHead label={label} hint={hint}>
+        <Button size="sm" disabled={disabled || value.length >= max} onClick={() => onChange([...value, { ...blank }])}>
+          + Thêm dòng
+        </Button>
+      </ListHead>
+      <div className="grid gap-2">
+        {/* Hàng nhãn dựng ĐÚNG khung của hàng dữ liệu — số thứ tự và nút Bỏ đều
+            có bề rộng cố định, nên nhãn không trôi lệch khỏi ô nó gọi tên */}
+        {value.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <span className="w-5 flex-none" />
+            <div
+              className="grid flex-1 gap-2 text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase"
+              style={{ gridTemplateColumns: grid }}
+            >
+              {columns.map((c) => (
+                <span key={c.key}>{c.label}</span>
+              ))}
+            </div>
+            <span className={`${DROP_WIDTH} flex-none`} />
+          </div>
+        ) : null}
+        {value.map((row, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <span className="w-5 flex-none text-center font-mono text-[length:var(--fs-c1)] text-ink-mute">
+              {index + 1}
+            </span>
+            <div className="grid flex-1 gap-2" style={{ gridTemplateColumns: grid }}>
+              {columns.map((c) => (
+                <TextInput
+                  key={c.key}
+                  value={row[c.key] ?? ''}
+                  disabled={disabled}
+                  placeholder={c.placeholder}
+                  onChange={(v) =>
+                    onChange(value.map((r, i) => (i === index ? { ...r, [c.key]: v } : r)))
+                  }
+                />
+              ))}
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={`${DROP_WIDTH} flex-none`}
+              disabled={disabled}
+              onClick={() => onChange(value.filter((_, i) => i !== index))}
+            >
+              Bỏ
+            </Button>
+          </div>
+        ))}
+        {value.length === 0 ? (
+          <p className="text-[length:var(--fs-c1)] text-ink-mute">{empty}</p>
+        ) : null}
+      </div>
+    </div>
   )
 }
 

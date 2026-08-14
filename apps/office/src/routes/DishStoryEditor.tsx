@@ -1,6 +1,6 @@
 import { Button } from '@sora/ui'
 import type { DishRow, DishStory, DishStoryCondiment, DishStoryCut } from '../api'
-import { Field, NumberInput, Select, TextArea, TextInput } from '../components/form'
+import { Field, LineList, ListHead, NumberInput, Select, TextArea, TextInput } from '../components/form'
 
 /** Chưa kể gì cả — mọi ô trống, trang web dựng bản gọn từ tên, giá, mô tả */
 export const BLANK_STORY: DishStory = {
@@ -114,10 +114,11 @@ export function StoryEditor({
             label="Bữa diễn ra theo thứ tự"
             hint="Set nấu theo nhịp — mỗi dòng là một chặng khách sẽ thấy dọn ra"
             placeholder="Dưa muối lên trước khi than đỏ"
-            value={story.flow}
+            value={story.flow ?? []}
             disabled={disabled}
             max={8}
-            onChange={(flow) => set({ flow })}
+            empty="Chưa có dòng nào — trang web bỏ qua khối này."
+            onChange={(flow) => set({ flow: flow.length > 0 ? flow : null })}
           />
 
           <DishPickList
@@ -148,10 +149,11 @@ export function StoryEditor({
             label="Hương vị"
             hint="Bốn dòng là vừa khối — mỗi dòng được gắn một chữ Nhật 旨 · 甘 · 香 · 合"
             placeholder="Vân mỡ đan dày, tan ngay trên than"
-            value={story.flavours}
+            value={story.flavours ?? []}
             disabled={disabled}
             max={8}
-            onChange={(flavours) => set({ flavours })}
+            empty="Chưa có dòng nào — trang web bỏ qua khối này."
+            onChange={(flavours) => set({ flavours: flavours.length > 0 ? flavours : null })}
           />
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -230,95 +232,6 @@ export function StoryEditor({
 }
 
 // ------------------------------------------------------------------ khối lặp
-
-/** Nhãn của một khối lặp — cùng cỡ chữ với `Field` để hai loại đứng cạnh nhau đều nhau */
-function ListHead({
-  label,
-  hint,
-  children,
-}: {
-  label: string
-  hint?: string
-  children?: React.ReactNode
-}) {
-  return (
-    <div className="mb-2 flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
-          {label}
-        </p>
-        {hint ? (
-          <p className="mt-1 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">{hint}</p>
-        ) : null}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-/** Danh sách dòng chữ đơn giản: hương vị, các chặng của bữa */
-function LineList({
-  label,
-  hint,
-  placeholder,
-  value,
-  disabled,
-  max,
-  onChange,
-}: {
-  label: string
-  hint?: string
-  placeholder?: string
-  value: string[] | null
-  disabled: boolean
-  max: number
-  onChange: (next: string[] | null) => void
-}) {
-  const rows = value ?? []
-  const put = (next: string[]) => onChange(next.length > 0 ? next : null)
-
-  return (
-    <div>
-      <ListHead label={label} hint={hint}>
-        <Button
-          size="sm"
-          disabled={disabled || rows.length >= max}
-          onClick={() => put([...rows, ''])}
-        >
-          + Thêm dòng
-        </Button>
-      </ListHead>
-      <div className="grid gap-2">
-        {rows.map((row, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <span className="w-5 flex-none text-center font-mono text-[length:var(--fs-c1)] text-ink-mute">
-              {index + 1}
-            </span>
-            <TextInput
-              value={row}
-              disabled={disabled}
-              placeholder={placeholder}
-              onChange={(v) => put(rows.map((r, i) => (i === index ? v : r)))}
-            />
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={disabled}
-              onClick={() => put(rows.filter((_, i) => i !== index))}
-            >
-              Bỏ
-            </Button>
-          </div>
-        ))}
-        {rows.length === 0 ? (
-          <p className="text-[length:var(--fs-c1)] text-ink-mute">
-            Chưa có dòng nào — trang web bỏ qua khối này.
-          </p>
-        ) : null}
-      </div>
-    </div>
-  )
-}
 
 /** Các độ cắt: mỗi cột trên trang là một thẻ có tên, quy cách, mô tả, thanh đo độ mềm */
 function CutList({
