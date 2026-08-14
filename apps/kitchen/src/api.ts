@@ -83,6 +83,54 @@ export interface ConfigDish {
   } | null
 }
 
+// ------------------------------------------------------ K7 · Công thức
+
+export type RecipeStepPhase = 'so_che' | 'che_bien' | 'hoan_thien'
+
+export interface RecipeStep {
+  phase: RecipeStepPhase
+  text: string
+  /** null = bước không bấm giờ (ướp qua đêm, chờ nguội) */
+  seconds: number | null
+  paramLabel: string | null
+  isCcp: boolean
+}
+
+/**
+ * Thẻ công thức đã trừ sạch tiền.
+ *
+ * Không có `costVnd`, không có đơn giá, không có hao hụt — nguyên tắc 3: bếp
+ * không bao giờ biết giá. Định lượng thì có, vì "200g thịt" là lời chỉ dẫn.
+ */
+export interface KitchenRecipe {
+  dish: {
+    id: string
+    nameVi: string
+    nameJa: string | null
+    allergens: string[]
+    prepSeconds: number
+  }
+  /** `null` = bếp trưởng chưa soạn quy trình cho món này */
+  doc: {
+    methodKind: 'song' | 'nuong' | 'nau' | 'lap_rap'
+    yieldLabel: string | null
+    plateLabel: string | null
+    prepMinutes: number
+    equipment: string[]
+    inputSpec: { item: string; requirement: string }[]
+    specMeasured: { name: string; target: string }[]
+    specSensory: string[]
+    ccp: { point: string; limit: string; action: string }[]
+    storage: string | null
+    tips: string[]
+    pitfalls: { mistake: string; effect: string; fix: string }[]
+    updatedAt: string
+  } | null
+  steps: RecipeStep[]
+  ingredients: { name: string; qtyBase: number; baseUnit: string }[]
+  substitutes: { id: string; nameVi: string }[]
+}
+
 export const api = {
   pair: (code: string, name: string) =>
     apiFetch<{ token: string; deviceId: number }>('/api/auth/pair', {
@@ -101,6 +149,11 @@ export const api = {
     apiFetch<{ dishes: ConfigDish[] }>(`/api/config?branch=${branchId}`),
 
   availability: () => apiFetch<AvailabilityRow[]>('/api/availability'),
+
+  /** Mã những món ĐÃ có quy trình — để ô món chưa soạn hiện mờ, bấm vào không hụt */
+  recipeIndex: () => apiFetch<string[]>('/api/recipes'),
+
+  recipe: (dishId: string) => apiFetch<KitchenRecipe>(`/api/recipes/${dishId}`),
 
   setState: (ticketId: number, action: 'start' | 'done' | 'undo', label: string) =>
     enqueue<{ state: string }>({

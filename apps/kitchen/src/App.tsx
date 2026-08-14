@@ -8,6 +8,7 @@ import { DishTotals } from './screens/DishTotals'
 import { Expo } from './screens/Expo'
 import { Holding } from './screens/Holding'
 import { Pair } from './screens/Pair'
+import { Recipes } from './screens/Recipes'
 import { SoldOut } from './screens/SoldOut'
 import { TicketQueue } from './screens/TicketQueue'
 
@@ -47,7 +48,7 @@ function Root() {
   return paired ? <Shell onUnpair={() => setPaired(false)} /> : <Pair onPaired={() => setPaired(true)} />
 }
 
-type ScreenId = 'queue' | 'totals' | 'holding' | 'soldout' | 'expo'
+type ScreenId = 'queue' | 'totals' | 'holding' | 'soldout' | 'expo' | 'recipes'
 
 const SCREENS: { id: ScreenId; label: string; code: string }[] = [
   { id: 'queue', label: 'Hàng vé', code: 'K2' },
@@ -69,6 +70,7 @@ const SCREENS: { id: ScreenId; label: string; code: string }[] = [
   // Tên trong code giữ nguyên `expo` — nó còn là tên đường dẫn API và phòng
   // realtime, đổi theo chỉ tổ rước rủi ro mà nhân viên chẳng thấy khác gì.
   { id: 'expo', label: 'Ra món', code: 'K6' },
+  { id: 'recipes', label: 'Công thức', code: 'K7' },
 ]
 
 function Shell({ onUnpair }: { onUnpair: () => void }) {
@@ -197,6 +199,7 @@ function Shell({ onUnpair }: { onUnpair: () => void }) {
         {screen === 'holding' ? <Holding queue={queue.data} /> : null}
         {screen === 'soldout' ? <SoldOut /> : null}
         {screen === 'expo' ? <Expo /> : null}
+        {screen === 'recipes' ? <Recipes /> : null}
       </div>
     </main>
   )

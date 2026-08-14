@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -326,6 +327,165 @@ export interface RecipeVersionLine {
   costPerBaseMilli: number
   costVnd: number
 }
+
+/**
+ * Kiểu công thức — thứ quyết định BIỂU MẪU nào mở ra khi soạn.
+ *
+ * Quán nướng không có một quy trình nấu duy nhất. Misuji không được nấu: bếp
+ * không bật lửa lần nào, người nướng là khách tại bàn, và cái quyết định chất
+ * lượng là thái ngang thớ mấy milimet chứ không phải nhiệt độ chảo. Karaage thì
+ * ngược lại, cần chỗ ghi nhiệt độ dầu và hai lượt chiên. Một biểu mẫu cứng phục
+ * vụ cả hai sẽ để trống ô này và thiếu ô kia.
+ *
+ * Suy được từ dữ liệu đã có (`dishes.routingMethod` và trạm) nên seed điền sẵn,
+ * nhưng vẫn cho sửa: bảng suy luận đúng khoảng chín phần mười, và một phần mười
+ * còn lại phải sửa được mà không cần đổi mã.
+ */
+export type RecipeMethodKind = 'song' | 'nuong' | 'nau' | 'lap_rap'
+
+/** Ba giai đoạn của một quy trình. `so_che` làm trước ca, hai giai đoạn sau theo vé. */
+export type RecipeStepPhase = 'so_che' | 'che_bien' | 'hoan_thien'
+
+/** Yêu cầu nguyên liệu ĐẦU VÀO — điều kiện nhận hàng, khác hẳn yêu cầu thành phẩm */
+export interface RecipeInputSpec {
+  item: string
+  requirement: string
+}
+
+/** Một tiêu chí nghiệm thu ĐO ĐƯỢC: 'Khối lượng' → '100g ± 3g' */
+export interface RecipeSpecItem {
+  name: string
+  target: string
+}
+
+/**
+ * Điểm kiểm soát tới hạn. `action` bắt buộc có nội dung: một ngưỡng không kèm
+ * cách xử lý khi vượt chỉ là chữ đỏ trang trí, không ai làm gì với nó.
+ */
+export interface RecipeCcp {
+  point: string
+  limit: string
+  action: string
+}
+
+/** Lỗi thường gặp → hậu quả → cách sửa. Phần có giá trị nhất lúc đào tạo người mới. */
+export interface RecipePitfall {
+  mistake: string
+  effect: string
+  fix: string
+}
+
+/**
+ * M4 · M8 — Phần VĂN BẢN của thẻ công thức: quy cách, yêu cầu, an toàn, mẹo.
+ *
+ * `dish_recipes` trả lời "món này tốn bao nhiêu tiền". Bảng này trả lời "làm thế
+ * nào để ra đúng món đó" — hai câu hỏi của hai người khác nhau, và khoảng trống
+ * giữa chúng đang được lấp bằng trí nhớ của người làm lâu năm: thứ không nhân bản
+ * được sang chi nhánh thứ hai và không đưa ra được khi đoàn kiểm tra hỏi.
+ *
+ * KHOÁ THEO (subject_kind, subject_id) GIỐNG `recipe_versions`, không phải theo
+ * `dish_id`: sốt tare và nước dùng của M8 cũng có bước, có nhiệt độ, có ngưỡng an
+ * toàn. Một bộ bảng phục vụ cả hai màn, và về sau M9 chụp được cả hai mà không
+ * mọc thêm nhánh.
+ *
+ * Mảng để `jsonb`/`text[]` chứ không tách bảng con: những cụm này luôn đọc cả
+ * khối và không bao giờ truy vấn lẻ — tách ra là thêm năm bảng để phục vụ đúng
+ * một câu SELECT. Riêng các BƯỚC thì tách, vì chúng cần sắp xếp và trỏ về BOM.
+ */
+export const recipeDocs = pgTable(
+  'recipe_docs',
+  {
+    /** 'dish' công thức món (M4) · 'prep' công thức mẻ bán thành phẩm (M8) */
+    subjectKind: text('subject_kind').notNull().$type<'dish' | 'prep'>(),
+    /** `dishes.id` hoặc `ingredients.id` tuỳ `subjectKind` — cùng lối polymorphic với M9 */
+    subjectId: text('subject_id').notNull(),
+
+    methodKind: text('method_kind').notNull().$type<RecipeMethodKind>(),
+    /** Quy cách một phần, viết cho người đọc: '100g · 7–9 lát' */
+    yieldLabel: text('yield_label'),
+    /** Dụng cụ đựng chuẩn: 'Đĩa gỗ số 3, lót lá tía tô' */
+    plateLabel: text('plate_label'),
+    /** Sơ chế theo mẻ, làm TRƯỚC ca. 0 = món không có việc gì làm trước */
+    prepMinutes: integer('prep_minutes').notNull().default(0),
+
+    equipment: text('equipment').array().notNull().default(sql`'{}'`),
+    inputSpec: jsonb('input_spec')
+      .notNull()
+      .default(sql`'[]'::jsonb`)
+      .$type<RecipeInputSpec[]>(),
+    specMeasured: jsonb('spec_measured')
+      .notNull()
+      .default(sql`'[]'::jsonb`)
+      .$type<RecipeSpecItem[]>(),
+    specSensory: text('spec_sensory').array().notNull().default(sql`'{}'`),
+    ccp: jsonb('ccp')
+      .notNull()
+      .default(sql`'[]'::jsonb`)
+      .$type<RecipeCcp[]>(),
+    storage: text('storage'),
+    tips: text('tips').array().notNull().default(sql`'{}'`),
+    pitfalls: jsonb('pitfalls')
+      .notNull()
+      .default(sql`'[]'::jsonb`)
+      .$type<RecipePitfall[]>(),
+    /** Món mời thay khi 86 — `dishes.id`, chỉ có nghĩa với `subject_kind = 'dish'` */
+    substituteIds: text('substitute_ids').array().notNull().default(sql`'{}'`),
+
+    updatedBy: bigint('updated_by', { mode: 'number' }).references(() => staff.id),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.subjectKind, t.subjectId] }),
+    check('recipe_docs_kind_check', sql`${t.subjectKind} IN ('dish','prep')`),
+    check(
+      'recipe_docs_method_check',
+      sql`${t.methodKind} IN ('song','nuong','nau','lap_rap')`,
+    ),
+    check('recipe_docs_prep_minutes_check', sql`${t.prepMinutes} >= 0`),
+  ],
+)
+
+/**
+ * Các BƯỚC của quy trình — bảng riêng vì chúng phải sắp xếp lại được, đánh số
+ * được, và trỏ được về dòng nguyên liệu.
+ *
+ * `ingredientIds` trỏ về `dish_recipes` thay vì chép lại định lượng vào câu chữ:
+ * chép tay thì sửa định lượng ở bảng BOM là câu trong bước sai ngay, và không ai
+ * phát hiện cho tới lúc người mới làm theo.
+ *
+ * Không khoá ngoại sang `ingredients` cho mảng đó — Postgres không có khoá ngoại
+ * trên phần tử mảng. Trỏ trượt thì màn hình bỏ qua, không làm hỏng bước; đánh đổi
+ * này rẻ hơn nhiều so với một bảng nối ba cột chỉ để giữ vài con trỏ hiển thị.
+ */
+export const recipeSteps = pgTable(
+  'recipe_steps',
+  {
+    subjectKind: text('subject_kind').notNull().$type<'dish' | 'prep'>(),
+    subjectId: text('subject_id').notNull(),
+    phase: text('phase').notNull().$type<RecipeStepPhase>(),
+    sort: integer('sort').notNull(),
+
+    /** Một hành động, thể mệnh lệnh: 'Thái ngang thớ dày 5mm.' */
+    text: text('text').notNull(),
+    /** Thời lượng bước; NULL = bước không bấm giờ (chờ nguội, ướp qua đêm) */
+    seconds: integer('seconds'),
+    /** Thông số nổi bật in cạnh bước: '170°C' · '5mm' · '0–2°C' */
+    paramLabel: text('param_label'),
+    ingredientIds: text('ingredient_ids').array().notNull().default(sql`'{}'`),
+    isCcp: boolean('is_ccp').notNull().default(false),
+  },
+  (t) => [
+    primaryKey({ columns: [t.subjectKind, t.subjectId, t.phase, t.sort] }),
+    foreignKey({
+      columns: [t.subjectKind, t.subjectId],
+      foreignColumns: [recipeDocs.subjectKind, recipeDocs.subjectId],
+      name: 'recipe_steps_doc_fk',
+    }).onDelete('cascade'),
+    check('recipe_steps_phase_check', sql`${t.phase} IN ('so_che','che_bien','hoan_thien')`),
+    check('recipe_steps_sort_check', sql`${t.sort} >= 0`),
+    check('recipe_steps_seconds_check', sql`${t.seconds} IS NULL OR ${t.seconds} > 0`),
+  ],
+)
 
 /**
  * S4 — Đơn đặt hàng.

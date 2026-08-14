@@ -6,11 +6,12 @@
  */
 import 'dotenv/config'
 import { hash } from '@node-rs/argon2'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Pool } from 'pg'
 import { createDb, type Db } from './client'
+import { RECIPE_DOCS } from './seed-recipe-docs'
 import { PREP_SECONDS_BY_STATION, routingForSeedDish } from './seed-routing'
 import { DISH_STORIES } from './seed-stories'
 import * as s from './schema'
@@ -701,6 +702,43 @@ async function seed(db: Db) {
       .insert(s.dishStories)
       .values(story)
       .onConflictDoUpdate({ target: s.dishStories.dishId, set: rest })
+  }
+
+  // ---- Quy trình chế biến (M4 · thẻ công thức) ----
+  // Thay CẢ THẺ mỗi lượt nạp: bước không có khoá tự nhiên nào ngoài vị trí của
+  // nó, nên chèn đè từng dòng sẽ để lại bước cũ của bản seed trước nằm lẫn vào.
+  for (const card of RECIPE_DOCS) {
+    if (!knownDishIds.has(card.dishId)) continue
+    const { dishId, steps, substituteIds, ...doc } = card
+
+    await db
+      .delete(s.recipeDocs)
+      .where(and(eq(s.recipeDocs.subjectKind, 'dish'), eq(s.recipeDocs.subjectId, dishId)))
+    await db.insert(s.recipeDocs).values({
+      subjectKind: 'dish',
+      subjectId: dishId,
+      ...doc,
+      // Món thay thế đã bị gỡ khỏi danh mục thì bỏ, đừng để thẻ mời một món không bán
+      substituteIds: substituteIds.filter((id) => knownDishIds.has(id)),
+    })
+
+    const sortOf = new Map<string, number>()
+    await db.insert(s.recipeSteps).values(
+      steps.map((step) => {
+        const sort = sortOf.get(step.phase) ?? 0
+        sortOf.set(step.phase, sort + 1)
+        return {
+          subjectKind: 'dish' as const,
+          subjectId: dishId,
+          phase: step.phase,
+          sort,
+          text: step.text,
+          seconds: step.seconds ?? null,
+          paramLabel: step.paramLabel ?? null,
+          isCcp: step.isCcp ?? false,
+        }
+      }),
+    )
   }
 
   // ---- Nhóm tuỳ chọn (modifier) ----

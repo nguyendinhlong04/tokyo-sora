@@ -1,13 +1,15 @@
 import { formatVnd } from '@sora/contracts'
 import { Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, type FoodCostBand, type IngredientRow, type RecipeView } from '../api'
 import { DataTable } from '../components/DataTable'
+import { SegmentedControl } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
 import { formatPercent } from '../components/report'
 import { useSession } from '../session-context'
+import { RecipeDocEditor } from './RecipeDocEditor'
 
 /**
  * M4 — Công thức (BOM).
@@ -166,8 +168,36 @@ export function RecipeList() {
 
 // ------------------------------------------------------------- bảng công thức
 
+/**
+ * Hai tab, hai câu hỏi của cùng một món: bảng nguyên liệu trả lời "tốn bao nhiêu
+ * tiền", quy trình trả lời "làm thế nào để ra đúng món đó". Chung một địa chỉ vì
+ * chúng là một thẻ công thức; tách tab vì hai người mở chúng vì hai lý do khác
+ * nhau và không ai cần cuộn qua phần của người kia.
+ */
 export function RecipeEditor() {
   const { dishId = '' } = useParams()
+  const [tab, setTab] = useState<'bom' | 'quy-trinh'>('bom')
+
+  const tabs = (
+    <SegmentedControl
+      size="md"
+      value={tab}
+      onChange={setTab}
+      options={[
+        { value: 'bom', label: 'Nguyên liệu & giá vốn' },
+        { value: 'quy-trinh', label: 'Quy trình chế biến' },
+      ]}
+    />
+  )
+
+  return tab === 'bom' ? (
+    <RecipeLines dishId={dishId} tabs={tabs} />
+  ) : (
+    <RecipeDocEditor dishId={dishId} tabs={tabs} />
+  )
+}
+
+function RecipeLines({ dishId, tabs }: { dishId: string; tabs: ReactNode }) {
   const { branchId, can } = useSession()
   const navigate = useNavigate()
   const toast = useToast()
@@ -241,6 +271,7 @@ export function RecipeEditor() {
         subtitle={`Công thức cho MỘT phần · giá bán ${formatVnd(saved.dish.basePrice)}. Định lượng tính bằng đơn vị cơ sở của từng nguyên liệu.`}
         action={
           <>
+            {tabs}
             <Button onClick={() => navigate('/cong-thuc')}>Về danh sách</Button>
             <Button onClick={() => navigate(`/lich-su-cong-thuc?kind=dish&id=${dishId}`)}>
               Lịch sử

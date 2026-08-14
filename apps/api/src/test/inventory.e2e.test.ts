@@ -407,6 +407,189 @@ describe('M4 — Công thức và food cost', () => {
   })
 })
 
+// ------------------------------------------- M4 · thẻ công thức (quy trình)
+
+/**
+ * Quy trình chế biến — phần trả lời "làm thế nào", tách khỏi phần trả lời "tốn
+ * bao nhiêu tiền". Bài kiểm chính: thẻ lưu vào là **thay cả cụm**, và những ràng
+ * buộc khiến thẻ không thành tài liệu chết (CCP phải có cách xử lý, bước không
+ * được trỏ vào nguyên liệu ngoài công thức).
+ */
+describe('M4 — Thẻ công thức: quy trình chế biến', () => {
+  const docOf = (id: string) =>
+    inject({ method: 'GET', url: `/api/inventory/recipe-docs/dish/${id}`, headers: asOwner() })
+
+  const putDoc = (id: string, payload: Record<string, unknown>) =>
+    inject({
+      method: 'PUT',
+      url: `/api/inventory/recipe-docs/dish/${id}`,
+      headers: asOwner(),
+      payload,
+    })
+
+  it('chưa soạn thì doc là null, kèm kiểu công thức suy từ định tuyến §16', async () => {
+    const res = await docOf('bachibo')
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.json().doc).toBeNull()
+    expect(res.json().steps).toEqual([])
+    // Món SỐNG khách tự nướng — bếp không bật lửa lần nào
+    expect(res.json().suggestedMethod).toBe('song')
+  })
+
+  it('suy kiểu theo trạm khi món không đi bảng nướng', async () => {
+    expect((await docOf('miso')).json().suggestedMethod).toBe('nau')
+    expect((await docOf('duamuoi')).json().suggestedMethod).toBe('lap_rap')
+    expect((await docOf('sodiep')).json().suggestedMethod).toBe('nuong')
+  })
+
+  it('lưu thẻ rồi đọc lại: bước xếp theo giai đoạn, đúng thứ tự gửi', async () => {
+    const res = await putDoc('bachibo', {
+      methodKind: 'song',
+      yieldLabel: '200g · 8–10 lát',
+      plateLabel: 'Đĩa gỗ số 3',
+      prepMinutes: 25,
+      equipment: ['Dao thái thịt', 'Thớt đỏ', 'Cân điện tử 1g'],
+      inputSpec: [{ item: 'Nhiệt độ khi nhận', requirement: 'Mát ≤ 4°C hoặc đông ≤ −18°C' }],
+      specMeasured: [{ name: 'Khối lượng', target: '200g ± 5g' }],
+      specSensory: ['Mặt cắt đỏ tươi, không đọng nước máu'],
+      ccp: [
+        { point: 'Thời gian ngoài lạnh', limit: '≤ 20 phút', action: 'Thu về, huỷ, làm đĩa mới' },
+      ],
+      storage: 'Lát đã thái không lưu qua ca.',
+      tips: ['Dao lạnh cắt ngọt hơn'],
+      pitfalls: [
+        { mistake: 'Thái dọc thớ', effect: 'Dai, mất cảm giác tan', fix: 'Xoay khối, dao vuông góc sợi thịt' },
+      ],
+      substituteIds: ['thanbo'],
+      steps: [
+        // Cố tình gửi lẫn giai đoạn để chắc là máy chủ xếp lại, không phải client
+        { phase: 'hoan_thien', text: 'Xếp lát xoè quạt trên đĩa đã làm lạnh.' },
+        { phase: 'so_che', text: 'Rã đông ngăn mát 0–2°C.', paramLabel: '18–24 giờ', isCcp: true },
+        { phase: 'che_bien', text: 'Thái ngang thớ.', seconds: 60, paramLabel: '5mm' },
+        { phase: 'che_bien', text: 'Cân 200g.', seconds: 20, ingredientIds: [BO.id] },
+      ],
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.json().steps).toBe(4)
+
+    const body = (await docOf('bachibo')).json()
+    expect(body.doc.methodKind).toBe('song')
+    expect(body.doc.prepMinutes).toBe(25)
+    expect(body.doc.ccp[0].action).toContain('huỷ')
+    expect(body.steps.map((s: { phase: string }) => s.phase)).toEqual([
+      'so_che',
+      'che_bien',
+      'che_bien',
+      'hoan_thien',
+    ])
+    expect(body.steps[1].text).toBe('Thái ngang thớ.')
+    expect(body.steps[3].ingredientIds).toEqual([])
+    expect(body.steps[2].ingredientIds).toEqual([BO.id])
+  })
+
+  it('lưu lần hai THAY cả cụm, không cộng dồn bước cũ', async () => {
+    await putDoc('bachibo', {
+      methodKind: 'song',
+      steps: [{ phase: 'che_bien', text: 'Thái ngang thớ dày 5mm.' }],
+    })
+    const body = (await docOf('bachibo')).json()
+    expect(body.steps).toHaveLength(1)
+    // Khối văn bản cũ cũng đi theo — thẻ là một tài liệu, không phải mấy ô rời
+    expect(body.doc.tips).toEqual([])
+    expect(body.doc.yieldLabel).toBeNull()
+  })
+
+  it('điểm kiểm soát không nói lệch ngưỡng thì làm gì — bị chặn', async () => {
+    const res = await putDoc('thanbo', {
+      methodKind: 'song',
+      ccp: [{ point: 'Nhiệt độ tâm', limit: '≤ 4°C', action: '   ' }],
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('bước trỏ vào nguyên liệu ngoài công thức bị chặn, và báo đúng tên', async () => {
+    const res = await putDoc('bachibo', {
+      methodKind: 'song',
+      steps: [{ phase: 'che_bien', text: 'Rưới sốt.', ingredientIds: [KEG.id] }],
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toContain(KEG.id)
+  })
+
+  it('món thay thế phải là món có thật', async () => {
+    const res = await putDoc('thanbo', { methodKind: 'song', substituteIds: ['mon-ma'] })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toContain('mon-ma')
+  })
+
+  it('set không có quy trình riêng', async () => {
+    const res = await putDoc('setsora', { methodKind: 'lap_rap' })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toContain('món thành phần')
+  })
+})
+
+// ------------------------------------------- K7 · màn bếp đọc công thức
+
+/**
+ * Bài kiểm chính KHÔNG phải "đọc được không" mà là: **màn bếp không thấy tiền**.
+ *
+ * Nguyên tắc 3 đã có event trigger canh cột tiền trong `tickets`/`ticket_items`;
+ * điểm đọc công thức là đường mới nhất có thể lách qua nó, vì dữ liệu gốc của nó
+ * nằm cạnh giá vốn trong cùng một module.
+ */
+describe('K7 — Màn bếp đọc công thức', () => {
+  const MONEY = /price|cost|amount|money|total|vnd|discount|vat|waste/i
+
+  /** Mọi khoá ở mọi tầng của payload, kể cả trong mảng và jsonb */
+  const allKeys = (value: unknown, found: string[] = []): string[] => {
+    if (Array.isArray(value)) value.forEach((v) => allKeys(v, found))
+    else if (value && typeof value === 'object') {
+      for (const [key, child] of Object.entries(value)) {
+        found.push(key)
+        allKeys(child, found)
+      }
+    }
+    return found
+  }
+
+  it('trả quy trình, định lượng và món thay thế — nhưng KHÔNG một khoá tiền nào', async () => {
+    const res = await inject({ method: 'GET', url: '/api/recipes/bachibo', headers: asOwner() })
+    expect(res.statusCode, res.payload).toBe(200)
+
+    const body = res.json()
+    expect(body.dish.nameVi).toBe('Ba chỉ bò')
+    expect(body.doc.methodKind).toBe('song')
+    expect(body.steps).toHaveLength(1)
+    // Định lượng là lời chỉ dẫn, phải có
+    expect(body.ingredients).toEqual(
+      expect.arrayContaining([{ name: BO.name, qtyBase: 200, baseUnit: 'g' }]),
+    )
+
+    const offending = allKeys(body).filter((key) => MONEY.test(key))
+    expect(offending, `khoá tiền lọt xuống màn bếp: ${offending.join(', ')}`).toEqual([])
+  })
+
+  it('món chưa soạn trả doc rỗng chứ không phải lỗi — bếp vẫn xem được định lượng', async () => {
+    const res = await inject({ method: 'GET', url: '/api/recipes/thanbo', headers: asOwner() })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().doc).toBeNull()
+    expect(res.json().steps).toEqual([])
+  })
+
+  it('danh sách món đã có quy trình — để ô chưa soạn hiện mờ', async () => {
+    const res = await inject({ method: 'GET', url: '/api/recipes', headers: asOwner() })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toContain('bachibo')
+    expect(res.json()).not.toContain('thanbo')
+  })
+
+  it('món không có thật thì báo rõ', async () => {
+    const res = await inject({ method: 'GET', url: '/api/recipes/mon-ma', headers: asOwner() })
+    expect(res.statusCode).toBe(404)
+  })
+})
+
 // ------------------------------------------------- Trừ kho khi bấm Xong
 
 describe('Trừ kho khi bếp bấm Xong', () => {

@@ -37,7 +37,30 @@ export default defineConfig({
         navigateFallback: '/index.html',
         // Không bao giờ phục vụ vé bếp từ cache HTTP — vé cũ nguy hiểm hơn màn trống
         navigateFallbackDenylist: [/^\/api\//],
-        runtimeCaching: [],
+        /**
+         * ĐÚNG MỘT ngoại lệ cho luật trên: công thức (K7).
+         *
+         * Vé cũ nguy hiểm vì nó nói sai việc ĐANG phải làm. Quy trình cũ thì
+         * không: nó đổi vài lần một mùa, và bản tuần trước vẫn đúng hơn nhiều so
+         * với một màn trống đúng lúc người ta quên cách lóc misuji. Mạng chớp
+         * giữa ca là chuyện thường ở quán, còn thẻ công thức thì phải mở được.
+         *
+         * NetworkFirst chứ không CacheFirst: có mạng thì vẫn lấy bản mới trước,
+         * cache chỉ đỡ khi hỏi không được. Thẻ có in ngày cập nhật để người đọc
+         * biết mình đang xem bản nào.
+         */
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/api/recipes'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'sora-recipes',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 120, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
         cleanupOutdatedCaches: true,
       },
       devOptions: { enabled: false },

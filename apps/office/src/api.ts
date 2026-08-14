@@ -1135,6 +1135,85 @@ export interface RecipeView {
   grossProfitVnd: number | null
 }
 
+// -------------------------------- M4 · M8 · Thẻ công thức (quy trình)
+
+/**
+ * Kiểu công thức — quyết định biểu mẫu nào mở ra khi soạn.
+ *
+ * `song` khách tự nướng · `nuong` bếp nướng ra chín · `nau` bếp nấu ·
+ * `lap_rap` lấy sẵn rồi xếp ra. Bốn kiểu vì quán nướng không có một quy trình
+ * nấu duy nhất: misuji không được nấu lần nào, karaage thì hai lượt chiên.
+ */
+export type RecipeMethodKind = 'song' | 'nuong' | 'nau' | 'lap_rap'
+
+export type RecipeStepPhase = 'so_che' | 'che_bien' | 'hoan_thien'
+
+/** Yêu cầu nguyên liệu ĐẦU VÀO — điều kiện nhận hàng, khác yêu cầu thành phẩm */
+export interface RecipeInputSpec {
+  item: string
+  requirement: string
+}
+
+/** Tiêu chí nghiệm thu đo được: 'Khối lượng' → '100g ± 3g' */
+export interface RecipeSpecItem {
+  name: string
+  target: string
+}
+
+export interface RecipeCcp {
+  point: string
+  limit: string
+  action: string
+}
+
+export interface RecipePitfall {
+  mistake: string
+  effect: string
+  fix: string
+}
+
+export interface RecipeStep {
+  phase: RecipeStepPhase
+  text: string
+  /** null = bước không bấm giờ (ướp qua đêm, chờ nguội) */
+  seconds: number | null
+  paramLabel: string | null
+  /** Trỏ về dòng trong bảng công thức — không chép lại định lượng vào câu chữ */
+  ingredientIds: string[]
+  isCcp: boolean
+}
+
+export interface RecipeDoc {
+  methodKind: RecipeMethodKind
+  yieldLabel: string | null
+  plateLabel: string | null
+  prepMinutes: number
+  equipment: string[]
+  inputSpec: RecipeInputSpec[]
+  specMeasured: RecipeSpecItem[]
+  specSensory: string[]
+  ccp: RecipeCcp[]
+  storage: string | null
+  tips: string[]
+  pitfalls: RecipePitfall[]
+  substituteIds: string[]
+}
+
+export interface RecipeDocView {
+  subject: {
+    id: string
+    name: string
+    stationId: string | null
+    /** Thời gian chuẩn của M6 — mốc để đối chiếu tổng thời lượng các bước */
+    prepSeconds: number | null
+  }
+  /** Kiểu suy từ định tuyến §16 — dùng khi chưa ai soạn */
+  suggestedMethod: RecipeMethodKind
+  /** `null` = chưa ai soạn quy trình, khác hẳn "soạn rồi mà để trống" */
+  doc: (RecipeDoc & { updatedAt: string }) | null
+  steps: RecipeStep[]
+}
+
 // ------------------------------------------------- M8 · Bán thành phẩm
 
 export interface PrepRow {
@@ -2491,6 +2570,20 @@ export const api = {
   dishCosts: () =>
     apiFetch<{ dishId: string; costVnd: number; lineCount: number }[]>(
       '/api/inventory/dish-costs',
+    ),
+
+  recipeDoc: (kind: RecipeSubjectKind, id: string) =>
+    apiFetch<RecipeDocView>(`/api/inventory/recipe-docs/${kind}/${id}`),
+
+  setRecipeDoc: (
+    kind: RecipeSubjectKind,
+    id: string,
+    input: RecipeDoc & { steps: RecipeStep[] },
+    approval?: Approval | null,
+  ) =>
+    apiFetch<{ subjectKind: string; subjectId: string; steps: number }>(
+      `/api/inventory/recipe-docs/${kind}/${id}`,
+      { method: 'PUT', body: { ...input, approval } },
     ),
 
   // ------------------------------------------------------------- M8

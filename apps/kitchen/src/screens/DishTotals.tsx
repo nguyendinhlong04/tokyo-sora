@@ -1,9 +1,13 @@
 import { elapsedSeconds, emberColor } from '@sora/core'
 import { EmptyState } from '@sora/ui'
+import { useState } from 'react'
 import type { Queue } from '../api'
+import { RecipeSheet } from './RecipeSheet'
 
 interface Row {
   name: string
+  /** Món nào — để mở đúng thẻ công thức; gộp theo tên nên lấy mã của dòng đầu */
+  dishId: string
   qty: number
   /** Vé nào đang chờ món này — bếp biết nấu xong thì chia về đâu */
   tickets: { code: string; tableCode: string | null; qty: number }[]
@@ -23,6 +27,7 @@ interface Row {
  * đúng bàn đang chờ lâu nhất.
  */
 export function DishTotals({ queue }: { queue: Queue | undefined }) {
+  const [recipeOf, setRecipeOf] = useState<string | null>(null)
   const live = (queue?.tickets ?? []).filter((t) => t.state === 'queued' || t.state === 'cooking')
 
   const byDish = new Map<string, Row>()
@@ -32,6 +37,7 @@ export function DishTotals({ queue }: { queue: Queue | undefined }) {
       if (item.state === 'done' || item.state === 'voided') continue
       const row = byDish.get(item.nameSnapshot) ?? {
         name: item.nameSnapshot,
+        dishId: item.dishId,
         qty: 0,
         tickets: [],
         hottest: 0,
@@ -81,8 +87,24 @@ export function DishTotals({ queue }: { queue: Queue | undefined }) {
               </span>
             ))}
           </div>
+
+          {/*
+            Lối tắt vào quy trình đặt ở ĐÂY chứ không ở dòng món trên vé K2: ở
+            đó cả dòng đã là một đích chạm để bấm trạng thái món, thêm nút thứ
+            hai vào trong là mời người ta bấm nhầm thành "Xong". Màn này chỉ để
+            đọc, và cũng chính là chỗ bếp đứng khi quyết định nấu gì trước.
+          */}
+          <button
+            type="button"
+            onClick={() => setRecipeOf(row.dishId)}
+            className="h-[var(--hit-target)] flex-none self-start rounded-sm border border-line-3 px-4 text-[length:var(--fs-b1)] text-ink-mute active:bg-surface-3"
+          >
+            Cách làm
+          </button>
         </div>
       ))}
+
+      <RecipeSheet dishId={recipeOf} onClose={() => setRecipeOf(null)} />
     </div>
   )
 }

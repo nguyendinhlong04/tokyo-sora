@@ -20,11 +20,19 @@ import {
   orderLines,
   orders,
   prepRecipeLines,
+  recipeDocs,
+  recipeSteps,
   recipeVersions,
   staff,
   stockLevels,
   stockMoves,
   ticketItems,
+  type RecipeCcp,
+  type RecipeInputSpec,
+  type RecipeMethodKind,
+  type RecipePitfall,
+  type RecipeSpecItem,
+  type RecipeStepPhase,
   type RecipeVersionLine,
 } from '../../db/schema'
 import type { Actor } from '../identity/actor'
@@ -63,6 +71,61 @@ export interface RecipeLineWrite {
   ingredientId: string
   qtyBase: number
   wasteBp: number
+}
+
+export interface RecipeStepWrite {
+  phase: RecipeStepPhase
+  text: string
+  seconds: number | null
+  paramLabel: string | null
+  ingredientIds: string[]
+  isCcp: boolean
+}
+
+export interface RecipeDocWrite {
+  methodKind: RecipeMethodKind
+  yieldLabel: string | null
+  plateLabel: string | null
+  prepMinutes: number
+  equipment: string[]
+  inputSpec: RecipeInputSpec[]
+  specMeasured: RecipeSpecItem[]
+  specSensory: string[]
+  ccp: RecipeCcp[]
+  storage: string | null
+  tips: string[]
+  pitfalls: RecipePitfall[]
+  substituteIds: string[]
+  steps: RecipeStepWrite[]
+}
+
+/** Thứ tự đọc của người trong bếp — cũng là thứ tự lưu `sort` */
+const STEP_PHASES: RecipeStepPhase[] = ['so_che', 'che_bien', 'hoan_thien']
+
+/**
+ * Kiểu công thức suy từ định tuyến §16 — chỉ là GỢI Ý cho lần soạn đầu.
+ *
+ * `linh_hoat` về 'song' chứ không về 'nuong': bàn có bếp thì món ra sống, và đó
+ * là đường đi thường gặp. Bàn không bếp là ngoại lệ, người soạn đổi tay được.
+ */
+function suggestMethodKind(
+  routingMethod: string | null,
+  stationId: string | null,
+): RecipeMethodKind {
+  if (routingMethod === 'song' || routingMethod === 'linh_hoat') return 'song'
+  if (routingMethod === 'nuong') return 'nuong'
+  switch (stationId) {
+    case 'ST-06':
+      return 'nuong'
+    case 'ST-02':
+      return 'song'
+    case 'ST-03':
+    case 'ST-04':
+      return 'nau'
+    default:
+      // ST-01 khai vị lạnh · ST-05 quầy đồ uống — lấy sẵn rồi xếp ra
+      return 'lap_rap'
+  }
 }
 
 const SLUG = /^[a-z0-9][a-z0-9-]*$/
@@ -442,6 +505,346 @@ export class InventoryService {
     }
 
     return new Map([...byDish].map(([dishId, lines]) => [dishId, dishCost(lines)]))
+  }
+
+  // ========================== M4 · M8 — Thẻ công thức: quy trình chế biến
+
+  /**
+   * Quy trình của một món hoặc một mẻ bán thành phẩm.
+   *
+   * `doc: null` nghĩa là chưa ai soạn — khác hẳn với "soạn rồi mà để trống".
+   * Kèm `suggestedMethod` để màn hình mở đúng biểu mẫu ngay lần soạn đầu: kiểu
+   * công thức suy được từ định tuyến §16 nên không việc gì bắt người nhập khai
+   * lại thứ máy đã biết.
+   */
+  async recipeDoc(subjectKind: 'dish' | 'prep', subjectId: string) {
+    const subject = await this.recipeSubject(subjectKind, subjectId)
+
+    const [doc] = await this.db
+      .select()
+      .from(recipeDocs)
+      .where(and(eq(recipeDocs.subjectKind, subjectKind), eq(recipeDocs.subjectId, subjectId)))
+
+    const steps = doc
+      ? await this.db
+          .select()
+          .from(recipeSteps)
+          .where(
+            and(eq(recipeSteps.subjectKind, subjectKind), eq(recipeSteps.subjectId, subjectId)),
+          )
+          .orderBy(asc(recipeSteps.sort))
+      : []
+
+    const { suggestedMethod, ...subjectView } = subject
+    return {
+      subject: subjectView,
+      suggestedMethod,
+      doc: doc
+        ? {
+            methodKind: doc.methodKind,
+            yieldLabel: doc.yieldLabel,
+            plateLabel: doc.plateLabel,
+            prepMinutes: doc.prepMinutes,
+            equipment: doc.equipment,
+            inputSpec: doc.inputSpec,
+            specMeasured: doc.specMeasured,
+            specSensory: doc.specSensory,
+            ccp: doc.ccp,
+            storage: doc.storage,
+            tips: doc.tips,
+            pitfalls: doc.pitfalls,
+            substituteIds: doc.substituteIds,
+            updatedAt: doc.updatedAt,
+          }
+        : null,
+      steps: steps
+        // Sắp theo giai đoạn ở đây chứ không trong SQL: `sort` chỉ duy nhất
+        // trong từng giai đoạn, nên ORDER BY sort một mình sẽ trộn ba nhóm.
+        .slice()
+        .sort(
+          (a, b) =>
+            STEP_PHASES.indexOf(a.phase) - STEP_PHASES.indexOf(b.phase) || a.sort - b.sort,
+        )
+        .map((step) => ({
+          phase: step.phase,
+          text: step.text,
+          seconds: step.seconds,
+          paramLabel: step.paramLabel,
+          ingredientIds: step.ingredientIds,
+          isCcp: step.isCcp,
+        })),
+    }
+  }
+
+  /**
+   * Thay CẢ THẺ, cùng lý do với `setRecipe`: đổi một bước thường kéo theo đổi
+   * bước sau nó và đổi cả tiêu chí nghiệm thu. Lưu từng mảnh thì giữa hai lần
+   * gọi sẽ có người mở ra một quy trình nửa cũ nửa mới — mà đây là tài liệu
+   * người ta làm theo, không phải bản nháp.
+   *
+   * `sort` do máy chủ đánh theo thứ tự client gửi, riêng trong từng giai đoạn.
+   * Client không gửi `sort` để không có cách nào gửi hai bước cùng số.
+   */
+  async setRecipeDoc(
+    subjectKind: 'dish' | 'prep',
+    subjectId: string,
+    input: RecipeDocWrite,
+    actor: Actor,
+    approval?: ApprovalInput | null,
+  ) {
+    await this.recipeSubject(subjectKind, subjectId)
+
+    for (const point of input.ccp) {
+      if (point.action.trim() === '') {
+        throw new BadRequestException(
+          `Điểm kiểm soát "${point.point}" chưa nói lệch ngưỡng thì làm gì — một ngưỡng không kèm cách xử lý thì không ai làm gì với nó`,
+        )
+      }
+    }
+    for (const step of input.steps) {
+      if (step.text.trim() === '') throw new BadRequestException('Có bước để trống nội dung')
+    }
+
+    // Bước trỏ về dòng BOM chứ không chép lại định lượng; trỏ vào nguyên liệu
+    // không có trong công thức là gõ nhầm, và để lọt thì màn hình vẽ ra một con
+    // trỏ chết ngay từ lúc lưu.
+    const referenced = [...new Set(input.steps.flatMap((s) => s.ingredientIds))]
+    if (referenced.length > 0) {
+      const bom =
+        subjectKind === 'dish'
+          ? await this.db
+              .select({ id: dishRecipes.ingredientId })
+              .from(dishRecipes)
+              .where(eq(dishRecipes.dishId, subjectId))
+          : await this.db
+              .select({ id: prepRecipeLines.ingredientId })
+              .from(prepRecipeLines)
+              .where(eq(prepRecipeLines.prepId, subjectId))
+      const known = new Set(bom.map((row) => row.id))
+      const stray = referenced.filter((id) => !known.has(id))
+      if (stray.length > 0) {
+        throw new BadRequestException(
+          `Bước trỏ vào nguyên liệu không có trong công thức: ${stray.join(', ')}`,
+        )
+      }
+    }
+
+    if (input.substituteIds.length > 0) {
+      const known = await this.db
+        .select({ id: dishes.id })
+        .from(dishes)
+        .where(inArray(dishes.id, input.substituteIds))
+      const missing = input.substituteIds.filter((id) => !known.some((k) => k.id === id))
+      if (missing.length > 0) {
+        throw new BadRequestException(`Không có món thay thế: ${missing.join(', ')}`)
+      }
+    }
+
+    return this.db.transaction(async (tx) => {
+      await this.approvals.authorize(tx, {
+        actor,
+        action: 'recipe.edit',
+        entity: 'recipe_doc',
+        entityId: `${subjectKind}:${subjectId}`,
+        approval,
+      })
+
+      // Xoá thẻ là xoá luôn các bước theo khoá ngoại — thay cả cụm chỉ cần một câu
+      await tx
+        .delete(recipeDocs)
+        .where(and(eq(recipeDocs.subjectKind, subjectKind), eq(recipeDocs.subjectId, subjectId)))
+
+      await tx.insert(recipeDocs).values({
+        subjectKind,
+        subjectId,
+        methodKind: input.methodKind,
+        yieldLabel: input.yieldLabel,
+        plateLabel: input.plateLabel,
+        prepMinutes: input.prepMinutes,
+        equipment: input.equipment,
+        inputSpec: input.inputSpec,
+        specMeasured: input.specMeasured,
+        specSensory: input.specSensory,
+        ccp: input.ccp,
+        storage: input.storage,
+        tips: input.tips,
+        pitfalls: input.pitfalls,
+        substituteIds: input.substituteIds,
+        updatedBy: actor.kind === 'staff' ? actor.staffId : null,
+      })
+
+      if (input.steps.length > 0) {
+        const counter = new Map<RecipeStepPhase, number>()
+        await tx.insert(recipeSteps).values(
+          input.steps.map((step) => {
+            const sort = counter.get(step.phase) ?? 0
+            counter.set(step.phase, sort + 1)
+            return {
+              subjectKind,
+              subjectId,
+              phase: step.phase,
+              sort,
+              text: step.text.trim(),
+              seconds: step.seconds,
+              paramLabel: step.paramLabel,
+              ingredientIds: step.ingredientIds,
+              isCcp: step.isCcp,
+            }
+          }),
+        )
+      }
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'recipe.doc-updated',
+        entity: 'recipe_doc',
+        entityId: `${subjectKind}:${subjectId}`,
+        payload: { methodKind: input.methodKind, steps: input.steps.length },
+      })
+
+      return { subjectKind, subjectId, steps: input.steps.length }
+    })
+  }
+
+  /**
+   * Thẻ công thức cho MÀN BẾP — cùng dữ liệu M4, đã trừ sạch tiền.
+   *
+   * Nguyên tắc 3 của dự án: vé bếp không bao giờ biết giá, và có hẳn một event
+   * trigger canh việc thêm cột tiền vào `tickets`/`ticket_items`. Màn bếp đọc
+   * công thức thì cũng chịu đúng luật đó: hàm này KHÔNG trả `costPerBaseMilli`,
+   * `costVnd`, `share`, và cũng không trả `wasteBp` — hao hụt là con số của kho
+   * để tính tiền, không phải lời chỉ dẫn cho người đứng bếp.
+   *
+   * Vì thế nó là một hàm riêng chứ không phải `recipe()` lọc bớt cột: một hàm
+   * dùng chung rồi lọc ở tầng trên là kiểu ranh giới mà lần sửa thứ ba sẽ quên.
+   */
+  async kitchenRecipe(dishId: string) {
+    const [dish] = await this.db.select().from(dishes).where(eq(dishes.id, dishId))
+    if (!dish) throw new NotFoundException('Không có món này')
+
+    const [doc] = await this.db
+      .select()
+      .from(recipeDocs)
+      .where(and(eq(recipeDocs.subjectKind, 'dish'), eq(recipeDocs.subjectId, dishId)))
+
+    const steps = doc
+      ? await this.db
+          .select()
+          .from(recipeSteps)
+          .where(and(eq(recipeSteps.subjectKind, 'dish'), eq(recipeSteps.subjectId, dishId)))
+      : []
+
+    // Định lượng thì bếp cần — "200g thịt" là lời chỉ dẫn. Đơn giá thì không.
+    const lines = await this.db
+      .select({ name: ingredients.name, qtyBase: dishRecipes.qtyBase, baseUnit: ingredients.baseUnit })
+      .from(dishRecipes)
+      .innerJoin(ingredients, eq(ingredients.id, dishRecipes.ingredientId))
+      .where(eq(dishRecipes.dishId, dishId))
+      .orderBy(asc(dishRecipes.sort), asc(ingredients.name))
+
+    const substitutes =
+      doc && doc.substituteIds.length > 0
+        ? await this.db
+            .select({ id: dishes.id, nameVi: dishes.nameVi })
+            .from(dishes)
+            .where(inArray(dishes.id, doc.substituteIds))
+        : []
+
+    return {
+      dish: {
+        id: dish.id,
+        nameVi: dish.nameVi,
+        nameJa: dish.nameJa,
+        allergens: dish.allergens ?? [],
+        prepSeconds: dish.prepSeconds,
+      },
+      doc: doc
+        ? {
+            methodKind: doc.methodKind,
+            yieldLabel: doc.yieldLabel,
+            plateLabel: doc.plateLabel,
+            prepMinutes: doc.prepMinutes,
+            equipment: doc.equipment,
+            inputSpec: doc.inputSpec,
+            specMeasured: doc.specMeasured,
+            specSensory: doc.specSensory,
+            ccp: doc.ccp,
+            storage: doc.storage,
+            tips: doc.tips,
+            pitfalls: doc.pitfalls,
+            updatedAt: doc.updatedAt,
+          }
+        : null,
+      steps: steps
+        .slice()
+        .sort(
+          (a, b) =>
+            STEP_PHASES.indexOf(a.phase) - STEP_PHASES.indexOf(b.phase) || a.sort - b.sort,
+        )
+        .map((step) => ({
+          phase: step.phase,
+          text: step.text,
+          seconds: step.seconds,
+          paramLabel: step.paramLabel,
+          isCcp: step.isCcp,
+        })),
+      ingredients: lines,
+      substitutes,
+    }
+  }
+
+  /**
+   * Món nào đã có quy trình — để màn bếp làm mờ những ô bấm vào là trống.
+   *
+   * Chỉ trả mã món, không trả nội dung: danh sách này được hỏi mỗi lần mở màn,
+   * còn thẻ đầy đủ thì chỉ tải khi có người bấm vào một món cụ thể.
+   */
+  async dishIdsWithRecipe(): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: recipeDocs.subjectId })
+      .from(recipeDocs)
+      .where(eq(recipeDocs.subjectKind, 'dish'))
+    return rows.map((row) => row.id)
+  }
+
+  /**
+   * Chủ thể của thẻ phải tồn tại VÀ phải là thứ có quy trình.
+   *
+   * Set bị chặn cùng lý do như ở `setRecipe`: set không có công thức của mình.
+   * Bán thành phẩm chưa bật cờ cũng bị chặn — nếu không thì một hũ tương mua sẵn
+   * sẽ có thẻ quy trình pha mà không ai pha nó bao giờ.
+   */
+  private async recipeSubject(subjectKind: 'dish' | 'prep', subjectId: string) {
+    if (subjectKind === 'dish') {
+      const [dish] = await this.db.select().from(dishes).where(eq(dishes.id, subjectId))
+      if (!dish) throw new NotFoundException('Không có món này')
+      if (dish.kind === 'set') {
+        throw new BadRequestException('Set không có quy trình riêng — quy trình nằm ở từng món thành phần')
+      }
+      return {
+        id: dish.id,
+        name: dish.nameVi,
+        stationId: dish.stationGrill,
+        prepSeconds: dish.prepSeconds,
+        suggestedMethod: suggestMethodKind(dish.routingMethod, dish.stationGrill),
+      }
+    }
+
+    const [prep] = await this.db.select().from(ingredients).where(eq(ingredients.id, subjectId))
+    if (!prep) throw new NotFoundException('Không có nguyên liệu này')
+    if (!prep.isSemiFinished) {
+      throw new BadRequestException(
+        `${prep.name} không phải bán thành phẩm — bật cờ đó ở màn Nguyên liệu (M7) trước`,
+      )
+    }
+    // Mẻ sốt, nồi nước dùng, hũ kim chi: đều là nấu theo mẻ
+    return {
+      id: prep.id,
+      name: prep.name,
+      stationId: null,
+      prepSeconds: null,
+      suggestedMethod: 'nau' as RecipeMethodKind,
+    }
   }
 
   // ============================================== M8 · Bán thành phẩm

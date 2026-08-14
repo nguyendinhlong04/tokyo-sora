@@ -407,6 +407,19 @@ export class KitchenService {
       .where(eq(dishAvailability.branchId, branchId))
   }
 
+  /**
+   * K7 Công thức. Dữ liệu thuộc về kho (M4 khai nó), nên đọc qua InventoryService
+   * thay vì viết lại câu truy vấn ở đây — hai bản của cùng một phép đọc sẽ trôi
+   * lệch, và bản trôi lệch ở đây là bản có nguy cơ để lọt một cột tiền.
+   */
+  recipeIndex() {
+    return this.inventory.dishIdsWithRecipe()
+  }
+
+  recipe(dishId: string) {
+    return this.inventory.kitchenRecipe(dishId)
+  }
+
   /** Bếp bấm nút là đơn tự đổi bước — POS không phải thao tác thêm */
   /**
    * Kéo trạng thái từ VÉ BẾP về DÒNG MÓN mà khách nhìn thấy.

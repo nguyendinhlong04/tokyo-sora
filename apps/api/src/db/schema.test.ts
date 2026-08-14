@@ -465,3 +465,55 @@ describe('Tham số gọi món tại bàn', () => {
     expect(rows[0]!.n).toBe(2)
   })
 })
+
+describe('Thẻ công thức — quy trình chế biến (M4 · M8)', () => {
+  it('kiểu công thức nằm trong bốn kiểu đã chốt', async () => {
+    await expect(
+      db.exec(`
+        INSERT INTO recipe_docs (subject_kind, subject_id, method_kind)
+          VALUES ('dish', 'bachibo', 'xao-nhanh')
+      `),
+    ).rejects.toThrow(/recipe_docs_method_check/)
+  })
+
+  it('bước phải thuộc một trong ba giai đoạn', async () => {
+    await db.exec(`
+      INSERT INTO recipe_docs (subject_kind, subject_id, method_kind)
+        VALUES ('dish', 'bachibo', 'song')
+    `)
+    await expect(
+      db.exec(`
+        INSERT INTO recipe_steps (subject_kind, subject_id, phase, sort, text)
+          VALUES ('dish', 'bachibo', 'don-ban', 0, 'Chạy bàn')
+      `),
+    ).rejects.toThrow(/recipe_steps_phase_check/)
+  })
+
+  it('bước không bấm giờ để NULL được, nhưng bấm giờ thì phải dương', async () => {
+    await db.exec(`
+      INSERT INTO recipe_steps (subject_kind, subject_id, phase, sort, text, seconds)
+        VALUES ('dish', 'bachibo', 'so_che', 0, 'Rã đông ngăn mát', NULL)
+    `)
+    await expect(
+      db.exec(`
+        INSERT INTO recipe_steps (subject_kind, subject_id, phase, sort, text, seconds)
+          VALUES ('dish', 'bachibo', 'che_bien', 0, 'Thái ngang thớ', 0)
+      `),
+    ).rejects.toThrow(/recipe_steps_seconds_check/)
+  })
+
+  it('bước không sống được nếu không có thẻ — và xoá thẻ là xoá luôn bước', async () => {
+    await expect(
+      db.exec(`
+        INSERT INTO recipe_steps (subject_kind, subject_id, phase, sort, text)
+          VALUES ('dish', 'khong-co-the', 'so_che', 0, 'Bước mồ côi')
+      `),
+    ).rejects.toThrow(/recipe_steps_doc_fk/)
+
+    await db.exec(`DELETE FROM recipe_docs WHERE subject_id = 'bachibo'`)
+    const left = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM recipe_steps WHERE subject_id = 'bachibo'`,
+    )
+    expect(left.rows[0]!.n).toBe(0)
+  })
+})

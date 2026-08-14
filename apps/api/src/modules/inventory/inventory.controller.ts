@@ -52,6 +52,79 @@ const PrepRecipeBody = z.object({
 
 const SubjectKind = z.enum(['dish', 'prep'])
 
+/**
+ * Thẻ công thức — phần quy trình.
+ *
+ * Trần số lượng ở đây không phải phòng thủ suông: một quy trình 60 bước là quy
+ * trình không ai đọc hết, và chặn ở API rẻ hơn nhiều so với phát hiện sau khi
+ * bếp trưởng đã dán nó lên tường.
+ */
+const NullableText = (max: number) => z.string().trim().max(max).nullish().default(null)
+
+const RecipeDocBody = z.object({
+  methodKind: z.enum(['song', 'nuong', 'nau', 'lap_rap']),
+  yieldLabel: NullableText(120),
+  plateLabel: NullableText(200),
+  prepMinutes: z.number().int().min(0).max(2880).default(0),
+  equipment: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
+  inputSpec: z
+    .array(
+      z.object({
+        item: z.string().trim().min(1).max(120),
+        requirement: z.string().trim().min(1).max(400),
+      }),
+    )
+    .max(15)
+    .default([]),
+  specMeasured: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(120),
+        target: z.string().trim().min(1).max(120),
+      }),
+    )
+    .max(15)
+    .default([]),
+  specSensory: z.array(z.string().trim().min(1).max(300)).max(10).default([]),
+  ccp: z
+    .array(
+      z.object({
+        point: z.string().trim().min(1).max(160),
+        limit: z.string().trim().min(1).max(160),
+        action: z.string().trim().min(1).max(400),
+      }),
+    )
+    .max(10)
+    .default([]),
+  storage: NullableText(1000),
+  tips: z.array(z.string().trim().min(1).max(400)).max(12).default([]),
+  pitfalls: z
+    .array(
+      z.object({
+        mistake: z.string().trim().min(1).max(200),
+        effect: z.string().trim().min(1).max(300),
+        fix: z.string().trim().min(1).max(300),
+      }),
+    )
+    .max(12)
+    .default([]),
+  substituteIds: z.array(z.string().min(1)).max(6).default([]),
+  steps: z
+    .array(
+      z.object({
+        phase: z.enum(['so_che', 'che_bien', 'hoan_thien']),
+        text: z.string().trim().min(1).max(600),
+        seconds: z.number().int().positive().max(86_400).nullish().default(null),
+        paramLabel: NullableText(60),
+        ingredientIds: z.array(z.string().min(1)).max(10).default([]),
+        isCcp: z.boolean().default(false),
+      }),
+    )
+    .max(60)
+    .default([]),
+  approval: Approval,
+})
+
 const ReceiveBody = z.object({
   branchId: z.string().min(1),
   ingredientId: z.string().min(1),
@@ -132,6 +205,28 @@ export class InventoryController {
   setRecipe(@Param('dishId') dishId: string, @Body() body: unknown, @Req() req: RequestWithActor) {
     const { lines, approval } = RecipeBody.parse(body)
     return this.inventory.setRecipe(dishId, lines, req.actor!, approval)
+  }
+
+  /**
+   * Quy trình chế biến — dùng chung cho món (M4) và mẻ bán thành phẩm (M8), nên
+   * đường dẫn mang `kind` y như M9 chứ không nằm dưới `recipes/`.
+   */
+  @Get('recipe-docs/:kind/:id')
+  @RequirePermission('cost.view-recipe')
+  recipeDoc(@Param('kind') kind: string, @Param('id') id: string) {
+    return this.inventory.recipeDoc(SubjectKind.parse(kind), id)
+  }
+
+  @Put('recipe-docs/:kind/:id')
+  @RequirePermission('recipe.edit')
+  setRecipeDoc(
+    @Param('kind') kind: string,
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    const { approval, ...input } = RecipeDocBody.parse(body)
+    return this.inventory.setRecipeDoc(SubjectKind.parse(kind), id, input, req.actor!, approval)
   }
 
   // ------------------------------------------------------------- M8

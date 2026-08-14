@@ -124,6 +124,35 @@ export class KitchenController {
     return this.kitchen.changeItemState(id, StateBody.parse(body).action, req.actor!)
   }
 
+  /**
+   * K7 Công thức — quy trình chế biến cho người đứng bếp.
+   *
+   * KHÔNG dùng `/api/inventory/recipes/:id` của M4: điểm đó đòi quyền
+   * `cost.view-recipe` và trả về giá vốn từng dòng. Màn bếp không có quyền đó và
+   * cũng không được thấy tiền (nguyên tắc 3) — nên đây là điểm đọc riêng, trả về
+   * bản đã trừ sạch tiền. Cùng ràng buộc danh tính với hàng vé: máy đã ghép hoặc
+   * người đã đăng nhập, không phải khách.
+   */
+  @Get('recipes')
+  recipeIndex(@Req() req: RequestWithActor) {
+    this.requireKitchenReader(req)
+    return this.kitchen.recipeIndex()
+  }
+
+  @Get('recipes/:dishId')
+  recipe(@Param('dishId') dishId: string, @Req() req: RequestWithActor) {
+    this.requireKitchenReader(req)
+    return this.kitchen.recipe(dishId)
+  }
+
+  /** Khách ngồi bàn và tiến trình nền không có việc gì với tài liệu vận hành của bếp */
+  private requireKitchenReader(req: RequestWithActor) {
+    const kind = req.actor!.kind
+    if (kind === 'system' || kind === 'customer' || kind === 'guest') {
+      throw new BadRequestException('Không đọc được công thức')
+    }
+  }
+
   /** K5 báo hết món */
   @Post('availability')
   @RequirePermission('menu.mark-sold-out')
