@@ -2,6 +2,7 @@
 
 import { formatVnd } from '@sora/contracts'
 import { useEffect, useState } from 'react'
+import { SiteImage } from '../../../components/SiteImage'
 import type { OnlineDish } from '../../../lib/api'
 import { useOrder } from '../order-context'
 
@@ -35,10 +36,11 @@ export function DishSheet({ dish, onClose }: { dish: OnlineDish; onClose: () => 
         <div className="flex-1 overflow-y-auto px-4 pt-4">
           <div className="grid aspect-3/2 w-full place-items-center overflow-hidden rounded-md border border-line-1 bg-[radial-gradient(120%_100%_at_50%_18%,var(--sora-line-1)_0%,var(--sora-surface-4)_76%)]">
             {dish.imageUrl ? (
-              <img
+              /* Tấm sheet rộng 520 từ khổ `sm`, trọn bề ngang trên điện thoại */
+              <SiteImage
                 src={dish.imageUrl}
                 alt={dish.nameVi}
-                loading="lazy"
+                sizes="(min-width: 640px) 488px, 100vw"
                 className="size-full object-cover"
               />
             ) : (

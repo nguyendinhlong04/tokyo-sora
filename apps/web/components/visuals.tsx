@@ -1,4 +1,19 @@
 import type { ReactNode } from 'react'
+import { SiteImage } from './SiteImage'
+
+/**
+ * Bề rộng hiển thị mặc định theo cỡ ô — dùng khi chỗ gọi không khai `sizes`.
+ *
+ * `sm` là ô vuông nhỏ trong danh sách; `md` là ô lưới (4 cột ở laptop, 2 cột ở
+ * điện thoại); `lg`/`xl` là ảnh lớn chiếm nửa trang ở laptop, trọn bề ngang ở
+ * điện thoại. Chỗ nào lệch hẳn mấy mức này thì khai `sizes` riêng ở chỗ gọi.
+ */
+const GLYPH_SIZES = {
+  sm: '160px',
+  md: '(min-width: 1024px) 320px, 50vw',
+  lg: '(min-width: 1024px) 50vw, 100vw',
+  xl: '(min-width: 1024px) 50vw, 100vw',
+} as const
 
 /**
  * Ô ảnh món.
@@ -16,6 +31,7 @@ export function DishGlyph({
   src,
   alt,
   size = 'md',
+  sizes,
   className = '',
 }: {
   glyph: string
@@ -23,6 +39,8 @@ export function DishGlyph({
   /** Chỉ cần khi có ảnh thật — ô chữ là trang trí nên vẫn `aria-hidden` */
   alt?: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
+  /** Bề rộng ô hiển thị, cú pháp thuộc tính `sizes` — bỏ trống thì suy từ `size` */
+  sizes?: string
   className?: string
 }) {
   const text = {
@@ -35,9 +53,12 @@ export function DishGlyph({
   if (src) {
     return (
       <div className={`overflow-hidden bg-surface-4 ${className}`}>
-        {/* `<img>` chứ không `next/image`: đường dẫn do người nhập khai ở Office nên
-            không biết trước miền, mà `next/image` đòi khai miền sẵn trong cấu hình */}
-        <img src={src} alt={alt ?? ''} className="size-full object-cover" loading="lazy" />
+        <SiteImage
+          src={src}
+          alt={alt ?? ''}
+          sizes={sizes ?? GLYPH_SIZES[size]}
+          className="size-full object-cover"
+        />
       </div>
     )
   }
@@ -61,6 +82,7 @@ export function PhotoFrame({
   glyph,
   src,
   alt,
+  sizes = '(min-width: 1024px) 50vw, 100vw',
   className = '',
   rounded = true,
   bordered = true,
@@ -68,6 +90,8 @@ export function PhotoFrame({
   glyph?: string
   src?: string | null
   alt?: string
+  /** Bề rộng ô hiển thị, cú pháp thuộc tính `sizes` — mặc định là ảnh nửa trang */
+  sizes?: string
   className?: string
   rounded?: boolean
   /**
@@ -83,9 +107,7 @@ export function PhotoFrame({
   if (src) {
     return (
       <div className={frame}>
-        {/* `<img>` chứ không `next/image`: đường dẫn do người nhập khai ở Office nên
-            không biết trước miền, mà `next/image` đòi khai miền sẵn trong cấu hình */}
-        <img src={src} alt={alt ?? ''} className="size-full object-cover" loading="lazy" />
+        <SiteImage src={src} alt={alt ?? ''} sizes={sizes} className="size-full object-cover" />
       </div>
     )
   }

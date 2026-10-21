@@ -106,6 +106,7 @@ export function DishRails({ top, bottom }: { top: RailDish[]; bottom: RailDish[]
                   glyph={dish.glyph}
                   src={dish.imageUrl}
                   alt={dish.nameVi}
+                  sizes="(min-width: 1024px) 276px, (min-width: 640px) 220px, 180px"
                   className="size-full"
                 />
               </Link>

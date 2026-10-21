@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DishCounter } from '../../../components/DishCounter'
 import { MenuIndex } from '../../../components/MenuIndex'
+import { SiteImage } from '../../../components/SiteImage'
 import type { OnlineDish, OnlineMenu } from '../../../lib/api'
 import { useOrder } from '../order-context'
 import { DishSheet } from './DishSheet'
@@ -150,10 +151,10 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
                       content. */}
                   <span className="grid h-22 w-22 flex-none place-items-center overflow-hidden rounded-md border border-line-1 bg-[radial-gradient(120%_100%_at_50%_20%,var(--sora-line-1)_0%,var(--sora-surface-4)_74%)]">
                     {dish.imageUrl ? (
-                      <img
+                      <SiteImage
                         src={dish.imageUrl}
                         alt=""
-                        loading="lazy"
+                        sizes="88px"
                         className="size-full object-cover"
                       />
                     ) : (

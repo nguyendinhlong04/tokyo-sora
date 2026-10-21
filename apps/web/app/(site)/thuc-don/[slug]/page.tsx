@@ -147,6 +147,7 @@ export default async function DishPage({ params }: PageProps) {
                       src={pair.imageUrl}
                       alt={pair.nameVi}
                       size="sm"
+                      sizes="88px"
                       className="size-22 flex-none rounded-md"
                     />
                     <div className="min-w-0">
@@ -271,6 +272,7 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
                       src={story.fireImageUrl}
                       bordered={false}
                       rounded={false}
+                      sizes="66px"
                       className="size-16.5 flex-none rounded-sm"
                     />
                     <p className="min-w-0 text-[length:var(--fs-b1)] leading-relaxed text-ink-cream">
@@ -288,6 +290,7 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
                       src={story.dipImageUrl}
                       bordered={false}
                       rounded={false}
+                      sizes="66px"
                       className="size-16.5 flex-none rounded-sm"
                     />
                     <p className="min-w-0 text-[length:var(--fs-b1)] leading-relaxed text-ink-cream">
@@ -363,6 +366,7 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
                       glyph={story.originKanji || '部'}
                       src={story.originImageUrl}
                       rounded={false}
+                      sizes="(min-width: 1024px) 260px, 100vw"
                       className="h-[150px] rounded-md"
                     />
                     <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
@@ -401,6 +405,7 @@ function StoryPoster({ dish, story }: { dish: SiteDish; story: SiteDishStory }) 
                       src={cut.imageUrl ?? dish.imageUrl}
                       alt={`${dish.nameVi} — ${cut.name}`}
                       size="sm"
+                      sizes="(min-width: 1024px) 280px, 100vw"
                       className="h-[130px]"
                     />
                     <div className="flex min-w-0 flex-1 flex-col gap-3.5 p-4">
@@ -698,6 +703,7 @@ function SetPoster({
                               src={itemDish.imageUrl}
                               alt={itemDish.nameVi}
                               size="sm"
+                              sizes="62px"
                               className="size-15.5 flex-none rounded-sm"
                             />
                             <div className="min-w-0 flex-1">
@@ -754,6 +760,7 @@ function SetPoster({
                           src={extra.imageUrl}
                           alt={extra.nameVi}
                           size="sm"
+                          sizes="62px"
                           className="size-15.5 flex-none rounded-sm"
                         />
                       ) : (

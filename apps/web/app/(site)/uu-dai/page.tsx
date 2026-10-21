@@ -71,7 +71,13 @@ export default async function OffersPage() {
                 key={set.id}
                 className="flex flex-col overflow-hidden rounded-lg border border-accent/16 bg-surface-2"
               >
-                <DishGlyph glyph={dishGlyph(set)} src={set.imageUrl} alt={set.nameVi} className="aspect-[4/3] w-full" />
+                <DishGlyph
+                  glyph={dishGlyph(set)}
+                  src={set.imageUrl}
+                  alt={set.nameVi}
+                  sizes="(min-width: 1024px) 400px, 100vw"
+                  className="aspect-[4/3] w-full"
+                />
                 <div className="flex flex-1 flex-col p-7">
                   <h3 className="font-display text-[26px] font-light text-ink-hi lg:text-[length:var(--fs-d3)]">
                     {set.nameVi}

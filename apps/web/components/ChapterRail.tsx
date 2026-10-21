@@ -77,7 +77,13 @@ export function ChapterRail({ chapters }: { chapters: RailChapter[] }) {
             tabIndex={at >= chapters.length ? -1 : undefined}
             className="relative aspect-[276/143] w-[180px] flex-none overflow-hidden rounded-md border border-accent/16 transition-colors hover:border-accent/45 sm:w-[220px] lg:w-[276px]"
           >
-            <DishGlyph glyph={chapter.glyph} src={chapter.imageUrl} alt="" className="size-full" />
+            <DishGlyph
+              glyph={chapter.glyph}
+              src={chapter.imageUrl}
+              alt=""
+              sizes="(min-width: 1024px) 276px, (min-width: 640px) 220px, 180px"
+              className="size-full"
+            />
             <div
               aria-hidden
               className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,8,10,0.1)_0%,rgba(7,8,10,0.86)_100%)]"

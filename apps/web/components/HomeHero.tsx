@@ -6,6 +6,7 @@ import { SITE } from '../content/site'
 import { apiGet } from '../lib/api'
 import { seedOrderDraft, type ReceiveMode } from '../lib/order-draft'
 import type { SiteWard } from '../lib/site'
+import { optimizedUrl, SiteImage } from './SiteImage'
 
 /**
  * Hero W1 — ảnh món chiếu vòng, và ngay trên nó là bước đầu của việc đặt món.
@@ -195,6 +196,25 @@ export function HomeHero({
   const move = (step: number) => setAt((v) => (v + step + total) % total)
 
   /**
+   * Những khung đã từng chiếu — chỉ chúng, cộng khung kế và khung trước, được dựng ảnh.
+   *
+   * Trước đây cả bộ dựng ảnh một lúc, chỉ đổi độ mờ. Mỗi khung là một `<img>` không
+   * lazy, nên lúc render trên máy chủ React chèn `<link rel=preload>` cho TỪNG tấm:
+   * năm ảnh hero tải song song ở mức ưu tiên cao nhất ngay khi mở trang, chen cả
+   * CSS lẫn chữ — trong khi khách chỉ nhìn thấy tấm đầu.
+   *
+   * Dựng sẵn khung kế để lúc đổi khung ảnh đã về, mờ dần không lộ nền trống; khung
+   * trước cho nút lùi. Khung đã chiếu thì giữ lại: ảnh đã tải rồi, gỡ đi rồi dựng
+   * lại chỉ làm vòng lặp sau nháy.
+   */
+  const [seen, setSeen] = useState(() => new Set([0]))
+  useEffect(() => {
+    setSeen((s) => (s.has(at) ? s : new Set(s).add(at)))
+  }, [at])
+  const mounted = (i: number) =>
+    seen.has(i) || i === at || i === (at + 1) % total || i === (at - 1 + total) % total
+
+  /**
    * Tự sang món sau sau sáu giây — đủ để đọc xong tên món rồi mới đổi.
    *
    * `at` nằm trong danh sách phụ thuộc nên bấm mũi tên là đồng hồ đếm lại từ
@@ -372,16 +392,20 @@ export function HomeHero({
             i === at ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          {slide.imageUrl ? (
-            /* `<img>` chứ không `next/image`: đường dẫn ảnh do người nhập khai ở
-               Office nên không biết trước miền */
+          {!mounted(i) ? null : slide.imageUrl ? (
             /* Tâm đi qua biến CSS chứ không viết thẳng vào `style`: giá trị là
                của riêng từng khung nên phải nội tuyến, nhưng chỉ được áp dưới
                1024 — mà `style` thì không có điểm gãy. Biến nội tuyến, lớp quyết
-               định khổ nào dùng nó. */
-            <img
+               định khổ nào dùng nó.
+
+               Chỉ khung ĐẦU là `priority`: đó là ảnh LCP. Các khung sau lazy —
+               chúng nằm trong khung nhìn nên vẫn tải ngay sau khi trang dựng
+               xong, chỉ là không chen trước ảnh đầu. */
+            <SiteImage
               src={slide.imageUrl}
               alt=""
+              sizes="100vw"
+              priority={i === 0}
               style={{ '--tieu-diem': slide.mobileFocus } as CSSProperties}
               className="size-full object-cover [object-position:var(--tieu-diem)] lg:[object-position:50%_50%]"
             />
@@ -400,7 +424,9 @@ export function HomeHero({
           {slide.videoUrl && i === at ? (
             <video
               src={slide.videoUrl}
-              poster={slide.imageUrl ?? undefined}
+              /* Ảnh chờ cũng phải là bản đã tối ưu — trỏ thẳng ảnh gốc là kéo
+                 lại đúng tấm PNG 8 MB mà ảnh bên dưới vừa tránh được */
+              poster={slide.imageUrl ? optimizedUrl(slide.imageUrl) : undefined}
               autoPlay
               muted
               playsInline

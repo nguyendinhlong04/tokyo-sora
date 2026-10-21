@@ -443,15 +443,20 @@ ra log hay chat.
 
 ## 8. Hiệu năng — yêu cầu bắt buộc
 
-**Số đo thực tế 21/10/2026 trên https://tokyo-sora.vn** (nguyên nhân "ảnh hiển thị chậm"):
-- Hero trang chủ gắn **cả 5 khung cùng lúc** (`HomeHero.tsx` mount mọi slide, chỉ đổi
-  opacity) → tải 5 PNG **~8 MB/ảnh** (2736×1536) ngay khi mở trang; `load` event ở **46 s**.
-- Thumbnail thực đơn là PNG gốc **3–7 MB**, 2816×1536, hiển thị ở 263×197 — không
-  `srcset`/`sizes`/`width`/`height`, không `next/image`, không `fetchpriority`.
-- Ảnh nằm ở **hai kho**: `storage.googleapis.com/tokyo-sora/...` (cache `max-age=3600`,
-  tên có dấu cách/tiếng Việt) và Supabase **signed URL** (token hết hạn 08/2027 → tới lúc
-  đó ảnh chết im lặng). Web không có `public/`, không favicon/OG image.
+**Số đo 21/10/2026 trên https://tokyo-sora.vn** (nguyên nhân "ảnh hiển thị chậm"):
+- Trang chủ kéo **98 MB ảnh**: PNG gốc 2–8,7 MB (tới 2816px) hiển thị trong ô vài trăm px;
+  `load` event ở **46 s**. Hero gắn cả 5 khung → React chèn `<link rel=preload>` cho cả 5.
+- Kho ảnh về Việt Nam chỉ 0,5–1,7 MB/s; ảnh Supabase signed URL trả `private, no-cache`
+  (trình duyệt không giữ lại) và token hết hạn 08/2027 → tới lúc đó ảnh chết im lặng.
 - Trên iPad Gen 7 (A10, 3 GB RAM) PNG cỡ này còn tốn bộ nhớ giải mã — lưới 20 món là treo.
+
+**Đã sửa ở `apps/web` (21/10/2026):** mọi ảnh từ Office đi qua `components/SiteImage.tsx`
+→ `next/image` (bộ tối ưu của Vercel, WebP, bộ đệm 31 ngày, kho được phép khai ở
+`lib/image-hosts.ts`); hero chỉ dựng khung đang chiếu/kế/trước, chỉ khung đầu `priority`.
+Đo bản build: hero 2560px còn 58–244 KB, thumbnail 4–75 KB (giảm ~50–1000×). Hệ quả cần
+nhớ: **ghi đè ảnh cùng tên ở kho thì web hiện ảnh cũ tới 31 ngày** — thay ảnh thì tải lên
+tên mới; gói Hobby của Vercel có 5.000 lượt đổi cỡ/tháng (quá là ảnh mới lỗi 402). Các app
+Vite (table, pos…) **chưa** sửa — vẫn phát ảnh gốc.
 
 **Ngân sách (đo trên Chrome DevTools, throttling 4G, máy chậm 4×):**
 - LCP ≤ 2,5 s (web, table) · tương tác chạm phản hồi ≤ 100 ms (optimistic update, không
@@ -469,8 +474,8 @@ ra log hay chat.
    `sharp` (đã có trong repo) → Supabase Storage; giữ ô "dán URL" ở Office làm đường phụ.
 2. `<img>` luôn có `width`/`height` (hoặc `aspect-ratio`), `srcset` + `sizes`, `decoding="async"`,
    `loading="lazy"` cho mọi ảnh **trừ** ảnh LCP (hero/ảnh đầu) — ảnh LCP dùng
-   `fetchpriority="high"` và có thể preload. Web: bật `next/image` với `remotePatterns`
-   cho kho ảnh đã chọn.
+   `fetchpriority="high"` và có thể preload. Web: **luôn dùng `SiteImage`** (bắt buộc
+   `sizes` đúng bề rộng ô), không viết `<img>` trần cho ảnh từ Office.
 3. Hero/băng chuyền: chỉ mount **khung đang chiếu + khung kế**, video `muted playsInline
    preload="metadata"` với poster nhỏ; không bao giờ tải cả bộ.
 4. Đĩa ảnh/LQIP: khung giữ chỗ bằng gradient token (đã có) để không nhảy bố cục; placeholder
