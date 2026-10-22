@@ -798,6 +798,8 @@ VietinBank có cổng Open API tự phục vụ (developer.vietinbank.vn): đăn
 
 **Khuyến nghị:** lấy báo giá khối lượng lớn từ **Viettel S-Invoice** và **MISA meInvoice**, quyết theo hai tiêu chí: (1) đơn giá ở mức 50.000–200.000 HĐ/năm, (2) chất lượng API môi trường test. Nếu kế toán chốt dùng phần mềm MISA thì cộng điểm mạnh cho meInvoice; nếu tối ưu chi phí thuần thì S-Invoice.
 
+**Trạng thái (22/10/2026):** phía quán đã dựng xong — tự lập hoá đơn lúc trả đủ, cấp số, người mua, thay thế, hàng chờ gửi lại — qua một lớp nối nhà cung cấp và bản giả lập (CLAUDE.md §9.7). Ký hợp đồng xong thì chỉ viết adapter cho nhà cung cấp được chọn.
+
 **Kiến trúc kết nối (không phụ thuộc nhà cung cấp):** hệ thống có **lớp trừu tượng hoá đơn** — một giao diện chung `phát hành / huỷ / thay thế / điều chỉnh / tra trạng thái`, mỗi nhà cung cấp là một adapter. Đổi nhà cung cấp = viết adapter mới, không đụng P11/T15/F3. Luồng phát hành: thanh toán xong → đẩy hàng đợi phát hành → gọi API ký số (HSM đặt phía nhà cung cấp để không phải cắm USB token từng máy) → nhận số HĐ + mã tra cứu → in QR lên bill + gửi T15. **Lỗi phát hành không được chặn khách ra về** — bill in trước, HĐ phát hành bù qua hàng đợi F3, ghi rõ SLA phát hành bù trong ngày.
 
 **ĐÃ CHỐT:** một mã số thuế → **một hợp đồng HĐĐT duy nhất**, mỗi địa điểm kinh doanh một ký hiệu M riêng (A9). Trình tự khi mở chi nhánh: đăng ký địa điểm kinh doanh với cơ quan thuế → thêm ký hiệu → bật công tắc. Lưu ý kế toán xác nhận khi mở chi nhánh **khác tỉnh**: có thể phát sinh phân bổ thuế cho địa phương — không ảnh hưởng thiết kế, chỉ ảnh hưởng kê khai.

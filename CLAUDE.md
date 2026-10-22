@@ -34,7 +34,8 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
   và **tự mở bàn** (QR điện thoại **đã gỡ** 22/10); **bàn đôi** chạy độc lập hoặc ghép; **màn
   chờ chạy quảng cáo** khi bàn chưa mở; POS gọi món của nhân viên chạy tốt trên **cả iPad
   lẫn điện thoại**; **dựng lại màn bếp**; **khuyến mãi áp dụng chung** mọi kênh, giá giảm
-  ghi thẳng vào đơn (§9.6); **tốc độ là yêu cầu cứng** — ảnh trên web hiện quá chậm (§8).
+  ghi thẳng vào đơn (§9.6); **hoá đơn điện tử** cho mọi bill, khách doanh nghiệp khai MST ở
+  POS, iPad, web (§9.7); **tốc độ là yêu cầu cứng** — ảnh trên web hiện quá chậm (§8).
 
 ---
 
@@ -684,7 +685,8 @@ Mục tiêu bản dựng lại (giữ nguyên API; đổi client):
 6. POS ba khổ (§9.3).
 Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
 Chen ngay sau giao diện iPad, theo yêu cầu 22/10/2026: **khuyến mãi áp dụng chung** (§9.6) —
-xong cùng ngày: API, B11, iPad, web và ô voucher ở POS.
+xong cùng ngày: API, B11, iPad, web và ô voucher ở POS. Rồi **hoá đơn điện tử** (§9.7): API
+xong 22/10/2026 trên nhánh `hoa-don-dien-tu`, giao diện từng app theo sau.
 
 ### 9.6 Khuyến mãi áp dụng chung (chốt và làm 22/10/2026)
 Một bộ chấm cho mọi kênh: `packages/contracts/src/promotions.ts` (test `promotions.test.ts`),
@@ -711,8 +713,9 @@ vào đơn; app chỉ hiển thị.
   (`standard` · `alcohol`), đóng băng vào `order_lines.vat_code`. Thuế suất là tham số A6
   `sales.vatRate` (món ăn — đang giảm còn 8% tới 31/12/2026) và `sales.vatRateAlcohol` (bia,
   rượu 10%, không được giảm). `computeOrderTotals` tính thuế riêng từng thuế suất; phần giảm
-  hoá đơn chia về dòng qua `priceBill().shares`; đơn lưu `orders.vat_breakdown`, F4 đọc nó.
-  Phí giao chưa chịu VAT — chờ kế toán xác nhận.
+  hoá đơn chia về dòng qua `priceBill().shares`; đơn lưu `orders.vat_breakdown`, hoá đơn
+  chép sang `invoices.vat_breakdown` và F4 đọc từ đó (§9.7). Phí giao chưa chịu VAT — chờ
+  kế toán xác nhận.
 - **Trần luật** (NĐ 81/2018 sửa bởi NĐ 128/2024): giảm ≤ 50% giá ngay trước khuyến mãi, quà
   ≤ 50% giá trị hàng mua; **khuyến mại tập trung** (`concentrated`) được tới 100%. Tham số
   `promo.maxDiscountRate` = 0,5. B11 chặn lúc soạn (% > 50, `get × pct > 50 × buy`); bộ chấm
@@ -730,7 +733,8 @@ vào đơn; app chỉ hiển thị.
   lại mỗi phút. iPad: `PromotionsProvider` ở `IpadShell`, `PromoTag` (cam than + ngọn lửa),
   giỏ ước bằng `priceNewLines`, gợi ý "gọi thêm X để được ưu đãi hoá đơn". Web: provider
   ở `app/dat-mon/[branch]/layout.tsx`, lấy sẵn khi dựng trang trên máy chủ (không nhảy giá)
-  rồi hỏi lại mỗi phút; `/api/online/menu` trả kèm `pricing {vatRate, roundingUnit}` để
+  rồi hỏi lại mỗi phút; `/api/online/menu` trả kèm `pricing {vatRate, vatRateAlcohol,
+  roundingUnit}` (và `einvoiceEnabled`) để
   web chạy chính `computeOrderTotals` — số trên nút "Đặt đơn và trả" = số mã QR đòi, kể cả
   làm tròn khi giá giảm lẻ đồng.
 - **Báo cáo:** `promotion_redemptions` một dòng cho mỗi (đơn, chương trình) = số đang giảm,
@@ -742,14 +746,82 @@ vào đơn; app chỉ hiển thị.
 - **Chưa làm / biết trước:**
   - Trang thương hiệu (W1/W2 `/thuc-don`) chưa in giá giảm — chưa biết chi nhánh, mà
     chương trình theo chi nhánh và giờ. Khách ở iPad/web chưa có ô tự nhập voucher.
-  - Hoá đơn điện tử (`invoices`) chưa có cột chiết khấu — NĐ 123/2020 bắt hiện chiết khấu
-    thương mại; làm khi nối nhà cung cấp HĐĐT.
   - Chia bill theo món (`split/claim`) cộng `price_total`: đã trừ giảm món, chưa chia giảm
     hoá đơn (như phí phục vụ/VAT trước giờ).
   - Mua N tặng M: huỷ dòng "đã mua" sau khi phần tặng đã ghi thì phần tặng vẫn giữ.
   - Chương trình hoá đơn bật giữa bữa chỉ áp khi đơn đổi lần tiếp theo.
   - Đơn tối thiểu vùng giao (`below_min_order`) so trên tiền món giá niêm yết.
   - Migration `0030_khuyen_mai_ap_dung_chung` phải `db:migrate` trước khi deploy API.
+
+### 9.7 Hoá đơn điện tử (NĐ 254/2026, TT 91/2026 — API làm 22/10/2026)
+Mọi bill trả đủ là **một** hoá đơn khởi tạo từ máy tính tiền, lập ngay lúc trả; người mua
+chỉ ghi khi khách yêu cầu, không thì "Bán cho người tiêu dùng". Module
+`apps/api/src/modules/einvoice/` không nhập Ordering/Payments/CRM — chúng nhập nó.
+- **Luồng:** mọi đường làm đơn "trả đủ" (tiền mặt, thẻ, VietQR bàn và online, đối soát P15,
+  COD, giao xong, ghi nợ công ty, đóng bàn 0đ toàn món tặng) gọi `enqueueForPaidOrder(tx)`
+  → dòng `invoices` `pending` trong CÙNG transaction (savepoint — hoá đơn hỏng không bao giờ
+  làm hỏng lượt thu). Sau commit, `tryIssue`: lease 60 s → dựng nội dung
+  (`domain/document.ts`) → cấp số (`einvoice_counters`, UPSERT) → gọi nhà cung cấp **ngoài**
+  transaction (timeout `EINVOICE_TIMEOUT_MS`, `request_key` cố định qua mọi lượt) →
+  `issued` / `failed`. Webhook ngân hàng chỉ xếp hàng; lượt đọc kế tiếp phát hành
+  (`GET table-sessions/:id/invoice`, trang theo dõi đơn, `GET accounting/invoices/pending`
+  của trạm thu ngân, F3 "phát hành lại"). Thử lại giãn 30 s → 1 h; không có tiến trình nền.
+  Đơn giao lập lúc `done`; đơn Grab/Shopee/Be **không** tự lập (F3 phát hành tay); chi
+  nhánh chưa bật ở A9 thì không lập.
+- **Ký hiệu, số:** A9 khai mẫu `C26MAA` (ký tự 4 là `M` = máy tính tiền); năm trong ký hiệu
+  theo ngày lập (`serialForDate`) nên sang năm số tự về 1. Số 8 chữ số; đã cấp thì không
+  đổi, không huỷ (`invoices_guard`, `invoices_numbered_not_voided` ở `9008`) — gửi hỏng
+  thì gửi lại đúng số đó.
+- **Bất biến:** tờ `issued` không sửa, không xoá; sai thì **thay thế** (TT 91 Điều 10): bản
+  cũ sang `replaced` kèm lý do, bản mới số mới trỏ `replaces_id`. `voided` chỉ cho tờ chưa
+  cấp số.
+- **Người mua:** `orders.invoice_buyer` (`InvoiceBuyer` ở `packages/contracts/src/invoice.ts`;
+  null = người tiêu dùng). `company`: MST 10 hoặc 10-3 số, tên, địa chỉ bắt buộc, email,
+  người mua hàng, `corporateId` (chỉ nhân viên gắn được). `person`: họ tên; có MST 10 số hay
+  số định danh 12 số thì bắt buộc địa chỉ. Khai bằng `PUT table-sessions/:id/invoice-buyer`
+  (POS, iPad — quyền `order.create`) và `customer.invoiceBuyer` lúc đặt hay
+  `PUT online/track/:token/invoice-buyer` (web). Sửa được tới khi tờ hoá đơn gửi đi — 409
+  `invoice_issued` · `invoice_issuing` (đang gửi) · `invoice_unconfirmed` (đã gửi, chưa có
+  câu trả lời) · `invoice_buyer_locked` (bill đã ghi nợ công ty) · `no_order`. Ghép bàn mang
+  người mua theo. Lúc phát hành nội dung đóng băng vào `invoices.snapshot`; công ty được
+  nhớ vào danh bạ `invoice_buyers` — **không bao giờ** lưu số định danh cá nhân.
+- **Tra MST:** `GET tax-codes/:code` (nhân viên, iPad của bàn đang mở) và
+  `GET online/tax-codes/:code` (công khai, giới hạn theo IP): hồ sơ B15 → danh bạ → VietQR
+  (`TAXCODE_LOOKUP`), kết quả nhớ vào danh bạ. Email, `corporateId` chỉ nhân viên thấy; số
+  12 chữ số không đem đi tra; 10 lượt/phút mỗi người tra, 30 lượt ra ngoài/phút mỗi instance.
+- **Nội dung:** từng món (tên kèm tuỳ chọn), giảm món, giảm hoá đơn thành dòng "Khuyến mại:
+  …" / "Chiết khấu thương mại" theo từng thuế suất, phí phục vụ theo thuế suất, phí giao
+  (không thuế), VAT từng thuế suất, tổng chính xác — phần làm tròn của bill ghi riêng, ngoài
+  tổng hoá đơn — và hình thức TM / CK / Thẻ / Công nợ.
+- **Quyền:** phát hành `einvoice.issue` (R2, R7, R8, R10): `POST orders/:id/invoice/issue`.
+  Thay thế `POST accounting/invoices/:id/replace {reason, buyer?, approval?}` —
+  `einvoice.void-replace-adjust`: thu ngân R2 △ (PIN quản lý ca ngay tại quầy), R7 · R8 ·
+  R10 ✓.
+- **Ghi nợ công ty** (`POST crm/corporate/charges`): công ty nợ phần còn lại; bill thành trả
+  đủ, bàn chờ dọn, hoá đơn đứng tên công ty lập ngay; mã VietQR còn treo hết hạn; hồ sơ
+  thiếu địa chỉ → 409 `corporate_profile_incomplete`. Không còn "gộp cuối kỳ" — cột
+  `corporate_customers.einvoice_mode` bỏ dùng, xoá sau khi API mới chạy ổn.
+- **Kế toán:** F3 lọc `state` / `buyer` / `q`, `queue`, `missing` (tính từ
+  `einvoice.enabledFrom` — ngày bật lần đầu ở A9), `needsAction` (tờ đã lên thuế mà đơn bị
+  huỷ), chi tiết `GET accounting/invoices/:id`. F6 chặn khoá khi còn tờ chưa lên hay bill
+  chưa có tờ. F4: VAT đầu ra theo tờ `issued` (ngày lập) + bill đã trả chưa có tờ
+  (`uninvoicedBuckets`, theo ngày kinh doanh).
+- **Nhà cung cấp:** `einvoice-provider.ts`, `EINVOICE_PROVIDER` (`mock` ở dev và test · `off`
+  mặc định ở production — A9 không cho bật). Bản giả lập trả `test: true` → bill và màn
+  khách in "HOÁ ĐƠN THỬ". Chưa ký hợp đồng: adapter thật thêm ở file này, thông tin đăng
+  nhập để trong env, không trong `parameters`.
+- **Chưa làm / biết trước:**
+  - Giao diện: POS P10/P11 + in 80 mm, iPad T10/T11/T15, web O5/O6/theo dõi đơn, Office
+    F3/B15/A9/M2/A6/F4 — mỗi app một PR. Office B15 còn ô chọn chế độ hoá đơn (vô tác dụng).
+  - Hoá đơn điều chỉnh, hoàn tiền sau khi xuất, thông báo sai sót 04/SS; người mua nước ngoài
+    (hộ chiếu); một bill nhiều người mua (tách ở P9 trước khi trả).
+  - Chờ kế toán xác nhận: phí giao có chịu VAT không; làm tròn 1.000đ sinh phần thu ngoài hoá
+    đơn; cách xuất cho đơn sàn giao đồ ăn.
+  - **gd1 chưa có bản sửa pool 1 kết nối (47eccc1, nhánh `to-chuc-dieu-hanh`):** trên Vercel
+    mọi luồng duyệt PIN — kể cả thu ngân thay thế hoá đơn, ghi nợ công ty — kẹt 10 s rồi 500
+    cho tới khi bản sửa đó vào. PGlite không chạy được các luồng này; kiểm bằng Postgres thật.
+  - Migration `0033_hoa_don_dien_tu`, `9008_hoa_don_dien_tu` phải `db:migrate` trước khi
+    deploy API.
 
 ---
 
