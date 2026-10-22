@@ -238,10 +238,27 @@ export interface InvoiceView {
 export interface InvoiceStatus {
   /** Chi nhánh đã bật hoá đơn điện tử */
   enabled: boolean
-  /** Còn sửa được người mua (chưa có hoá đơn phát hành) */
+  /** Còn sửa được người mua: hoá đơn chưa phát hành, không đang gửi, không chờ kết quả */
   editable: boolean
   buyer: InvoiceBuyer | null
   invoice: InvoiceView | null
+}
+
+/**
+ * Kết quả tra MST để tự điền tên, địa chỉ người mua (`GET /api/tax-codes/:code`).
+ * Chỉ gợi ý: người nhập vẫn sửa được trước khi lưu.
+ */
+export interface TaxCodeLookupView {
+  taxCode: string
+  name: string
+  address: string | null
+  /** Tình trạng theo Cục Thuế lúc tra, vd "NNT ngừng hoạt động…" — null khi chưa từng tra */
+  status: string | null
+  /** corporate = hồ sơ B15 · directory = công ty quán đã xuất hoá đơn · registry = tra ngoài */
+  source: 'corporate' | 'directory' | 'registry'
+  /** Chỉ nhân viên nhận hai trường dưới */
+  email?: string | null
+  corporateId?: number | null
 }
 
 /** "1C26MAA · 00000123" — chưa cấp số thì chỉ ký hiệu */

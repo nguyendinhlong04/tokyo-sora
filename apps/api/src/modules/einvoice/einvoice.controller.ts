@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   ParseIntPipe,
@@ -16,6 +17,7 @@ import { assertOwnTableSession } from '../identity/actor'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { EinvoiceService } from './einvoice.service'
+import { TaxCodesService } from './tax-codes.service'
 
 /** null = "Bán cho người tiêu dùng" */
 const BuyerBody = z.object({ buyer: InvoiceBuyerSchema.nullable() })
@@ -26,7 +28,10 @@ const BuyerBody = z.object({ buyer: InvoiceBuyerSchema.nullable() })
  */
 @Controller('api')
 export class EinvoiceController {
-  constructor(private readonly einvoice: EinvoiceService) {}
+  constructor(
+    private readonly einvoice: EinvoiceService,
+    private readonly taxCodes: TaxCodesService,
+  ) {}
 
   /**
    * POS P10/P11 và iPad T10/T11/T15. Không gắn quyền: khách tại bàn (R0) chỉ hỏi
@@ -52,6 +57,22 @@ export class EinvoiceController {
   ) {
     assertOwnTableSession(req.actor!, id)
     return this.einvoice.setBuyerForSession(id, BuyerBody.parse(body).buyer, req.actor!)
+  }
+
+  /**
+   * Gõ MST là điền sẵn tên, địa chỉ — POS, iPad bàn, Office F3. Không gắn quyền:
+   * nhân viên nào cũng có thể đang nhập người mua, iPad chỉ khi bàn đang mở (khách).
+   */
+  @Get('tax-codes/:code')
+  lookupTaxCode(@Param('code') code: string, @Req() req: RequestWithActor) {
+    const actor = req.actor!
+    if (actor.kind === 'staff') {
+      return this.taxCodes.lookup(code, { key: `staff:${actor.staffId}`, staff: true })
+    }
+    if (actor.kind === 'customer') {
+      return this.taxCodes.lookup(code, { key: `table:${actor.tableSessionId}`, staff: false })
+    }
+    throw new ForbiddenException('Thiết bị này không tra được mã số thuế')
   }
 
   @Get('orders/:id/invoice')

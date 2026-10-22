@@ -11,6 +11,8 @@
  *      gửi lại; hai lượt thử cùng lúc chỉ gọi nhà cung cấp một lần.
  *   4. Người mua (công ty, cá nhân) khai ở iPad, POS hay web nằm trên đơn tới lúc
  *      phát hành; sau đó chỉ còn đường lập hoá đơn thay thế.
+ *   5. Gõ MST là có tên, địa chỉ — từ hồ sơ B15, danh bạ của quán hay nguồn ngoài;
+ *      số định danh cá nhân không bao giờ đem đi tra.
  */
 import { createHmac } from 'node:crypto'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
@@ -19,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ParamsService } from '../common/params.service'
 import type { Db } from '../db/client'
 import {
+  corporateCustomers,
   deliveryZones,
   devices,
   dishes,
@@ -28,6 +31,7 @@ import {
   payments,
 } from '../db/schema'
 import { EINVOICE_PROVIDER, type MockEinvoiceProvider } from '../modules/einvoice/einvoice-provider'
+import { TAX_CODE_REGISTRY, type MockTaxCodeRegistry } from '../modules/einvoice/tax-code-registry'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
 import { bootTestApp, type Fixtures } from './harness'
@@ -753,5 +757,123 @@ describe('Thu ngân lập hoá đơn thay thế tại quầy', () => {
     expect(oldRow).toMatchObject({ state: 'replaced', invoiceNo: old.invoiceNo })
     expect(oldRow!.approvalId).not.toBeNull()
     await closeTable(sessionId)
+  })
+})
+
+describe('Tra mã số thuế để điền sẵn người mua', () => {
+  const FPT = {
+    taxCode: '0101248141',
+    name: 'CÔNG TY CỔ PHẦN FPT',
+    address: 'Số 10 Phạm Văn Bạch, Dịch Vọng, Cầu Giấy, Hà Nội',
+    status: 'NNT đang hoạt động (đã được cấp GCN ĐKT)',
+  }
+  let registry: MockTaxCodeRegistry
+
+  const lookup = (code: string, headers: Record<string, string> = auth()) =>
+    inject({ method: 'GET', url: `/api/tax-codes/${code}`, headers })
+
+  beforeAll(() => {
+    registry = app.get<MockTaxCodeRegistry>(TAX_CODE_REGISTRY)
+    // Test không bao giờ ra mạng
+    expect(registry.name).toBe('mock')
+    registry.entries.set(FPT.taxCode, {
+      name: FPT.name,
+      address: FPT.address,
+      status: FPT.status,
+    })
+  })
+
+  it('MST lạ: tra nguồn ngoài một lần, lần sau lấy từ danh bạ của quán', async () => {
+    const first = await lookup('0101 248 141')
+    expect(first.statusCode, first.payload).toBe(200)
+    expect(first.json()).toEqual({ ...FPT, source: 'registry', email: null, corporateId: null })
+    expect(registry.calls).toEqual([FPT.taxCode])
+
+    const again = await lookup(FPT.taxCode)
+    expect(again.json()).toMatchObject({ name: FPT.name, status: FPT.status, source: 'directory' })
+    expect(registry.calls).toHaveLength(1)
+  })
+
+  it('công ty quán đã xuất hoá đơn: iPad thấy tên, địa chỉ; email chỉ nhân viên thấy', async () => {
+    const { sessionId } = await tableWith([{ dishId: 'bachibo', qty: 1 }], fx.plainTableId)
+    const fromIpad = await lookup(COMPANY.taxCode, ipad())
+    expect(fromIpad.statusCode, fromIpad.payload).toBe(200)
+    expect(fromIpad.json()).toEqual({
+      taxCode: COMPANY.taxCode,
+      name: COMPANY.name,
+      address: COMPANY.address,
+      status: null,
+      source: 'directory',
+    })
+    const fromStaff = await lookup(COMPANY.taxCode)
+    expect(fromStaff.json()).toMatchObject({ email: COMPANY.email, corporateId: null })
+    await payCash(sessionId, 308_000)
+    await closeTable(sessionId)
+
+    // Bàn đã đóng: iPad không còn là khách của bàn nào
+    expect((await lookup(COMPANY.taxCode, ipad())).statusCode).toBe(403)
+  })
+
+  it('khách doanh nghiệp B15: nhân viên nhận luôn hồ sơ để ghi nợ', async () => {
+    const [profile] = await db
+      .insert(corporateCustomers)
+      .values({
+        code: 'DN-HB',
+        name: 'CÔNG TY TNHH HẢI BÌNH',
+        taxCode: '0109876543',
+        address: '5 Láng Hạ, Đống Đa, Hà Nội',
+        contactEmail: 'hoadon@haibinh.vn',
+        creditLimitVnd: 20_000_000,
+      })
+      .returning({ id: corporateCustomers.id })
+    const res = await lookup('0109876543')
+    expect(res.json()).toMatchObject({
+      source: 'corporate',
+      name: 'CÔNG TY TNHH HẢI BÌNH',
+      email: 'hoadon@haibinh.vn',
+      corporateId: profile!.id,
+    })
+    expect(registry.calls).toHaveLength(1)
+  })
+
+  it('số định danh 12 số không đem đi tra; MST sai dạng bị chặn', async () => {
+    const personal = await lookup('001099012345')
+    expect(personal.statusCode).toBe(400)
+    expect(personal.json().code).toBe('personal_id')
+    expect((await lookup('01012')).json().code).toBe('bad_tax_code')
+    expect(registry.calls).toHaveLength(1)
+  })
+
+  it('không có ở đâu → 404; nguồn ngoài hỏng → 503, nhập tay', async () => {
+    const missing = await lookup('0100000000')
+    expect(missing.statusCode).toBe(404)
+    expect(missing.json().code).toBe('tax_code_not_found')
+
+    registry.down = true
+    try {
+      const down = await lookup('0100000001')
+      expect(down.statusCode).toBe(503)
+      expect(down.json().code).toBe('lookup_unavailable')
+    } finally {
+      registry.down = false
+    }
+  })
+
+  it('cửa công khai cho web: chỉ tên, địa chỉ; quá 10 lượt một phút thì 429', async () => {
+    const publicLookup = (code: string) =>
+      inject({
+        method: 'GET',
+        url: `/api/online/tax-codes/${code}`,
+        headers: { 'x-real-ip': '203.0.113.7' },
+      })
+    const res = await publicLookup(COMPANY.taxCode)
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.json()).not.toHaveProperty('email')
+    expect(res.json()).toMatchObject({ name: COMPANY.name, address: COMPANY.address })
+
+    for (let i = 0; i < 9; i++) await publicLookup(COMPANY.taxCode)
+    const blocked = await publicLookup(COMPANY.taxCode)
+    expect(blocked.statusCode).toBe(429)
+    expect(blocked.json().code).toBe('too_many_lookups')
   })
 })
