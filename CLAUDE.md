@@ -348,7 +348,7 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   riêng `src/db/migrate.ts` chạy mọi file một lần theo tên, ghi `_sora_migrations`.
   **Không có down**; file đã chạy thì sửa không có tác dụng → luôn thêm file mới.
   Vercel build **không** chạy migration — chạy tay trước khi deploy API. Dữ liệu nền
-  mới cho CSDL đang chạy (khoá tham số A6…) cũng đi bằng migration `9xxx` (mẫu `9006`):
+  mới cho CSDL đang chạy (khoá tham số A6…) cũng đi bằng migration `9xxx` (mẫu `9013`):
   `db:seed` từ chối CSDL đã có dữ liệu.
 - Không dùng Drizzle `.prepare()` (pooler transaction của Supabase).
 - Không viết truy vấn con tương quan trong `sql` ở **phần select** của truy vấn **không

@@ -147,6 +147,8 @@ describe('db:seed chỉ nạp CSDL mới', () => {
   })
 
   it('CSDL trống: nạp đủ dữ liệu nền trong một lượt', async () => {
+    // "Trống" vẫn có tham số do migration nạp — seed không được coi đó là dữ liệu nền
+    expect(await count(`parameters WHERE key = 'promo.maxDiscountRate'`)).toBe(1)
     const summary = await seed(db, { dir: await fixture() })
     expect(summary).toMatchObject({ branches: 1, dishes: 3, tables: 2 })
     expect(await misuji()).toEqual({ name: 'Lõi vai bò', price: 380_000 })
@@ -197,6 +199,44 @@ describe('db:seed chỉ nạp CSDL mới', () => {
     expect(await firstMisujiStep()).toBe(prototypeStep)
     expect(await count(`branches WHERE name = 'Cầu Giấy'`)).toBe(1)
     expect(await count(`dishes WHERE id = 'karaage2'`)).toBe(1)
+  })
+})
+
+// CSDL production seed trước một khoá mới chỉ nhận khoá đó qua migration. Giả lập
+// CSDL "cũ": xoá dòng và dấu đã chạy của migration, rồi chạy migration lại.
+describe('dữ liệu nền mới cho CSDL đang chạy đi bằng migration', () => {
+  const FILE = '9013_promo_max_discount_rate.sql'
+  const promoRow = async () =>
+    (
+      await pg.query(
+        `SELECT value, unit, sensitive, overridable FROM parameters
+          WHERE key = 'promo.maxDiscountRate' AND branch_id IS NULL`,
+      )
+    ).rows
+
+  it('promo.maxDiscountRate: CSDL seed trước khoá này nhận đúng dòng mà seed nạp', async () => {
+    // Dòng seed tự nạp khi chưa có. Trên CSDL mới migration chạy trước và dòng của
+    // nó được giữ, nên hai bên lệch nhau là CSDL mới và cũ mang hai giá trị khác nhau
+    await pg.exec(`DELETE FROM parameters WHERE key = 'promo.maxDiscountRate'`)
+    await seed(db, { dir: await fixture(), overwrite: true })
+    const fromSeed = await promoRow()
+    expect(fromSeed).toHaveLength(1)
+
+    await pg.exec(`
+      DELETE FROM parameters WHERE key = 'promo.maxDiscountRate';
+      DELETE FROM _sora_migrations WHERE filename = '${FILE}';
+    `)
+    expect(await runMigrations(pg)).toEqual([FILE])
+    expect(await promoRow()).toEqual(fromSeed)
+  })
+
+  it('không đè giá trị đã sửa ở A6', async () => {
+    await pg.exec(`
+      UPDATE parameters SET value = '0.3' WHERE key = 'promo.maxDiscountRate';
+      DELETE FROM _sora_migrations WHERE filename = '${FILE}';
+    `)
+    expect(await runMigrations(pg)).toEqual([FILE])
+    expect(await promoRow()).toMatchObject([{ value: 0.3 }])
   })
 })
 

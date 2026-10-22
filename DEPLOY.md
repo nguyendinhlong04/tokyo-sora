@@ -63,7 +63,7 @@ ngoài máy đang chạy là bị từ chối trước khi kết nối.
 
 Cũng vì vậy, dữ liệu nền thêm vào seed **sau** lần nạp đầu — khoá tham số mới, khoản mục
 chi mới — không tới được CSDL này qua `db:seed`. Bản phát hành cần chúng phải kèm
-migration riêng (mẫu: `migrations/9006_table_branch_networks.sql`), chạy bằng
+migration riêng (mẫu: `migrations/9013_promo_max_discount_rate.sql`), chạy bằng
 `db:migrate` ở trên.
 
 Migration in ra `NOTICE` cho hai guard có thể bị Supabase chặn:

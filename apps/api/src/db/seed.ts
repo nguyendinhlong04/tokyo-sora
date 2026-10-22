@@ -12,7 +12,7 @@
  *
  * Hệ quả: dòng thêm vào đây SAU lần nạp đầu (khoá tham số, khoản mục…) không bao
  * giờ tới được CSDL đang chạy qua lệnh này — cần ở đó thì thêm bằng migration, như
- * `9006_table_branch_networks.sql`.
+ * `9013_promo_max_discount_rate.sql`.
  *
  * KHÔNG tạo tài khoản, mật khẩu hay PIN nào: lệnh này chạy cả lên production
  * (DEPLOY.md), mà bản cũ nạp tài khoản Office mẫu bằng UPSERT — mỗi lượt chạy đặt
@@ -164,6 +164,8 @@ const PARAMETERS: {
   // Khuyến mãi (§9.6). Trần giảm theo NĐ 81/2018 sửa bởi NĐ 128/2024: không quá 50%
   // giá ngay trước khuyến mãi, trừ chương trình khuyến mại tập trung. Là tham số vì
   // luật đổi được — nhưng nhạy cảm, nâng nó lên là bỏ chốt chặn pháp lý của B11.
+  // CSDL seed trước khoá này nhận dòng qua 9013_promo_max_discount_rate.sql — sửa
+  // một bên thì sửa cả hai.
   { key: 'promo.maxDiscountRate', value: 0.5, unit: 'tỉ lệ', sensitive: true },
 
   // Công nợ khách doanh nghiệp (§29.1 nhóm "Công nợ DN")
@@ -524,6 +526,7 @@ function layoutFromDescription(branch: SeedBranch): SeedTable[] {
  * Bảng seed ghi đè mà Office sửa được (A3 · A10 · M1 · O10 · S3…). Dù chỉ một dòng ở
  * bảng nào là CSDL đã nạp rồi hoặc đang được dùng. Bảng con (chặng set, bài kể, thẻ
  * công thức, tuỳ chọn) không cần đếm: Office chỉ tạo chúng từ món hay nhóm cha đã có.
+ * Không đếm `parameters`: migration 9xxx nạp tham số cả vào CSDL mới, trước seed.
  */
 const OWNED_TABLES = [
   ['chi nhánh', s.branches],
