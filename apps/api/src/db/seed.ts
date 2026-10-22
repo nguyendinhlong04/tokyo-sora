@@ -3,9 +3,14 @@
  *
  * Idempotent — chạy lại không nhân bản, chỉ cập nhật. Nguồn là các file JSON do
  * `pnpm extract-seed` sinh ra từ designs/*.dc.html.
+ *
+ * KHÔNG tạo tài khoản, mật khẩu hay PIN nào: lệnh này chạy cả lên production
+ * (DEPLOY.md), mà bản cũ nạp tài khoản Office mẫu bằng UPSERT — mỗi lượt chạy đặt
+ * lại mật khẩu chủ quán về một hằng công khai trong repo. Tài khoản dev nằm ở
+ * `dev-accounts.ts` (db:dev-bootstrap); tài khoản quản trị đầu tiên ở production
+ * tạo bằng db:create-admin.
  */
 import 'dotenv/config'
-import { hash } from '@node-rs/argon2'
 import { and, eq } from 'drizzle-orm'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -337,50 +342,6 @@ const DELIVERY_ZONES = [
   },
 ]
 
-/** Vai trò trong prototype → mã vai trò trong ma trận §4.2 */
-const ROLE_BY_TITLE: Record<string, string> = {
-  'Thu ngân': 'R2',
-  'Phục vụ': 'R1',
-  'Trưởng ca': 'R7',
-  'Lễ tân': 'R3',
-  Bếp: 'R4',
-}
-
-/**
- * Tài khoản Sora Office cho môi trường dev.
- *
- * Bộ nhân viên trong prototype dừng ở cấp chi nhánh (thu ngân, phục vụ, trưởng
- * ca) nên không ai mở được màn quản trị. Thêm một tài khoản chủ chuỗi — vai trò
- * gán ở phạm vi TOÀN CHUỖI (branch_id NULL) đúng như §5.
- */
-const DEV_OFFICE_PASSWORD = 'sora-dev-2026'
-/**
- * Tài khoản Office cho máy dev.
- *
- * Có kế toán và quản lý nhân sự vì hai luồng mới ĐÒI HỎI nhiều người: phiếu chi
- * trên hạn mức phải người khác duyệt (§4.3.1 không ai tự duyệt việc của mình), và
- * kỳ lương đi qua ba vai — R13 trình, R8 kiểm, R10 duyệt. Chỉ có một tài khoản
- * chủ thì hai luồng đó không chạy thử được trên máy dev.
- */
-const OFFICE_ACCOUNTS: { code: string; fullName: string; email: string; roles: string[] }[] = [
-  { code: 'CHU01', fullName: 'Chủ quán', email: 'chu@tokyosora.vn', roles: ['R10'] },
-  { code: 'CHUOI01', fullName: 'Quản lý chuỗi', email: 'chuoi@tokyosora.vn', roles: ['R11'] },
-  { code: 'KETOAN01', fullName: 'Kế toán', email: 'ketoan@tokyosora.vn', roles: ['R8'] },
-  { code: 'NHANSU01', fullName: 'Quản lý nhân sự', email: 'nhansu@tokyosora.vn', roles: ['R13'] },
-  // R9 chỉ mở được đúng một màn — A8 nội dung website. Có tài khoản này thì thử
-  // được ranh giới đó thật, thay vì tin rằng nó hẹp.
-  { code: 'MARKETING01', fullName: 'Marketing', email: 'marketing@tokyosora.vn', roles: ['R9'] },
-]
-
-/** PIN dev — mọi nhân viên dùng 4 số khác nhau, chỉ dành cho môi trường phát triển */
-const DEV_PINS: Record<string, string> = {
-  hoa: '1101',
-  minh: '1102',
-  tuan: '1103',
-  lan: '1104',
-  duc: '1105',
-}
-
 interface SeedBranch {
   id: string
   name: string
@@ -438,11 +399,6 @@ function dietTags(d: SeedDishRow): string[] | null {
     d.hasSeafood ? 'hai-san' : null,
   ].filter((t): t is string => t !== null)
   return tags.length > 0 ? tags : null
-}
-interface SeedStaff {
-  id: string
-  name: string
-  role: string
 }
 interface SeedModifierGroup {
   gid: string
@@ -788,45 +744,6 @@ async function seed(db: Db) {
     }
   }
 
-  // ---- Nhân viên + vai trò ----
-  const { staff: staffRows } = await readJson<{ staff: SeedStaff[] }>('staff.json')
-  for (const st of staffRows) {
-    const pin = DEV_PINS[st.id] ?? '1100'
-    const row = { code: st.id.toUpperCase(), fullName: st.name, pinHash: await hash(pin) }
-    const [created] = await db
-      .insert(s.staff)
-      .values(row)
-      .onConflictDoUpdate({ target: s.staff.code, set: { fullName: row.fullName, pinHash: row.pinHash } })
-      .returning({ id: s.staff.id })
-    const roleCode = ROLE_BY_TITLE[st.role] ?? 'R1'
-    await db
-      .insert(s.staffRoles)
-      .values({ staffId: created!.id, roleCode, branchId })
-      .onConflictDoNothing()
-  }
-
-  // ---- Tài khoản Office ----
-  for (const account of OFFICE_ACCOUNTS) {
-    const row = {
-      code: account.code,
-      fullName: account.fullName,
-      email: account.email,
-      passwordHash: await hash(DEV_OFFICE_PASSWORD),
-    }
-    const [created] = await db
-      .insert(s.staff)
-      .values(row)
-      .onConflictDoUpdate({ target: s.staff.code, set: row })
-      .returning({ id: s.staff.id })
-    for (const roleCode of account.roles) {
-      await db
-        .insert(s.staffRoles)
-        // branchId NULL = phạm vi toàn chuỗi
-        .values({ staffId: created!.id, roleCode, branchId: null })
-        .onConflictDoNothing()
-    }
-  }
-
   // ---- Tham số A6 ----
   for (const p of PARAMETERS) {
     await db
@@ -929,7 +846,6 @@ async function seed(db: Db) {
     categories: cats.length,
     dishes: dishes.length,
     tables: tableCount,
-    staff: staffRows.length,
     parameters: PARAMETERS.length,
     printers: branchRows.length * PRINTERS.length,
     baiViet: SITE_POSTS.length,

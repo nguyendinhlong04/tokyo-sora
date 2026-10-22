@@ -24,7 +24,8 @@ Mật khẩu nằm ở `~/.tokyo-sora-dev/superpw.txt` (superuser `postgres`) v�
 ```bash
 pnpm install
 pnpm --filter @sora/api db:migrate
-pnpm --filter @sora/api db:seed
+pnpm --filter @sora/api db:seed            # dữ liệu nền — không có tài khoản nào
+pnpm --filter @sora/api db:dev-bootstrap   # tài khoản dev, thiết bị dev, phát hành bundle
 ```
 
 Sửa dữ liệu thực đơn (giá, nhóm tuỳ chọn, cờ chay/cay/hải sản) thì phải **phát
@@ -110,8 +111,13 @@ pnpm extract-seed
 pnpm --filter @sora/api db:dev-bootstrap
 ```
 
-Lệnh này làm hai việc mà ngoài đời người vận hành làm tay lúc mở quán: tạo thiết bị
-đầu tiên của chi nhánh và phát hành bundle cấu hình. Nó in ra token của từng máy.
+Lệnh này làm ba việc mà ngoài đời người vận hành làm tay lúc mở quán: tạo các tài
+khoản dev còn thiếu (xem mục Tài khoản dev), tạo thiết bị đầu tiên của chi nhánh và phát
+hành bundle cấu hình. Nó in ra token của từng máy.
+
+Mật khẩu, PIN và token ở đây công khai trong repo, nên lệnh **chỉ chạy khi `DATABASE_URL`
+trỏ vào CSDL trên chính máy này** (localhost, 127.x, ::1 hoặc socket) — trỏ vào Supabase
+là bị từ chối ngay, kể cả khi `NODE_ENV` để trống.
 
 Mở app rồi dán vào Console của trình duyệt:
 
@@ -164,7 +170,12 @@ chỉ đổi màn hình chờ.
 
 ## Tài khoản dev
 
-PIN 4 số, chỉ dùng ở môi trường phát triển (xem `apps/api/src/db/seed.ts`):
+Do `db:dev-bootstrap` tạo, danh sách ở `apps/api/src/db/dev-accounts.ts`. `db:seed` không
+tạo tài khoản nào — nó còn chạy lên production. Tài khoản đã có (trùng mã hoặc trùng
+email) được giữ nguyên, không bị đặt lại mật khẩu, PIN hay vai trò: đã đổi mật khẩu một
+tài khoản dev thì muốn về mật khẩu dưới đây phải đặt lại ở A1.
+
+PIN 4 số, chỉ dùng ở môi trường phát triển:
 
 | Nhân viên | Vai trò | PIN |
 |---|---|---|

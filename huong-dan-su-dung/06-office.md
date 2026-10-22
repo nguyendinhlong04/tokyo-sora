@@ -283,11 +283,12 @@ gia vị… **Bỏ trống là hợp lệ ở mọi ô** — trang web tự lùi
 
 ## 6.11 Giới hạn của bản dựng hiện tại (08/2026)
 
-- **Nút "Lưu & phát hành" cấu hình chưa có trên Office.** Máy chủ đã có sẵn
-  lệnh phát hành bundle (và POS còn nhắc "Vào Office bấm 'Lưu & phát hành'"),
-  nhưng Office chưa dựng nút — hiện phát hành do kỹ thuật chạy lệnh
-  (`db:dev-bootstrap` trên máy dev). Các màn cần phát hành lại sau khi sửa: A3
-  sơ đồ bàn, A5 máy in, M1/M10/M11 phần cờ kênh.
+- **Phát hành cấu hình** bằng nút **Phát hành cấu hình** ở cột trái, ngay trên tên
+  người đăng nhập (chỉ hiện với người có quyền sửa giá) — POS còn nhắc tên cũ "Lưu &
+  phát hành". Các màn cần
+  phát hành lại sau khi sửa: A3 sơ đồ bàn, A5 máy in, M1/M10/M11 phần cờ kênh.
+  Không dùng `db:dev-bootstrap` cho việc này: lệnh đó tạo tài khoản dev có mật khẩu
+  công khai và chỉ chạy trên máy dev.
 - **Luồng duyệt bằng PIN trên Office mới có ở B11 (bật khuyến mãi).** Các chỗ
   khác vượt hạn mức (phiếu chi của quản lý ca, điều chỉnh tồn của thủ kho, huỷ
   hoá đơn) hiện báo *"cần người duyệt, mà luồng duyệt bằng PIN chưa có trên

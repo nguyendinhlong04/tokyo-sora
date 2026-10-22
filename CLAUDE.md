@@ -90,8 +90,9 @@ pnpm --filter @sora/api test src/modules/ordering/domain/order-state.test.ts -t 
 
 pnpm --filter @sora/api db:generate      # drizzle-kit → migrations/00NN_<tên>.sql
 pnpm --filter @sora/api db:migrate       # runner riêng, chạy mọi *.sql theo tên file
-pnpm --filter @sora/api db:seed          # upsert idempotent; reset mật khẩu Office mẫu
-pnpm --filter @sora/api db:dev-bootstrap # tạo thiết bị dev + phát hành bundle, in token
+pnpm --filter @sora/api db:seed          # dữ liệu nền, upsert (đè thực đơn mẫu); KHÔNG tạo tài khoản
+pnpm --filter @sora/api db:dev-bootstrap # chỉ CSDL ở máy này: tài khoản dev + thiết bị dev + bundle, in token
+pnpm --filter @sora/api db:create-admin  # R10 đầu tiên ở production — hỏi mật khẩu, chỉ tạo mới
 pnpm --filter @sora/pos build && pnpm --filter @sora/pos preview   # thử service worker :4174 (kitchen :4175, table :4173)
 ```
 

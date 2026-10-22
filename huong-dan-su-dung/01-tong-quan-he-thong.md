@@ -212,5 +212,4 @@ riêng, có bán không, trạm riêng). Trên Office:
 > và nhà cung cấp HĐĐT; kênh nhắn tin Messenger/Zalo và cầu in ESC/POS chưa dựng
 > (in bill tạm dùng chức năng in của trình duyệt). Khi ký hợp đồng thật, thay
 > adapter là chạy — giao diện người dùng không đổi. Danh sách tính năng màn
-> hình chưa dựng nằm cuối mỗi chương (đáng chú ý nhất: nút phát hành cấu hình
-> trên Office — xem chương 6 §6.11).
+> hình chưa dựng nằm cuối mỗi chương.

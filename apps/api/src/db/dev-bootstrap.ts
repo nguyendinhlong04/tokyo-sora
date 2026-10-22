@@ -1,13 +1,16 @@
 /**
- * Chuẩn bị môi trường dev để mở POS/KDS lên là dùng được ngay:
+ * Chuẩn bị môi trường dev để mở POS/KDS/Office lên là dùng được ngay:
  *   pnpm --filter @sora/api db:dev-bootstrap
  *
- * Làm hai việc mà ngoài đời người vận hành làm bằng tay lúc mở quán:
- *   1. Tạo THIẾT BỊ ĐẦU TIÊN của chi nhánh (bài toán con gà quả trứng: sinh mã
+ * Làm ba việc mà ngoài đời người vận hành làm bằng tay lúc mở quán:
+ *   1. Tạo TÀI KHOẢN DEV còn thiếu — Office và PIN nhân viên (`dev-accounts.ts`).
+ *      Tài khoản đã có thì giữ nguyên, không đặt lại mật khẩu.
+ *   2. Tạo THIẾT BỊ ĐẦU TIÊN của chi nhánh (bài toán con gà quả trứng: sinh mã
  *      ghép cần quyền quản trị, mà đăng nhập lại cần thiết bị đã ghép).
- *   2. Phát hành bundle cấu hình để POS có thực đơn.
+ *   3. Phát hành bundle cấu hình để POS có thực đơn.
  *
- * Chỉ dùng cho dev — token cố định, không bao giờ chạy ở môi trường thật.
+ * Chỉ dùng cho dev — mật khẩu, PIN và token cố định, công khai trong repo. Script
+ * từ chối mọi CSDL không nằm trên máy đang chạy.
  */
 import 'dotenv/config'
 import { createHash } from 'node:crypto'
@@ -15,6 +18,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import { Pool } from 'pg'
 import { ParamsService } from '../common/params.service'
 import { createDb } from './client'
+import { assertLocalDatabase, seedDevAccounts } from './dev-accounts'
 import { branches, devices, tables } from './schema'
 import { ConfigBundleService } from '../modules/config-bundle/config-bundle.service'
 
@@ -25,6 +29,7 @@ async function main() {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('dev-bootstrap không được chạy ở môi trường production')
   }
+  assertLocalDatabase(process.env.DATABASE_URL)
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const db = createDb(pool)
@@ -32,6 +37,10 @@ async function main() {
   try {
     const [branch] = await db.select().from(branches).limit(1)
     if (!branch) throw new Error('Chưa có chi nhánh nào — chạy db:seed trước')
+
+    // Cùng chi nhánh với thiết bị bên dưới: PIN chỉ đăng nhập được trên máy của
+    // chi nhánh mà người đó có vai trò
+    const accounts = await seedDevAccounts(db, branch.id)
 
     // iPad dev gắn bàn đầu tiên của chi nhánh (§9.1) — mở Sora Table là vào bàn ngay
     const [firstTable] = await db
@@ -93,11 +102,18 @@ async function main() {
         {
           branchId: branch.id,
           configVersion: published.version,
+          accounts,
           tokens: Object.fromEntries(wanted.map((d) => [d.name, d.token])),
         },
         null,
         2,
       ),
+    )
+    console.log(
+      '\nMật khẩu Office và PIN của tài khoản dev: DEV.md § Tài khoản dev.' +
+        (accounts.kept.length > 0
+          ? `\nGiữ nguyên vì đã có từ trước (mật khẩu/PIN không bị đặt lại): ${accounts.kept.join(', ')}`
+          : ''),
     )
     console.log(
       '\nMở app rồi chạy trong Console của trình duyệt:' +

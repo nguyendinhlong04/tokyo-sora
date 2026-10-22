@@ -52,6 +52,11 @@ DATABASE_MIGRATION_URL="<direct-url>" pnpm --filter @sora/api db:migrate
 DATABASE_URL="<direct-url>" pnpm --filter @sora/api db:seed
 ```
 
+`db:seed` chỉ nạp dữ liệu nền — chi nhánh, trạm bếp, thực đơn mẫu, sơ đồ bàn, tham số —
+và **không tạo tài khoản, mật khẩu hay PIN nào**. Chạy một lần cho CSDL mới: lệnh ghi đè
+bằng bản mẫu, nên chạy lại là trả tên món, giá niêm yết và sơ đồ bàn đã sửa ở Office về
+như prototype.
+
 Migration in ra `NOTICE` cho hai guard có thể bị Supabase chặn:
 
 - `sora_kitchen_money_guard` — cần superuser. Bị bỏ qua là **bình thường**; hai lớp
@@ -79,6 +84,58 @@ psql "<direct-url>" -v app_password="<mật khẩu role app>" -f deploy/db-roles
 > đường không chạm CSDL mất 0,4s, đường có chạm CSDL mất 1,0s — riêng khoảng cách
 > ăn 600ms mỗi lượt gọi. Màn thực đơn gọi bốn lượt liên tiếp nên khách chờ hơn ba
 > giây, và **không có lỗi nào báo ra**.
+
+### Tài khoản quản trị đầu tiên
+
+Production không có tài khoản mẫu nào. Tạo tài khoản Chủ / Admin đầu tiên (R10, toàn
+chuỗi) bằng:
+
+```bash
+DATABASE_URL="<direct-url>" ADMIN_CODE=<mã> ADMIN_EMAIL=<email> ADMIN_NAME="<họ tên>" \
+  pnpm --filter @sora/api db:create-admin
+```
+
+Lệnh **hỏi mật khẩu** trên terminal — gõ không hiện, gõ hai lần, tối thiểu 15 ký tự;
+không có mật khẩu mặc định và không nhận mật khẩu qua biến môi trường. Lệnh chỉ tạo mới:
+mã hoặc email đã có thì dừng, không đụng tới tài khoản đó. Mọi tài khoản khác tạo ở
+Office **A1** bằng tài khoản này.
+
+**Không chạy `db:dev-bootstrap` lên CSDL thật**: mật khẩu, PIN và token thiết bị của nó
+công khai trong repo. Lệnh tự từ chối khi `DATABASE_URL` không trỏ vào chính máy đang
+chạy, nhưng không chặn được một đường hầm SSH trỏ `localhost` về CSDL thật.
+
+> **Nếu production từng chạy `db:seed` bản cũ** (trước 22/10/2026): mỗi lượt chạy đặt lại
+> mật khẩu của năm tài khoản Office mẫu về `sora-dev-2026` — chuỗi nằm công khai trong
+> repo — và PIN của năm nhân viên mẫu về `1101`–`1105`. Ai đọc được repo là đăng nhập được
+> Office với quyền chủ quán. Làm ngay:
+>
+> 1. **Office A1:** đổi mật khẩu hoặc **ngừng hoạt động** `CHU01`, `CHUOI01`, `KETOAN01`,
+>    `NHANSU01`, `MARKETING01`; ngừng hoạt động luôn `HOA`, `MINH`, `TUAN`, `LAN`, `DUC`.
+>    Thiếu máy đã ghép thì PIN không mở được POS, nhưng vẫn đủ để **duyệt** thao tác △
+>    (`LAN` mang R7). Mã nào trùng nhân viên thật thì đặt lại PIN và kiểm lại vai trò: seed
+>    cũ đã đè tên, PIN và có thể đã thêm vai trò. A1 không cho ngừng hoạt động R10 cuối
+>    cùng — nếu `CHU01` đang là R10 duy nhất, tạo tài khoản thật bằng `db:create-admin` trước.
+> 2. **Cắt mọi phiên.** A1 tự cắt phiên của tài khoản vừa đổi mật khẩu, đổi PIN hay ngừng
+>    hoạt động. Phiên của mọi tài khoản khác — kể cả tài khoản lạ có thể đã bị tạo thêm —
+>    chưa có nút; chạy trong SQL Editor của Supabase, rồi mọi người đăng nhập lại:
+>
+>    ```sql
+>    UPDATE staff_sessions SET revoked_at = now() WHERE revoked_at IS NULL;
+>    ```
+>
+> 3. **Tìm dấu vết.** A7 lọc theo các tài khoản trên; A1 xem có tài khoản lạ không; A4 xem
+>    có máy lạ không, nhất là "Máy POS dev" và "Màn bếp ST-0x" — token của chúng
+>    (`dev-device-token`, `dev-kds-st-0x`) cũng công khai, và chương 6 hướng dẫn sử dụng
+>    bản cũ bảo chạy `db:dev-bootstrap` để phát hành cấu hình. Thấy thì **Ngắt máy**. Các
+>    lần đăng nhập bằng tài khoản mẫu:
+>
+>    ```sql
+>    SELECT s.code, ss.created_at, ss.branch_id, ss.device_id, ss.revoked_at
+>      FROM staff_sessions ss JOIN staff s ON s.id = ss.staff_id
+>     WHERE s.code IN ('CHU01', 'CHUOI01', 'KETOAN01', 'NHANSU01', 'MARKETING01',
+>                      'HOA', 'MINH', 'TUAN', 'LAN', 'DUC')
+>     ORDER BY ss.created_at DESC;
+>    ```
 
 ## Bước 2 — Vercel
 
