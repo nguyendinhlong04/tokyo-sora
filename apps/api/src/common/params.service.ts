@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { and, eq, isNull } from 'drizzle-orm'
 import { DB } from './db.module'
 import type { Db } from '../db/client'
@@ -27,8 +27,8 @@ export class ParamsService {
   private cache = new Map<string, Map<string, unknown>>()
   /** 0 = chưa nạp lần nào */
   private loadedAt = 0
-  /** Lượt nạp đang chạy — các lời gọi đến cùng lúc chờ chung, không SELECT trùng */
   private loading: Promise<void> | null = null
+  private readonly logger = new Logger(ParamsService.name)
 
   constructor(@Inject(DB) private readonly db: Db) {}
 
@@ -45,11 +45,30 @@ export class ParamsService {
   }
 
   private async ensureLoaded() {
+    if (this.loadedAt === 0) {
+      // Chưa có bản nào để trả — lần nạp đầu buộc phải chờ
+      await this.startReload()
+      return
+    }
     if (Date.now() - this.loadedAt < MAX_AGE_MS) return
+    /**
+     * Hết hạn thì nạp lại NỀN, lượt đọc này dùng bản đang có. Lượt đọc hay nằm
+     * trong transaction (tính tiền, phát hành hoá đơn), mà trên Vercel pool chỉ có
+     * một kết nối và transaction đang giữ nó: chờ nạp ở đây là chờ chính mình, kẹt
+     * tới khi pg hết giờ (10 s) và request thành 500. Nạp nền thì xếp hàng tới lúc
+     * transaction trả kết nối; hỏng thì giữ bản cũ, lượt đọc sau thử lại.
+     */
+    this.startReload().catch((err: Error) => {
+      this.logger.warn(`Nạp lại tham số hỏng, dùng bản cũ: ${err.message}`)
+    })
+  }
+
+  /** Lượt nạp đang chạy — các lời gọi đến cùng lúc chờ chung, không SELECT trùng */
+  private startReload(): Promise<void> {
     this.loading ??= this.reload().finally(() => {
       this.loading = null
     })
-    await this.loading
+    return this.loading
   }
 
   /** Giá trị của chi nhánh nếu có ghi đè, ngược lại lấy mặc định cấp chuỗi */

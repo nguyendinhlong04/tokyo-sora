@@ -2,18 +2,42 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Db } from '../db/client'
 import { ParamsService } from './params.service'
 
-/** CSDL giả: chỉ đủ cho `select().from(parameters)`, đếm số lần bị hỏi */
+/**
+ * CSDL giả: chỉ đủ cho `select().from(parameters)`, đếm số lần bị hỏi.
+ * `hold()` giữ lượt hỏi kế tiếp như pool đang bị một transaction chiếm, trả về
+ * hàm nhả; `failNext()` làm lượt hỏi kế tiếp hỏng.
+ */
 function fakeDb(rows: { key: string; branchId: string | null; value: unknown }[]) {
   const calls = { count: 0 }
+  let gate: Promise<void> | null = null
+  let fail = false
   const db = {
     select: () => ({
       from: async () => {
         calls.count++
+        if (gate) await gate
+        if (fail) {
+          fail = false
+          throw new Error('timeout exceeded when trying to connect')
+        }
         return rows.map((r) => ({ ...r }))
       },
     }),
   }
-  return { db: db as unknown as Db, calls, rows }
+  const hold = () => {
+    let release = () => {}
+    gate = new Promise<void>((resolve) => {
+      release = () => {
+        gate = null
+        resolve()
+      }
+    })
+    return release
+  }
+  const failNext = () => {
+    fail = true
+  }
+  return { db: db as unknown as Db, calls, rows, hold, failNext }
 }
 
 describe('ParamsService — cache theo từng instance', () => {
@@ -33,7 +57,7 @@ describe('ParamsService — cache theo từng instance', () => {
     expect(calls.count).toBe(1)
   })
 
-  it('quá 60 giây thì tự nạp lại — instance khác đổi tham số cũng tới được đây', async () => {
+  it('quá 60 giây thì nạp lại nền — instance khác đổi tham số cũng tới được đây', async () => {
     const { db, rows } = fakeDb([{ key: 'sales.vatRate', branchId: null, value: 0.08 }])
     const params = new ParamsService(db)
     expect(await params.getNumber('sales.vatRate', 0)).toBe(0.08)
@@ -41,10 +65,42 @@ describe('ParamsService — cache theo từng instance', () => {
     // Kế toán đổi ở A6 qua một instance khác — instance này không được báo
     rows[0]!.value = 0.1
     vi.advanceTimersByTime(60_000)
-    expect(await params.getNumber('sales.vatRate', 0)).toBe(0.1)
+    await params.getNumber('sales.vatRate', 0)
+    await vi.waitFor(async () => expect(await params.getNumber('sales.vatRate', 0)).toBe(0.1))
   })
 
-  it('nhiều lời gọi cùng lúc lúc cache hết hạn chỉ nạp một lần', async () => {
+  it('lượt đọc lúc hết hạn KHÔNG chờ kết nối đang bị transaction giữ (pool 1 trên Vercel)', async () => {
+    const { db, rows, hold } = fakeDb([{ key: 'sales.vatRate', branchId: null, value: 0.08 }])
+    const params = new ParamsService(db)
+    expect(await params.getNumber('sales.vatRate', 0)).toBe(0.08)
+
+    rows[0]!.value = 0.1
+    const release = hold()
+    vi.advanceTimersByTime(60_000)
+    // Lượt nạp đang xếp hàng sau transaction — lượt đọc trả ngay bản đang có
+    expect(await params.getNumber('sales.vatRate', 0)).toBe(0.08)
+
+    release()
+    await vi.waitFor(async () => expect(await params.getNumber('sales.vatRate', 0)).toBe(0.1))
+  })
+
+  it('nạp lại hỏng thì giữ bản cũ, lượt đọc sau thử lại', async () => {
+    const { db, rows, calls, failNext } = fakeDb([
+      { key: 'sales.vatRate', branchId: null, value: 0.08 },
+    ])
+    const params = new ParamsService(db)
+    expect(await params.getNumber('sales.vatRate', 0)).toBe(0.08)
+
+    failNext()
+    vi.advanceTimersByTime(60_000)
+    expect(await params.getNumber('sales.vatRate', 0)).toBe(0.08)
+    await vi.waitFor(() => expect(calls.count).toBe(2))
+
+    rows[0]!.value = 0.1
+    await vi.waitFor(async () => expect(await params.getNumber('sales.vatRate', 0)).toBe(0.1))
+  })
+
+  it('nhiều lời gọi cùng lúc lúc chưa nạp chỉ nạp một lần', async () => {
     const { db, calls } = fakeDb([{ key: 'kitchen.undoSeconds', branchId: null, value: 30 }])
     const params = new ParamsService(db)
 
