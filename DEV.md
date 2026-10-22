@@ -131,9 +131,13 @@ location.reload()
    trên là iPad của bàn đầu tiên. Muốn thử đường ghép thật: xoá token, vào Office →
    **Quản trị → Thiết bị**, loại **iPad tại bàn**, chọn bàn → **Sinh mã ghép**, rồi nhập mã
    ở màn "Ghép iPad với bàn".
-2. Bàn trống: chọn số người → **Bắt đầu gọi món** là khách tự mở bàn, POS thấy bàn "Có
-   khách". Bàn đã mở ở POS thì iPad hỏi lại số khách. Chọn đông hơn sức chứa → bàn mở
-   đúng sức chứa và POS nhận yêu cầu "Nhóm N khách — cần ghép thêm bàn".
+2. Bàn trống: iPad chiếu màn chờ quảng cáo — khung bật cờ **Chiếu trên iPad tại bàn** ở
+   Office → **Nội dung website → W1**; DB seed chưa có khung nào và món chưa có ảnh nên màn
+   chờ là tấm chữ 空. Ảnh đi qua bộ tối ưu của web production (`tokyo-sora.vn/_next/image`)
+   ngay cả trên máy dev. Chạm màn chờ → chọn số người → **Bắt đầu gọi món** là khách tự
+   mở bàn, POS thấy bàn "Có khách". Bàn đã mở ở POS thì iPad hỏi lại số khách. Chọn đông
+   hơn sức chứa → bàn mở đúng sức chứa và POS nhận yêu cầu "Nhóm N khách — cần ghép thêm
+   bàn".
 3. Khách gọi món trên iPad → vé xuống màn bếp; bấm **Gọi nhân viên** → yêu cầu hiện ở
    màn **Yêu cầu từ bàn** (P12) của POS.
 4. Tự thanh toán tới màn VietQR rồi giả lập ngân hàng báo có:
@@ -145,7 +149,7 @@ node -e "const {createHmac}=require('crypto');const raw=JSON.stringify({bankRef:
 Chỉ webhook này mới đổi trạng thái sang **đã trả** — nút "Đã chuyển xong" của khách
 chỉ đổi màn hình chờ.
 
-Đóng bàn ở POS → iPad về màn đầu sau vài giây (hỏi lại bàn 2 s khi chờ dọn, 10 s khi
+Đóng bàn ở POS → iPad về màn chờ sau vài giây (hỏi lại bàn 2 s khi chờ dọn, 10 s khi
 đang mở) và giỏ của khách trước bị xoá. Ngắt iPad ở Office → iPad về màn ghép. Trang để
 ở tab nền thì trình duyệt ngưng hỏi lại — chuyển về tab đó là chạy tiếp.
 

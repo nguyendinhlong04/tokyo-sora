@@ -1,6 +1,10 @@
 import { Controller, Get, Query } from '@nestjs/common'
+import { z } from 'zod'
 import { Public } from '../identity/auth.guard'
 import { SiteService } from './site.service'
+
+/** Hero của mặt nào: trang chủ, hay màn chờ quảng cáo của iPad tại bàn (§9.1b) */
+const HeroQuery = z.object({ surface: z.enum(['web', 'table']).default('web') })
 
 /** Website thương hiệu chỉ ĐỌC — không có endpoint ghi nào ở đây */
 @Controller('api/site')
@@ -54,10 +58,13 @@ export class SiteController {
     return this.site.jobs()
   }
 
-  /** W1 — ảnh hero trang chủ, xếp ở A8 */
+  /**
+   * W1 — ảnh hero trang chủ, xếp ở A8. `?surface=table` là bộ khung của màn chờ iPad
+   * tại bàn. Công khai như trang chủ: thứ chiếu giữa phòng ăn không có gì phải giấu.
+   */
   @Public()
   @Get('hero')
-  hero() {
-    return this.site.heroImages()
+  hero(@Query() query: unknown) {
+    return this.site.heroImages(HeroQuery.parse(query).surface)
   }
 }

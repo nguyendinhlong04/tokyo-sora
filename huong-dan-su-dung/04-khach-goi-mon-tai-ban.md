@@ -8,19 +8,25 @@ biết ranh giới nào là cố ý.
 > Luồng cũ "khách quét mã QR bằng điện thoại" **đã bỏ** (22/10/2026). POS không còn
 > nút **Mã QR bàn**.
 
-## 4.1 Mở bàn
+## 4.1 Màn chờ và mở bàn
 
-Hai cách, kết quả như nhau — iPad luôn đi theo **phiên của bàn**:
+Bàn trống thì iPad chiếu **màn chờ quảng cáo**: ảnh và video marketing bật cho iPad ở
+Office A8 (tab W1, cờ **Chiếu trên iPad tại bàn**), mỗi ảnh 7 giây, chữ lớn như hero trang
+chủ; chưa bật khung nào thì chiếu món ký của bếp. Góc phải dưới là số bàn và nút vàng
+**Chạm để bắt đầu gọi món** — chạm chỗ nào trên màn cũng được. Mở hộp ra mà để yên 60
+giây thì iPad về lại màn chờ.
 
-1. **Khách tự mở trên iPad.** Bàn trống, iPad hiện hộp **Chào mừng quý khách** →
+Hai cách mở bàn, kết quả như nhau — iPad luôn đi theo **phiên của bàn**:
+
+1. **Khách tự mở trên iPad.** Chạm màn chờ → hộp **Chào mừng quý khách** →
    khách chọn **Mấy người ăn?** (1–6, hoặc **Khác** để nhập số) → **Bắt đầu gọi món**.
    Ô bàn trên sơ đồ POS chuyển `Có khách` ngay.
    - Nhóm **đông hơn sức chứa bàn**: bàn vẫn mở (ghi đúng sức chứa) và POS nhận yêu
      cầu *"Nhóm N khách — cần ghép thêm bàn cạnh bàn X"* ở **Yêu cầu từ bàn**.
-   - Bàn **có khách đặt trong 90 phút tới**: iPad không mở, chỉ báo *"Bàn này được giữ
-     cho khách đặt lúc HH:MM"* (không bao giờ hiện tên người đặt) và mời gặp nhân
-     viên. Đúng khách đặt thì nhân viên mở bàn ở POS (từ đặt chỗ); khách khác thì xếp
-     bàn khác.
+   - Bàn **có khách đặt trong 90 phút tới**: nút vàng ở màn chờ đổi thành *"Bàn đã có khách
+     đặt lúc HH:MM"*; chạm vào, iPad không mở mà chỉ báo *"Bàn này được giữ cho khách đặt
+     lúc HH:MM"* (không bao giờ hiện tên người đặt) và mời gặp nhân viên. Đúng khách đặt thì
+     nhân viên mở bàn ở POS (từ đặt chỗ); khách khác thì xếp bàn khác.
 2. **Nhân viên mở ở POS** (P3) như cũ. iPad thấy bàn đã mở trong vài giây và hỏi lại
    **Mấy người ăn?** với số nhân viên đã nhập — khách sửa nếu sai (số này đi vào báo
    cáo bình quân đầu khách).
@@ -32,7 +38,7 @@ iPad vào đúng phiên vừa mở.
 
 ```mermaid
 flowchart TD
-    A["iPad: bàn trống"] -- "Mấy người ăn? · Bắt đầu" --> C
+    A["iPad: màn chờ quảng cáo"] -- "chạm · Mấy người ăn? · Bắt đầu" --> C
     S["POS mở bàn"] --> B["iPad: chốt số khách"] --> C
     C["Thực đơn — nhóm món · tìm · lọc · giỏ bên phải"]
     C -- "Gửi bếp" --> E["Vé xuống trạm bếp"]
@@ -94,8 +100,10 @@ flowchart TD
 
 ## 4.5 Đóng bàn và đổi lượt khách
 
-- **Nhân viên đóng bàn ở POS** (sau khi trả đủ, hoặc bàn 0đ) → iPad về hộp **Chào mừng
-  quý khách** trong vài giây, dù đang đứng ở màn nào.
+- **Nhân viên đóng bàn ở POS** (sau khi trả đủ, hoặc bàn 0đ) → iPad về **màn chờ quảng
+  cáo** trong vài giây, dù đang đứng ở màn nào.
+- Có bản phần mềm mới thì iPad tự tải lại **chỉ khi đang ở màn chờ** — không bao giờ giữa
+  bữa.
 - Đổi lượt khách là **xoá sạch** dấu vết khách trước trên iPad: món chọn chưa gửi, các
   lượt trả, từ khoá tìm gần đây. Đơn của bàn trước chỉ còn xem được ở POS.
 - iPad bị **ngắt ở Office → A4** thì về màn **Ghép iPad với bàn** — nhờ quản lý sinh mã
@@ -116,6 +124,6 @@ flowchart TD
 
 ## 4.7 Chưa có trong bản dựng này
 
-- **Màn chờ quảng cáo** khi bàn trống — hiện bàn trống đứng sẵn ở hộp mở bàn.
 - Chọn ngôn ngữ **VI / EN / JA**.
-- iPad tự cập nhật phần mềm — bản mới chạy khi trang được tải lại (xem THIET-BI.md).
+- Chạy khi bật máy lúc mất mạng (chưa có service worker): mất mạng giữa chừng thì màn chờ vẫn
+  chiếu ảnh đã tải, nhưng bật lại iPad khi chưa có mạng thì app không lên.

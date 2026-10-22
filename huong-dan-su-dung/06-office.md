@@ -263,7 +263,7 @@ gia vị… **Bỏ trống là hợp lệ ở mọi ô** — trang web tự lùi
 | **A5 · Máy in** | Khai máy in bill/tem theo trạm, địa chỉ LAN, mẫu in. *Sửa xong phải phát hành lại bundle cấu hình* (xem 6.11) |
 | **A6 · Trung tâm tham số** | Một sổ cho mọi ngưỡng/hệ số của hệ thống, nhóm theo mảng, mỗi dòng có chú thích hệ quả + lịch sử ai đổi. Hai nút lưu: **"Lưu cho chuỗi"** / **"Chỉ chi nhánh này"** (+ **Bỏ ghi đè**). Hiệu lực ngay, không cần triển khai lại |
 | **A7 · Nhật ký thao tác** | Sổ bất biến mọi hành động nhạy cảm; lọc theo ngày/hành động/người; 50 dòng/trang |
-| **A8 · Nội dung website** | Hai tab **Tin tức** và **Tuyển dụng**; bài giữ nháp được. Giá món sửa ở M1, địa chỉ/giờ mở sửa ở A10 — không ở đây |
+| **A8 · Nội dung website** | Ba tab **Tin tức**, **Tuyển dụng** và **W1 · Ảnh & video hero**; bài giữ nháp được. Mỗi khung hero có hai cờ riêng: **Chiếu trên trang chủ** và **Chiếu trên iPad tại bàn** (màn chờ quảng cáo khi bàn trống — trang chủ đổi trong một phút, iPad trong mười phút; video nên dưới 3 MB). Giá món sửa ở M1, địa chỉ/giờ mở sửa ở A10 — không ở đây |
 | **A9 · Hoá đơn điện tử** | Phần chuỗi: MST, nhà cung cấp HĐĐT, chứng thư số (đếm ngày hết hạn); phần chi nhánh: **ký hiệu 6 ký tự có chữ M** + công tắc bật phát hành. Khai ở đây, phát hành ở F3 |
 | **A10 · Chi nhánh** | Tên, SĐT, địa chỉ, email, **giờ mở cửa** — sửa một chỗ đổ ra website, chân hoá đơn, và là **nguồn dựng lưới giờ đặt bàn** (gõ sai giờ mở là chi nhánh ngừng nhận đặt) |
 

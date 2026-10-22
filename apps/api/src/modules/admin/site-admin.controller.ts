@@ -10,6 +10,7 @@ import {
   Req,
 } from '@nestjs/common'
 import { z } from 'zod'
+import { parsePatch } from '../../common/patch'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { SiteAdminService } from './site-admin.service'
@@ -42,6 +43,8 @@ const HeroBody = z.object({
   mobileFocusX: z.number().int().min(0).max(100).default(50),
   mobileFocusY: z.number().int().min(0).max(100).default(50),
   published: z.boolean().default(false),
+  /** Màn chờ quảng cáo của iPad tại bàn (§9.1b) — cờ riêng, không theo `published` */
+  tableScreen: z.boolean().default(false),
   sort: z.number().int().min(0).max(999).default(0),
 })
 
@@ -75,7 +78,7 @@ export class SiteAdminController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    return this.cms.updatePost(id, PostBody.partial().parse(body), req.actor!)
+    return this.cms.updatePost(id, parsePatch(PostBody, body), req.actor!)
   }
 
   @Delete('posts/:id')
@@ -103,7 +106,7 @@ export class SiteAdminController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    return this.cms.updateJob(id, JobBody.partial().parse(body), req.actor!)
+    return this.cms.updateJob(id, parsePatch(JobBody, body), req.actor!)
   }
 
   @Delete('jobs/:id')
@@ -131,7 +134,7 @@ export class SiteAdminController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    return this.cms.updateHeroImage(id, HeroBody.partial().parse(body), req.actor!)
+    return this.cms.updateHeroImage(id, parsePatch(HeroBody, body), req.actor!)
   }
 
   @Delete('hero/:id')

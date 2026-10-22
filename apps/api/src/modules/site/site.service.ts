@@ -268,8 +268,11 @@ export class SiteService {
    * Trần 8 khung: hero dựng sẵn mọi ảnh trong DOM rồi mờ chồng lên nhau, nên
    * khung thứ chín trở đi chỉ làm trang nặng chứ khách không kịp xem tới. Danh
    * sách rỗng thì trang chủ tự quay về ảnh năm món ký như trước khi có màn này.
+   *
+   * `table`: khung bật cho màn chờ quảng cáo của iPad tại bàn (§9.1b) — cờ riêng
+   * `table_screen`, không theo trang chủ.
    */
-  async heroImages() {
+  async heroImages(surface: 'web' | 'table' = 'web') {
     const rows = await this.db
       .select({
         id: siteHeroImages.id,
@@ -281,7 +284,11 @@ export class SiteService {
         mobileFocusY: siteHeroImages.mobileFocusY,
       })
       .from(siteHeroImages)
-      .where(eq(siteHeroImages.published, true))
+      .where(
+        surface === 'table'
+          ? eq(siteHeroImages.tableScreen, true)
+          : eq(siteHeroImages.published, true),
+      )
       .orderBy(asc(siteHeroImages.sort), asc(siteHeroImages.id))
       .limit(8)
     return rows

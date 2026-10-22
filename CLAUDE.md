@@ -219,7 +219,9 @@ mất mạng = dải báo + hàng đợi cục bộ, màn thanh toán bị chặ
 `OrderTicket` (K2) · `MenuItemCard` (P4 — cố ý **không ảnh**) · `OutboxBanner` ·
 `QrCode` (entry riêng `@sora/ui/QrCode` để web không kéo Dexie) · `PromoTag` (nhãn khuyến
 mãi §9.6, entry riêng `@sora/ui/PromoTag`; web khai `@source` đúng file đó trong
-`globals.css` vì web không quét cả gói).
+`globals.css` vì web không quét cả gói) · `OptimizedImage`/`optimizedSrc` (entry
+`@sora/ui/image`: ảnh Office cho app Vite qua bộ tối ưu của web, bị từ chối thì rơi về ảnh
+gốc — §8.1).
 
 Quy tắc: mọi `<button>` có `type="button"`; variant là `Record<Union,string>` UPPER_CASE;
 không responsive prefix trong gói; app Vite **phải** có `@source '../../../packages/ui/src'`
@@ -271,7 +273,9 @@ chuyển/ghép/tách, thiết bị bàn, yêu cầu từ bàn) · catalog · kit
 reservations · site · admin · inventory · expenses · hr · accounting · crm · reports.
 
 **Controller mỏng:** zod schema ở đầu file; `@Body() body: unknown` → `Schema.parse(body)`;
-query qua `z.coerce`; `ParseIntPipe` cho id; truyền `req.actor!` vào service. Decorator:
+PATCH qua `parsePatch(Schema, body)` (`common/patch.ts`) — `.partial()` của zod 4 vẫn điền
+`.default()` cho trường vắng mặt và ghi đè dữ liệu (§11); query qua `z.coerce`;
+`ParseIntPipe` cho id; truyền `req.actor!` vào service. Decorator:
 `@RequirePermission('<domain.verb>')`, `@Public()`, `@UseInterceptors(IdempotencyInterceptor)`
 cho mọi route ghi mà client có thể gửi lại. Không DTO class, không class-validator.
 
@@ -533,8 +537,8 @@ chọn im lặng.
   **đã gỡ hẳn**: `table-devices/*`, cookie `sora_table`, kiểm Wi-Fi, chủ bàn duyệt, bố cục
   điện thoại của `apps/table`, nút "Mã QR bàn" ở POS.
 - **Vòng đời màn hình** (server quyết định, iPad chỉ render theo phiên của bàn):
-  1. **Bàn chưa mở → màn chờ quảng cáo** (§9.1b — chưa làm; tạm thời bàn trống hiện sẵn
-     hộp "Mấy người ăn?").
+  1. **Bàn chưa mở → màn chờ quảng cáo** (§9.1b); chạm là hộp "Mấy người ăn?", để yên
+     60 giây thì về lại màn chờ.
   2. Mở phiên: nhân viên mở ở POS P3 như hiện tại, **và** khách chạm "Bắt đầu gọi món" trên
      iPad → hỏi số khách → tạo phiên, POS thấy bàn chuyển "có khách" ngay. **Khách được
      tự mở bàn** (chốt 22/10/2026); bàn có đặt chỗ trong 90′ thì iPad không mở, chỉ báo
@@ -569,21 +573,34 @@ chọn im lặng.
   chỗ thì báo giờ · T2–T7 · T8+T10 chung một màn (nhóm theo **lượt gửi bếp** `sentAt`, không
   theo `batchNo` — món gọi từ bàn luôn ở đợt 1) · T9 · T11–T15 · T16 kèm 2 món thay · T17 ·
   màn mờ 3 phút · "Bí quyết thưởng thức" (đọc `/api/site/menu`, chỉ món có bài kể như trang
-  web) · giá khuyến mãi (§9.6) · tự về màn đầu khi đóng bàn. **Chưa:** màn chờ quảng cáo
-  (§9.1b), VI/EN/JA, manifest standalone + Wake Lock, Realtime thay polling, ảnh qua bộ tối
-  ưu (§8 — bắt buộc trước khi lắp iPad thật: lưới đang phát ảnh gốc).
+  web) · giá khuyến mãi (§9.6) · tự về màn đầu khi đóng bàn · màn chờ quảng cáo (§9.1b) ·
+  tự nạp bản mới ở màn chờ. **Chưa:** VI/EN/JA, manifest standalone + Wake Lock, service
+  worker, Realtime thay polling, ảnh lưới thực đơn qua bộ tối ưu (§8 — bắt buộc trước khi
+  lắp iPad thật: lưới đang phát ảnh gốc; dùng `@sora/ui/image` như màn chờ).
 - **Offline:** giỏ và lệnh gửi qua outbox như hiện tại; màn chờ vẫn hiển thị khi mất mạng
-  (nội dung đã cache); thanh toán bị chặn kèm "Vui lòng gọi thu ngân".
-- **Cập nhật phần mềm:** chỉ tự reload khi đang ở **màn chờ** (không bao giờ giữa bữa).
+  (ảnh đã tải nằm trong bộ đệm trình duyệt — chưa có service worker nên bật máy lúc mất
+  mạng thì app không lên); thanh toán bị chặn kèm "Vui lòng gọi thu ngân".
+- **Cập nhật phần mềm:** chỉ tự reload khi đang ở **màn chờ** (không bao giờ giữa bữa) —
+  đã làm: mỗi lần vào màn chờ và mỗi 10 phút, so script/CSS của trang với `index.html` mới
+  nhất trên máy chủ, khác là tải lại; nhớ bản vừa tải lại để không tải vòng tròn.
 
-#### 9.1b Màn chờ quảng cáo (bàn chưa mở)
-- Nội dung lấy từ Office **A8** (dùng lại `site_hero_images`: ảnh + video + tâm ảnh), có
-  thể gắn cờ "hiện ở bàn". Chạy vòng tự động: ảnh 6–8 s/khung, video `autoplay muted loop
-  playsinline`, chữ lớn Cormorant + kanji watermark theo đúng ngôn ngữ hero của web.
-- Góc dưới: "Chạm để bắt đầu gọi món" + số bàn; chạm bất kỳ → bước 2 của vòng đời.
+#### 9.1b Màn chờ quảng cáo (bàn chưa mở) — làm xong 22/10/2026
+- Nội dung từ Office **A8** (dùng lại `site_hero_images`: ảnh + video) với cờ **riêng**
+  `table_screen` ("Chiếu trên iPad tại bàn"), không theo cờ trang chủ: khách trong quán cần
+  thấy thứ khác khách lướt web. Migration `0032` bật sẵn cho khung đang chiếu trên trang
+  chủ; khung mới mặc định tắt. iPad đọc `GET /api/site/hero?surface=table` (công khai, ≤ 8
+  khung). Chưa bật khung nào → món ký có ảnh như hero web → tấm chữ 空 của quán.
+- `apps/table/src/routes/IpadIdle.tsx`: ảnh 7 s/khung, video `autoplay muted playsinline`
+  chạy hết độ dài rồi sang khung (một khung thì lặp), chỉ dựng ảnh khung trước/đang
+  chiếu/kế; chữ lớn Cormorant + chữ Nhật + kanji chìm theo hero web.
+- Góc dưới: số bàn + nút vàng "Chạm để bắt đầu gọi món"; chạm bất kỳ → hộp mở bàn (bước 2),
+  để yên 60 s thì về màn chờ. Bàn có đặt chỗ trong 90′: nút đổi thành "Bàn đã có khách đặt
+  lúc HH:MM".
 - Khi bàn **đang mở** mà không ai chạm ≥ 3 phút: **không** quay về quảng cáo (che mất
   giỏ/đơn) — chỉ giảm sáng (dimmer) và hiện tổng tạm tính; chạm là trở lại.
-- Ảnh/video của màn chờ tuân §8 (biến thể 1600, video ≤ 3 MB/clip, precache).
+- Ảnh qua bộ tối ưu của web (`@sora/ui/image`, 1080/1920 WebP — một nền đo 152 KB thay cho
+  PNG vài MB); CSP của table có `img-src https://tokyo-sora.vn` và `media-src` cho kho video.
+  Video ≤ 3 MB/clip (A8 nhắc, không ép). **Chưa precache** — cần service worker.
 
 ### 9.2 Bàn đôi
 - Sơ đồ bàn (Office A3) khai **cặp bàn**: `tables.pair_id` (hoặc bảng `table_pairs`),
@@ -656,8 +673,8 @@ Mục tiêu bản dựng lại (giữ nguyên API; đổi client):
 1. Đường ống ảnh + sửa hero/thumbnail web (§8) — thấy ngay, không đụng nghiệp vụ.
 2. Realtime client dùng chung (`@sora/core`), áp cho KDS trước.
 3. Dựng lại KDS (§9.4).
-4. Thiết bị kind `table` + vòng đời phiên theo bàn + khách tự mở bàn + gỡ QR: **xong**
-   (22/10/2026, §9.1). Còn màn chờ quảng cáo (§9.1b).
+4. Thiết bị kind `table` + vòng đời phiên theo bàn + khách tự mở bàn + gỡ QR + màn chờ
+   quảng cáo: **xong** (22/10/2026, §9.1 · §9.1b).
 5. Bàn đôi (§9.2).
 6. POS ba khổ (§9.3).
 Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
@@ -735,8 +752,9 @@ vào đơn; app chỉ hiển thị.
   — **đừng viết lại inline**, đã dính lỗi im lặng bỏ build hai lần.
 - Thêm app/trang mới: copy `vercel.json` của app gần nhất, chỉnh `buildCommand` (luôn
   build `@sora/contracts` trước), header bảo mật và **CSP `img-src`** phải chứa kho ảnh
-  (hiện chỉ table/office có `*.supabase.co storage.googleapis.com`; pos/kitchen chặn mọi
-  ảnh ngoài; web chưa có CSP). Biến môi trường từng project: `DEPLOY.md` §Bước 2.
+  (table/office có `*.supabase.co storage.googleapis.com`; table thêm `https://tokyo-sora.vn`
+  — bộ tối ưu ảnh — và `media-src` cho video màn chờ; pos/kitchen chặn mọi ảnh ngoài; web
+  chưa có CSP). Biến môi trường từng project: `DEPLOY.md` §Bước 2.
 - Trước khi deploy API: `db:migrate` bằng direct URL; lần đầu mỗi môi trường chạy
   `deploy/db-roles.sql` để API dùng `sora_app` (mất lớp bảo vệ sổ nếu dùng `postgres`).
 - Sau deploy: `curl https://api.tokyo-sora.vn/health` → `{"ok":true,"service":"sora-api"}`;
@@ -766,6 +784,10 @@ vào đơn; app chỉ hiển thị.
 5. Kiosk ghép máy: một `catch` chung (`apps/kiosk/src/screens/Pair.tsx:21-38`) — ghép
    thành công nhưng `me()` lỗi vẫn báo "Mã không đúng" (KDS đã sửa ở `04ffd9b`).
 6. CI không chạy trên nhánh làm việc và không có Postgres (§7).
+7. **PATCH ghi đè dữ liệu:** zod 4 `.partial()` vẫn điền `.default()` cho trường vắng mặt.
+   Đã xác nhận: lưu lịch bán của set (Office `Sets.tsx`) xoá ảnh và giá online của món; sửa
+   thông tin một tài khoản đã khoá (`AccountPatch`, `active` mặc định true) mở khoá lại nó.
+   A8 đã sửa bằng `common/patch.ts`; còn M1 món/set, M10, A3, A5, A1, nguyên liệu kho.
 
 Thấp hơn:
 - `var(--sora-accent)` không tồn tại (`apps/office/src/routes/Cms.tsx:1035`).

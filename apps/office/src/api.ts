@@ -252,6 +252,8 @@ export interface CmsHeroImage {
   mobileFocusX: number
   mobileFocusY: number
   published: boolean
+  /** Chiếu ở màn chờ quảng cáo của iPad tại bàn (§9.1b) — cờ riêng với trang chủ */
+  tableScreen: boolean
   sort: number
   updatedAt: string
   updatedBy: string | null

@@ -225,6 +225,13 @@
       "when": 1792653636855,
       "tag": "0031_ipad_ban_go_qr",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792657219924,
+      "tag": "0032_man_cho_ipad",
+      "breakpoints": true
     }
   ]
 }

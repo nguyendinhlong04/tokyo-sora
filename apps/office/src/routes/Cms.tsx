@@ -66,6 +66,7 @@ const blankHero = (sort: number): HeroDraft => ({
   mobileFocusX: 50,
   mobileFocusY: 50,
   published: false,
+  tableScreen: false,
   sort,
 })
 
@@ -559,6 +560,9 @@ function toJobDraft(row: CmsJob): JobDraft {
  * Trần 8 khung đã bật là của phía website — hero dựng sẵn mọi ảnh trong DOM,
  * khung thứ chín chỉ làm trang nặng. Ở đây chỉ đếm và nhắc, không chặn: chặn tay
  * người nhập giữa lúc họ đang xếp lại thứ tự thì phiền hơn là giúp.
+ *
+ * Cùng bộ khung chiếu ở màn chờ quảng cáo của iPad tại bàn (§9.1b), bằng một cờ
+ * RIÊNG: khách đang ngồi trong quán cần thấy thứ khác khách lướt web.
  */
 function HeroTab() {
   const toast = useToast()
@@ -576,7 +580,8 @@ function HeroTab() {
   const save = useMutation({
     mutationFn: ({ input, id }: { input: HeroDraft; id?: number }) =>
       id === undefined ? api.createCmsHeroImage(input) : api.updateCmsHeroImage(id, input),
-    onSuccess: () => done('Đã lưu khung hero — trang chủ đổi theo trong vòng một phút'),
+    onSuccess: () =>
+      done('Đã lưu khung hero — trang chủ đổi theo trong một phút, iPad tại bàn trong mười phút'),
     onError: (err: Error) => toast(err.message, 'danger'),
   })
 
@@ -596,6 +601,7 @@ function HeroTab() {
   const list = images.data ?? []
   const shown = list.filter((row) => row.published).length
   const shownVideos = list.filter((row) => row.published && row.videoUrl).length
+  const atTables = list.filter((row) => row.tableScreen).length
 
   return (
     <>
@@ -607,7 +613,10 @@ function HeroTab() {
             ? 'Chưa bật khung nào, nên hero trang chủ đang chiếu ảnh của năm món ký đầu danh sách như trước giờ.'
             : `Hero đang chiếu ${shown} khung${
                 shownVideos > 0 ? ` (${shownVideos} video)` : ''
-              }, lần lượt theo cột thứ tự.${shown > 8 ? ' Trang chủ chỉ lấy 8 khung đầu.' : ''}`}
+              }, lần lượt theo cột thứ tự.${shown > 8 ? ' Trang chủ chỉ lấy 8 khung đầu.' : ''}`}{' '}
+          {atTables === 0
+            ? 'iPad tại bàn chưa có khung nào — màn chờ đang chiếu món ký của bếp.'
+            : `iPad tại bàn chiếu ${atTables} khung${atTables > 8 ? ' (lấy 8 khung đầu)' : ''}.`}
         </p>
         {draft ? null : (
           <Button variant="primary" onClick={() => setDraft({ input: blankHero(list.length) })}>
@@ -632,7 +641,7 @@ function HeroTab() {
               </Field>
               <Field
                 label="Đường dẫn video"
-                hint="Bỏ trống là khung ảnh tĩnh. Tệp .mp4 chiếu không tiếng, tự chuyển khung khi hết."
+                hint="Bỏ trống là khung ảnh tĩnh. Tệp .mp4 chiếu không tiếng, tự chuyển khung khi hết; dưới 3 MB để iPad tại bàn tải kịp."
               >
                 <Input
                   value={draft.input.videoUrl ?? ''}
@@ -750,7 +759,19 @@ function HeroTab() {
               on={draft.input.published}
               tone="ok"
             >
-              {draft.input.published ? 'Chiếu trên trang chủ' : 'Chưa chiếu'}
+              {draft.input.published ? 'Chiếu trên trang chủ' : 'Chưa chiếu trên trang chủ'}
+            </Toggle>
+            <Toggle
+              onChange={() =>
+                setDraft({
+                  ...draft,
+                  input: { ...draft.input, tableScreen: !draft.input.tableScreen },
+                })
+              }
+              on={draft.input.tableScreen}
+              tone="ok"
+            >
+              {draft.input.tableScreen ? 'Chiếu trên iPad tại bàn' : 'Chưa chiếu trên iPad tại bàn'}
             </Toggle>
             <div className="ml-auto flex gap-2">
               <Button onClick={() => setDraft(null)}>Bỏ</Button>
@@ -829,10 +850,15 @@ function HeroTab() {
             },
             {
               key: 'state',
-              header: 'Trạng thái',
-              width: '130px',
-              cell: (row) =>
-                row.published ? <Badge tone="ok">Đang chiếu</Badge> : <Badge>Chưa chiếu</Badge>,
+              header: 'Đang chiếu ở',
+              width: '150px',
+              cell: (row) => (
+                <span className="flex flex-col items-start gap-1">
+                  {row.published ? <Badge tone="ok">Trang chủ</Badge> : null}
+                  {row.tableScreen ? <Badge tone="ok">iPad tại bàn</Badge> : null}
+                  {row.published || row.tableScreen ? null : <Badge>Chưa chiếu</Badge>}
+                </span>
+              ),
             },
             {
               key: 'actions',
@@ -1058,6 +1084,7 @@ function toHeroDraft(row: CmsHeroImage): HeroDraft {
     mobileFocusX: row.mobileFocusX,
     mobileFocusY: row.mobileFocusY,
     published: row.published,
+    tableScreen: row.tableScreen,
     sort: row.sort,
   }
 }

@@ -5,18 +5,22 @@ import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { api, type TableSession } from '../api'
 import { IconCheck, IconMinus, IconPlus } from '../icons'
+import { useIdleTimer } from '../idle'
 import { clock } from '../order-status'
 import { useTable, useTableSession } from '../table-context'
+import { IpadIdle } from './IpadIdle'
 import { useIpadCall } from './IpadShell'
 
 /** Số nút chạm nhanh; nhóm đông hơn gõ ở ô "Khác" */
 const QUICK_MAX = 6
 
+/** Hộp mở bàn để yên ngần này thì về màn chờ — khách đi ngang chạm thử rồi bỏ đi */
+const BACK_TO_IDLE_MS = 60_000
+
 /**
- * Màn đầu của iPad (§9.1 vòng đời): bàn chưa mở thì khách tự mở; bàn nhân viên đã
- * mở ở POS thì khách chốt lại số khách; bữa đã trả đủ thì "đã thanh toán, chờ dọn".
- *
- * Màn chờ quảng cáo (§9.1b) chưa làm — tới lúc đó bàn trống đứng sẵn ở hộp mở bàn.
+ * Màn đầu của iPad (§9.1 vòng đời): bàn chưa mở thì màn chờ quảng cáo, chạm là
+ * khách tự mở; bàn nhân viên đã mở ở POS thì khách chốt lại số khách; bữa đã trả đủ
+ * thì "đã thanh toán, chờ dọn".
  */
 export function IpadWelcome() {
   const { session } = useTable()
@@ -29,7 +33,7 @@ export function IpadWelcome() {
         空
       </span>
       {!session ? (
-        <OpenTable />
+        <Unopened />
       ) : session.status === 'paid_wait_clear' ? (
         <Paid />
       ) : (
@@ -42,7 +46,14 @@ export function IpadWelcome() {
 const overNote = (guests: number, tableCode: string) =>
   `Nhóm ${guests} khách — cần ghép thêm bàn cạnh bàn ${tableCode}`
 
-/** Bàn chưa mở: khách chọn số người rồi tự mở bàn (chốt 22/10/2026) */
+/** Bàn chưa mở: màn chờ quảng cáo (§9.1b) cho tới khi có người chạm */
+function Unopened() {
+  const [awake, setAwake] = useState(false)
+  useIdleTimer(awake ? BACK_TO_IDLE_MS : null, () => setAwake(false))
+  return awake ? <OpenTable /> : <IpadIdle onWake={() => setAwake(true)} />
+}
+
+/** Khách chọn số người rồi tự mở bàn (chốt 22/10/2026) */
 function OpenTable() {
   const { terminal } = useTable()
   const navigate = useNavigate()

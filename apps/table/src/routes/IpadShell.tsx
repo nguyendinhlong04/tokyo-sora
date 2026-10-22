@@ -1,10 +1,11 @@
 import { Button, ErrorState, Money, useToast } from '@sora/ui'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, type ReactNode } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { api, type RequestKind } from '../api'
 import { useCart } from '../cart-context'
 import { IconBell, IconOffline, IconReceipt } from '../icons'
+import { useIdleTimer } from '../idle'
 import { useOutbox } from '../outbox'
 import { PromotionsProvider } from '../promotions'
 import { useTable, useTableSession } from '../table-context'
@@ -252,27 +253,13 @@ function IdleDimmer() {
   const session = useTableSession()
   const cart = useCart()
   const [dim, setDim] = useState(false)
+  useIdleTimer(DIM_AFTER_MS, () => setDim(true))
 
   const order = useQuery({
     queryKey: ['order', session.id],
     queryFn: () => api.order(session.id),
     enabled: dim,
   })
-
-  useEffect(() => {
-    let timer = setTimeout(() => setDim(true), DIM_AFTER_MS)
-    const wake = () => {
-      clearTimeout(timer)
-      timer = setTimeout(() => setDim(true), DIM_AFTER_MS)
-    }
-    window.addEventListener('pointerdown', wake, true)
-    window.addEventListener('keydown', wake, true)
-    return () => {
-      clearTimeout(timer)
-      window.removeEventListener('pointerdown', wake, true)
-      window.removeEventListener('keydown', wake, true)
-    }
-  }, [])
 
   if (!dim) return null
 

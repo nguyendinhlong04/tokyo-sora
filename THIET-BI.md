@@ -77,8 +77,9 @@ mép thì vé hàng dưới biến mất mà không ai biết — nên bước n
 ## iPad tại bàn — iPad thế hệ 7 (10,2″) gắn đế, nằm ngang
 
 Mỗi bàn một iPad, ghim cứng vào **đúng một bàn** ngay lúc ghép. Khách gọi món, gọi
-nhân viên, xem đơn và tự trả tiền trên máy này; bàn trống thì khách tự mở bàn ngay
-trên iPad (chọn số người → "Bắt đầu gọi món").
+nhân viên, xem đơn và tự trả tiền trên máy này. Bàn trống thì iPad chiếu màn chờ quảng cáo
+(khung marketing bật cho iPad ở Office A8); khách chạm vào là tự mở bàn (chọn số người →
+"Bắt đầu gọi món").
 
 1. Office → **Quản trị → A4 Thiết bị** → loại **iPad tại bàn** → chọn **bàn** → Sinh mã
    ghép. Bàn đã có iPad đang chạy thì không chọn được: một bàn một iPad — ngắt máy cũ
@@ -146,9 +147,10 @@ Chạy đủ sáu bước này trước khi bàn giao cho quán:
    **không được nhân đôi**. Thanh trên cùng phải báo "Mất mạng" trong lúc đó.
 5. **Tắt nguồn màn bếp rồi bật lại khi chưa có mạng** — màn phải tự lên và hiện
    được giao diện (chưa có vé mới là đúng, vì vé đến từ máy chủ).
-6. **iPad tại bàn** — ở bàn trống chạm "Bắt đầu gọi món" phải mở được bàn và POS thấy
-   "Có khách" ngay; gọi một món, rồi đóng bàn ở POS: iPad về màn đầu trong vài giây,
-   món chưa gửi của khách trước không còn trong giỏ.
+6. **iPad tại bàn** — bàn trống phải đang chiếu màn chờ quảng cáo; chạm vào, chọn số người,
+   "Bắt đầu gọi món" phải mở được bàn và POS thấy "Có khách" ngay; gọi một món, rồi đóng
+   bàn ở POS: iPad về màn chờ trong vài giây, món chưa gửi của khách trước không còn trong
+   giỏ.
 
 Bước 4 và 5 là hai bước hay bị bỏ qua nhất và cũng là hai bước quan trọng nhất —
 chúng chứng minh quán vẫn chạy được khi mạng chập chờn.
@@ -164,8 +166,9 @@ Không phải cài lại gì. Khi có bản mới:
   phiếu order đang dựng.
 - **Màn bếp**: tự cập nhật khi hàng vé rỗng. Màn treo tường không có ai bấm nút,
   nhưng tải lại giữa lúc đang có vé thì đầu bếp mất chỗ đang nhìn.
-- **iPad tại bàn**: chưa tự cập nhật — bản mới chạy khi trang được tải lại. Tải lại lúc
-  bàn trống (thoát Guided Access → kéo trang xuống), không bao giờ giữa bữa.
+- **iPad tại bàn**: tự tải bản mới khi đang ở **màn chờ quảng cáo** (bàn trống) — ngay khi
+  bàn vừa đóng, hoặc trong vòng 10 phút nếu bàn đang trống sẵn. Không bao giờ tải lại giữa
+  bữa, nên bàn đang có khách nhận bản mới sau khi đóng bàn.
 
 ## Máy in bill
 

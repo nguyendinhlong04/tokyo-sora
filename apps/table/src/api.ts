@@ -1,4 +1,4 @@
-import type { PromoClock, PromotionRule, SiteMenu } from '@sora/contracts'
+import type { PromoClock, PromotionRule, SiteHeroFrame, SiteMenu } from '@sora/contracts'
 import { apiFetch, enqueue } from '@sora/core'
 
 export interface TableSession {
@@ -230,6 +230,9 @@ export const api = {
    * "Bí quyết thưởng thức". Giá và món gọi được vẫn lấy từ bundle cấu hình.
    */
   siteMenu: () => apiFetch<SiteMenu>('/api/site/menu'),
+
+  /** §9.1b khung quảng cáo marketing bật cho iPad bàn ở Office A8 — công khai như hero web */
+  idleFrames: () => apiFetch<SiteHeroFrame[]>('/api/site/hero?surface=table'),
 
   order: (sessionId: number) => apiFetch<SessionOrder | null>(`/api/table-sessions/${sessionId}/order`),
 

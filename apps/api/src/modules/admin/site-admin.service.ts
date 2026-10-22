@@ -34,6 +34,8 @@ export interface HeroImageInput {
   mobileFocusX: number
   mobileFocusY: number
   published: boolean
+  /** Chiếu ở màn chờ quảng cáo của iPad tại bàn (§9.1b), riêng với trang chủ */
+  tableScreen: boolean
   sort: number
 }
 
@@ -190,6 +192,7 @@ export class SiteAdminService {
       mobileFocusX: h.mobileFocusX,
       mobileFocusY: h.mobileFocusY,
       published: h.published,
+      tableScreen: h.tableScreen,
       sort: h.sort,
       updatedAt: h.updatedAt,
       updatedBy: byName,
@@ -316,6 +319,7 @@ function normaliseHeroImage(input: HeroImageInput) {
     mobileFocusX: input.mobileFocusX,
     mobileFocusY: input.mobileFocusY,
     published: input.published,
+    tableScreen: input.tableScreen,
     sort: input.sort,
   }
 }

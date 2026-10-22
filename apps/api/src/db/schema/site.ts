@@ -123,6 +123,13 @@ export const siteHeroImages = pgTable(
     mobileFocusY: integer('mobile_focus_y').notNull().default(50),
     sort: integer('sort').notNull().default(0),
     published: boolean('published').notNull().default(false),
+    /**
+     * Chiếu ở màn chờ quảng cáo của iPad tại bàn (§9.1b) — cờ RIÊNG với
+     * `published`, không phải "cũng chiếu ở bàn": khách đang ngồi trong quán cần
+     * thấy thứ khác khách lướt web (giờ vàng bia, món mới của bếp), và một khung
+     * khoe giao hàng tận nơi thì vô nghĩa ở bàn ăn.
+     */
+    tableScreen: boolean('table_screen').notNull().default(false),
     updatedBy: bigint('updated_by', { mode: 'number' }).references(() => staff.id),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

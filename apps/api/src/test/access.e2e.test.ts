@@ -658,6 +658,94 @@ describe('A8 — CMS website', () => {
     expect(res.json()[0]).toMatchObject({ title: 'Phục vụ bàn', branchName: null, slots: 6 })
   })
 
+  /**
+   * Nút Bật/Tắt ở A8 chỉ gửi đúng một trường. zod 4 vẫn điền giá trị mặc định
+   * cho mọi trường vắng mặt trong `.partial()`, nên trước đây một cú bấm tắt tin
+   * đã lặng lẽ đưa số vị trí về 1.
+   */
+  it('tắt rồi bật lại tin tuyển dụng không đổi số vị trí', async () => {
+    const [job] = (
+      await inject({ method: 'GET', url: '/api/admin/cms/jobs', headers: asMarketing() })
+    ).json<{ id: number }[]>()
+    for (const published of [false, true]) {
+      await inject({
+        method: 'PATCH',
+        url: `/api/admin/cms/jobs/${job!.id}`,
+        headers: asMarketing(),
+        payload: { published },
+      })
+    }
+    const res = await inject({ method: 'GET', url: '/api/site/jobs' })
+    expect(res.json()[0]).toMatchObject({ title: 'Phục vụ bàn', slots: 6 })
+  })
+
+  describe('khung hero — trang chủ và màn chờ iPad bàn (§9.1b)', () => {
+    let frameId = 0
+    const heroOf = async () =>
+      (await inject({ method: 'GET', url: '/api/admin/cms/hero', headers: asMarketing() }))
+        .json<{ id: number; sort: number; mobileFocusX: number; tableScreen: boolean }[]>()
+        .find((h) => h.id === frameId)!
+
+    it('khung chỉ bật cho iPad bàn thì iPad thấy, trang chủ không thấy', async () => {
+      const created = await inject({
+        method: 'POST',
+        url: '/api/admin/cms/hero',
+        headers: asMarketing(),
+        payload: {
+          imageUrl: 'https://storage.googleapis.com/tokyo-sora/hero/gio-vang.jpg',
+          caption: 'Giờ vàng bia tươi',
+          sort: 7,
+          mobileFocusX: 30,
+          published: false,
+          tableScreen: true,
+        },
+      })
+      expect(created.statusCode, created.payload).toBe(201)
+      frameId = created.json<{ id: number }>().id
+
+      const web = await inject({ method: 'GET', url: '/api/site/hero' })
+      expect(web.json<{ id: number }[]>().map((h) => h.id)).not.toContain(frameId)
+
+      const ipad = await inject({ method: 'GET', url: '/api/site/hero?surface=table' })
+      expect(ipad.statusCode).toBe(200)
+      expect(ipad.json<{ id: number; caption: string }[]>()).toEqual([
+        expect.objectContaining({ id: frameId, caption: 'Giờ vàng bia tươi' }),
+      ])
+    })
+
+    it('bật nhanh lên trang chủ không làm mất thứ tự, tâm ảnh hay cờ iPad', async () => {
+      const res = await inject({
+        method: 'PATCH',
+        url: `/api/admin/cms/hero/${frameId}`,
+        headers: asMarketing(),
+        payload: { published: true },
+      })
+      expect(res.statusCode, res.payload).toBe(200)
+      expect(await heroOf()).toMatchObject({ sort: 7, mobileFocusX: 30, tableScreen: true })
+
+      const web = await inject({ method: 'GET', url: '/api/site/hero' })
+      expect(web.json<{ id: number }[]>().map((h) => h.id)).toContain(frameId)
+    })
+
+    it('tắt riêng cờ iPad thì iPad thôi chiếu, trang chủ vẫn chiếu', async () => {
+      await inject({
+        method: 'PATCH',
+        url: `/api/admin/cms/hero/${frameId}`,
+        headers: asMarketing(),
+        payload: { tableScreen: false },
+      })
+      const ipad = await inject({ method: 'GET', url: '/api/site/hero?surface=table' })
+      expect(ipad.json()).toEqual([])
+      const web = await inject({ method: 'GET', url: '/api/site/hero' })
+      expect(web.json<{ id: number }[]>().map((h) => h.id)).toContain(frameId)
+    })
+
+    it('mặt hiển thị lạ bị từ chối thay vì lặng lẽ trả về trang chủ', async () => {
+      const res = await inject({ method: 'GET', url: '/api/site/hero?surface=tv' })
+      expect(res.statusCode).toBe(400)
+    })
+  })
+
   it('marketing ĐỌC được thực đơn nhưng không sửa được giá, và không chạm vào chi nhánh', async () => {
     // §4.2 cho R9 dòng `menu.view-price` — người viết bài phải xem được món họ viết
     const read = await inject({

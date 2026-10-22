@@ -90,3 +90,21 @@ export interface SiteMenu {
   dishes: SiteMenuDish[]
   sets: SiteMenuSet[]
 }
+
+/**
+ * Một khung hero xếp ở Office A8: `GET /api/site/hero` cho trang chủ, thêm
+ * `?surface=table` cho màn chờ quảng cáo của iPad tại bàn (§9.1b) — hai mặt bật
+ * bằng hai cờ riêng.
+ */
+export interface SiteHeroFrame {
+  id: number
+  /** Bắt buộc kể cả khung video: là ảnh chờ lúc phim tải và ảnh thay khi phim hỏng */
+  imageUrl: string
+  /** Null là khung ảnh tĩnh */
+  videoUrl: string | null
+  caption: string | null
+  captionJa: string | null
+  /** Điểm giữ lại giữa khung khi khung dựng đứng, tính bằng % của tấm ảnh */
+  mobileFocusX: number
+  mobileFocusY: number
+}
