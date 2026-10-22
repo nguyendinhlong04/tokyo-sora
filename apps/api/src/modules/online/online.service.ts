@@ -26,6 +26,7 @@ import {
   orders,
   payments,
 } from '../../db/schema'
+import { priceOf } from '../catalog/domain/price'
 import { isOnSale, scheduleOf } from '../catalog/domain/sale-window'
 import type { Actor } from '../identity/actor'
 import { hashToken, newToken } from '../identity/tokens'
@@ -149,15 +150,8 @@ export class OnlineService {
         imageUrl: d.imageUrl,
         allergens: d.allergens,
         tags: d.tags,
-        /**
-         * Thứ tự ưu tiên giá, hẹp trước rộng sau: giá online của chi nhánh → giá
-         * chung của chi nhánh → giá online cấp chuỗi → giá tại quán.
-         */
-        price:
-          overrideByDish.get(d.id)?.onlinePrice ??
-          overrideByDish.get(d.id)?.price ??
-          d.onlinePrice ??
-          d.basePrice,
+        // Cùng một hàm với giá đóng băng vào đơn web: in giá nào thì tính giá đó
+        price: priceOf(d, overrideByDish.get(d.id), 'web'),
         soldOut: soldOutIds.has(d.id),
         /**
          * Món nướng nguội nhanh — O3 nhắc khách chọn khung giờ gần nhất. Suy từ

@@ -326,7 +326,9 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   `dishes`, `categories`, `stations` (`'ST-01'…'ST-06'`), `modifier_*`; `timestamptz`.
 - **Tiền = số nguyên VND** `bigint`, không `numeric` (riêng giá vốn kho đơn vị phần nghìn
   đồng `*_milli`). Tổng tiền chỉ tính bằng `computeOrderTotals` **trên server**; giá, tên và
-  khuyến mãi món **đóng băng** vào dòng đơn lúc tạo (§9.6).
+  khuyến mãi món **đóng băng** vào dòng đơn lúc tạo (§9.6). Giá theo kênh chỉ có một chỗ:
+  `priceOf` (`catalog/domain/price.ts`) — đơn web theo giá online O11, mọi kênh khác (kể cả
+  Grab/ShopeeFood/Be nhập tay) theo giá tại quán; thực đơn O2, Office và dòng đơn cùng gọi nó.
 - `business_date` theo múi giờ chi nhánh (`businessDateOf`); mã hiển thị `ON-yyMM-NNNN`
   / `DB-yyMM-NNNN` (`nextDisplayCode`), khách đọc mã này, không đọc id.
 - **Sổ bất biến** (append-only, trigger `sora_append_only` + revoke quyền role `sora_app`
@@ -834,10 +836,6 @@ Thấp hơn:
 - Ba cách format tiền (`formatVnd`, `<Money>` Intl, `toLocaleString`+'₫' ở POS) → chuẩn
   về `formatVnd` + `font-mono tabular-nums`.
 - POS `soldOut` bỏ qua `limited` còn 0 (`TableOrder.tsx:292`), table thì xử lý.
-- Giá online lệch giá tính tiền: `/api/online/menu` in `onlinePrice` (ưu tiên giá online chi
-  nhánh → giá chi nhánh → giá online chuỗi → giá tại quán) nhưng đơn web tính theo
-  `catalog.dishesByIds` (`o?.price ?? basePrice`, bỏ qua `onlinePrice`). Chỉ lộ khi Office
-  khai giá online khác giá tại quán.
 - Dead code: `screens/Holding.tsx` (K4); `pnpm-workspace.yaml` liệt kê `e2e` không tồn tại.
 - Thiếu favicon ở table/staff/office/web; POS/kitchen có `favicon.svg` chưa link.
 - Nhiều endpoint đọc tin `?branch=` mà không so với `actor.branchId`.

@@ -23,6 +23,7 @@ import {
   type DishStoryCondiment,
   type DishStoryCut,
 } from '../../db/schema'
+import { priceOf } from '../catalog/domain/price'
 import { describeSchedule, scheduleOf } from '../catalog/domain/sale-window'
 import { setCostRange } from '../catalog/domain/set-cost'
 import type { Actor } from '../identity/actor'
@@ -188,8 +189,8 @@ export class CatalogAdminService {
         effectiveActive: override?.active ?? d.active,
         /** Cùng thứ tự ưu tiên với thực đơn online mà khách nhìn thấy */
         effectiveOnlineVisible: override?.onlineVisible ?? d.onlineVisible,
-        effectiveOnlinePrice:
-          override?.onlinePrice ?? override?.price ?? d.onlinePrice ?? d.basePrice,
+        // Cùng hàm với thực đơn O2 và đơn web: giá khách thấy cũng là giá khách trả
+        effectiveOnlinePrice: priceOf(d, override, 'web'),
       }
     })
   }

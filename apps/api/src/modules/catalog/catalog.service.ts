@@ -14,6 +14,7 @@ import {
 } from '../../db/schema'
 import type { SetDefinition } from '../kitchen/domain/explode'
 import type { DishRouting } from '../kitchen/domain/routing'
+import { priceOf } from './domain/price'
 import { scheduleOf, type SaleSchedule } from './domain/sale-window'
 
 export interface CatalogDish {
@@ -23,7 +24,7 @@ export interface CatalogDish {
   name: string
   /** Nhóm món — khuyến mãi theo nhóm ("đồ uống giờ vàng") chấm theo đây */
   categoryId: string | null
-  /** Giá đã áp ghi đè theo chi nhánh — đây là giá sẽ ĐÓNG BĂNG vào dòng đơn */
+  /** Giá theo chi nhánh và kênh của đơn (`priceOf`) — đây là giá sẽ ĐÓNG BĂNG vào dòng đơn */
   price: number
   routing: DishRouting | null
   /** Lịch bán M11 — chỗ duy nhất mọi cửa gọi món đi qua, nên cũng là chỗ cưỡng chế */
@@ -40,8 +41,14 @@ export interface CatalogDish {
 export class CatalogService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
+  /**
+   * Kênh là tham số BẮT BUỘC: đơn web và đơn tại bàn bán cùng một món ở hai giá,
+   * và chính lúc nơi gọi không phải nói kênh nào là lúc đơn web lặng lẽ bị tính
+   * giá tại quán.
+   */
   async dishesByIds(
     branchId: string,
+    channel: string,
     ids: string[],
     tx: DbOrTx = this.db,
   ): Promise<Map<string, CatalogDish>> {
@@ -69,7 +76,7 @@ export class CatalogService {
         kind: dish.kind as CatalogDish['kind'],
         name: dish.nameVi,
         categoryId: dish.categoryId,
-        price: o?.price ?? dish.basePrice,
+        price: priceOf(dish, o, channel),
         routing:
           dish.stationGrill && dish.stationNoGrill
             ? {

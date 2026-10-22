@@ -247,7 +247,9 @@ gia vị… **Bỏ trống là hợp lệ ở mọi ô** — trang web tự lùi
   đơn tối thiểu, thời gian; một phường chỉ thuộc một vùng. Panel **Giờ ngừng
   nhận đơn** riêng cho mang về / giao hàng.
 - **O11 · Menu online** — trần đơn mỗi khung 15 phút, thời gian bếp cần trước;
-  công tắc bán online + **giá online** từng món (trống = giá tại quán).
+  công tắc bán online + **giá online** từng món (trống = giá tại quán). Giá online
+  là giá khách web thấy và trả; đơn tại quán và đơn kênh ngoài nhập tay (O12) vẫn
+  tính giá tại quán.
 - **R3 · Cấu hình nhận đặt** — chế độ xác nhận **tự động / duyệt tay**; 11 tham
   số thời lượng & giữ chỗ (giữ chỗ mềm 10′, giữ bàn 15′, thời lượng bữa…); trần
   suất và **tiền cọc theo kiểu chỗ**; **chặn ngày** (không huỷ suất đã nhận —

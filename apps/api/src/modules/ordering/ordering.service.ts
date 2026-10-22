@@ -261,7 +261,7 @@ export class OrderingService {
     }
 
     const batchNo = input.batchNo ?? 1
-    const catalog = await this.catalog.dishesByIds(branchId, [input.dishId], tx)
+    const catalog = await this.catalog.dishesByIds(branchId, order.channel, [input.dishId], tx)
     const dish = catalog.get(input.dishId)
     if (!dish) throw new NotFoundException(`Không có món ${input.dishId}`)
 
@@ -324,6 +324,7 @@ export class OrderingService {
 
       const childCatalog = await this.catalog.dishesByIds(
         branchId,
+        order.channel,
         children.map((c) => c.dishId),
         tx,
       )
@@ -526,6 +527,7 @@ export class OrderingService {
 
     const catalog = await this.catalog.dishesByIds(
       branchId,
+      order.channel,
       drafts.map((d) => d.dishId),
       tx,
     )

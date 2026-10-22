@@ -12,7 +12,17 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
-import { deliveryZones, devices, dishes, orders, tickets } from '../db/schema'
+import {
+  deliveryZones,
+  devices,
+  dishBranchOverrides,
+  dishes,
+  orderLines,
+  orders,
+  promotions,
+  tickets,
+} from '../db/schema'
+import { businessDateOf } from '../common/business-date'
 import { ParamsService } from '../common/params.service'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
@@ -763,5 +773,128 @@ describe('7. Trả trước và phần của người giao (O6 · O13 · P16)', 
 
     const tracked = await inject({ method: 'GET', url: `/api/online/track/${fresh.trackToken}` })
     expect(tracked.json<{ status: string }>().status).toBe('new')
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Thực đơn online in giá nào thì đơn web tính đúng giá đó.
+ *
+ * Office khai được giá online riêng (O11), ở cấp chuỗi lẫn cấp chi nhánh. Trước
+ * đây O2 in giá online còn đơn web đóng băng giá tại quán: khách thấy một số, mã
+ * QR đòi một số khác. Đơn tại bàn thì vẫn phải là giá tại quán.
+ */
+describe('8. Giá kênh online — thực đơn và đơn web cùng một giá (O2 · O6 · O11)', () => {
+  /** Giá một món trên thực đơn online, đúng như web đang hiện cho khách */
+  async function menuPrice(dishId: string) {
+    const res = await inject({ method: 'GET', url: `/api/online/menu?branch=${fx.branchId}` })
+    return res
+      .json<{ dishes: { id: string; price: number }[] }>()
+      .dishes.find((d) => d.id === dishId)!.price
+  }
+
+  /** Dòng và tiền món của một đơn, đọc thẳng từ CSDL chứ không qua lời API tự kể */
+  async function stored(orderId: number) {
+    const lines = await db.select().from(orderLines).where(eq(orderLines.orderId, orderId))
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+    return { lines, order: order! }
+  }
+
+  beforeAll(async () => {
+    // Ba chỉ bò: tại quán 285.000₫, online cấp chuỗi 315.000₫
+    await db.update(dishes).set({ onlinePrice: 315_000 }).where(eq(dishes.id, 'bachibo'))
+  })
+
+  it('giá online cấp chuỗi: dòng đơn web đóng băng đúng giá thực đơn in', async () => {
+    const price = await menuPrice('bachibo')
+    expect(price).toBe(315_000)
+
+    const res = await placeTakeaway([{ dishId: 'bachibo', qty: 2 }])
+    expect(res.statusCode, res.payload).toBe(201)
+    const body = res.json<{ id: number; money: { sub: number } }>()
+    expect(body.money.sub).toBe(2 * price)
+
+    const { lines, order } = await stored(body.id)
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toMatchObject({ unitPrice: price, priceTotal: 2 * price })
+    expect(order.moneySub).toBe(2 * price)
+  })
+
+  it('giá online của chi nhánh đè giá online của chuỗi, ở thực đơn lẫn ở đơn', async () => {
+    await db
+      .insert(dishBranchOverrides)
+      .values({ dishId: 'bachibo', branchId: fx.branchId, onlinePrice: 299_000 })
+    const price = await menuPrice('bachibo')
+    expect(price).toBe(299_000)
+
+    const res = await placeTakeaway([{ dishId: 'bachibo', qty: 1 }])
+    expect(res.statusCode, res.payload).toBe(201)
+    const { lines, order } = await stored(res.json<{ id: number }>().id)
+    expect(lines[0]!.unitPrice).toBe(price)
+    expect(order.moneySub).toBe(price)
+  })
+
+  it('đơn tại bàn vẫn tính giá tại quán dù món có giá online', async () => {
+    const opened = await inject({
+      method: 'POST',
+      url: `/api/tables/${fx.plainTableId}/open`,
+      headers: staffAuth(),
+      payload: { guestCount: 2 },
+    })
+    expect(opened.statusCode, opened.payload).toBe(201)
+    const added = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${opened.json<{ id: number }>().id}/lines`,
+      headers: staffAuth(),
+      payload: { lines: [{ dishId: 'bachibo', qty: 1 }] },
+    })
+    expect(added.statusCode, added.payload).toBe(201)
+
+    const { lines, order } = await stored(added.json<{ orderId: number }>().orderId)
+    expect(lines[0]!.unitPrice).toBe(285_000)
+    expect(order.moneySub).toBe(285_000)
+  })
+
+  /**
+   * "Đồng giá" thay giá gốc của món bằng giá chương trình (§9.6), nên giá gốc bộ
+   * chấm nhận cũng phải là giá online: web tính 299.000 − 250.000, máy chủ mà lấy
+   * giá tại quán thì dòng đơn ra một số khác với số khách vừa thấy.
+   */
+  it('đồng giá trên đơn web giảm từ giá online, dòng ra đúng giá đồng giá', async () => {
+    const anHourAgo = new Date(Date.now() - 3_600_000)
+    const day = (offset: number) =>
+      businessDateOf(new Date(Date.now() + offset * 86_400_000), 'Asia/Ho_Chi_Minh')
+    const [promo] = await db
+      .insert(promotions)
+      .values({
+        code: 'KM-BACHI-DG',
+        name: 'Ba chỉ bò đồng giá 250k',
+        scope: 'item',
+        kind: 'set_price',
+        setPriceVnd: 250_000,
+        targetDishIds: ['bachibo'],
+        startsOn: day(-1),
+        endsOn: day(1),
+        state: 'active',
+        activatedAt: anHourAgo,
+        activatedBy: fx.managerId,
+        stateChangedAt: anHourAgo,
+      })
+      .returning({ id: promotions.id })
+
+    const price = await menuPrice('bachibo')
+    const res = await placeTakeaway([{ dishId: 'bachibo', qty: 2 }])
+    expect(res.statusCode, res.payload).toBe(201)
+
+    const { lines, order } = await stored(res.json<{ id: number }>().id)
+    expect(lines[0]).toMatchObject({
+      unitPrice: price,
+      promotionId: promo!.id,
+      discountVnd: 2 * (price - 250_000),
+      promoQty: 2,
+      priceTotal: 2 * 250_000,
+    })
+    expect(order.moneySub).toBe(2 * price)
   })
 })
