@@ -549,7 +549,9 @@ describe('A9 — Hoá đơn điện tử', () => {
         taxCode: '0101234567',
         provider: 'Viettel',
         certificateSerial: 'CT-2026-001',
-        certificateExpiry: '2027-01-01',
+        // Hạn tính từ ngày chạy: hạn cứng 2027-01-01 trước đây qua ngày là
+        // `certificateDaysLeft` âm và bài kiểm cuối của khối này đỏ
+        certificateExpiry: `${new Date().getUTCFullYear() + 1}-12-31`,
       },
     })
     expect(chain.statusCode, chain.payload).toBe(200)

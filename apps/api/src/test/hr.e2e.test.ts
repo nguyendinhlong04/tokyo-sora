@@ -11,6 +11,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { hash } from '@node-rs/argon2'
 import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
 import { parameters, staff, staffRoles, timeEntries } from '../db/schema'
 import { bootTestApp, type Fixtures } from './harness'
@@ -37,13 +38,37 @@ const HR_PIN = '4913'
 const inject = (opts: Parameters<NestFastifyApplication['inject']>[0]) => app.inject(opts)
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` })
 
-/** Thứ Hai 2026-08-03 — tuần dùng cho mọi bài kiểm lịch */
-const WEEK = '2026-08-03'
-const day = (offset: number) => {
-  const at = new Date(`${WEEK}T00:00:00Z`)
+const addDays = (date: string, offset: number) => {
+  const at = new Date(`${date}T00:00:00Z`)
   at.setUTCDate(at.getUTCDate() + offset)
   return at.toISOString().slice(0, 10)
 }
+
+/**
+ * Tuần dùng cho mọi bài kiểm lịch: thứ Hai đầu tiên của THÁNG SAU, theo giờ Việt Nam
+ * lúc chạy test.
+ *
+ * Phải là tuần CHƯA TỚI: sửa lịch tuần đã qua là `timesheet.edit-manual`, dòng mà quản
+ * lý ca chỉ có ở mức △ — tuần cố định 2026-08-03 trước đây trôi qua là cả nhóm H2–H7 đỏ
+ * dây chuyền. Lấy thứ Hai ĐẦU THÁNG chứ không phải thứ Hai tuần sau để cả tuần nằm gọn
+ * trong một tháng: kỳ lương thử là đúng tháng đó và phải phủ cả ca Chủ nhật.
+ */
+const WEEK = (() => {
+  const [y, m] = businessDateOf(new Date(), 'Asia/Ho_Chi_Minh').split('-').map(Number)
+  // Tháng đếm từ 1 nên Date.UTC(y, m, 1) là ngày 1 của tháng sau
+  const first = new Date(Date.UTC(y!, m!, 1))
+  // getUTCDay: Chủ nhật 0, thứ Hai 1 … ⇒ còn (8 − thứ) % 7 ngày nữa là thứ Hai
+  return addDays(first.toISOString().slice(0, 10), (8 - first.getUTCDay()) % 7)
+})()
+const day = (offset: number) => addDays(WEEK, offset)
+
+/** Kỳ lương thử: cả tháng chứa tuần WEEK */
+const PERIOD_START = `${WEEK.slice(0, 7)}-01`
+const PERIOD_END = (() => {
+  const [y, m] = WEEK.split('-').map(Number)
+  // Ngày 0 của tháng sau = ngày cuối của tháng này
+  return new Date(Date.UTC(y!, m!, 0)).toISOString().slice(0, 10)
+})()
 
 async function officeLogin(email: string) {
   const res = await inject({
@@ -330,8 +355,9 @@ describe('H3 · H4 — công THỰC TẾ, không phải lịch xếp', () => {
     expect(res.statusCode, res.payload).toBe(200)
     const me = res.json().rows.find((r: { employeeId: number }) => r.employeeId === cookEmployeeId)
     expect(me.days).toHaveLength(0)
-    // Sáu ngày có ca mà không có công và cũng không có phép — vắng thật
-    expect(me.missingDays).toHaveLength(6)
+    // Sáu ca đều chưa tới ngày nên chưa ai bị tính vắng — vắng chỉ xét ngày ĐÃ QUA (ca đã
+    // qua mà không công, không phép mới là vắng: kiểm ở domain/timesheet.test.ts)
+    expect(me.missingDays).toHaveLength(0)
   })
 
   it('quản lý CA sửa công tay phải có người khác duyệt — đây là dấu △ của §4.2b', async () => {
@@ -614,7 +640,7 @@ describe('H7 — Kỳ lương, năm bước khoá nhau', () => {
       method: 'POST',
       url: '/api/hr/payroll/periods',
       headers: bearer(hrManager),
-      payload: { branchId: fx.branchId, periodStart: '2026-08-01', periodEnd: '2026-08-31' },
+      payload: { branchId: fx.branchId, periodStart: PERIOD_START, periodEnd: PERIOD_END },
     })
     expect(res.statusCode, res.payload).toBe(201)
     periodId = res.json<{ id: number }>().id
@@ -837,7 +863,7 @@ describe('Kỳ lương đã duyệt chảy vào dòng Nhân sự của F7', () =
   const pnl = async () => {
     const res = await inject({
       method: 'GET',
-      url: `/api/reports/pnl?branch=${fx.branchId}&kind=tuy-chon&compare=ky-truoc&from=2026-08-01&to=2026-08-31`,
+      url: `/api/reports/pnl?branch=${fx.branchId}&kind=tuy-chon&compare=ky-truoc&from=${PERIOD_START}&to=${PERIOD_END}`,
       headers: bearer(owner),
     })
     expect(res.statusCode, res.payload).toBe(200)
@@ -904,9 +930,9 @@ describe('H5 — không ai tự duyệt yêu cầu của chính mình', () => {
         branchId: fx.branchId,
         employeeId: profile.json<{ id: number }>().id,
         kind: 'nghi-phep',
-        // Tháng 9: tháng 8 đã chốt công ở phần H7, duyệt nghỉ trong đó là 409 trước
-        fromDate: day(40),
-        toDate: day(40),
+        // Ngày đầu kỳ sau: kỳ lương ở phần H7 đã chốt công, duyệt nghỉ trong đó là 409 trước
+        fromDate: addDays(PERIOD_END, 1),
+        toDate: addDays(PERIOD_END, 1),
         reason: 'Đi khám',
       },
     })

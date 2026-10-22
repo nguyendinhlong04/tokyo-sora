@@ -726,9 +726,15 @@ Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
    (H7 Tính nháp), `PeriodLockService.assertOpen`, `CatalogAdminService.announceCategories`
    (M10); cả `ParamsService` khi cache chưa nạp (instance vừa khởi động). Máy dev pool 10
    không lộ. Hàm chạy trong transaction phải nhận `tx` (§5.2).
-8. `src/test/hr.e2e.test.ts` dùng tuần cố định `2026-08-03`, nay đã qua: sửa lịch tuần đã
-   qua là `timesheet.edit-manual` (△ với R7) nên nhóm H2–H7 đỏ dây chuyền, cả trên Postgres
-   thật. Tính tuần từ ngày chạy test.
+8. **Ngày cứng trong e2e — đã sửa 22/10/2026.** `hr.e2e` dùng tuần cố định `2026-08-03`;
+   qua ngày đó, xếp lịch thành "sửa lịch tuần đã qua" (`timesheet.edit-manual`, △ với R7) và
+   H2–H7 đỏ dây chuyền. Nay tuần = thứ Hai đầu tháng sau (giờ VN lúc chạy), kỳ lương = cả
+   tháng đó. Cùng nguyên nhân: `crm.e2e` B15 (khung bảng kê cứng tới 31/08/2026, dòng nợ mang
+   ngày chạy thật) và `access.e2e` A9 (hạn chứng thư `2027-01-01`). Luật nào so với HÔM NAY
+   thì test tính ngày từ `businessDateOf(new Date(), 'Asia/Ho_Chi_Minh')`, không viết cứng.
+   Còn lệch, chưa sửa: `inventory.e2e` "F7: đủ cả giá vốn lẫn nhân sự" lấy hôm nay theo UTC
+   còn F7 neo giờ VN → đỏ nếu chạy 00:00–07:00; `HrService` xét "tuần đã qua" bằng ngày UTC
+   (`todayIso`).
 
 Thấp hơn:
 - `var(--sora-accent)` không tồn tại (`apps/office/src/routes/Cms.tsx:1035`).
