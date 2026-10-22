@@ -181,3 +181,20 @@ export const IconStar = ({ filled = false, ...p }: P & { filled?: boolean }) => 
     <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" />
   </svg>
 )
+
+/**
+ * Ngọn lửa của nhãn khuyến mãi — tô ĐẶC chứ không vẽ nét như các icon khác: vẽ
+ * 12px trên nền cam than, nét 1.5 chỉ còn là một vệt (cùng lý do dấu +/− nét dày).
+ */
+export const IconFlame = ({ size = 12, className }: { size?: number; className?: string }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    aria-hidden
+    className={className}
+  >
+    <path d="M12 2c1 3.5 5 6 5 11a5 5 0 0 1-10 0c0-2.5 1.2-4 2.5-5.2.3 1.8 1.2 2.8 2.2 3.2-.6-3.4.3-6.4.3-9Z" />
+  </svg>
+)

@@ -573,6 +573,8 @@ export class OnlineService {
       etaMinutes: typeof customer.etaMinutes === 'number' ? customer.etaMinutes : 0,
       money: {
         sub: order.moneySub,
+        // Dòng món in giá SAU giảm món; giảm hoá đơn khách phải thấy là một dòng riêng
+        billDiscount: order.moneyBillDiscount,
         vat: order.moneyVat,
         ship: order.moneyShip,
         total: order.moneyTotal,

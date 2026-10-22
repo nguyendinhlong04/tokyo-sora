@@ -10,7 +10,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common'
-import { can } from '@sora/contracts'
+import { can, PROMOTION_KINDS, PROMOTION_SCOPES } from '@sora/contracts'
 import { z } from 'zod'
 import { actorRoles } from '../identity/actor'
 import type { RequestWithActor } from '../identity/auth.guard'
@@ -34,11 +34,18 @@ const Approval = z
 const PromotionBody = z.object({
   code: z.string().min(2).max(32),
   name: z.string().min(1).max(160),
-  kind: z.enum(['percent', 'amount', 'free_dish', 'set_price']),
+  scope: z.enum(PROMOTION_SCOPES),
+  kind: z.enum(PROMOTION_KINDS),
+  badge: z.string().max(24).nullable().default(null),
   percentBp: z.number().int().min(1).max(10_000).nullable().default(null),
   amountVnd: z.number().int().positive().nullable().default(null),
-  targetDishId: z.string().min(1).nullable().default(null),
   setPriceVnd: z.number().int().min(0).nullable().default(null),
+  buyQty: z.number().int().min(1).max(20).nullable().default(null),
+  getQty: z.number().int().min(1).max(20).nullable().default(null),
+  getPercent: z.number().int().min(1).max(100).nullable().default(null),
+  giftDishId: z.string().min(1).nullable().default(null),
+  targetDishIds: z.array(z.string().min(1)).max(200).default([]),
+  targetCategoryIds: z.array(z.string().min(1)).max(50).default([]),
   maxDiscountVnd: z.number().int().positive().nullable().default(null),
   channels: z.array(z.enum(['web', 'table', 'pos', 'grab', 'shopee', 'be'])).default([]),
   branchIds: z.array(z.string().min(1)).default([]),
@@ -47,6 +54,8 @@ const PromotionBody = z.object({
   toMinute: z.number().int().min(1).max(1440).nullable().default(null),
   minOrderVnd: z.number().int().min(0).default(0),
   requiresVoucher: z.boolean().default(false),
+  concentrated: z.boolean().default(false),
+  legalNotice: z.string().max(300).nullable().default(null),
   startsOn: BusinessDate,
   endsOn: BusinessDate,
 })
@@ -164,27 +173,45 @@ export class CrmController {
   }
 
   /**
-   * Chấm giỏ hàng: chương trình nào ăn, cái nào lợi nhất. P10 gọi khi thu ngân
-   * bấm "Xem khuyến mãi" hoặc gõ mã. Chỉ đọc — gắn `menu.view-price` vì đây là
-   * câu hỏi về GIÁ mà mọi vai trò bán hàng đều hỏi được.
+   * Chương trình đang chạy của một chi nhánh — iPad, POS, web in giá giảm lên thẻ
+   * món từ đây. CÔNG KHAI như thực đơn; chương trình cần mã voucher không lộ ra.
+   */
+  @Public()
+  @Get('promotions/live')
+  livePromotions(@Query('branch') branch: string) {
+    return this.promotions.live(this.requireBranch(branch))
+  }
+
+  /**
+   * Đơn đang được giảm bao nhiêu và còn thiếu bao nhiêu cho mức kế tiếp; có mã thì
+   * chấm thử mã. Chỉ đọc — gắn `menu.view-price` vì đây là câu hỏi về GIÁ mà mọi
+   * vai trò bán hàng đều hỏi được.
    */
   @Get('promotions/quote')
   @RequirePermission('menu.view-price')
-  quote(@Query('order', ParseIntPipe) orderId: number, @Query('voucher') voucher?: string) {
-    return this.promotions.quote(orderId, voucher ?? null)
+  quote(
+    @Query('order', ParseIntPipe) orderId: number,
+    @Req() req: RequestWithActor,
+    @Query('voucher') voucher?: string,
+  ) {
+    return this.promotions.quote(orderId, voucher ?? null, req.actor!)
   }
 
-  @Post('promotions/redeem')
-  @RequirePermission('menu.view-price')
-  redeem(@Body() body: unknown, @Req() req: RequestWithActor) {
+  /**
+   * Gắn mã voucher vào đơn. Gắn `order.create`: ghi vào đơn là việc của người được
+   * gọi món — khách ở bàn tự gõ mã được, nhưng chỉ vào đơn của chính bàn mình.
+   * Gắn lại cùng mã là no-op nên hàng đợi offline gửi lại không trừ lượt hai lần.
+   */
+  @Post('promotions/apply-voucher')
+  @RequirePermission('order.create')
+  applyVoucher(@Body() body: unknown, @Req() req: RequestWithActor) {
     const parsed = z
       .object({
         orderId: z.number().int().positive(),
-        promotionId: z.number().int().positive(),
-        voucherCode: z.string().max(40).nullable().default(null),
+        voucherCode: z.string().min(1).max(40),
       })
       .parse(body)
-    return this.promotions.redeem(parsed, req.actor!)
+    return this.promotions.applyVoucher(parsed, req.actor!)
   }
 
   // ============================================================== B12 · Sổ khách

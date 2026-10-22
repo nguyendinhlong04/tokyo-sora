@@ -5,7 +5,9 @@ import { api } from '../api'
 import { useCart, type CartItem } from '../cart-context'
 import { IconCheck, IconMinus, IconPencil, IconPlus } from '../icons'
 import { clock } from '../order-status'
+import type { CartPricing } from '../promotions'
 import { useTableSession } from '../table-context'
+import { PromoTag } from './PromoTag'
 
 /** T7 hiện bấy lâu rồi cột trở lại giỏ (§9.1) */
 const SENT_MS = 2000
@@ -28,12 +30,18 @@ interface Sent {
  */
 export function CartColumn({
   nextRound,
+  pricing,
   target,
   landed,
   flash,
 }: {
   /** Đợt sắp gửi là đợt thứ mấy của bữa — xem `sendRounds` */
   nextRound: number
+  /**
+   * Khuyến mãi ước tính cho từng dòng giỏ — cùng bộ chấm máy chủ dùng lúc gửi bếp,
+   * nên số khách thấy ở đây là số in trên bill (§9.6)
+   */
+  pricing: CartPricing
   /** Đích bay của nhãn "+N" */
   target: RefObject<HTMLSpanElement | null>
   /** Đếm lên mỗi lần một món hạ cánh — số phần nảy lên một nhịp */
@@ -173,58 +181,79 @@ export function CartColumn({
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 [scrollbar-width:none]">
-          {cart.items.map((line, index) => (
-            <div
-              key={`${line.dishId}#${line.note}#${line.options.map((o) => o.id).join(',')}`}
-              className={[
-                '-mx-2 rounded-sm border-b border-surface-4 px-2 pt-2.5 pb-1 transition-colors duration-500',
-                index === litIndex ? 'bg-accent/12' : '',
-              ].join(' ')}
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[length:var(--fs-b2)] font-semibold text-ink-hi">
-                  {line.name}
-                </span>
-                <Money
-                  amount={line.price * line.qty}
-                  className="flex-none text-[length:var(--fs-b2)] text-gold-300"
-                />
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 text-[length:var(--fs-c1)] text-ink-mute">
-                  {line.options.length > 0 ? (
-                    line.options.map((o) => o.name).join(' · ')
-                  ) : (
-                    <>
-                      <Money amount={line.price} /> / phần
-                    </>
-                  )}
-                </span>
-                <div className="-mr-1.5 flex flex-none items-center">
-                  <StepButton
-                    label={`Bớt một ${line.name}`}
-                    onClick={() => cart.setQty(index, line.qty - 1)}
-                  >
-                    <IconMinus size={14} stroke={1.8} />
-                  </StepButton>
-                  <span className="min-w-[22px] text-center font-mono text-[length:var(--fs-b2)] text-ink-hi">
-                    {line.qty}
+          {cart.items.map((line, index) => {
+            const deal = pricing.lines[index]
+            const off = deal?.discount ?? 0
+            return (
+              <div
+                key={`${line.dishId}#${line.note}#${line.options.map((o) => o.id).join(',')}`}
+                className={[
+                  '-mx-2 rounded-sm border-b border-surface-4 px-2 pt-2.5 pb-1 transition-colors duration-500',
+                  index === litIndex ? 'bg-accent/12' : '',
+                ].join(' ')}
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-[length:var(--fs-b2)] font-semibold text-ink-hi">
+                    {line.name}
                   </span>
-                  <StepButton
-                    label={`Thêm một ${line.name}`}
-                    onClick={() => cart.setQty(index, line.qty + 1)}
-                  >
-                    <IconPlus size={14} stroke={1.8} />
-                  </StepButton>
+                  <span className="flex flex-none items-baseline gap-2">
+                    {off > 0 ? (
+                      <Money
+                        amount={line.price * line.qty}
+                        className="text-[length:var(--fs-c1)] text-ink-mute line-through"
+                      />
+                    ) : null}
+                    <Money
+                      amount={line.price * line.qty - off}
+                      className={[
+                        'text-[length:var(--fs-b2)]',
+                        off > 0 ? 'font-medium text-ember-2' : 'text-gold-300',
+                      ].join(' ')}
+                    />
+                  </span>
                 </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 text-[length:var(--fs-c1)] text-ink-mute">
+                    {line.options.length > 0 ? (
+                      line.options.map((o) => o.name).join(' · ')
+                    ) : (
+                      <>
+                        <Money amount={line.price} /> / phần
+                      </>
+                    )}
+                  </span>
+                  <div className="-mr-1.5 flex flex-none items-center">
+                    <StepButton
+                      label={`Bớt một ${line.name}`}
+                      onClick={() => cart.setQty(index, line.qty - 1)}
+                    >
+                      <IconMinus size={14} stroke={1.8} />
+                    </StepButton>
+                    <span className="min-w-[22px] text-center font-mono text-[length:var(--fs-b2)] text-ink-hi">
+                      {line.qty}
+                    </span>
+                    <StepButton
+                      label={`Thêm một ${line.name}`}
+                      onClick={() => cart.setQty(index, line.qty + 1)}
+                    >
+                      <IconPlus size={14} stroke={1.8} />
+                    </StepButton>
+                  </div>
+                </div>
+                {/* Nhãn ở hàng riêng: chen vào hàng tuỳ chọn thì cột 304px vỡ thành ba dòng */}
+                {deal?.badge ? (
+                  <p className="pb-1.5">
+                    <PromoTag label={deal.badge} compact />
+                  </p>
+                ) : null}
+                {line.note ? (
+                  <p className="pb-1.5 text-[length:var(--fs-c1)] leading-normal text-warn">
+                    ▸ {line.note}
+                  </p>
+                ) : null}
               </div>
-              {line.note ? (
-                <p className="pb-1.5 text-[length:var(--fs-c1)] leading-normal text-warn">
-                  ▸ {line.note}
-                </p>
-              ) : null}
-            </div>
-          ))}
+            )
+          })}
 
           {noteOpen ? (
             <div className="pt-3 pb-4">
@@ -262,10 +291,30 @@ export function CartColumn({
       )}
 
       <div className="flex-none border-t border-accent/16 px-5 pt-3 pb-4">
+        {pricing.hint ? (
+          <p className="mb-2 flex items-center gap-2 text-[length:var(--fs-c1)] leading-snug text-ink-body">
+            <PromoTag label={pricing.hint.badge} compact />
+            <span>
+              Gọi thêm <Money amount={pricing.hint.missingVnd} className="text-ink-hi" /> để được ưu
+              đãi hoá đơn
+            </span>
+          </p>
+        ) : null}
+        {cart.count > 0 && pricing.discount > 0 ? (
+          <div className="mb-1 flex items-baseline justify-between text-[length:var(--fs-c1)]">
+            <span className="text-ink-mute">Khuyến mãi món</span>
+            <span className="font-mono text-ember-2 tabular-nums">
+              −<Money amount={pricing.discount} />
+            </span>
+          </div>
+        ) : null}
         <div className="mb-2.5 flex items-baseline justify-between">
           <span className="text-[length:var(--fs-c1)] text-ink-mute">Tạm tính đợt này</span>
           {cart.count > 0 ? (
-            <Money amount={cart.total} className="text-[length:var(--fs-t2)] text-ink-hi" />
+            <Money
+              amount={cart.total - pricing.discount}
+              className="text-[length:var(--fs-t2)] text-ink-hi"
+            />
           ) : (
             <span className="font-mono text-[length:var(--fs-t2)] text-ink-hi">—</span>
           )}

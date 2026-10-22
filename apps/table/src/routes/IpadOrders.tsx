@@ -5,10 +5,12 @@ import { useNavigate } from 'react-router'
 import { api, type Dish, type OrderLineRow } from '../api'
 import { useCart } from '../cart-context'
 import { BackLink } from '../components/PayHeader'
+import { PromoTag } from '../components/PromoTag'
 import { StoryDialog } from '../components/StoryDialog'
 import { IconBook, IconPlus, IconWarning } from '../icons'
 import { useMenu } from '../menu'
 import { clock, LABELS, sendRounds, STEPS } from '../order-status'
+import { moneyOf, usePromos } from '../promotions'
 import { storyMore, useStories } from '../stories'
 import { useTableSession } from '../table-context'
 import { useIpadCall } from './IpadShell'
@@ -73,6 +75,8 @@ export function IpadOrders() {
   const sentLines = rounds.flatMap((r) => r.lines).filter((l) => l.state !== 'voided')
   const served = sentLines.filter((l) => l.state === 'served').length
   const money = order.data?.order
+  const split = money ? moneyOf(money) : null
+  const promos = usePromos()
   const settled = bill.data ? bill.data.outstanding === 0 && bill.data.total > 0 : false
 
   return (
@@ -170,7 +174,14 @@ export function IpadOrders() {
           Bàn {session.table.code} · {session.guestCount} khách · chưa phải hoá đơn
         </p>
         <div className="mt-4 grid gap-2">
-          <MoneyRow label="Tiền món" amount={money?.moneySub ?? 0} />
+          <MoneyRow label="Tiền món" amount={split?.lines ?? 0} />
+          {split && split.billDiscount > 0 ? (
+            <MoneyRow
+              label={promos.nameOf(money?.billPromotionId ?? null) ?? 'Khuyến mãi hoá đơn'}
+              amount={-split.billDiscount}
+              ember
+            />
+          ) : null}
           {money && money.moneyService > 0 ? (
             <MoneyRow label="Phí phục vụ" amount={money.moneyService} />
           ) : null}
@@ -188,6 +199,11 @@ export function IpadOrders() {
             className="text-[length:var(--fs-t1)] text-ink-hi"
           />
         </div>
+        {split && split.saved > 0 ? (
+          <p className="mt-1.5 text-right text-[length:var(--fs-c1)] text-ember-2">
+            Bàn đã được giảm <Money amount={split.saved} />
+          </p>
+        ) : null}
         {bill.data && bill.data.paid > 0 && !settled ? (
           <p className="mt-1.5 text-right text-[length:var(--fs-c1)] text-ink-mute">
             Đã trả <Money amount={bill.data.paid} /> · còn <Money amount={bill.data.outstanding} />
@@ -242,11 +258,19 @@ export function IpadOrders() {
   )
 }
 
-function MoneyRow({ label, amount }: { label: string; amount: number }) {
+function MoneyRow({
+  label,
+  amount,
+  ember = false,
+}: {
+  label: string
+  amount: number
+  ember?: boolean
+}) {
   return (
     <div className="flex justify-between gap-3 text-[length:var(--fs-b2)]">
-      <span className="text-ink-mute">{label}</span>
-      <Money amount={amount} className="text-ink-body" />
+      <span className={ember ? 'min-w-0 truncate text-ember-2' : 'text-ink-mute'}>{label}</span>
+      <Money amount={amount} className={ember ? 'flex-none text-ember-2' : 'text-ink-body'} />
     </div>
   )
 }
@@ -276,7 +300,11 @@ function Round({
 }
 
 function LineRow({ line, onStory }: { line: OrderLineRow; onStory: (() => void) | null }) {
+  const promos = usePromos()
   const voided = line.state === 'voided'
+  // Giảm đã ghi vào CHÍNH dòng đơn lúc gọi; chương trình đã dừng thì không còn nhãn riêng
+  const off = voided ? 0 : line.discountVnd
+  const badge = off > 0 ? (promos.badgeOf(line.promotionId) ?? 'Khuyến mãi') : null
   const step = STEPS.indexOf(line.state)
   const sub = [...(line.modifiers ?? []).map((m) => m.name), line.note ? `“${line.note}”` : null]
     .filter(Boolean)
@@ -293,7 +321,12 @@ function LineRow({ line, onStory }: { line: OrderLineRow; onStory: (() => void) 
         >
           {line.qty} × {line.nameSnapshot}
         </p>
-        {sub ? <p className="mt-0.5 text-[length:var(--fs-c1)] text-ink-mute">{sub}</p> : null}
+        {sub || badge ? (
+          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[length:var(--fs-c1)] text-ink-mute">
+            {badge ? <PromoTag label={badge} compact /> : null}
+            {sub}
+          </p>
+        ) : null}
         {onStory ? (
           <button
             type="button"
@@ -328,13 +361,25 @@ function LineRow({ line, onStory }: { line: OrderLineRow; onStory: (() => void) 
           ))}
         </div>
       </div>
-      <Money
-        amount={line.priceTotal}
-        className={[
-          'text-right text-[length:var(--fs-b2)]',
-          voided ? 'text-ink-mute line-through' : 'text-gold-300',
-        ].join(' ')}
-      />
+      <span className="flex flex-col items-end">
+        {off > 0 ? (
+          <Money
+            amount={line.qty * line.unitPrice}
+            className="text-[length:var(--fs-c1)] text-ink-mute line-through"
+          />
+        ) : null}
+        <Money
+          amount={line.priceTotal}
+          className={[
+            'text-right text-[length:var(--fs-b2)]',
+            voided
+              ? 'text-ink-mute line-through'
+              : off > 0
+                ? 'font-medium text-ember-2'
+                : 'text-gold-300',
+          ].join(' ')}
+        />
+      </span>
     </div>
   )
 }

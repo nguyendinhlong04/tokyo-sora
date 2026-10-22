@@ -88,6 +88,9 @@ export function Invoice() {
         </div>
 
         <div className="border-t border-line-1 pt-3.5">
+          {money && money.moneyBillDiscount > 0 ? (
+            <Row label="Khuyến mãi hoá đơn" amount={-money.moneyBillDiscount} />
+          ) : null}
           {money && money.moneyService > 0 ? (
             <Row label="Phí phục vụ" amount={money.moneyService} />
           ) : null}

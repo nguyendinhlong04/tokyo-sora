@@ -23,6 +23,7 @@ import {
   type Filters,
 } from '../menu'
 import { sendRounds } from '../order-status'
+import { usePromos } from '../promotions'
 import { storyMore, useStories } from '../stories'
 import { useTableSession } from '../table-context'
 import { loadRecent, RECENT_KEY, RECENT_MAX } from './Search'
@@ -71,6 +72,11 @@ export function IpadMenu() {
   const nextRound = sendRounds(order.data).length + 1
 
   const dishById = useMemo(() => new Map(menu.dishes.map((d) => [d.id, d])), [menu.dishes])
+  const promos = usePromos()
+  const pricing = useMemo(
+    () => promos.priceCart(cart.items, order.data, dishById),
+    [promos, cart.items, order.data, dishById],
+  )
 
   /**
    * "Gọi món này" từ Bí quyết ở Đơn của bàn dẫn về đây kèm mã món: mở đúng nhóm
@@ -516,7 +522,13 @@ export function IpadMenu() {
         )}
       </main>
 
-      <CartColumn nextRound={nextRound} target={fly.target} landed={fly.landed} flash={flash} />
+      <CartColumn
+        nextRound={nextRound}
+        pricing={pricing}
+        target={fly.target}
+        landed={fly.landed}
+        flash={flash}
+      />
 
       {open ? (
         <DishDialog

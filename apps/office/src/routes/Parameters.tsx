@@ -21,6 +21,7 @@ const GROUP_LABEL: Record<string, string> = {
   stock: 'Kho',
   einvoice: 'Hoá đơn điện tử',
   loyalty: 'Tích điểm',
+  promo: 'Khuyến mãi',
   corporate: 'Công nợ doanh nghiệp',
   feedback: 'Phản hồi khách',
   report: 'Báo cáo',
@@ -124,6 +125,8 @@ const NOTE: Record<string, string> = {
   'einvoice.serial':
     'Ký hiệu hoá đơn RIÊNG từng địa điểm kinh doanh — không chi nhánh nào dùng chung.',
 
+  'promo.maxDiscountRate':
+    'Trần giảm của mọi chương trình không phải khuyến mại tập trung — luật hiện là 0,5 (50%). Chỉ đổi khi luật đổi.',
   'loyalty.vndPerPoint': 'Khách tiêu ngần này đồng thì được 1 điểm.',
   'loyalty.vndPerPointRedeem': '1 điểm đổi được ngần này đồng khi trừ vào bill.',
   'loyalty.redeemCapVndPerOrder': 'Trần tiền điểm được trừ trên một bill.',

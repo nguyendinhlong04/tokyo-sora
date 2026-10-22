@@ -6,6 +6,7 @@ import { PayHeader } from '../components/PayHeader'
 import { RatingCard } from '../components/RatingCard'
 import { useMenu } from '../menu'
 import { clock } from '../order-status'
+import { moneyOf, usePromos } from '../promotions'
 import { useTableSession } from '../table-context'
 import { Frame } from './IpadPay'
 
@@ -17,11 +18,15 @@ import { Frame } from './IpadPay'
  * HĐĐT phải do nhà cung cấp cấp mã mới tra được trên hệ thống thuế, còn điểm cần
  * danh tính khách mà máy ở bàn không có. In ra một mã không tra được gì thì tệ
  * hơn là không in.
+ *
+ * Món được khuyến mãi in GIÁ GỐC rồi một dòng giảm ngay dưới, như hoá đơn có
+ * chiết khấu (§9.6): khách đối được từng món với thực đơn, và cộng tay vẫn ra tổng.
  */
 export function IpadInvoice() {
   const session = useTableSession()
   const navigate = useNavigate()
   const menu = useMenu(session.branchId)
+  const promos = usePromos()
 
   const order = useQuery({
     queryKey: ['order', session.id],
@@ -33,6 +38,7 @@ export function IpadInvoice() {
   })
 
   const money = order.data?.order
+  const split = money ? moneyOf(money) : null
   const lines = (order.data?.lines ?? []).filter(
     (l) => l.parentLineId === null && l.state !== 'voided',
   )
@@ -79,13 +85,30 @@ export function IpadInvoice() {
           ) : null}
           <div className="mt-3.5 mb-2 border-t border-dashed border-kraft-ink/35" />
           {lines.map((line) => (
-            <div key={line.id} className="flex gap-2.5 py-[3px] text-[length:var(--fs-c1)]">
-              <span className="w-6 flex-none font-mono">{line.qty}×</span>
-              <span className="min-w-0 flex-1">{line.nameSnapshot}</span>
-              <Money amount={line.priceTotal} className="flex-none" />
+            <div key={line.id} className="py-[3px] text-[length:var(--fs-c1)]">
+              <div className="flex gap-2.5">
+                <span className="w-6 flex-none font-mono">{line.qty}×</span>
+                <span className="min-w-0 flex-1">{line.nameSnapshot}</span>
+                <Money amount={line.qty * line.unitPrice} className="flex-none" />
+              </div>
+              {line.discountVnd > 0 ? (
+                <div className="flex gap-2.5 text-kraft-ink-2">
+                  <span className="w-6 flex-none" />
+                  <span className="min-w-0 flex-1">
+                    {promos.badgeOf(line.promotionId) ?? 'Khuyến mãi'}
+                  </span>
+                  <Money amount={-line.discountVnd} className="flex-none" />
+                </div>
+              ) : null}
             </div>
           ))}
           <div className="my-2 border-t border-dashed border-kraft-ink/35" />
+          {split && split.billDiscount > 0 ? (
+            <ReceiptRow
+              label={promos.nameOf(money?.billPromotionId ?? null) ?? 'Khuyến mãi hoá đơn'}
+              amount={-split.billDiscount}
+            />
+          ) : null}
           {money && money.moneyService > 0 ? (
             <ReceiptRow label="Phí phục vụ" amount={money.moneyService} />
           ) : null}

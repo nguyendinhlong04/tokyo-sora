@@ -45,11 +45,20 @@ riêng lát "theo cách trả tiền" cộng cả hai vì để đối soát v�
 
 ## 6.3 Khách & khuyến mãi (B11–B15)
 
-- **B11 · Khuyến mãi & voucher** — nút **Soạn chương trình** (giảm %, giảm
-  tiền, tặng món, giá set khung giờ; điều kiện kênh/thứ/giờ/đơn tối thiểu; phát
-  lô mã voucher). Marketing soạn được nhưng **bật chương trình phải có quản lý
-  chuỗi/chủ duyệt bằng PIN** ngay trên màn (dải **Duyệt & bật**) — vì bật là
-  đụng giá. **Một đơn chỉ hưởng một chương trình, không cộng dồn.**
+- **B11 · Khuyến mãi & voucher** — áp **chung cho mọi kênh** (iPad tại bàn, quầy,
+  web): máy chủ ghi tiền giảm thẳng vào đơn, khách thấy giá giảm ngay trên thẻ món.
+  Nút **Soạn chương trình**, bắt đầu từ một trong 7 **mẫu** (giờ vàng đồ uống, mua 2
+  tặng 1, phần thứ hai −50%, đồng giá set trưa, giảm % hoá đơn, tặng món theo hoá
+  đơn, voucher khách quen) rồi đi 5 bước: **Loại** (áp cho *món · set · nhóm món*
+  hay *cả hoá đơn*) · **Món áp dụng** · **Điều kiện** (kênh/thứ/khung giờ/đơn tối
+  thiểu/trần mỗi đơn) · **Mã, nhãn & pháp lý** · **Lịch chạy**. Khung bên phải xem
+  trước đúng giá khách sẽ thấy. Giảm quá **50%** (hay "mua 1 tặng 1") chỉ lưu được
+  khi bật **Khuyến mại tập trung** — luật khuyến mại, không phải ý của phần mềm.
+  Mã voucher chỉ dùng cho chương trình hoá đơn. Marketing soạn được nhưng **bật
+  chương trình phải có quản lý chuỗi/chủ duyệt bằng PIN** ngay trên màn (dải
+  **Duyệt & bật**) — vì bật là đụng giá; đang chạy thì **Tạm dừng** rồi mới sửa.
+  **Không cộng dồn:** mỗi món một chương trình món, hoá đơn một chương trình hoá
+  đơn và chỉ tính trên món chưa giảm — hệ thống tự chọn mức lợi nhất cho khách.
 - **B12 · Sổ khách** — hồ sơ gom **tự động theo SĐT** từ đặt bàn + đơn online +
   lượt thu tiền; không có nút "thêm khách". Hai tab *Hồ sơ & lịch sử* và
   *Điểm & hạng*. Vai trò không đủ quyền thấy SĐT bị che. **Điều chỉnh điểm

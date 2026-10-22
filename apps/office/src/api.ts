@@ -1,3 +1,4 @@
+import type { PromotionKind, PromotionScope } from '@sora/contracts'
 import { apiFetch } from '@sora/core'
 
 export interface OfficeStaff {
@@ -1872,17 +1873,25 @@ export interface Approval {
 
 // ------------------------------------- B11 · B12 · B13 · B14 · B15 (nhóm CRM)
 
-export type PromotionKind = 'percent' | 'amount' | 'free_dish' | 'set_price'
+export type { PromotionKind, PromotionScope }
 export type PromotionState = 'draft' | 'active' | 'paused' | 'ended'
 
+/** Hình dạng của bộ chấm chung (`@sora/contracts/promotions`) cộng phần chỉ màn soạn cần */
 export interface PromotionInput {
   code: string
   name: string
+  scope: PromotionScope
   kind: PromotionKind
+  badge: string | null
   percentBp: number | null
   amountVnd: number | null
-  targetDishId: string | null
   setPriceVnd: number | null
+  buyQty: number | null
+  getQty: number | null
+  getPercent: number | null
+  giftDishId: string | null
+  targetDishIds: string[]
+  targetCategoryIds: string[]
   maxDiscountVnd: number | null
   channels: string[]
   branchIds: string[]
@@ -1891,6 +1900,8 @@ export interface PromotionInput {
   toMinute: number | null
   minOrderVnd: number
   requiresVoucher: boolean
+  concentrated: boolean
+  legalNotice: string | null
   startsOn: string
   endsOn: string
 }
@@ -1898,7 +1909,7 @@ export interface PromotionInput {
 export interface PromotionRow extends PromotionInput {
   id: number
   state: PromotionState
-  targetDishName: string | null
+  giftDishName: string | null
   activatedAt: string | null
   activatedBy: string | null
   uses: number

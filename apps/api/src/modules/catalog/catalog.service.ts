@@ -21,6 +21,8 @@ export interface CatalogDish {
   code: string
   kind: 'dish' | 'set' | 'drink'
   name: string
+  /** Nhóm món — khuyến mãi theo nhóm ("đồ uống giờ vàng") chấm theo đây */
+  categoryId: string | null
   /** Giá đã áp ghi đè theo chi nhánh — đây là giá sẽ ĐÓNG BĂNG vào dòng đơn */
   price: number
   routing: DishRouting | null
@@ -66,6 +68,7 @@ export class CatalogService {
         code: dish.code,
         kind: dish.kind as CatalogDish['kind'],
         name: dish.nameVi,
+        categoryId: dish.categoryId,
         price: o?.price ?? dish.basePrice,
         routing:
           dish.stationGrill && dish.stationNoGrill

@@ -119,7 +119,16 @@ export interface TrackedOrder {
   slotAt: string | null
   etaMinutes: number
   /** `prepay` là phần phải trả trước — đơn giao thì phí ship KHÔNG nằm trong đó */
-  money: { sub: number; vat: number; ship: number; total: number; prepay: number; paid: number }
+  money: {
+    sub: number
+    /** Giảm hoá đơn (§9.6) — giảm món đã nằm sẵn trong giá từng dòng */
+    billDiscount: number
+    vat: number
+    ship: number
+    total: number
+    prepay: number
+    paid: number
+  }
   lines: { nameSnapshot: string; qty: number; priceTotal: number; state: string }[]
   cancelReason: string | null
 }

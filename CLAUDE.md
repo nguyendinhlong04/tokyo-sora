@@ -311,8 +311,8 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   khoá chính `bigint identity` (`{mode:'number'}`), slug text cho `branches` (`'cg'`),
   `dishes`, `categories`, `stations` (`'ST-01'…'ST-06'`), `modifier_*`; `timestamptz`.
 - **Tiền = số nguyên VND** `bigint`, không `numeric` (riêng giá vốn kho đơn vị phần nghìn
-  đồng `*_milli`). Tổng tiền chỉ tính bằng `computeOrderTotals` **trên server**; giá và tên
-  **đóng băng** vào dòng đơn lúc tạo.
+  đồng `*_milli`). Tổng tiền chỉ tính bằng `computeOrderTotals` **trên server**; giá, tên và
+  khuyến mãi món **đóng băng** vào dòng đơn lúc tạo (§9.6).
 - `business_date` theo múi giờ chi nhánh (`businessDateOf`); mã hiển thị `ON-yyMM-NNNN`
   / `DB-yyMM-NNNN` (`nextDisplayCode`), khách đọc mã này, không đọc id.
 - **Sổ bất biến** (append-only, trigger `sora_append_only` + revoke quyền role `sora_app`
@@ -342,7 +342,7 @@ Enum chính (giá trị đúng như CHECK):
 
 Luồng: `POST /api/tables/:id/open` (409 `table_reserved` nếu có đặt chỗ trong 90′) →
 `POST /api/table-sessions/:id/lines` (đơn tạo lười `new`, dòng `draft`, set nổ thành món
-con, giá đóng băng, trừ cap món hết) → `/send` (đợt 1 `fired`, đợt sau `held` không chạy
+con, giá và khuyến mãi món đóng băng, trừ cap món hết) → `/send` (đợt 1 `fired`, đợt sau `held` không chạy
 giờ; đơn `confirmed`; **một vé cho mỗi trạm**; `ticket.created`) → KDS `POST /api/tickets/:id/state`
 hoặc `/api/ticket-items/:id/state` `{action: start|done|undo}` (done **trừ kho cùng
 transaction**; undo trong `kitchen.undoSeconds`=30; trạng thái đơn chỉ đi tới) → phục vụ
@@ -642,19 +642,59 @@ Mục tiêu bản dựng lại (giữ nguyên API; đổi client):
 5. Bàn đôi (§9.2).
 6. POS ba khổ (§9.3).
 Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
-Chen ngay sau giao diện iPad, theo yêu cầu 22/10/2026: **khuyến mãi áp dụng chung** (§9.6).
+Chen ngay sau giao diện iPad, theo yêu cầu 22/10/2026: **khuyến mãi áp dụng chung** (§9.6) —
+xong phần API, B11 và iPad cùng ngày; còn hiển thị ở web và ô voucher ở POS.
 
-### 9.6 Khuyến mãi áp dụng chung (chốt 22/10/2026)
-Hiện khuyến mãi (Office B11 `/khuyen-mai`, `crm.promotions`) chỉ được thu ngân áp ở P10
-(`promotions/quote` + `/redeem`); khách ở bàn, trên web hay trên POS không thấy giá giảm ở
-đâu cả. Đã chốt:
-- **Một bộ máy cho mọi kênh** — iPad tại bàn, web, POS, giao hàng — thay cho áp tay ở quầy.
-- **Đích áp:** từng món, set, cả hoá đơn, cùng các dạng phổ biến của nhà hàng (nghiên cứu
-  khi làm).
-- **Giá giảm ghi thẳng vào dòng đơn qua API** lúc gọi món, đóng băng như giá (kèm giá gốc
-  và chương trình để báo cáo, kế toán đối chiếu); app chỉ hiển thị.
-- **Trang B11 làm lại** theo mô hình mới.
-Thiết kế chi tiết (loại, điều kiện, cộng dồn, kế toán, hiển thị) viết vào đây khi làm.
+### 9.6 Khuyến mãi áp dụng chung (chốt và làm 22/10/2026)
+Một bộ chấm cho mọi kênh: `packages/contracts/src/promotions.ts` (test `promotions.test.ts`),
+API và app gọi cùng hàm nên giá khách thấy = giá in trên bill. Máy chủ ghi tiền giảm thẳng
+vào đơn; app chỉ hiển thị.
+- **Chương trình món** `scope='item'`: `percent` · `amount` (mỗi phần) · `set_price` (đồng
+  giá — chỉ thay giá món, tuỳ chọn vẫn cộng, không bao giờ làm đắt lên) · `buy_x_get_y` (mua
+  N tặng M, phần tặng giảm `get_percent`%, tặng phần rẻ nhất). Đích `target_dish_ids` (món
+  hoặc set) và/hoặc `target_category_ids`. Chấm **lúc gọi món** (`appendLines`, theo giờ gọi)
+  và **đóng băng vào dòng**: `order_lines.promotion_id` · `discount_vnd` · `promo_qty`,
+  `price_total = qty × unit_price − discount_vnd` (CHECK). Set: giảm nằm ở dòng cha.
+- **Chương trình hoá đơn** `scope='bill'`: `percent` · `amount` · `free_dish` (tặng một phần
+  rẻ nhất của `target_dish_id`, có thể đòi món gọi kèm). Chấm lại **mỗi lần
+  `recomputeTotals`**, theo giờ MỞ đơn → `orders.bill_promotion_id` + `money_bill_discount`.
+  Chương trình dừng sau lúc mở đơn vẫn giữ cho đơn đó (`heldFor` + `state_changed_at`).
+- **Không cộng dồn:** mỗi dòng ≤ 1 chương trình món (lợi nhất, hoà → id nhỏ); giảm theo
+  phần đi trước mua N tặng M; hoá đơn ≤ 1 chương trình hoá đơn, chỉ trên các **phần** chưa
+  giảm món (mua 2 tặng 1 gọi một dòng: hai phần phải trả vẫn được giảm hoá đơn).
+- **Tiền:** `unit_price` giữ giá niêm yết; `money_sub` = tiền món giá niêm yết;
+  `money_discount` = giảm món + giảm hoá đơn → `computeOrderTotals`. Màn khách hiện "tiền
+  món" = `money_sub − giảm món` (khớp tổng các dòng) rồi dòng giảm hoá đơn (`moneyOf` ở
+  `apps/table/src/promotions.tsx`); phiếu hoá đơn in giá gốc + dòng giảm dưới từng món.
+- **Trần luật** (NĐ 81/2018 sửa bởi NĐ 128/2024): giảm ≤ 50% giá ngay trước khuyến mãi, quà
+  ≤ 50% giá trị hàng mua; **khuyến mại tập trung** (`concentrated`) được tới 100%. Tham số
+  `promo.maxDiscountRate` = 0,5. B11 chặn lúc soạn (% > 50, `get × pct > 50 × buy`); bộ chấm
+  cắt ở trần khi tính (giảm tiền, đồng giá, tặng món). `legal_notice` = số thông báo Sở CT.
+- **Voucher:** chỉ chương trình hoá đơn đòi mã. `POST /api/crm/promotions/apply-voucher`
+  (`order.create`, khách chỉ đơn bàn mình): gắn `orders.voucher_code_id`, trừ lượt ngay trên
+  dòng mã đã khoá, gắn lại cùng mã là no-op, đổi mã thì trả lượt; rồi tính lại tiền.
+  `GET /api/crm/promotions/quote?order=&voucher=` chỉ đọc.
+- **App đọc** `GET /api/crm/promotions/live?branch=` (công khai) → `{clock, maxDiscountRate,
+  rules}`, không có chương trình cần mã; `clock` = giờ chi nhánh do máy chủ tính, app hỏi
+  lại mỗi phút. iPad: `PromotionsProvider` ở `IpadShell`, `PromoTag` (cam than + ngọn lửa),
+  giỏ ước bằng `priceNewLines`, gợi ý "gọi thêm X để được ưu đãi hoá đơn".
+- **Báo cáo:** `promotion_redemptions` một dòng cho mỗi (đơn, chương trình) = số đang giảm,
+  ghi lại mỗi lần tính tiền (unique `promotion_redemptions_order_promo`) — B8 đọc bảng này.
+  Ma trận món (`dishStats`) dùng `price_total` = sau giảm món.
+- **B11** (Office `/khuyen-mai`): 5 bước theo prototype (Loại · Món áp dụng · Điều kiện ·
+  Mã, nhãn & pháp lý · Lịch chạy), 7 mẫu nhà hàng hay chạy, xem trước bằng chính bộ chấm.
+  Soạn ≠ bật (R9 soạn, R11/R10 bật); đang chạy phải tạm dừng mới sửa.
+- **Chưa làm / biết trước:**
+  - Web chưa in giá giảm ở thực đơn và giỏ (đơn web vẫn được giảm khi đặt; trang theo dõi
+    đơn có dòng giảm hoá đơn). POS P4/P10 chưa có ô nhập voucher (API có rồi).
+  - Hoá đơn điện tử (`invoices`) chưa có cột chiết khấu — NĐ 123/2020 bắt hiện chiết khấu
+    thương mại; làm khi nối nhà cung cấp HĐĐT.
+  - Chia bill theo món (`split/claim`) cộng `price_total`: đã trừ giảm món, chưa chia giảm
+    hoá đơn (như phí phục vụ/VAT trước giờ).
+  - Mua N tặng M: huỷ dòng "đã mua" sau khi phần tặng đã ghi thì phần tặng vẫn giữ.
+  - Chương trình hoá đơn bật giữa bữa chỉ áp khi đơn đổi lần tiếp theo.
+  - Đơn tối thiểu vùng giao (`below_min_order`) so trên tiền món giá niêm yết.
+  - Migration `0030_khuyen_mai_ap_dung_chung` phải `db:migrate` trước khi deploy API.
 
 ---
 

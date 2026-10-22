@@ -1,5 +1,6 @@
 import { Money } from '@sora/ui'
 import type { Dish } from '../api'
+import { usePromos } from '../promotions'
 import { AddButton } from './AddButton'
 
 /**
@@ -24,8 +25,16 @@ export function DishLine({
   onOpen: () => void
   onAdd: (from: HTMLElement) => void
 }) {
+  const promos = usePromos()
+  const offer = soldOut ? null : promos.offerOf(dish)
+  const cheaper = offer !== null && offer.price < dish.price
   return (
-    <div className="flex h-16 items-center gap-1 rounded-md border border-line-1 bg-surface-3 pr-1 pl-2">
+    <div
+      className={[
+        'flex h-16 items-center gap-1 rounded-md border bg-surface-3 pr-1 pl-2',
+        offer ? 'border-ember-2/60' : 'border-line-1',
+      ].join(' ')}
+    >
       <button
         type="button"
         aria-label={`Xem chi tiết ${dish.nameVi}`}
@@ -46,14 +55,20 @@ export function DishLine({
           </span>
           <span className="mt-0.5 flex items-baseline gap-2 overflow-hidden whitespace-nowrap">
             <Money
-              amount={dish.price}
+              amount={cheaper ? offer.price : dish.price}
               className={[
                 'flex-none text-[length:var(--fs-b2)]',
-                soldOut ? 'text-ink-mute' : 'text-gold-300',
+                cheaper ? 'font-medium text-ember-2' : soldOut ? 'text-ink-mute' : 'text-gold-300',
               ].join(' ')}
             />
+            {cheaper ? (
+              <Money
+                amount={dish.price}
+                className="flex-none text-[length:var(--fs-c1)] text-ink-mute line-through"
+              />
+            ) : null}
             <span className="min-w-0 truncate text-[length:var(--fs-c1)] text-ink-mute">
-              {soldOut ? 'Đã hết' : meta}
+              {soldOut ? 'Đã hết' : offer && !cheaper ? offer.badge : meta}
             </span>
           </span>
         </span>

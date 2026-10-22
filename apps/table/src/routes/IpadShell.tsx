@@ -7,6 +7,7 @@ import { useCart } from '../cart-context'
 import { KINDS } from '../components/CallStaffSheet'
 import { HostApproval } from '../components/HostApproval'
 import { IconBell, IconOffline, IconReceipt } from '../icons'
+import { PromotionsProvider } from '../promotions'
 import { useTable, useTableSession } from '../table-context'
 import { ScanAgain, useOutbox } from './Shell'
 
@@ -53,16 +54,18 @@ export function IpadShell() {
   if (!session) return <ScanAgain ended={ended} />
 
   return (
-    <CallProvider>
-      <div className="flex h-dvh flex-col overflow-hidden bg-surface-2 font-sans text-[length:var(--fs-b2)] leading-[1.45] text-ink-body">
-        {pathname === '/' ? null : <TopBar />}
-        <div className="flex min-h-0 flex-1 flex-col">
-          <Outlet />
+    <PromotionsProvider branchId={session.branchId}>
+      <CallProvider>
+        <div className="flex h-dvh flex-col overflow-hidden bg-surface-2 font-sans text-[length:var(--fs-b2)] leading-[1.45] text-ink-body">
+          {pathname === '/' ? null : <TopBar />}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <Outlet />
+          </div>
         </div>
-      </div>
-      {pathname.startsWith('/tra-tien') ? null : <IdleDimmer />}
-      <HostApproval />
-    </CallProvider>
+        {pathname.startsWith('/tra-tien') ? null : <IdleDimmer />}
+        <HostApproval />
+      </CallProvider>
+    </PromotionsProvider>
   )
 }
 

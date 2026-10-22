@@ -257,6 +257,14 @@ export function TrackOrder({ token }: { token: string }) {
           ))}
         </div>
         <div className="mt-3 border-t border-line-1 pt-3">
+          {order.money.billDiscount > 0 ? (
+            <div className="flex justify-between py-1">
+              <span className="text-[length:var(--fs-b2)] text-ink-mute">Khuyến mãi hoá đơn</span>
+              <span className="font-mono text-[length:var(--fs-b2)] text-ink-body">
+                −{formatVnd(order.money.billDiscount)}
+              </span>
+            </div>
+          ) : null}
           {order.money.ship > 0 ? (
             <div className="flex justify-between py-1">
               <span className="text-[length:var(--fs-b2)] text-ink-mute">Phí giao</span>

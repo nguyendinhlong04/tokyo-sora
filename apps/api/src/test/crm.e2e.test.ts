@@ -4,10 +4,11 @@
  * Năm màn này khác nhóm báo cáo ở chỗ chúng GHI, nên bài kiểm không hỏi "gọi có
  * chạy không" mà hỏi năm điều mà một bản dựng sai sẽ vi phạm âm thầm:
  *
- *   1. **Khuyến mãi không cộng dồn** — đơn hưởng đúng một chương trình, và là
- *      chương trình lợi nhất cho khách.
+ *   1. **Khuyến mãi không cộng dồn** — đơn hưởng đúng một chương trình hoá đơn,
+ *      và là chương trình lợi nhất cho khách. Phần áp vào từng dòng đơn (món, set,
+ *      mua N tặng M) có bài riêng: `promotions-order.e2e.test.ts`.
  *   2. **Kích hoạt là đụng giá** — R9 marketing soạn được nhưng bật phải có
- *      R11/R10 duyệt bằng PIN.
+ *      R11/R10 duyệt bằng PIN; giảm quá trần luật bị chặn ngay lúc soạn.
  *   3. **Điểm chỉ sinh từ thanh toán** — không có API cộng điểm, thu tiền mới
  *      sinh điểm, huỷ bill thì thu hồi.
  *   4. **SĐT che ba số giữa với vai trò không cần thấy** — marketing thấy Sổ
@@ -27,11 +28,13 @@ import {
   orders,
   parameters,
   payments,
+  promotionRedemptions,
   staff,
   staffRoles,
   tableSessions,
 } from '../db/schema'
 import { pointsExpireOn, type LoyaltyConfig } from '../modules/crm/domain/loyalty'
+import { OrderingService } from '../modules/ordering/ordering.service'
 import { bootTestApp, type Fixtures } from './harness'
 
 let app: NestFastifyApplication
@@ -132,6 +135,7 @@ async function makeOrder(spec: OrderSpec) {
 const draftPromotion = (over: Record<string, unknown> = {}) => ({
   code: 'KM-TEST',
   name: 'Chương trình thử',
+  scope: 'bill',
   kind: 'percent',
   percentBp: 1000,
   startsOn: '2026-08-01',
@@ -234,7 +238,7 @@ describe('B11 — Soạn ≠ kích hoạt', () => {
       method: 'PUT',
       url: `/api/crm/promotions/${promoId}`,
       headers: bearer(marketer),
-      payload: draftPromotion({ code: 'KM-TRUA', name: 'Đổi tên giữa chừng', percentBp: 9000 }),
+      payload: draftPromotion({ code: 'KM-TRUA', name: 'Đổi tên giữa chừng', percentBp: 2000 }),
     })
     expect(res.statusCode).toBe(409)
     expect(res.json().message).toContain('tạm dừng')
@@ -272,10 +276,87 @@ describe('B11 — Soạn ≠ kích hoạt', () => {
   })
 })
 
+describe('B11 — Trần theo luật và hình dạng chương trình', () => {
+  const compose = (body: Record<string, unknown>) =>
+    inject({
+      method: 'POST',
+      url: '/api/crm/promotions',
+      headers: bearer(marketer),
+      payload: draftPromotion(body),
+    })
+
+  it('giảm quá 50% bị chặn lúc soạn — trừ chương trình khuyến mại tập trung', async () => {
+    const over = await compose({ code: 'KM-60PT', percentBp: 6000 })
+    expect(over.statusCode).toBe(400)
+    expect(over.json().message).toContain('khuyến mại tập trung')
+
+    const concentrated = await compose({
+      code: 'KM-60PT',
+      percentBp: 6000,
+      concentrated: true,
+      legalNotice: 'TB 12/2026 gửi Sở Công Thương Hà Nội',
+    })
+    expect(concentrated.statusCode, concentrated.payload).toBe(201)
+    expect(concentrated.json()).toMatchObject({ concentrated: true, state: 'draft' })
+  })
+
+  it('"mua 1 tặng 1" là giảm 100% phần tặng — vượt trần; "mua 2 tặng 1" thì vừa đúng trần', async () => {
+    const bogo = { scope: 'item', kind: 'buy_x_get_y', percentBp: null, targetDishIds: ['thanbo'] }
+    const oneForOne = await compose({
+      ...bogo,
+      code: 'KM-1T1',
+      buyQty: 1,
+      getQty: 1,
+      getPercent: 100,
+    })
+    expect(oneForOne.statusCode).toBe(400)
+
+    const twoForOne = await compose({
+      ...bogo,
+      code: 'KM-2T1',
+      buyQty: 2,
+      getQty: 1,
+      getPercent: 100,
+    })
+    expect(twoForOne.statusCode, twoForOne.payload).toBe(201)
+    expect(twoForOne.json()).toMatchObject({ scope: 'item', buyQty: 2, getQty: 1, percentBp: null })
+  })
+
+  it('chương trình món phải chỉ ra món, set hoặc nhóm món — và mã phải có thật', async () => {
+    const none = await compose({ code: 'KM-MON', scope: 'item' })
+    expect(none.statusCode).toBe(400)
+
+    const typo = await compose({ code: 'KM-MON', scope: 'item', targetDishIds: ['bachiboo'] })
+    expect(typo.statusCode).toBe(400)
+    expect(typo.json().message).toContain('bachiboo')
+  })
+
+  it('đồng giá là chương trình món, không phải chương trình hoá đơn', async () => {
+    const res = await compose({
+      code: 'KM-DG',
+      kind: 'set_price',
+      percentBp: null,
+      setPriceVnd: 99_000,
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toContain('hoá đơn')
+  })
+
+  it('mã voucher chỉ mở được chương trình hoá đơn', async () => {
+    const res = await compose({
+      code: 'KM-MON-MA',
+      scope: 'item',
+      targetDishIds: ['bachibo'],
+      requiresVoucher: true,
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toContain('voucher')
+  })
+})
+
 describe('B11 — Không cộng dồn, tự áp mức lợi nhất', () => {
   let orderId: number
   let percentId: number
-  let amountId: number
 
   beforeAll(async () => {
     orderId = await makeOrder({
@@ -306,10 +387,11 @@ describe('B11 — Không cộng dồn, tự áp mức lợi nhất', () => {
       return id
     }
 
-    // 15% để hơn hẳn chương trình 10% của nhóm trên — bài này kiểm phép CHỌN,
-    // và hai chương trình hoà nhau thì nó không kiểm được gì
-    percentId = await create({ code: 'KM-15PT', name: 'Giảm 15%', percentBp: 1500 })
-    amountId = await create({
+    // 25% để hơn hẳn KM-TRUA của nhóm trên — bài này kiểm phép CHỌN, và hai chương
+    // trình hoà nhau thì nó không kiểm được gì. Hơn cả khi lượt sửa 20% ở nhóm trên
+    // lọt qua (nhóm đó đỏ thì nhóm này vẫn kiểm đúng việc của nó)
+    percentId = await create({ code: 'KM-25PT', name: 'Giảm 25%', percentBp: 2500 })
+    await create({
       code: 'KM-50K',
       name: 'Giảm 50k',
       kind: 'amount',
@@ -326,29 +408,26 @@ describe('B11 — Không cộng dồn, tự áp mức lợi nhất', () => {
     })
     expect(res.statusCode, res.payload).toBe(200)
     const body = res.json()
-    expect(body.eligible.length).toBeGreaterThanOrEqual(2)
-    expect(body.best.promotionId).toBe(percentId)
-    expect(body.best.discountVnd).toBe(150_000)
+    expect(body.bill.promotionId).toBe(percentId)
+    expect(body.bill.discountVnd).toBe(250_000)
+    expect(body.lineDiscountVnd).toBe(0)
   })
 
-  it('đơn đã hưởng một chương trình thì chương trình thứ hai bị chặn ở CSDL', async () => {
-    const first = await inject({
-      method: 'POST',
-      url: '/api/crm/promotions/redeem',
-      headers: bearer(owner),
-      payload: { orderId, promotionId: percentId },
-    })
-    expect(first.statusCode, first.payload).toBe(201)
-    expect(first.json().discountVnd).toBe(150_000)
+  it('tính lại tiền đơn: đúng MỘT chương trình hoá đơn được ghi vào đơn', async () => {
+    await db.transaction((tx) => app.get(OrderingService).recomputeTotals(tx, orderId, fx.branchId))
 
-    const second = await inject({
-      method: 'POST',
-      url: '/api/crm/promotions/redeem',
-      headers: bearer(owner),
-      payload: { orderId, promotionId: amountId },
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+    expect(order).toMatchObject({
+      billPromotionId: percentId,
+      moneyBillDiscount: 250_000,
+      moneyDiscount: 250_000,
     })
-    expect(second.statusCode).toBe(409)
-    expect(second.json().message).toContain('không cộng dồn')
+    // Ba chương trình cùng đủ điều kiện, sổ lượt hưởng chỉ có MỘT — cái thắng
+    const redeemed = await db
+      .select()
+      .from(promotionRedemptions)
+      .where(eq(promotionRedemptions.orderId, orderId))
+    expect(redeemed.map((r) => [r.promotionId, r.discountVnd])).toEqual([[percentId, 250_000]])
   })
 
   it('lượt hưởng chảy thẳng vào khối chương trình của B8', async () => {
@@ -358,9 +437,9 @@ describe('B11 — Không cộng dồn, tự áp mức lợi nhất', () => {
       headers: bearer(owner),
     })
     expect(res.statusCode, res.payload).toBe(200)
-    const row = res.json().promotions.find((p: { code: string }) => p.code === 'KM-15PT')
+    const row = res.json().promotions.find((p: { code: string }) => p.code === 'KM-25PT')
     expect(row.uses).toBe(1)
-    expect(row.discountVnd).toBe(150_000)
+    expect(row.discountVnd).toBe(250_000)
   })
 })
 
@@ -373,12 +452,14 @@ describe('B11 — Lô voucher và giới hạn lượt', () => {
       method: 'POST',
       url: '/api/crm/promotions',
       headers: bearer(owner),
+      // 200k để hơn hẳn chương trình 25% đang chạy trên một đơn 500k (125k) — mã
+      // phải THẮNG thì mới thấy được nó đã được gắn
       payload: draftPromotion({
         code: 'KM-VOUCHER',
-        name: 'Voucher 30k',
+        name: 'Voucher 200k',
         kind: 'amount',
         percentBp: null,
-        amountVnd: 30_000,
+        amountVnd: 200_000,
         requiresVoucher: true,
       }),
     })
@@ -417,38 +498,97 @@ describe('B11 — Lô voucher và giới hạn lượt', () => {
     expect(on.statusCode, on.payload).toBe(201)
   })
 
-  it('không có mã thì chương trình cần mã không ăn', async () => {
-    const orderId = await makeOrder({ code: 'KM-ORDER-2', sub: 500_000, channel: 'pos' })
-    const res = await inject({
+  const oneDish = [
+    { dishId: 'bachibo', code: 'SORA-BO-001', name: 'Ba chỉ bò', qty: 1, unitPrice: 500_000 },
+  ]
+
+  it('không có mã thì chương trình cần mã không ăn; có mã thì chấm thử được', async () => {
+    const orderId = await makeOrder({
+      code: 'KM-ORDER-2',
+      sub: 500_000,
+      channel: 'pos',
+      lines: oneDish,
+    })
+    const without = await inject({
       method: 'GET',
       url: `/api/crm/promotions/quote?order=${orderId}`,
       headers: bearer(owner),
     })
-    const rejected = res
-      .json()
-      .rejected.find((r: { code: string }) => r.code === 'KM-VOUCHER')
-    expect(rejected.reason).toBe('thieu-ma-voucher')
+    expect(without.statusCode, without.payload).toBe(200)
+    expect(without.json().bill.code).toBe('KM-25PT')
+
+    const withCode = await inject({
+      method: 'GET',
+      url: `/api/crm/promotions/quote?order=${orderId}&voucher=${code.toLowerCase()}`,
+      headers: bearer(owner),
+    })
+    expect(withCode.json().voucher).toMatchObject({ code, accepted: true })
+    expect(withCode.json().bill).toMatchObject({ code: 'KM-VOUCHER', discountVnd: 200_000 })
   })
 
-  it('một mã một lượt: đơn thứ hai dùng lại mã đó bị từ chối', async () => {
-    const first = await makeOrder({ code: 'KM-ORDER-3', sub: 500_000, channel: 'pos' })
+  it('một mã một lượt: gắn lại vào cùng đơn là no-op, đơn thứ hai bị từ chối', async () => {
+    const first = await makeOrder({
+      code: 'KM-ORDER-3',
+      sub: 500_000,
+      channel: 'pos',
+      paid: false,
+      lines: oneDish,
+    })
     const ok = await inject({
       method: 'POST',
-      url: '/api/crm/promotions/redeem',
+      url: '/api/crm/promotions/apply-voucher',
       headers: bearer(owner),
-      payload: { orderId: first, promotionId: promoId, voucherCode: code },
+      payload: { orderId: first, voucherCode: code },
     })
     expect(ok.statusCode, ok.payload).toBe(201)
+    expect(ok.json()).toMatchObject({ changed: true, money: { discount: 200_000 } })
 
-    const second = await makeOrder({ code: 'KM-ORDER-4', sub: 500_000, channel: 'pos' })
+    // Hàng đợi offline gửi lại đúng lệnh đó: không trừ lượt lần hai
+    const again = await inject({
+      method: 'POST',
+      url: '/api/crm/promotions/apply-voucher',
+      headers: bearer(owner),
+      payload: { orderId: first, voucherCode: code },
+    })
+    expect(again.json().changed).toBe(false)
+    const batch = await inject({
+      method: 'GET',
+      url: `/api/crm/promotions/${promoId}/vouchers`,
+      headers: bearer(owner),
+    })
+    expect(batch.json().find((v: { code: string }) => v.code === code).usedCount).toBe(1)
+
+    const second = await makeOrder({
+      code: 'KM-ORDER-4',
+      sub: 500_000,
+      channel: 'pos',
+      paid: false,
+      lines: oneDish,
+    })
     const denied = await inject({
       method: 'POST',
-      url: '/api/crm/promotions/redeem',
+      url: '/api/crm/promotions/apply-voucher',
       headers: bearer(owner),
-      payload: { orderId: second, promotionId: promoId, voucherCode: code },
+      payload: { orderId: second, voucherCode: code },
     })
     expect(denied.statusCode).toBe(409)
     expect(denied.json().message).toContain('hết lượt')
+  })
+
+  it('đơn đã trả đủ thì không gắn mã được nữa', async () => {
+    const paid = await makeOrder({
+      code: 'KM-ORDER-5',
+      sub: 500_000,
+      channel: 'pos',
+      lines: oneDish,
+    })
+    const res = await inject({
+      method: 'POST',
+      url: '/api/crm/promotions/apply-voucher',
+      headers: bearer(owner),
+      payload: { orderId: paid, voucherCode: 'SORA8-0002' },
+    })
+    expect(res.statusCode).toBe(409)
   })
 })
 

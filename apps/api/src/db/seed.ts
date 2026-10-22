@@ -152,6 +152,11 @@ const PARAMETERS: {
   { key: 'loyalty.tierSilverVnd', value: 5_000_000, unit: 'đồng / 12 tháng' },
   { key: 'loyalty.tierGoldVnd', value: 20_000_000, unit: 'đồng / 12 tháng' },
 
+  // Khuyến mãi (§9.6). Trần giảm theo NĐ 81/2018 sửa bởi NĐ 128/2024: không quá 50%
+  // giá ngay trước khuyến mãi, trừ chương trình khuyến mại tập trung. Là tham số vì
+  // luật đổi được — nhưng nhạy cảm, nâng nó lên là bỏ chốt chặn pháp lý của B11.
+  { key: 'promo.maxDiscountRate', value: 0.5, unit: 'tỉ lệ', sensitive: true },
+
   // Công nợ khách doanh nghiệp (§29.1 nhóm "Công nợ DN")
   { key: 'corporate.defaultCreditLimitVnd', value: 20_000_000, unit: 'đồng', sensitive: true },
   { key: 'corporate.blockAfterOverdueDays', value: 15, unit: 'ngày', sensitive: true },

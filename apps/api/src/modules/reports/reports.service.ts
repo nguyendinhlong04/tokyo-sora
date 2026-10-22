@@ -621,8 +621,10 @@ export class ReportsService {
    * trận là thứ khách chọn và trả tiền; tiêu hao món thành phần bên trong set là
    * câu hỏi của kho, trả lời ở S11 khi có công thức.
    *
-   * Cùng tập dòng mà `recomputeTotals` dùng để chốt `orders.money_sub`, nên tổng
-   * doanh thu ở đây khớp với F7.
+   * Cùng tập dòng mà `recomputeTotals` dùng để chốt `orders.money_sub`. Doanh thu
+   * là `price_total` — tiền món SAU khuyến mãi món (§9.6): món bán giờ vàng đóng góp
+   * đúng số khách trả. Giảm HOÁ ĐƠN không chia về từng món, nên kỳ có giảm hoá đơn
+   * thì F7 thấp hơn tổng ở đây đúng bằng phần đó.
    *
    * GIÁ VỐN dùng giá TIÊU CHUẨN (định lượng công thức × giá bình quân hiện hành),
    * không dùng số đã trừ trong sổ kho. Hai con số này khác nhau có chủ ý: sổ kho

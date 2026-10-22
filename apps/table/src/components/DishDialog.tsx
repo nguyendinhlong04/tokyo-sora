@@ -4,8 +4,10 @@ import type { Dish, ModifierGroup } from '../api'
 import { useCart } from '../cart-context'
 import { IconBook, IconCheck, IconClose, IconMinus, IconPlus } from '../icons'
 import type { SetCourse, SetExtra } from '../menu'
+import { usePromos } from '../promotions'
 import { DishArt } from './DishArt'
 import { DishLine } from './DishLine'
+import { PromoTag } from './PromoTag'
 
 /**
  * T3 Chi tiết món trên iPad — hộp thoại hai cột giữa màn.
@@ -48,6 +50,7 @@ export function DishDialog({
   onStory: (() => void) | null
 }) {
   const cart = useCart()
+  const promos = usePromos()
   const [qty, setQty] = useState(1)
   const [note, setNote] = useState('')
   // Nơi gọi gắn `key` theo mã món nên mỗi món mở ra là một lượt dựng mới
@@ -82,6 +85,9 @@ export function DishDialog({
 
   const chosen = groups.flatMap((g) => g.options.filter((o) => (picked[g.id] ?? []).includes(o.id)))
   const unitPrice = dish.price + chosen.reduce((sum, o) => sum + o.priceDelta, 0)
+  // Giỏ giữ giá niêm yết (máy chủ tự chấm lại lúc gửi); nút thêm báo giá khách sẽ trả
+  const offer = soldOut ? null : promos.offerOf(dish)
+  const payUnit = promos.unitPriceOf(dish, unitPrice)
   const missing = groups.filter((g) => g.required && (picked[g.id] ?? []).length === 0)
   // Món định tuyến khác nhau theo bàn có bếp hay không = món nướng tại bàn
   const grillDish =
@@ -128,10 +134,28 @@ export function DishDialog({
               {dish.nameJa}
             </p>
           ) : null}
-          <Money
-            amount={dish.price}
-            className="mt-2.5 block text-[length:var(--fs-b1)] text-gold-300"
-          />
+          {offer && offer.price < dish.price ? (
+            <p className="mt-2.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              <Money
+                amount={offer.price}
+                className="text-[length:var(--fs-t2)] font-medium text-ember-2"
+              />
+              <Money
+                amount={dish.price}
+                className="text-[length:var(--fs-b2)] text-ink-mute line-through"
+              />
+            </p>
+          ) : (
+            <Money
+              amount={dish.price}
+              className="mt-2.5 block text-[length:var(--fs-b1)] text-gold-300"
+            />
+          )}
+          {offer ? (
+            <p className="mt-2">
+              <PromoTag label={offer.badge} />
+            </p>
+          ) : null}
           {setCount > 0 ? (
             <p className="mt-1 text-[length:var(--fs-c1)] text-ink-mute">
               {setCount} món trong set
@@ -338,7 +362,7 @@ export function DishDialog({
                 `Chọn ${missing[0]!.name.toLowerCase()}`
               ) : (
                 <>
-                  Thêm vào giỏ · <Money amount={unitPrice * qty} />
+                  Thêm vào giỏ · <Money amount={payUnit * qty} />
                 </>
               )}
             </Button>

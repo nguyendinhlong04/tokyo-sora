@@ -209,7 +209,17 @@ export interface DispatchDetail extends DispatchCard {
   customer: Record<string, unknown> | null
   shipper: { name: string; phone: string | null; provider: string | null } | null
   cancelReason: string | null
-  money: { sub: number; service: number; vat: number; ship: number; round: number; total: number }
+  money: {
+    sub: number
+    /** Mọi phần giảm: giảm món (đã nằm trong `priceTotal` từng dòng) + giảm hoá đơn */
+    discount: number
+    billDiscount: number
+    service: number
+    vat: number
+    ship: number
+    round: number
+    total: number
+  }
   lines: {
     id: number
     parentLineId: number | null

@@ -2,6 +2,7 @@ import { Button, Card, Money } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { api } from '../api'
+import { moneyOf } from '../promotions'
 import { useTableSession } from '../table-context'
 import { useCallStaff } from './Shell'
 
@@ -59,7 +60,11 @@ export function Bill() {
       </div>
 
       <div className="px-4 pt-5">
-        <Row label="Tạm tính" amount={money?.moneySub ?? 0} />
+        {/* Dòng món đã trừ khuyến mãi món; giảm hoá đơn là dòng riêng (§9.6) */}
+        <Row label="Tạm tính" amount={money ? moneyOf(money).lines : 0} />
+        {money && money.moneyBillDiscount > 0 ? (
+          <Row label="Khuyến mãi hoá đơn" amount={-money.moneyBillDiscount} />
+        ) : null}
         {money && money.moneyService > 0 ? (
           <Row label="Phí phục vụ" amount={money.moneyService} />
         ) : null}

@@ -5,8 +5,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { computeOrderTotals, rooms, type OrderLineInput } from '@sora/contracts'
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import {
+  computeOrderTotals,
+  priceBill,
+  priceNewLines,
+  rooms,
+  type NewPricingLine,
+  type OrderLineInput,
+  type PricedLine,
+  type PromoClock,
+} from '@sora/contracts'
+import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm'
 import { businessDateOf, minuteOfDayIn } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { nextDisplayCode, orderNumberOf } from '../../common/display-code'
@@ -23,6 +32,7 @@ import {
   orderLines,
   orders,
   payments,
+  promotionRedemptions,
   tableSessions,
   tables,
   ticketItems,
@@ -36,6 +46,7 @@ import { AuditService } from '../identity/audit.service'
 import { explodeSet, SetSelectionError, type SetSelection } from '../kitchen/domain/explode'
 import type { ServiceContext } from '../kitchen/domain/routing'
 import { syncSetParents } from './set-parent'
+import { clockOf, contextOf, heldFor, pricedLinesOf, ruleOf, rulesOn } from './promo-pricing'
 import {
   buildTickets,
   type OrderChannel,
@@ -186,14 +197,51 @@ export class OrderingService {
       minuteOfDay: minuteOfDayIn(now, branch!.timezone),
     }
 
+    // Dòng đã có TRƯỚC lượt gọi này — "mua N tặng M" và đơn tối thiểu đếm cả chúng
+    const before = await pricedLinesOf(tx, ctx.order.id, branch!.timezone)
+    const fresh: NewPricingLine[] = []
     for (const input of ctx.inputs) {
-      await this.addOneLine(tx, {
-        order: ctx.order,
-        branchId: ctx.branchId,
-        input,
-        actor: ctx.actor,
-        at,
-      })
+      fresh.push(
+        await this.addOneLine(tx, {
+          order: ctx.order,
+          branchId: ctx.branchId,
+          input,
+          actor: ctx.actor,
+          at,
+        }),
+      )
+    }
+    await this.priceFreshLines(tx, ctx.order, clockOf(now, branch!.timezone), before, fresh)
+  }
+
+  /**
+   * Chấm khuyến mãi MÓN cho các dòng vừa thêm và ghi thẳng vào dòng (§9.6).
+   *
+   * Đóng băng ngay lúc gọi, như giá: món gọi trong giờ vàng giữ giá giờ vàng dù
+   * khách tính tiền lúc chương trình đã hết. Cùng một cửa với giá nên mọi kênh —
+   * iPad tại bàn, POS, web — được giảm như nhau.
+   */
+  private async priceFreshLines(
+    tx: Tx,
+    order: typeof orders.$inferSelect,
+    clock: PromoClock,
+    before: PricedLine[],
+    fresh: NewPricingLine[],
+  ) {
+    const rows = await rulesOn(tx, clock.businessDate)
+    if (rows.length === 0) return
+    const ctx = await contextOf(tx, order, this.params)
+    const priced = priceNewLines(rows.map(ruleOf), ctx, clock, before, fresh)
+    for (const [key, deal] of priced) {
+      await tx
+        .update(orderLines)
+        .set({
+          promotionId: deal.promotionId,
+          discountVnd: deal.discountVnd,
+          promoQty: deal.promoQty,
+          priceTotal: sql`${orderLines.qty} * ${orderLines.unitPrice} - ${deal.discountVnd}`,
+        })
+        .where(eq(orderLines.id, Number(key)))
     }
   }
 
@@ -206,7 +254,7 @@ export class OrderingService {
       actor: Actor
       at: { businessDate: string; minuteOfDay: number }
     },
-  ) {
+  ): Promise<NewPricingLine> {
     const { order, branchId, input } = ctx
     if (!Number.isSafeInteger(input.qty) || input.qty <= 0) {
       throw new BadRequestException(`Số lượng không hợp lệ: ${input.qty}`)
@@ -321,23 +369,27 @@ export class OrderingService {
           state: 'draft',
         })
       }
-      return
+      return pricingLine(parent!.id, dish, input.qty, unitPrice)
     }
 
-    await tx.insert(orderLines).values({
-      orderId: order.id,
-      kind: 'dish',
-      batchNo,
-      dishId: dish.id,
-      dishCode: dish.code,
-      nameSnapshot: dish.name,
-      qty: input.qty,
-      unitPrice,
-      priceTotal: unitPrice * input.qty,
-      modifiers: modifiers.length ? modifiers : null,
-      note: input.note ?? null,
-      state: 'draft',
-    })
+    const [line] = await tx
+      .insert(orderLines)
+      .values({
+        orderId: order.id,
+        kind: 'dish',
+        batchNo,
+        dishId: dish.id,
+        dishCode: dish.code,
+        nameSnapshot: dish.name,
+        qty: input.qty,
+        unitPrice,
+        priceTotal: unitPrice * input.qty,
+        modifiers: modifiers.length ? modifiers : null,
+        note: input.note ?? null,
+        state: 'draft',
+      })
+      .returning({ id: orderLines.id })
+    return pricingLine(line!.id, dish, input.qty, unitPrice)
   }
 
   // --------------------------------------------------- GỬI BẾP / Ra đợt
@@ -1573,18 +1625,36 @@ export class OrderingService {
   async recomputeTotals(tx: Tx, orderId: number, branchId: string) {
     const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
     if (!order) throw new NotFoundException('Không có đơn này')
+    const [branch] = await tx
+      .select({ timezone: branches.timezone })
+      .from(branches)
+      .where(eq(branches.id, order.branchId))
 
-    const lines = await tx
-      .select()
-      .from(orderLines)
-      .where(and(eq(orderLines.orderId, orderId), sql`${orderLines.state} <> 'voided'`))
+    // Dòng con của set giá 0 nên không vào: giá — và khuyến mãi — nằm ở dòng set cha
+    const lines = await pricedLinesOf(tx, orderId, branch!.timezone)
+
+    /**
+     * Khuyến mãi HOÁ ĐƠN chấm lại mỗi lần đơn đổi, theo giờ MỞ đơn (§9.6). Chương
+     * trình đơn đang hưởng mà vừa bị dừng vẫn được giữ nếu nó đang chạy lúc mở đơn.
+     */
+    const rows = await rulesOn(
+      tx,
+      order.businessDate,
+      order.billPromotionId === null ? [] : [order.billPromotionId],
+    )
+    const bill = priceBill(
+      rows.filter((r) => heldFor(r, order.createdAt)).map(ruleOf),
+      await contextOf(tx, order, this.params),
+      clockOf(order.createdAt, branch!.timezone),
+      lines,
+    )
+    const lineDiscount = lines.reduce((sum, l) => sum + l.discountVnd, 0)
 
     const money = computeOrderTotals({
-      // Dòng con của set giá 0 nên cộng vào cũng không đổi kết quả, nhưng loại ra
-      // cho rõ ý: giá nằm ở dòng set cha.
-      lines: lines
-        .filter((l) => l.parentLineId === null)
-        .map<OrderLineInput>((l) => ({ qty: l.qty, unitPrice: l.unitPrice })),
+      lines: lines.map<OrderLineInput>((l) => ({ qty: l.qty, unitPrice: l.unitPrice })),
+      // Tiền món giữ GIÁ NIÊM YẾT, mọi phần giảm (món + hoá đơn) nằm ở `money_discount`:
+      // báo cáo và hoá đơn cần thấy cả doanh thu gộp lẫn chiết khấu
+      discount: lineDiscount + (bill?.discountVnd ?? 0),
       serviceRate:
         order.type === 'dinein'
           ? await this.params.getNumber('sales.serviceFeeRate', 0, branchId)
@@ -1603,10 +1673,83 @@ export class OrderingService {
         moneyVat: money.vat,
         moneyRound: money.round,
         moneyTotal: money.total,
+        billPromotionId: bill?.promotionId ?? null,
+        moneyBillDiscount: bill?.discountVnd ?? 0,
         version: sql`${orders.version} + 1`,
       })
       .where(eq(orders.id, orderId))
 
+    await this.syncRedemptions(tx, order, lines, bill)
     return money
+  }
+
+  /**
+   * Ghi lại lượt hưởng của đơn cho B8: một dòng cho mỗi chương trình, đúng số tiền
+   * chương trình đó đang giảm trên đơn. Ghi lại TOÀN BỘ mỗi lần tính lại tiền, nên
+   * huỷ món hay chuyển bàn xong thì B8 vẫn khớp từng đồng với đơn.
+   */
+  private async syncRedemptions(
+    tx: Tx,
+    order: typeof orders.$inferSelect,
+    lines: PricedLine[],
+    bill: { promotionId: number; discountVnd: number } | null,
+  ) {
+    const byPromotion = new Map<number, number>()
+    for (const line of lines) {
+      if (line.promotionId !== null) {
+        byPromotion.set(
+          line.promotionId,
+          (byPromotion.get(line.promotionId) ?? 0) + line.discountVnd,
+        )
+      }
+    }
+    if (bill) {
+      byPromotion.set(bill.promotionId, (byPromotion.get(bill.promotionId) ?? 0) + bill.discountVnd)
+    }
+
+    const kept = [...byPromotion.keys()]
+    await tx
+      .delete(promotionRedemptions)
+      .where(
+        kept.length > 0
+          ? and(
+              eq(promotionRedemptions.orderId, order.id),
+              notInArray(promotionRedemptions.promotionId, kept),
+            )
+          : eq(promotionRedemptions.orderId, order.id),
+      )
+    for (const [promotionId, discountVnd] of byPromotion) {
+      await tx
+        .insert(promotionRedemptions)
+        .values({
+          promotionId,
+          voucherCodeId: order.voucherCodeId,
+          branchId: order.branchId,
+          orderId: order.id,
+          discountVnd,
+          businessDate: order.businessDate,
+        })
+        .onConflictDoUpdate({
+          target: [promotionRedemptions.orderId, promotionRedemptions.promotionId],
+          set: { discountVnd },
+        })
+    }
+  }
+}
+
+/** Dòng mới quy về thứ bộ chấm khuyến mãi cần — giá gốc là giá món chưa cộng tuỳ chọn */
+function pricingLine(
+  lineId: number,
+  dish: { id: string; categoryId: string | null; price: number },
+  qty: number,
+  unitPrice: number,
+): NewPricingLine {
+  return {
+    key: String(lineId),
+    dishId: dish.id,
+    categoryId: dish.categoryId,
+    qty,
+    unitPrice,
+    basePrice: dish.price,
   }
 }

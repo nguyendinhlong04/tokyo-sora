@@ -113,6 +113,9 @@ export class DispatchService {
       cancelReason: order.cancelReason,
       money: {
         sub: order.moneySub,
+        // Giảm món nằm sẵn trong giá từng dòng; giảm hoá đơn là dòng riêng (§9.6)
+        discount: order.moneyDiscount,
+        billDiscount: order.moneyBillDiscount,
         service: order.moneyService,
         vat: order.moneyVat,
         ship: order.moneyShip,

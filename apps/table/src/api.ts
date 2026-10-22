@@ -1,4 +1,4 @@
-import type { SiteMenu } from '@sora/contracts'
+import type { PromoClock, PromotionRule, SiteMenu } from '@sora/contracts'
 import { apiFetch, enqueue } from '@sora/core'
 
 export interface TableSession {
@@ -92,7 +92,11 @@ export interface OrderLineRow {
   nameSnapshot: string
   qty: number
   unitPrice: number
+  /** Tiền dòng SAU khuyến mãi món: `qty × unitPrice − discountVnd` (§9.6) */
   priceTotal: number
+  promotionId: number | null
+  discountVnd: number
+  promoQty: number
   /** Tuỳ chọn đóng băng lúc gọi — "Tương Sora · Tỏi nướng" ở Đơn của bàn */
   modifiers: { optionId: string; name: string; priceDelta: number }[] | null
   note: string | null
@@ -107,7 +111,11 @@ export interface SessionOrder {
   order: {
     id: number
     displayCode: string
+    /** Tiền món theo GIÁ NIÊM YẾT; giảm món và giảm hoá đơn cùng nằm ở `moneyDiscount` */
     moneySub: number
+    moneyDiscount: number
+    moneyBillDiscount: number
+    billPromotionId: number | null
     moneyService: number
     moneyVat: number
     moneyRound: number
@@ -147,6 +155,13 @@ export interface PaymentStatus {
   qrString: string | null
   expiresAt: string | null
   paidAt: string | null
+}
+
+/** Chương trình đang chạy của chi nhánh, kèm giờ của chi nhánh do máy chủ tính */
+export interface LivePromotions {
+  clock: PromoClock
+  maxDiscountRate: number
+  rules: PromotionRule[]
 }
 
 export type RequestKind = 'phuc-vu' | 'them-than' | 'da-nuoc' | 'tinh-tien' | 'khac'
@@ -234,6 +249,10 @@ export const api = {
 
   availability: (branchId: string) =>
     apiFetch<AvailabilityRow[]>(`/api/availability?branch=${branchId}`),
+
+  /** Khuyến mãi đang chạy — công khai như thực đơn, chương trình cần mã không có ở đây */
+  promotions: (branchId: string) =>
+    apiFetch<LivePromotions>(`/api/crm/promotions/live?branch=${branchId}`),
 
   /**
    * Thực đơn công khai của trang web — chỉ để đọc phần kể chuyện của món cho nút

@@ -23,9 +23,9 @@ import { payments } from './payments'
  *
  * Năm màn cuối nhóm Kinh doanh, và bốn ranh giới giữ cho chúng không lẫn vào nhau:
  *
- *  1. **Không cộng dồn khuyến mãi** — `promotion_redemptions` UNIQUE theo đơn.
- *     Quy tắc "tự áp mức lợi nhất cho khách" (§25 B11) chỉ đúng khi CSDL không cho
- *     phép đơn thứ hai chồng lên; để tầng nghiệp vụ tự nhớ là sớm muộn cũng chồng.
+ *  1. **Không cộng dồn khuyến mãi** — mỗi dòng món hưởng nhiều nhất một chương
+ *     trình món, hoá đơn một chương trình hoá đơn chỉ trên dòng chưa giảm (§9.6);
+ *     phép chấm ở `@sora/contracts/promotions`, tiền giảm ghi thẳng vào đơn.
  *
  *  2. **Điểm chỉ sinh từ sự kiện thanh toán** — `loyalty_entries` dòng `earn` bắt
  *     buộc có `order_id`, và UNIQUE theo đơn. Không có nút cộng tay: muốn cộng thì
@@ -48,12 +48,15 @@ import { payments } from './payments'
 // ============================================================ B11 · Khuyến mãi
 
 /**
- * B11 — Chương trình khuyến mãi. Nơi TẠO, thứ mà P10 xưa nay thiếu.
+ * B11 — Chương trình khuyến mãi, áp CHUNG cho mọi kênh (§9.6).
  *
- * Bốn loại của tài liệu nằm trong `kind`, và mỗi loại chỉ dùng đúng cột của nó —
- * ràng buộc `promotions_value_check` bên dưới cưỡng chế điều đó, vì một chương
- * trình "giảm %" mà lại điền số tiền là một chương trình sẽ tính ra số nào đó chứ
- * không báo lỗi.
+ * Hai phạm vi: `item` (món, set, nhóm món — chấm lúc gọi món và đóng băng vào dòng
+ * đơn) và `bill` (cả hoá đơn — chấm lại mỗi lần đơn đổi). Phép tính nằm ở
+ * `@sora/contracts/promotions` để app hiện đúng con số API sẽ ghi.
+ *
+ * Mỗi loại chỉ dùng đúng cột của nó — `promotions_value_check` cưỡng chế, vì một
+ * chương trình "giảm %" mà lại điền số tiền là chương trình sẽ tính ra số nào đó
+ * chứ không báo lỗi.
  *
  * Mảng rỗng nghĩa là KHÔNG GIỚI HẠN (mọi kênh / mọi chi nhánh / mọi thứ trong
  * tuần). Dùng NULL cho ý đó sẽ phải viết `IS NULL OR …` ở mọi câu lệnh.
@@ -65,17 +68,38 @@ export const promotions = pgTable(
     /** Mã người đọc: KM-TRUA-2026 */
     code: text('code').notNull().unique(),
     name: text('name').notNull(),
+    /** 'item' = món / set / nhóm món · 'bill' = cả hoá đơn */
+    scope: text('scope').notNull().default('bill'),
     kind: text('kind').notNull(),
+    /** Nhãn ngắn in trên thẻ món cho khách: "Giờ vàng" — trống thì app đặt theo loại */
+    badge: text('badge'),
 
     /** Giảm % nhân 100 (1250 = 12,5%) — chỉ `kind = 'percent'` */
     percentBp: integer('percent_bp'),
-    /** Giảm thẳng số tiền — chỉ `kind = 'amount'` */
+    /** Giảm số tiền (mỗi phần với món, một lần với hoá đơn) — chỉ `kind = 'amount'` */
     amountVnd: bigint('amount_vnd', { mode: 'number' }),
-    /** Món được tặng hoặc món áp giá khung giờ */
+    /** Món được TẶNG — chỉ `kind = 'free_dish'` */
     targetDishId: text('target_dish_id').references(() => dishes.id),
-    /** Giá cố định của món/set trong khung giờ — chỉ `kind = 'set_price'` */
+    /** Đồng giá: giá một phần của món áp dụng — chỉ `kind = 'set_price'` */
     setPriceVnd: bigint('set_price_vnd', { mode: 'number' }),
-    /** Trần giảm của loại % — không có trần thì một bàn 20 người ăn hết chương trình */
+    /** Mua N tặng M, phần tặng giảm `get_percent`% — chỉ `kind = 'buy_x_get_y'` */
+    buyQty: smallint('buy_qty'),
+    getQty: smallint('get_qty'),
+    getPercent: smallint('get_percent'),
+    /**
+     * Món / set / nhóm món áp dụng. Chương trình món bắt buộc có; với "tặng món" thì
+     * đây là món phải gọi kèm mới được tặng (trống = không đòi). Mảng mã chứ không
+     * khoá ngoại: món ngừng bán thì chương trình cũ vẫn đọc lại được.
+     */
+    targetDishIds: text('target_dish_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    targetCategoryIds: text('target_category_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    /** Trần tiền giảm của chương trình trên MỘT đơn — không có trần thì bàn 20 người ăn hết chương trình */
     maxDiscountVnd: bigint('max_discount_vnd', { mode: 'number' }),
 
     // ---- Điều kiện áp dụng
@@ -91,6 +115,13 @@ export const promotions = pgTable(
     minOrderVnd: bigint('min_order_vnd', { mode: 'number' }).notNull().default(0),
     /** Phải nhập mã voucher mới được hưởng */
     requiresVoucher: boolean('requires_voucher').notNull().default(false),
+    /**
+     * Chương trình khuyến mại TẬP TRUNG — được giảm quá trần 50% của Nghị định
+     * 81/2018/NĐ-CP (sửa bởi 128/2024/NĐ-CP). Không bật thì bộ máy cắt ở trần.
+     */
+    concentrated: boolean('concentrated').notNull().default(false),
+    /** Số, ngày văn bản thông báo khuyến mại gửi Sở Công Thương — để tra khi bị hỏi */
+    legalNotice: text('legal_notice'),
 
     // ---- Lịch chạy
     startsOn: date('starts_on').notNull(),
@@ -104,29 +135,57 @@ export const promotions = pgTable(
     approvalId: bigint('approval_id', { mode: 'number' }).references(() => approvals.id),
     activatedAt: timestamp('activated_at', { withTimezone: true }),
     activatedBy: bigint('activated_by', { mode: 'number' }).references(() => staff.id),
+    /**
+     * Lần đổi trạng thái gần nhất. Chương trình hoá đơn vừa bị dừng vẫn giữ cho
+     * những đơn đã MỞ trước mốc này: khách ngồi xuống lúc chương trình đang chạy
+     * thì tính tiền theo chương trình đó.
+     */
+    stateChangedAt: timestamp('state_changed_at', { withTimezone: true }),
 
     createdBy: bigint('created_by', { mode: 'number' }).references(() => staff.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    check('promotions_scope_check', sql`${t.scope} IN ('item','bill')`),
     check(
       'promotions_kind_check',
-      sql`${t.kind} IN ('percent','amount','free_dish','set_price')`,
+      sql`${t.kind} IN ('percent','amount','set_price','buy_x_get_y','free_dish')`,
+    ),
+    // Đúng bảng KINDS_BY_SCOPE của @sora/contracts
+    check(
+      'promotions_scope_kind_check',
+      sql`(${t.scope} = 'item' AND ${t.kind} IN ('percent','amount','set_price','buy_x_get_y'))
+       OR (${t.scope} = 'bill' AND ${t.kind} IN ('percent','amount','free_dish'))`,
     ),
     check('promotions_state_check', sql`${t.state} IN ('draft','active','paused','ended')`),
     // Mỗi loại chỉ mang đúng con số của mình — không có loại nào mang hai con số
     check(
       'promotions_value_check',
-      sql`(${t.kind} = 'percent'   AND ${t.percentBp} BETWEEN 1 AND 10000
-                                   AND ${t.amountVnd} IS NULL AND ${t.setPriceVnd} IS NULL)
-       OR (${t.kind} = 'amount'    AND ${t.amountVnd} > 0
-                                   AND ${t.percentBp} IS NULL AND ${t.setPriceVnd} IS NULL)
-       OR (${t.kind} = 'free_dish' AND ${t.targetDishId} IS NOT NULL
-                                   AND ${t.percentBp} IS NULL AND ${t.amountVnd} IS NULL
-                                   AND ${t.setPriceVnd} IS NULL)
-       OR (${t.kind} = 'set_price' AND ${t.targetDishId} IS NOT NULL AND ${t.setPriceVnd} >= 0
-                                   AND ${t.percentBp} IS NULL AND ${t.amountVnd} IS NULL)`,
+      sql`(${t.kind} = 'percent'     AND ${t.percentBp} BETWEEN 1 AND 10000
+                                     AND ${t.amountVnd} IS NULL AND ${t.setPriceVnd} IS NULL
+                                     AND ${t.buyQty} IS NULL AND ${t.targetDishId} IS NULL)
+       OR (${t.kind} = 'amount'      AND ${t.amountVnd} > 0
+                                     AND ${t.percentBp} IS NULL AND ${t.setPriceVnd} IS NULL
+                                     AND ${t.buyQty} IS NULL AND ${t.targetDishId} IS NULL)
+       OR (${t.kind} = 'set_price'   AND ${t.setPriceVnd} >= 0
+                                     AND ${t.percentBp} IS NULL AND ${t.amountVnd} IS NULL
+                                     AND ${t.buyQty} IS NULL AND ${t.targetDishId} IS NULL)
+       OR (${t.kind} = 'buy_x_get_y' AND ${t.buyQty} >= 1 AND ${t.getQty} >= 1
+                                     AND ${t.getPercent} BETWEEN 1 AND 100
+                                     AND ${t.percentBp} IS NULL AND ${t.amountVnd} IS NULL
+                                     AND ${t.setPriceVnd} IS NULL AND ${t.targetDishId} IS NULL)
+       OR (${t.kind} = 'free_dish'   AND ${t.targetDishId} IS NOT NULL
+                                     AND ${t.percentBp} IS NULL AND ${t.amountVnd} IS NULL
+                                     AND ${t.setPriceVnd} IS NULL AND ${t.buyQty} IS NULL)`,
+    ),
+    // Chương trình món phải chỉ ra món áp dụng; giảm %/tiền cả hoá đơn thì không có món nào
+    check(
+      'promotions_targets_check',
+      sql`(${t.scope} = 'item'
+             AND cardinality(${t.targetDishIds}) + cardinality(${t.targetCategoryIds}) > 0)
+       OR (${t.scope} = 'bill' AND (${t.kind} = 'free_dish'
+             OR cardinality(${t.targetDishIds}) + cardinality(${t.targetCategoryIds}) = 0))`,
     ),
     check('promotions_window_check', sql`${t.endsOn} >= ${t.startsOn}`),
     check(
@@ -187,10 +246,11 @@ export const voucherCodes = pgTable(
 /**
  * Lượt hưởng khuyến mãi — nguồn để B8 đo hiệu quả chương trình.
  *
- * UNIQUE theo `order_id` chính là **quy tắc không cộng dồn**: một đơn hưởng đúng
- * một chương trình, mức lợi nhất cho khách. Đặt ràng buộc ở đây thay vì ở tầng
- * nghiệp vụ vì hai thu ngân bấm cùng lúc trên hai máy thì tầng nghiệp vụ không
- * thấy nhau, còn chỉ số duy nhất thì thấy.
+ * Một dòng cho mỗi cặp (đơn, chương trình), ghi tổng tiền chương trình đó đã giảm
+ * trên đơn. Một đơn có thể hưởng nhiều chương trình MÓN (mỗi dòng món một chương
+ * trình) cộng một chương trình HOÁ ĐƠN; "không cộng dồn" giờ được giữ ở chỗ chấm
+ * (`@sora/contracts/promotions`): một đồng không bao giờ bị giảm hai lần. Bảng
+ * được ghi lại mỗi lần đơn tính lại tiền, nên luôn khớp với tiền của đơn.
  */
 export const promotionRedemptions = pgTable(
   'promotion_redemptions',
@@ -212,7 +272,7 @@ export const promotionRedemptions = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex('promotion_redemptions_one_per_order').on(t.orderId),
+    uniqueIndex('promotion_redemptions_order_promo').on(t.orderId, t.promotionId),
     check('promotion_redemptions_amount_check', sql`${t.discountVnd} >= 0`),
     index('promotion_redemptions_promo_date_idx').on(t.promotionId, t.businessDate),
     index('promotion_redemptions_branch_date_idx').on(t.branchId, t.businessDate),

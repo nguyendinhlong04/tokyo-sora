@@ -54,6 +54,18 @@ export const orders = pgTable(
     moneyShip: bigint('money_ship', { mode: 'number' }).notNull().default(0),
     moneyRound: bigint('money_round', { mode: 'number' }).notNull().default(0),
     moneyTotal: bigint('money_total', { mode: 'number' }).notNull().default(0),
+    /**
+     * Phần giảm của chương trình HOÁ ĐƠN — đã nằm trong `money_discount` (cùng phần
+     * giảm món của các dòng). Tách riêng để bill in được "Ưu đãi hoá đơn" thành một
+     * dòng, và để biết chương trình nào đang được hưởng (§9.6).
+     *
+     * Không khai khoá ngoại sang `promotions`: bảng đó ở schema CRM vốn đã trỏ về
+     * `orders`, trỏ ngược lại là hai file schema import vòng nhau.
+     */
+    billPromotionId: bigint('bill_promotion_id', { mode: 'number' }),
+    moneyBillDiscount: bigint('money_bill_discount', { mode: 'number' }).notNull().default(0),
+    /** Mã voucher gắn vào đơn — mở khoá chương trình cần mã (B11) */
+    voucherCodeId: bigint('voucher_code_id', { mode: 'number' }),
     pricingBundleVersion: text('pricing_bundle_version'),
 
     paymentState: text('payment_state').notNull().default('unpaid'),
@@ -102,6 +114,12 @@ export const orders = pgTable(
       sql`${t.status} <> 'cancelled' OR ${t.cancelReason} IS NOT NULL`,
     ),
     check('orders_money_nonneg', sql`${t.moneySub} >= 0 AND ${t.moneyTotal} >= 0`),
+    // Phần giảm hoá đơn nằm trong tổng giảm, và có giảm thì phải biết chương trình nào
+    check(
+      'orders_bill_discount_check',
+      sql`${t.moneyBillDiscount} >= 0 AND ${t.moneyBillDiscount} <= ${t.moneyDiscount}
+          AND (${t.billPromotionId} IS NULL) = (${t.moneyBillDiscount} = 0)`,
+    ),
     // Bảng điều phối O8: chỉ quét đơn đang sống
     index('orders_dispatch_idx')
       .on(t.branchId, t.status, t.createdAt)
@@ -173,8 +191,19 @@ export const orderLines = pgTable(
     dishCode: text('dish_code').notNull(),
     nameSnapshot: text('name_snapshot').notNull(),
     qty: integer('qty').notNull(),
+    /** Giá NIÊM YẾT một phần, đã cộng tuỳ chọn — đóng băng lúc tạo */
     unitPrice: bigint('unit_price', { mode: 'number' }).notNull(),
+    /** Tiền khách trả cho dòng: `qty × unit_price − discount_vnd` */
     priceTotal: bigint('price_total', { mode: 'number' }).notNull(),
+    /**
+     * Khuyến mãi MÓN của dòng (§9.6): chấm lúc gọi món rồi đóng băng như giá — giờ
+     * vàng hết giữa bữa không làm món đã gọi đắt lên. `promo_qty` là số phần được
+     * hưởng (với "mua N tặng M": số phần được tặng). Không khoá ngoại sang
+     * `promotions` vì cùng lý do với `orders.bill_promotion_id`.
+     */
+    promotionId: bigint('promotion_id', { mode: 'number' }),
+    discountVnd: bigint('discount_vnd', { mode: 'number' }).notNull().default(0),
+    promoQty: integer('promo_qty').notNull().default(0),
     /** [{optionId, name, priceDelta}] đóng băng lúc tạo */
     modifiers: jsonb('modifiers'),
 
@@ -200,6 +229,13 @@ export const orderLines = pgTable(
     ),
     check('order_lines_qty_check', sql`${t.qty} > 0`),
     check('order_lines_price_check', sql`${t.unitPrice} >= 0 AND ${t.priceTotal} >= 0`),
+    // Tiền của dòng luôn khớp giá × số lượng − giảm: một chỗ ghi lệch là bill lệch
+    check(
+      'order_lines_discount_check',
+      sql`${t.discountVnd} >= 0 AND ${t.promoQty} BETWEEN 0 AND ${t.qty}
+          AND ${t.priceTotal} = ${t.qty} * ${t.unitPrice} - ${t.discountVnd}
+          AND (${t.promotionId} IS NULL) = (${t.discountVnd} = 0)`,
+    ),
     // Dòng con của set không mang giá — giá nằm ở dòng set cha
     check(
       'order_lines_child_price_zero',

@@ -38,6 +38,17 @@ export function minuteOfDayIn(at: Date, timezone: string): number {
 }
 
 /**
+ * Thứ trong tuần theo giờ chi nhánh: 0 = Chủ nhật … 6 = Thứ bảy — cùng quy ước
+ * với `extract(dow)` của Postgres mà cột `promotions.weekdays` khai theo.
+ */
+export function weekdayIn(at: Date, timezone: string): number {
+  const name = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'short' }).format(at)
+  return WEEKDAYS.indexOf(name as (typeof WEEKDAYS)[number])
+}
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+/**
  * Mốc tuyệt đối của 00:00 ngày làm việc, theo múi giờ chi nhánh.
  *
  * Khung giờ nhận đơn online đếm bằng phút kể từ mốc này, nên nó phải đúng dù máy

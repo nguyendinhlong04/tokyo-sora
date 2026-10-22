@@ -171,7 +171,14 @@ export function OrderDrawer({
 
           {order ? (
             <div className="mt-4">
-              <MoneyRow label="Tạm tính" value={order.money.sub} />
+              {/* Các dòng ở trên đã trừ giảm món — tạm tính phải khớp tổng của chúng (§9.6) */}
+              <MoneyRow
+                label="Tạm tính"
+                value={order.money.sub - (order.money.discount - order.money.billDiscount)}
+              />
+              {order.money.billDiscount > 0 ? (
+                <MoneyRow label="Khuyến mãi hoá đơn" value={-order.money.billDiscount} />
+              ) : null}
               {order.money.ship > 0 ? <MoneyRow label="Phí giao" value={order.money.ship} /> : null}
               {order.money.vat > 0 ? <MoneyRow label="Thuế VAT" value={order.money.vat} /> : null}
               <div className="mt-2 flex items-baseline justify-between border-t border-line-1 pt-3">

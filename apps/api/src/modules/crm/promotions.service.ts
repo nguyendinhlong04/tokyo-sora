@@ -5,39 +5,59 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
+import {
+  KINDS_BY_SCOPE,
+  LEGAL_MAX_DISCOUNT_RATE,
+  nextBillHint,
+  priceBill,
+  type PromotionKind,
+  type PromotionScope,
+} from '@sora/contracts'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
+import { ParamsService } from '../../common/params.service'
 import { isUniqueViolation } from '../../common/pg-error'
-import type { DbOrTx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
   branches,
+  categories,
   dishes,
-  orderLines,
   orders,
   promotionRedemptions,
   promotions,
   staff,
   voucherCodes,
 } from '../../db/schema'
-import type { Actor } from '../identity/actor'
+import { assertOwnTableSession, type Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
+import { OrderingService } from '../ordering/ordering.service'
 import {
-  pickBestPromotion,
-  type CartContext,
-  type PromotionKind,
-  type PromotionRule,
-} from './domain/promo-engine'
+  clockOf,
+  contextOf,
+  heldFor,
+  pricedLinesOf,
+  ruleOf,
+  rulesOn,
+} from '../ordering/promo-pricing'
 
 export interface PromotionInput {
   code: string
   name: string
+  scope: PromotionScope
   kind: PromotionKind
+  badge: string | null
   percentBp: number | null
   amountVnd: number | null
-  targetDishId: string | null
   setPriceVnd: number | null
+  buyQty: number | null
+  getQty: number | null
+  getPercent: number | null
+  /** Món được tặng — chỉ loại `free_dish` */
+  giftDishId: string | null
+  targetDishIds: string[]
+  targetCategoryIds: string[]
   maxDiscountVnd: number | null
   channels: string[]
   branchIds: string[]
@@ -46,23 +66,27 @@ export interface PromotionInput {
   toMinute: number | null
   minOrderVnd: number
   requiresVoucher: boolean
+  concentrated: boolean
+  legalNotice: string | null
   startsOn: string
   endsOn: string
 }
 
 /**
- * B11 — Khuyến mãi & voucher.
+ * B11 — Khuyến mãi & voucher, áp CHUNG cho mọi kênh (§9.6).
  *
- * Màn này tồn tại vì P10 có ô nhập voucher từ ngày đầu mà cả hệ thống không có
- * chỗ nào TẠO ra voucher — tức là một tính năng chết (§G.1). Nên phần quan trọng
- * nhất ở đây không phải giao diện soạn thảo mà là hai chốt chặn:
+ * Màn này soạn chương trình; phép chấm nằm ở `@sora/contracts/promotions` và tiền
+ * giảm được ghi THẲNG vào đơn ở luồng gọi món (`OrderingService`) — iPad tại bàn,
+ * POS, web đều đi qua một cửa đó nên không kênh nào lệch kênh nào. Phần quan
+ * trọng nhất ở đây là ba chốt chặn:
  *
  *   · **Soạn ≠ kích hoạt.** R9 marketing soạn được, nhưng bật một chương trình là
  *     đụng giá bán nên phải có R11/R10 duyệt (§4.2b). Hai quyền riêng, và lượt
  *     duyệt để lại bản ghi trên chính chương trình đó.
- *   · **Không cộng dồn.** Mỗi đơn hưởng đúng một chương trình — mức lợi nhất cho
- *     khách. Chỗ cưỡng chế là chỉ số duy nhất `promotion_redemptions.order_id`;
- *     phép chọn nằm ở `domain/promo-engine.ts`.
+ *   · **Trần theo luật.** Giảm quá 50% (hay "mua 1 tặng 1") chỉ được khi là chương
+ *     trình khuyến mại tập trung — chặn ngay lúc soạn, không để tới lúc bị phạt.
+ *   · **Không cộng dồn.** Một dòng một chương trình món, hoá đơn một chương trình
+ *     hoá đơn chỉ trên dòng chưa giảm — mức lợi nhất cho khách.
  */
 @Injectable()
 export class PromotionsService {
@@ -70,6 +94,8 @@ export class PromotionsService {
     @Inject(DB) private readonly db: Db,
     private readonly approvals: ApprovalService,
     private readonly audit: AuditService,
+    private readonly params: ParamsService,
+    private readonly ordering: OrderingService,
   ) {}
 
   // ================================================================ Danh sách
@@ -80,30 +106,7 @@ export class PromotionsService {
    */
   async list() {
     const rows = await this.db
-      .select({
-        id: promotions.id,
-        code: promotions.code,
-        name: promotions.name,
-        kind: promotions.kind,
-        percentBp: promotions.percentBp,
-        amountVnd: promotions.amountVnd,
-        targetDishId: promotions.targetDishId,
-        targetDishName: dishes.nameVi,
-        setPriceVnd: promotions.setPriceVnd,
-        maxDiscountVnd: promotions.maxDiscountVnd,
-        channels: promotions.channels,
-        branchIds: promotions.branchIds,
-        weekdays: promotions.weekdays,
-        fromMinute: promotions.fromMinute,
-        toMinute: promotions.toMinute,
-        minOrderVnd: promotions.minOrderVnd,
-        requiresVoucher: promotions.requiresVoucher,
-        startsOn: promotions.startsOn,
-        endsOn: promotions.endsOn,
-        state: promotions.state,
-        activatedAt: promotions.activatedAt,
-        activatedBy: staff.fullName,
-      })
+      .select({ promo: promotions, giftDishName: dishes.nameVi, activatedBy: staff.fullName })
       .from(promotions)
       .leftJoin(dishes, eq(dishes.id, promotions.targetDishId))
       .leftJoin(staff, eq(staff.id, promotions.activatedBy))
@@ -132,13 +135,51 @@ export class PromotionsService {
     const usedBy = new Map(used.map((u) => [u.promotionId, u]))
     const codesBy = new Map(codes.map((c) => [c.promotionId, c]))
 
-    return rows.map((row) => ({
-      ...row,
-      uses: usedBy.get(row.id)?.uses ?? 0,
-      discountVnd: Math.round(usedBy.get(row.id)?.discountVnd ?? 0),
-      voucherCount: codesBy.get(row.id)?.batch ?? 0,
-      voucherLive: codesBy.get(row.id)?.live ?? 0,
+    return rows.map(({ promo, giftDishName, activatedBy }) => ({
+      ...ruleOf(promo),
+      legalNotice: promo.legalNotice,
+      giftDishName,
+      state: promo.state,
+      activatedAt: promo.activatedAt,
+      activatedBy,
+      uses: usedBy.get(promo.id)?.uses ?? 0,
+      discountVnd: Math.round(usedBy.get(promo.id)?.discountVnd ?? 0),
+      voucherCount: codesBy.get(promo.id)?.batch ?? 0,
+      voucherLive: codesBy.get(promo.id)?.live ?? 0,
     }))
+  }
+
+  /**
+   * Chương trình đang chạy của một chi nhánh, cho app in giá giảm lên thẻ món và
+   * báo trước ưu đãi hoá đơn (§9.6). CÔNG KHAI như thực đơn: khách ở web và ở bàn
+   * đều cần thấy giá. Chương trình cần mã voucher không lộ ra đây.
+   *
+   * Trả cả trần luật đang chạy: app tự cắt đúng như máy chủ sẽ cắt, giá trên thẻ
+   * món mới khớp giá trên bill. Và trả GIỜ CỦA CHI NHÁNH tính ở máy chủ: iPad để
+   * cả buổi, đồng hồ máy lệch được, còn giờ vàng phải bật đúng giờ của quán — app
+   * hỏi lại mỗi phút thay vì tự đoán múi giờ.
+   */
+  async live(branchId: string) {
+    const [branch] = await this.db
+      .select({ timezone: branches.timezone })
+      .from(branches)
+      .where(eq(branches.id, branchId))
+    if (!branch) throw new NotFoundException(`Không có chi nhánh ${branchId}`)
+
+    const now = new Date()
+    const rows = await rulesOn(this.db, businessDateOf(now, branch.timezone))
+    return {
+      clock: clockOf(now, branch.timezone),
+      maxDiscountRate: await this.params.getNumber(
+        'promo.maxDiscountRate',
+        LEGAL_MAX_DISCOUNT_RATE,
+        branchId,
+      ),
+      rules: rows
+        .filter((r) => !r.requiresVoucher)
+        .filter((r) => r.branchIds.length === 0 || r.branchIds.includes(branchId))
+        .map(ruleOf),
+    }
   }
 
   /** Lô mã của một chương trình */
@@ -160,18 +201,53 @@ export class PromotionsService {
   // ================================================================ Soạn thảo
 
   async save(input: PromotionInput, id: number | null, actor: Actor) {
-    validateShape(input)
+    validateShape(
+      input,
+      await this.params.getNumber('promo.maxDiscountRate', LEGAL_MAX_DISCOUNT_RATE),
+    )
 
     return this.db.transaction(async (tx) => {
+      // Mảng mã không có khoá ngoại (món ngừng bán thì chương trình cũ vẫn đọc lại
+      // được) nên kiểm ở cửa: một mã gõ sai là một chương trình không bao giờ ăn
+      const wantDishes = [...new Set(input.targetDishIds)]
+      if (wantDishes.length > 0) {
+        const found = await tx
+          .select({ id: dishes.id })
+          .from(dishes)
+          .where(inArray(dishes.id, wantDishes))
+        const missing = wantDishes.filter((d) => !found.some((f) => f.id === d))
+        if (missing.length > 0) throw new BadRequestException(`Không có món: ${missing.join(', ')}`)
+      }
+      const wantCategories = [...new Set(input.targetCategoryIds)]
+      if (wantCategories.length > 0) {
+        const found = await tx
+          .select({ id: categories.id })
+          .from(categories)
+          .where(inArray(categories.id, wantCategories))
+        const missing = wantCategories.filter((c) => !found.some((f) => f.id === c))
+        if (missing.length > 0)
+          throw new BadRequestException(`Không có nhóm món: ${missing.join(', ')}`)
+      }
+
+      const kind = input.kind
+      // Giảm %/tiền cả hoá đơn không có món áp dụng — bỏ đi chứ không lưu một danh
+      // sách không ai đọc
+      const keepTargets = input.scope === 'item' || kind === 'free_dish'
       const values = {
         code: input.code.trim().toUpperCase(),
         name: input.name.trim(),
-        kind: input.kind,
-        percentBp: input.kind === 'percent' ? input.percentBp : null,
-        amountVnd: input.kind === 'amount' ? input.amountVnd : null,
-        targetDishId:
-          input.kind === 'free_dish' || input.kind === 'set_price' ? input.targetDishId : null,
-        setPriceVnd: input.kind === 'set_price' ? input.setPriceVnd : null,
+        scope: input.scope,
+        kind,
+        badge: input.badge?.trim() || null,
+        percentBp: kind === 'percent' ? input.percentBp : null,
+        amountVnd: kind === 'amount' ? input.amountVnd : null,
+        setPriceVnd: kind === 'set_price' ? input.setPriceVnd : null,
+        buyQty: kind === 'buy_x_get_y' ? input.buyQty : null,
+        getQty: kind === 'buy_x_get_y' ? input.getQty : null,
+        getPercent: kind === 'buy_x_get_y' ? input.getPercent : null,
+        targetDishId: kind === 'free_dish' ? input.giftDishId : null,
+        targetDishIds: keepTargets ? wantDishes : [],
+        targetCategoryIds: keepTargets ? wantCategories : [],
         maxDiscountVnd: input.maxDiscountVnd,
         channels: input.channels,
         branchIds: input.branchIds,
@@ -180,6 +256,8 @@ export class PromotionsService {
         toMinute: input.toMinute,
         minOrderVnd: input.minOrderVnd,
         requiresVoucher: input.requiresVoucher,
+        concentrated: input.concentrated,
+        legalNotice: input.legalNotice?.trim() || null,
         startsOn: input.startsOn,
         endsOn: input.endsOn,
       }
@@ -275,6 +353,7 @@ export class PromotionsService {
         .set({
           state,
           updatedAt: new Date(),
+          stateChangedAt: new Date(),
           ...(state === 'active'
             ? { activatedAt: new Date(), activatedBy: staffIdOf(actor), approvalId }
             : {}),
@@ -374,23 +453,50 @@ export class PromotionsService {
   // =========================================================== Áp vào một đơn
 
   /**
-   * Chấm giỏ hàng của một đơn: chương trình nào ăn, giảm bao nhiêu, cái nào lợi
-   * nhất. Đây là thứ P10 gọi khi thu ngân bấm "Xem khuyến mãi" hoặc gõ mã voucher.
+   * Đơn này đang được giảm bao nhiêu, theo chương trình nào, và còn thiếu bao nhiêu
+   * để đạt chương trình hoá đơn kế tiếp. Có mã voucher thì chấm thử với mã đó.
    *
-   * Chỉ ĐỌC — không ghi gì. Áp thật là việc của `redeem`.
+   * Chỉ ĐỌC — không ghi gì. Gắn mã thật là việc của `applyVoucher`.
    */
-  async quote(orderId: number, voucherCode: string | null) {
-    const cart = await this.cartOf(orderId)
-    const voucher = voucherCode ? await this.liveVoucher(voucherCode, cart.businessDate) : null
+  async quote(orderId: number, voucherCode: string | null, actor: Actor) {
+    const [row] = await this.db
+      .select({ order: orders, timezone: branches.timezone })
+      .from(orders)
+      .innerJoin(branches, eq(branches.id, orders.branchId))
+      .where(eq(orders.id, orderId))
+    if (!row) throw new NotFoundException('Không có đơn này')
+    const { order, timezone } = row
+    assertOwnTableSession(actor, order.tableSessionId ?? 0)
 
-    const rules = await this.liveRules(cart.businessDate)
-    const pick = pickBestPromotion(rules, {
-      ...cart,
-      voucherPromotionId: voucher?.promotionId ?? null,
-    })
+    const voucher = voucherCode ? await this.liveVoucher(voucherCode, order.businessDate) : null
+    const lines = await pricedLinesOf(this.db, orderId, timezone)
+    const ctx = await contextOf(this.db, order, this.params)
+    if (voucher) ctx.voucherPromotionIds = [voucher.promotionId]
+
+    const rules = (
+      await rulesOn(
+        this.db,
+        order.businessDate,
+        order.billPromotionId ? [order.billPromotionId] : [],
+      )
+    )
+      .filter((r) => heldFor(r, order.createdAt))
+      .map(ruleOf)
+    const at = clockOf(order.createdAt, timezone)
+    const bill = priceBill(rules, ctx, at, lines)
+    const named = new Map(rules.map((r) => [r.id, r]))
 
     return {
-      ...pick,
+      lineDiscountVnd: lines.reduce((sum, l) => sum + l.discountVnd, 0),
+      bill: bill
+        ? {
+            promotionId: bill.promotionId,
+            code: named.get(bill.promotionId)?.code ?? '',
+            name: named.get(bill.promotionId)?.name ?? '',
+            discountVnd: bill.discountVnd,
+          }
+        : null,
+      hint: nextBillHint(rules, ctx, at, lines),
       voucher: voucherCode
         ? {
             code: voucherCode.trim().toUpperCase(),
@@ -402,132 +508,79 @@ export class PromotionsService {
   }
 
   /**
-   * Ghi nhận đơn đã hưởng chương trình.
+   * Gắn mã voucher vào đơn rồi tính lại tiền — chương trình của mã được chấm như
+   * mọi chương trình hoá đơn khác, và vẫn chỉ thắng khi nó lợi nhất cho khách.
    *
-   * KHÔNG tự sửa `orders.money_discount` ở đây: khối tiền của đơn do luồng tính
-   * tiền sở hữu (`packages/contracts/money.ts` tính, POS đóng băng), và hai nơi
-   * cùng ghi một con số là hai nơi sẽ lệch. Hàm này ghi LƯỢT HƯỞNG — thứ B8 đọc
-   * để đo hiệu quả, và thứ chặn đơn hưởng chương trình thứ hai.
+   * Lượt dùng của mã bị trừ NGAY lúc gắn, trong cùng transaction với dòng mã đã
+   * khoá: hai quầy quẹt cùng một mã cuối cùng thì người đến sau thấy lượt của
+   * người đến trước. Đổi sang mã khác thì trả lượt cho mã cũ.
    */
-  async redeem(
-    input: { orderId: number; promotionId: number; voucherCode: string | null },
-    actor: Actor,
-  ) {
+  async applyVoucher(input: { orderId: number; voucherCode: string }, actor: Actor) {
     return this.db.transaction(async (tx) => {
-      const cart = await this.cartOf(input.orderId, tx)
-      const rules = await this.liveRules(cart.businessDate, tx)
-      const rule = rules.find((r) => r.id === input.promotionId)
-      if (!rule) throw new NotFoundException('Chương trình không tồn tại hoặc không còn chạy')
-
-      // Khoá dòng mã trước khi đếm lượt: hai quầy quẹt cùng một mã cuối cùng thì
-      // người đến sau phải thấy lượt của người đến trước
-      let voucher = null
-      if (rule.requiresVoucher || input.voucherCode) {
-        if (!input.voucherCode) throw new BadRequestException('Chương trình này cần mã voucher')
-        const [locked] = await tx
-          .select()
-          .from(voucherCodes)
-          .where(eq(voucherCodes.code, input.voucherCode.trim().toUpperCase()))
-          .for('update')
-        if (!locked || locked.state !== 'live') throw new NotFoundException('Mã không dùng được')
-        if (locked.promotionId !== input.promotionId) {
-          throw new BadRequestException('Mã này thuộc chương trình khác')
-        }
-        if (locked.usedCount >= locked.maxUses) throw new ConflictException('Mã đã hết lượt')
-        if (locked.expiresOn && locked.expiresOn < cart.businessDate) {
-          throw new ConflictException('Mã đã hết hạn')
-        }
-        voucher = locked
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, input.orderId))
+        .for('update')
+      if (!order) throw new NotFoundException('Không có đơn này')
+      assertOwnTableSession(actor, order.tableSessionId ?? 0)
+      if (order.status === 'cancelled' || order.paymentState === 'paid') {
+        throw new ConflictException('Đơn đã huỷ hoặc đã trả đủ — không gắn mã được nữa')
       }
 
-      const pick = pickBestPromotion([rule], {
-        ...cart,
-        voucherPromotionId: voucher?.promotionId ?? null,
-      })
-      if (!pick.best) {
-        throw new BadRequestException(
-          `Đơn không đủ điều kiện: ${pick.rejected[0]?.reason ?? 'không rõ'}`,
-        )
+      const code = input.voucherCode.trim().toUpperCase()
+      const [voucher] = await tx
+        .select()
+        .from(voucherCodes)
+        .where(eq(voucherCodes.code, code))
+        .for('update')
+      if (!voucher || voucher.state !== 'live') throw new NotFoundException('Mã không dùng được')
+      if (order.voucherCodeId === voucher.id) {
+        return { orderId: order.id, voucherCode: code, changed: false }
+      }
+      if (voucher.usedCount >= voucher.maxUses) throw new ConflictException('Mã đã hết lượt')
+      if (voucher.expiresOn && voucher.expiresOn < order.businessDate) {
+        throw new ConflictException('Mã đã hết hạn')
+      }
+      const [promo] = await tx
+        .select()
+        .from(promotions)
+        .where(eq(promotions.id, voucher.promotionId))
+      if (
+        !promo ||
+        promo.state !== 'active' ||
+        order.businessDate < promo.startsOn ||
+        order.businessDate > promo.endsOn
+      ) {
+        throw new ConflictException('Chương trình của mã này không còn chạy')
       }
 
-      let redemption
-      try {
-        const [row] = await tx
-          .insert(promotionRedemptions)
-          .values({
-            promotionId: rule.id,
-            voucherCodeId: voucher?.id ?? null,
-            branchId: cart.branchId,
-            orderId: input.orderId,
-            discountVnd: pick.best.discountVnd,
-            businessDate: cart.businessDate,
-          })
-          .returning()
-        redemption = row!
-      } catch (err) {
-        if (isUniqueViolation(err)) {
-          throw new ConflictException(
-            'Đơn đã hưởng một chương trình rồi — khuyến mãi không cộng dồn',
-          )
-        }
-        throw err
-      }
-
-      if (voucher) {
+      if (order.voucherCodeId !== null) {
         await tx
           .update(voucherCodes)
-          .set({ usedCount: voucher.usedCount + 1 })
-          .where(eq(voucherCodes.id, voucher.id))
+          .set({ usedCount: sql`${voucherCodes.usedCount} - 1` })
+          .where(eq(voucherCodes.id, order.voucherCodeId))
       }
+      await tx
+        .update(voucherCodes)
+        .set({ usedCount: voucher.usedCount + 1 })
+        .where(eq(voucherCodes.id, voucher.id))
+      await tx.update(orders).set({ voucherCodeId: voucher.id }).where(eq(orders.id, order.id))
+
+      const money = await this.ordering.recomputeTotals(tx, order.id, order.branchId)
 
       await this.audit.write(tx, {
         actor,
-        action: 'promotion.redeem',
+        action: 'promotion.voucher-applied',
         entity: 'order',
-        entityId: String(input.orderId),
-        payload: { promotion: rule.code, discountVnd: pick.best.discountVnd, voucher: voucher?.code },
+        entityId: String(order.id),
+        payload: { voucher: code, promotion: promo.code, discountVnd: money.discount },
       })
-      return { ...redemption, promotionCode: rule.code, promotionName: rule.name }
+      return { orderId: order.id, voucherCode: code, changed: true, money }
     })
   }
 
   // ================================================================== Nội bộ
-
-  /** Chương trình đang chạy và còn trong lịch — nguồn cho engine chấm điểm */
-  private async liveRules(businessDate: string, tx?: DbOrTx): Promise<PromotionRule[]> {
-    const rows = await (tx ?? this.db)
-      .select()
-      .from(promotions)
-      .where(
-        and(
-          eq(promotions.state, 'active'),
-          lte(promotions.startsOn, businessDate),
-          gte(promotions.endsOn, businessDate),
-        ),
-      )
-      .orderBy(asc(promotions.id))
-
-    return rows.map((r) => ({
-      id: r.id,
-      code: r.code,
-      name: r.name,
-      kind: r.kind as PromotionKind,
-      percentBp: r.percentBp,
-      amountVnd: r.amountVnd,
-      targetDishId: r.targetDishId,
-      setPriceVnd: r.setPriceVnd,
-      maxDiscountVnd: r.maxDiscountVnd,
-      channels: r.channels,
-      branchIds: r.branchIds,
-      weekdays: r.weekdays,
-      fromMinute: r.fromMinute,
-      toMinute: r.toMinute,
-      minOrderVnd: r.minOrderVnd,
-      requiresVoucher: r.requiresVoucher,
-      startsOn: r.startsOn,
-      endsOn: r.endsOn,
-    }))
-  }
 
   private async liveVoucher(code: string, businessDate: string) {
     const [row] = await this.db
@@ -539,81 +592,15 @@ export class PromotionsService {
     if (row.expiresOn && row.expiresOn < businessDate) return null
     return row
   }
-
-  /**
-   * Giỏ hàng của một đơn, quy về thứ engine cần.
-   *
-   * `weekday` và `minuteOfDay` tính theo MÚI GIỜ CHI NHÁNH, không theo giờ máy
-   * chủ — cùng lý do với `businessDateOf`: chương trình "trưa thứ ba" của quán Hà
-   * Nội không được đổi nghĩa vì máy chủ chạy ở UTC.
-   */
-  private async cartOf(
-    orderId: number,
-    tx?: DbOrTx,
-  ): Promise<Omit<CartContext, 'voucherPromotionId'>> {
-    const db = tx ?? this.db
-    const [order] = await db
-      .select({
-        id: orders.id,
-        branchId: orders.branchId,
-        channel: orders.channel,
-        businessDate: orders.businessDate,
-        createdAt: orders.createdAt,
-        moneySub: orders.moneySub,
-        timezone: branches.timezone,
-      })
-      .from(orders)
-      .innerJoin(branches, eq(branches.id, orders.branchId))
-      .where(eq(orders.id, orderId))
-    if (!order) throw new NotFoundException('Không có đơn này')
-
-    const lines = await db
-      .select({
-        dishId: orderLines.dishId,
-        qty: orderLines.qty,
-        priceTotal: orderLines.priceTotal,
-      })
-      .from(orderLines)
-      .where(and(eq(orderLines.orderId, orderId), inArray(orderLines.state, LIVE_LINE_STATES)))
-
-    const local = new Intl.DateTimeFormat('en-CA', {
-      timeZone: order.timezone,
-      hour12: false,
-      weekday: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).formatToParts(order.createdAt)
-    const part = (type: string) => local.find((p) => p.type === type)!.value
-    const weekday = WEEKDAY_INDEX[part('weekday')] ?? 0
-    const minuteOfDay = (Number(part('hour')) % 24) * 60 + Number(part('minute'))
-
-    return {
-      branchId: order.branchId,
-      channel: order.channel,
-      businessDate: order.businessDate,
-      weekday,
-      minuteOfDay,
-      subtotalVnd: order.moneySub,
-      lines: lines.filter((l) => l.priceTotal > 0),
-    }
-  }
-}
-
-/** Dòng đã huỷ không được tính vào giỏ — khách không trả tiền cho món bị huỷ */
-const LIVE_LINE_STATES = ['draft', 'queued', 'cooking', 'ready', 'served'] as const
-
-const WEEKDAY_INDEX: Record<string, number> = {
-  Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
 }
 
 const staffIdOf = (actor: Actor) => (actor.kind === 'staff' ? actor.staffId : null)
 
-
 /**
- * Kiểm phần mà ràng buộc CSDL kiểm được nhưng kiểm bằng thông báo khó hiểu.
- * Cùng một luật, nói bằng tiếng người trước khi Postgres nói bằng tên constraint.
+ * Kiểm phần mà ràng buộc CSDL kiểm được nhưng kiểm bằng thông báo khó hiểu, cộng
+ * trần theo luật — thứ CSDL không biết vì nó là tham số.
  */
-function validateShape(input: PromotionInput) {
+function validateShape(input: PromotionInput, maxRate: number) {
   if (input.endsOn < input.startsOn) {
     throw new BadRequestException('Ngày kết thúc phải sau ngày bắt đầu')
   }
@@ -623,10 +610,30 @@ function validateShape(input: PromotionInput) {
   if (input.fromMinute !== null && input.toMinute !== null && input.toMinute <= input.fromMinute) {
     throw new BadRequestException('Giờ kết thúc phải sau giờ bắt đầu')
   }
+  if (!KINDS_BY_SCOPE[input.scope].includes(input.kind)) {
+    throw new BadRequestException(
+      input.scope === 'item'
+        ? 'Chương trình món chỉ có: giảm %, giảm tiền, đồng giá, mua N tặng M'
+        : 'Chương trình hoá đơn chỉ có: giảm %, giảm tiền, tặng món',
+    )
+  }
+  if (input.scope === 'item' && input.targetDishIds.length + input.targetCategoryIds.length === 0) {
+    throw new BadRequestException('Chọn ít nhất một món, set hoặc nhóm món được áp dụng')
+  }
+  // Mã voucher gắn vào ĐƠN lúc tính tiền, sau khi món đã gọi và giá món đã chốt —
+  // nên mã chỉ mở được chương trình hoá đơn
+  if (input.requiresVoucher && input.scope === 'item') {
+    throw new BadRequestException('Mã voucher chỉ dùng cho chương trình hoá đơn')
+  }
+
+  const legalLine = `Giảm quá ${Math.round(maxRate * 100)}% chỉ được khi là chương trình khuyến mại tập trung (NĐ 81/2018, sửa bởi NĐ 128/2024)`
   switch (input.kind) {
     case 'percent':
       if (!input.percentBp || input.percentBp < 1 || input.percentBp > 10_000) {
         throw new BadRequestException('Mức giảm phải trong khoảng 0,01% – 100%')
+      }
+      if (!input.concentrated && input.percentBp > maxRate * 10_000) {
+        throw new BadRequestException(legalLine)
       }
       break
     case 'amount':
@@ -634,14 +641,27 @@ function validateShape(input: PromotionInput) {
         throw new BadRequestException('Số tiền giảm phải lớn hơn 0')
       }
       break
-    case 'free_dish':
-      if (!input.targetDishId) throw new BadRequestException('Chọn món được tặng')
-      break
     case 'set_price':
-      if (!input.targetDishId) throw new BadRequestException('Chọn món áp giá khung giờ')
       if (input.setPriceVnd === null || input.setPriceVnd < 0) {
-        throw new BadRequestException('Giá khung giờ không hợp lệ')
+        throw new BadRequestException('Giá đồng giá không hợp lệ')
       }
+      break
+    case 'buy_x_get_y': {
+      const buy = input.buyQty ?? 0
+      const get = input.getQty ?? 0
+      const pct = input.getPercent ?? 0
+      if (buy < 1 || get < 1) throw new BadRequestException('Số phần mua và số phần tặng phải từ 1')
+      if (pct < 1 || pct > 100) throw new BadRequestException('Phần tặng giảm từ 1% đến 100%')
+      // Giá trị phần tặng so với phần phải mua: "mua 2 tặng 1" là 50%, "mua 1 tặng 1" là 100%
+      if (!input.concentrated && get * pct > maxRate * 100 * buy) {
+        throw new BadRequestException(
+          `Phần tặng vượt ${Math.round(maxRate * 100)}% giá trị phần mua — chỉ được khi là chương trình khuyến mại tập trung (NĐ 81/2018, sửa bởi NĐ 128/2024)`,
+        )
+      }
+      break
+    }
+    case 'free_dish':
+      if (!input.giftDishId) throw new BadRequestException('Chọn món được tặng')
       break
   }
 }
