@@ -23,6 +23,7 @@ import {
   tables,
 } from '../../db/schema'
 import { activePrintersOf } from '../admin/device-admin.service'
+import { activeOf } from '../catalog/domain/active'
 import { onlineVisibleOf } from '../catalog/domain/online-visible'
 import type { Actor } from '../identity/actor'
 
@@ -105,8 +106,8 @@ export class ConfigBundleService {
     const menu = dishRows
       .map((d) => {
         const o = overrideByDish.get(d.id)
-        const active = o?.active ?? d.active
-        if (!active) return null
+        // Cùng một hàm với cửa gọi món: POS và iPad hiện món nào thì gọi được món đó
+        if (!activeOf(d, o)) return null
         return {
           id: d.id,
           code: d.code,

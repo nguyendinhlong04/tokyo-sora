@@ -60,6 +60,8 @@ Những chặn khách sẽ gặp (đều là hành vi đúng):
   khung giờ gần.
 - **"Món chỉ phục vụ tại quán: …"**: món chi nhánh vừa tắt bán online (O11) mà
   còn nằm trong giỏ cũ — bỏ món đó khỏi giỏ rồi đặt lại.
+- **"{món} hiện không bán ở chi nhánh này"**: món vừa ngừng bán ở M1 (cả chuỗi hoặc
+  riêng chi nhánh) mà còn nằm trong giỏ cũ — bỏ món đó khỏi giỏ rồi đặt lại.
 
 Khuyến mãi (soạn ở Office **B11**, chạy chung với iPad tại bàn và quầy): món đang
 được giảm hiện giá giảm màu cam, giá gốc gạch ngang và nhãn chương trình ("Giờ

@@ -12,6 +12,7 @@ import type { Db } from '../db/client'
 import {
   auditLog,
   devices,
+  dishes,
   journalEntries,
   outboxEvents,
   stockMoves,
@@ -878,5 +879,155 @@ describe('8. Sự kiện realtime được ghi cùng transaction nghiệp vụ',
     expect(
       ticketEvents.every((e) => e.rooms.some((r) => r.startsWith(`branch:${fx.branchId}:station:`))),
     ).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Món đã tắt thì không cửa nào gọi được (M1 · §5 đa chi nhánh).
+ *
+ * M1 có hai công tắc: "Đang bán trên toàn chuỗi" (`dishes.active`) và "Tắt ở chi
+ * nhánh này" (ghi đè `active = false` của riêng chi nhánh). Trước đây bundle ẩn
+ * món nhưng cửa gọi món không soi cờ nào: giỏ cũ trên iPad, lệnh gửi lại từ hàng
+ * đợi offline hay một lệnh gọi thẳng API vẫn tạo dòng đơn và vé bếp cho món chi
+ * nhánh không bán.
+ *
+ * Chạy sau mục 7 vì dùng bàn 05: bàn đó vẫn mở, chưa ai thu tiền.
+ */
+describe('9. Món đã tắt không gọi được (M1 · §5 đa chi nhánh)', () => {
+  let manager: string
+
+  beforeAll(async () => {
+    manager = await login(fx.managerId)
+  })
+
+  /** Gọi một phần lên bàn 05, đúng lệnh POS hay iPad gửi */
+  const order = (dishId: string) =>
+    inject({
+      method: 'POST',
+      url: `/api/table-sessions/${plainSession}/lines`,
+      headers: auth(cashier),
+      payload: { lines: [{ dishId, qty: 1 }] },
+    })
+
+  const lineCount = async () =>
+    (
+      await inject({
+        method: 'GET',
+        url: `/api/table-sessions/${plainSession}/order`,
+        headers: auth(cashier),
+      })
+    ).json<{ lines: unknown[] }>().lines.length
+
+  /** Thực đơn POS và iPad đang đọc: phát hành lại bundle rồi tải về như app tải */
+  async function bundleHas(dishId: string) {
+    const published = await inject({
+      method: 'POST',
+      url: `/api/office/config/publish?branch=${fx.branchId}`,
+      headers: auth(manager),
+    })
+    expect(published.statusCode, published.payload).toBe(201)
+    const bundle = await inject({
+      method: 'GET',
+      url: `/api/config?branch=${fx.branchId}`,
+      headers: auth(cashier),
+    })
+    return bundle.json<{ dishes: { id: string }[] }>().dishes.some((d) => d.id === dishId)
+  }
+
+  const setChainActive = (dishId: string, active: boolean) =>
+    db.update(dishes).set({ active }).where(eq(dishes.id, dishId))
+
+  /** Nút "Tắt ở chi nhánh này" của M1 gửi đúng lệnh này; `null` = theo cấp chuỗi */
+  async function setBranchActive(dishId: string, active: boolean | null) {
+    const res = await inject({
+      method: 'PATCH',
+      url: `/api/admin/dishes/${dishId}/branches/${fx.branchId}`,
+      headers: auth(manager),
+      payload: { price: null, active },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+  }
+
+  it('chuỗi ngừng bán: bundle ẩn món, gọi món bị từ chối kèm tên món, không sinh dòng', async () => {
+    await setChainActive('duamuoi', false)
+    expect(await bundleHas('duamuoi')).toBe(false)
+
+    const before = await lineCount()
+    const res = await order('duamuoi')
+    expect(res.statusCode, res.payload).toBe(409)
+    expect(res.json<{ code: string; message: string }>()).toMatchObject({
+      code: 'dish_inactive',
+      message: expect.stringContaining('Dưa muối ba vị'),
+    })
+    expect(await lineCount()).toBe(before)
+  })
+
+  it('chuỗi bán lại: bundle hiện món, gọi được', async () => {
+    await setChainActive('duamuoi', true)
+    expect(await bundleHas('duamuoi')).toBe(true)
+    const res = await order('duamuoi')
+    expect(res.statusCode, res.payload).toBe(201)
+  })
+
+  it('"Tắt ở chi nhánh này": bundle ẩn, gọi món bị từ chối; bỏ tắt thì gọi lại được', async () => {
+    await setBranchActive('sodiep', false)
+    expect(await bundleHas('sodiep')).toBe(false)
+    const off = await order('sodiep')
+    expect(off.statusCode, off.payload).toBe(409)
+    expect(off.json<{ code: string; message: string }>()).toMatchObject({
+      code: 'dish_inactive',
+      message: expect.stringContaining('Sò điệp Hokkaido'),
+    })
+
+    await setBranchActive('sodiep', null)
+    expect(await bundleHas('sodiep')).toBe(true)
+    const on = await order('sodiep')
+    expect(on.statusCode, on.payload).toBe(201)
+  })
+
+  /**
+   * Chuỗi ngừng bán là ngừng ở MỌI chi nhánh; ghi đè chỉ tắt thêm được. M1 không
+   * có nút "bán riêng ở chi nhánh này", nên ghi đè `true` chỉ đến từ lệnh gọi thẳng
+   * hay dữ liệu cũ — nó không được lặng lẽ giữ một món chuỗi đã ngừng trên thực đơn
+   * của một chi nhánh. Office, bundle và cửa gọi món cùng một kết luận.
+   */
+  it('ghi đè "đang bán" của chi nhánh không bán lại món chuỗi đã ngừng', async () => {
+    await setChainActive('duamuoi', false)
+    await setBranchActive('duamuoi', true)
+    try {
+      expect(await bundleHas('duamuoi')).toBe(false)
+      expect((await order('duamuoi')).json<{ code: string }>().code).toBe('dish_inactive')
+
+      const list = await inject({
+        method: 'GET',
+        url: `/api/admin/dishes?branch=${fx.branchId}`,
+        headers: auth(manager),
+      })
+      const row = list
+        .json<{ id: string; effectiveActive: boolean }[]>()
+        .find((d) => d.id === 'duamuoi')
+      expect(row?.effectiveActive).toBe(false)
+    } finally {
+      await setChainActive('duamuoi', true)
+      await setBranchActive('duamuoi', null)
+    }
+  })
+
+  /**
+   * Cờ chặn thứ được GỌI — món lẻ, hoặc cả cái set. Món trong set theo khai báo M11:
+   * một món có thể ngừng bán lẻ mà vẫn nằm trong set (dữ liệu gốc có Dẻ sườn bò tắt
+   * mà vẫn ở chặng bò của Set Kiwami); chặn ở đây là cả set chết theo một công tắc
+   * bán lẻ. Món trong set hết thật thì báo hết (86) — cửa đó vẫn soi từng món con.
+   */
+  it('set vẫn gọi được khi một món trong set chỉ ngừng bán lẻ', async () => {
+    await setChainActive('kemtra', false)
+    try {
+      const res = await order('setsora')
+      expect(res.statusCode, res.payload).toBe(201)
+    } finally {
+      await setChainActive('kemtra', true)
+    }
   })
 })

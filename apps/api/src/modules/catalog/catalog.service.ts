@@ -14,6 +14,7 @@ import {
 } from '../../db/schema'
 import type { SetDefinition } from '../kitchen/domain/explode'
 import type { DishRouting } from '../kitchen/domain/routing'
+import { activeOf } from './domain/active'
 import { priceOf } from './domain/price'
 import { scheduleOf, type SaleSchedule } from './domain/sale-window'
 
@@ -26,6 +27,11 @@ export interface CatalogDish {
   categoryId: string | null
   /** Giá theo chi nhánh và kênh của đơn (`priceOf`) — đây là giá sẽ ĐÓNG BĂNG vào dòng đơn */
   price: number
+  /**
+   * Chi nhánh có đang bán món không (`activeOf`). Món tắt vẫn trả về chứ không lọc
+   * đi: dòng nháp gọi trước lúc tắt vẫn phải định tuyến được khi gửi bếp.
+   */
+  active: boolean
   routing: DishRouting | null
   /** Lịch bán M11 — chỗ duy nhất mọi cửa gọi món đi qua, nên cũng là chỗ cưỡng chế */
   schedule: SaleSchedule
@@ -77,6 +83,7 @@ export class CatalogService {
         name: dish.nameVi,
         categoryId: dish.categoryId,
         price: priceOf(dish, o, channel),
+        active: activeOf(dish, o),
         routing:
           dish.stationGrill && dish.stationNoGrill
             ? {

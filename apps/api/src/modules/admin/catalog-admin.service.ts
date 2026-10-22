@@ -23,6 +23,7 @@ import {
   type DishStoryCondiment,
   type DishStoryCut,
 } from '../../db/schema'
+import { activeOf } from '../catalog/domain/active'
 import { onlineVisibleOf } from '../catalog/domain/online-visible'
 import { priceOf } from '../catalog/domain/price'
 import { describeSchedule, scheduleOf } from '../catalog/domain/sale-window'
@@ -187,7 +188,8 @@ export class CatalogAdminService {
           : null,
         /** Giá và trạng thái mà chi nhánh này thật sự bán */
         effectivePrice: override?.price ?? d.basePrice,
-        effectiveActive: override?.active ?? d.active,
+        // Cùng hàm với cửa gọi món: Office thấy "Đang bán" là gọi được
+        effectiveActive: activeOf(d, override),
         /** Cùng hàm với thực đơn O2 và cửa nhận đơn web: Office thấy bật là khách đặt được */
         effectiveOnlineVisible: onlineVisibleOf(d, override),
         // Cùng hàm với thực đơn O2 và đơn web: giá khách thấy cũng là giá khách trả
@@ -859,7 +861,7 @@ export class CatalogAdminService {
         id: set.id,
         code: set.code,
         nameVi: set.nameVi,
-        active: override?.active ?? set.active,
+        active: activeOf(set, override),
         priceVnd: price,
         onlineVisible: onlineVisibleOf(set, override),
         tableOrderable: set.tableOrderable,

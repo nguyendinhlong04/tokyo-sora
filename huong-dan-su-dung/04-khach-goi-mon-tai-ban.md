@@ -120,6 +120,7 @@ flowchart TD
 | Mất mạng khi thanh toán | **Chặn hẳn**: *"Thanh toán cần mạng ổn định. Vui lòng gọi thu ngân."* — lượt trả cần tài khoản định danh thật, không xếp hàng được |
 | Mất mạng khi mở bàn | Báo *"Mất kết nối — chưa mở được bàn. Vui lòng gọi nhân viên."* — nhân viên mở ở POS |
 | Bếp báo hết món đang nằm trong giỏ | Hộp thoại báo món vừa hết, bỏ khỏi giỏ và gợi ý hai món thay (T16) |
+| Office vừa ngừng bán món đang nằm trong giỏ (M1) | Gửi bếp bị từ chối: *"{món} hiện không bán ở chi nhánh này"* — bỏ món đó khỏi giỏ rồi gửi lại |
 | Khách gọi nhân viên khi mất mạng | Báo lỗi thẳng (gọi người thì không thể nằm chờ trong hàng đợi) |
 | Khách muốn mở bàn khác hay xem đơn bàn khác | Không làm được — iPad chỉ thấy đúng bàn được ghép |
 

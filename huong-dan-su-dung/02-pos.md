@@ -163,8 +163,8 @@ flowchart LR
 - **Kênh ngoài (O12):** đơn GrabFood / ShopeeFood / Be **nhập tay** — chọn kênh,
   gõ `Mã đơn kênh`, tìm món (gõ không dấu được), **Thêm vào bảng điều phối**.
   Sau đó đơn đi chung một đường với đơn web. Món đang tắt bán online ở O11 vẫn
-  nhập được (khách đã đặt trên sàn); món đã báo hết (86) hoặc ngoài lịch bán thì
-  không.
+  nhập được (khách đã đặt trên sàn); món đã tắt ở M1, đã báo hết (86) hoặc ngoài
+  lịch bán thì không.
 
 ## 2.9 Đặt bàn (R1 · R2 · R4)
 

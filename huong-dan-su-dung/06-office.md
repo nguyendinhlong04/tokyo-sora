@@ -216,8 +216,15 @@ Ba trạng thái "không bán" dễ nhầm:
 | Thao tác | Ở đâu | Phạm vi & thời hạn |
 |---|---|---|
 | **86 / báo hết** | Màn bếp K5 (hoặc B1 hiển thị) | Hết **trong ca**, tự hết hạn cuối ngày, khoá mọi kênh ngay |
-| **Tắt ở chi nhánh này** | M1, khối giá | Chi nhánh đó ngừng bán tới khi bật lại |
+| **Tắt ở chi nhánh này** | M1, khối giá | Chi nhánh đó ngừng bán tới khi bật lại, khoá mọi kênh — tại bàn, POS, web và đơn Grab/Shopee/Be nhập tay |
 | **Đang tắt (online)** | O11 Menu online | Chỉ tắt trên web đặt món (mang về/giao) — tại quán vẫn bán, đơn Grab/Shopee/Be nhập tay (O12) không bị chặn |
+
+Bỏ chọn **Đang bán trên toàn chuỗi** (M1, khối Trạng thái) là ngừng ở **mọi** chi
+nhánh: ghi đè chi nhánh chỉ tắt thêm được, không bán lại món chuỗi đã ngừng. Hai
+công tắc chặn ngay khi lưu, kể cả món còn trong giỏ cũ ("{món} hiện không bán ở chi
+nhánh này"); thực đơn web ẩn món ngay, POS và iPad ẩn sau lần **phát hành** cấu hình kế
+tiếp. Công tắc chặn thứ được gọi — món lẻ, hoặc cả set; món nằm trong set vẫn ra theo
+set. Muốn bỏ một món khỏi set thì sửa set ở M11; món đó hết hàng thì báo hết (86).
 
 **Trang giới thiệu món trên web** (khối trong drawer M1): soạn nội dung trang
 `/thuc-don/{mã}` — chương, lời dẫn, vị trí phần thịt, hương vị, độ cắt, gợi ý

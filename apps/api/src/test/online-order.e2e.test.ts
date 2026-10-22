@@ -989,3 +989,91 @@ describe('9. Cờ bán online của chi nhánh — thực đơn và cửa nhận
     expect(message).toContain('Kem trà xanh')
   })
 })
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Món đã tắt ở M1 thì thực đơn web ẩn VÀ cửa nhận đơn từ chối, ở mọi kênh.
+ *
+ * Khác cờ bán online ở mục 9: cờ đó là thực đơn của web nên đơn sàn nhập tay được
+ * miễn. "Đang bán trên toàn chuỗi" và "Tắt ở chi nhánh này" nói chi nhánh không bán
+ * món đó nữa — như báo hết (86), chặn cả đơn GrabFood/ShopeeFood/Be. Trước đây
+ * thực đơn ẩn món mà giỏ cũ hay lệnh gọi thẳng vẫn đặt được.
+ */
+describe('10. Món đã tắt — thực đơn ẩn, đơn ở mọi kênh bị từ chối (M1 · O2 · O6 · O12)', () => {
+  /** Hai công tắc của M1; `branch = null` = chi nhánh theo cấp chuỗi */
+  async function setActive(dishId: string, chain: boolean, branch: boolean | null) {
+    await db.update(dishes).set({ active: chain }).where(eq(dishes.id, dishId))
+    await db
+      .insert(dishBranchOverrides)
+      .values({ dishId, branchId: fx.branchId, active: branch })
+      .onConflictDoUpdate({
+        target: [dishBranchOverrides.dishId, dishBranchOverrides.branchId],
+        set: { active: branch },
+      })
+  }
+
+  const onMenu = async (dishId: string) =>
+    (await inject({ method: 'GET', url: `/api/online/menu?branch=${fx.branchId}` }))
+      .json<{ dishes: { id: string }[] }>()
+      .dishes.some((d) => d.id === dishId)
+
+  afterAll(async () => {
+    for (const dishId of ['sodiep', 'kemtra']) await setActive(dishId, true, null)
+  })
+
+  it('chuỗi ngừng bán: thực đơn ẩn, đơn web bị từ chối kèm tên món', async () => {
+    await setActive('sodiep', false, null)
+    expect(await onMenu('sodiep')).toBe(false)
+
+    const res = await placeTakeaway([{ dishId: 'sodiep', qty: 1 }])
+    expect(res.statusCode, res.payload).toBe(409)
+    expect(res.json<{ code: string; message: string }>()).toMatchObject({
+      code: 'dish_inactive',
+      message: expect.stringContaining('Sò điệp Hokkaido'),
+    })
+  })
+
+  it('tắt ở chi nhánh: thực đơn ẩn, đơn web bị từ chối kèm tên món', async () => {
+    await setActive('kemtra', true, false)
+    expect(await onMenu('kemtra')).toBe(false)
+
+    const res = await placeTakeaway([{ dishId: 'kemtra', qty: 1 }])
+    expect(res.statusCode, res.payload).toBe(409)
+    expect(res.json<{ code: string; message: string }>()).toMatchObject({
+      code: 'dish_inactive',
+      message: expect.stringContaining('Kem trà xanh'),
+    })
+  })
+
+  it('đơn kênh ngoài nhập tay cũng bị từ chối — khác cờ bán online', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/orders/external',
+      headers: staffAuth(),
+      payload: {
+        branchId: fx.branchId,
+        channel: 'grab',
+        type: 'delivery',
+        externalCode: 'GR-9002',
+        customer: {},
+        lines: [{ dishId: 'kemtra', qty: 1 }],
+      },
+    })
+    expect(res.statusCode, res.payload).toBe(409)
+    expect(res.json<{ code: string }>().code).toBe('dish_inactive')
+  })
+
+  it('bật lại: thực đơn hiện và đơn web nhận cả hai món', async () => {
+    await setActive('sodiep', true, null)
+    await setActive('kemtra', true, null)
+    expect(await onMenu('sodiep')).toBe(true)
+    expect(await onMenu('kemtra')).toBe(true)
+
+    const res = await placeTakeaway([
+      { dishId: 'sodiep', qty: 1 },
+      { dishId: 'kemtra', qty: 1 },
+    ])
+    expect(res.statusCode, res.payload).toBe(201)
+  })
+})

@@ -266,6 +266,23 @@ export class OrderingService {
     if (!dish) throw new NotFoundException(`Không có món ${input.dishId}`)
 
     /**
+     * Món đã tắt ở M1 (cả chuỗi, hoặc "Tắt ở chi nhánh này") chặn ở đây cùng lẽ với
+     * lịch bán bên dưới: thực đơn và bundle ẩn món, nhưng giỏ cũ trên iPad hay web,
+     * lệnh gửi lại từ hàng đợi offline và lệnh gọi thẳng API không đi qua thực đơn.
+     *
+     * Chỉ soi thứ được GỌI — món lẻ, hoặc cả set. Món trong set theo khai báo M11:
+     * một món có thể ngừng bán lẻ mà vẫn nằm trong set (dữ liệu gốc có Dẻ sườn bò
+     * tắt mà vẫn ở chặng bò của Set Kiwami), chặn ở đây là cả set chết theo một công
+     * tắc bán lẻ. Món trong set hết thật thì báo hết — cửa 86 vẫn soi từng món con.
+     */
+    if (!dish.active) {
+      throw new ConflictException({
+        code: 'dish_inactive',
+        message: `${dish.name} hiện không bán ở chi nhánh này`,
+      })
+    }
+
+    /**
      * Lịch bán (M11) kiểm ở đây, ngay cạnh 86, vì đây là cửa DUY NHẤT mà mọi kênh
      * gọi món đi qua — POS, Table và đơn online dùng chung đúng đường này.
      */

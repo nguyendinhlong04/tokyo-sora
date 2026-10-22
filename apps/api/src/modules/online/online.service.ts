@@ -26,6 +26,7 @@ import {
   orders,
   payments,
 } from '../../db/schema'
+import { activeOf } from '../catalog/domain/active'
 import { onlineVisibleOf } from '../catalog/domain/online-visible'
 import { priceOf } from '../catalog/domain/price'
 import { isOnSale, scheduleOf } from '../catalog/domain/sale-window'
@@ -102,12 +103,12 @@ export class OnlineService {
     const [categoryRows, dishRows, overrideRows, soldOut] = await Promise.all([
       this.db.select().from(categories).orderBy(asc(categories.sort)),
       /**
-       * Lấy mọi món đang bán rồi mới lọc kênh online trong mã, KHÔNG lọc
-       * `online_visible = true` ngay ở câu lệnh: chi nhánh có quyền bật riêng một
-       * món mà cấp chuỗi đang tắt (O11), và câu lọc ở SQL sẽ loại nó trước khi
-       * ai kịp xem tới ghi đè.
+       * Lấy mọi món rồi mới lọc trong mã, KHÔNG lọc `active` hay `online_visible`
+       * ngay ở câu lệnh: chi nhánh có quyền bật riêng một món online mà cấp chuỗi
+       * đang tắt (O11), và câu lọc ở SQL sẽ loại nó trước khi ai kịp xem tới ghi
+       * đè. Thứ tự ưu tiên của hai cờ chỉ nằm ở `activeOf` và `onlineVisibleOf`.
        */
-      this.db.select().from(dishes).where(eq(dishes.active, true)).orderBy(asc(dishes.sort)),
+      this.db.select().from(dishes).orderBy(asc(dishes.sort)),
       this.db
         .select()
         .from(dishBranchOverrides)
@@ -135,7 +136,8 @@ export class OnlineService {
     const menu = dishRows
       .filter((d) => {
         const override = overrideByDish.get(d.id)
-        if (override?.active === false) return false
+        // Cùng một hàm với cửa gọi món: chi nhánh không bán món nào thì web không hiện món đó
+        if (!activeOf(d, override)) return false
         if (!isOnSale(scheduleOf(d), today, minuteNow)) return false
         // Cùng một hàm với cửa nhận đơn web: hiện món nào thì khách đặt được món đó
         return onlineVisibleOf(d, override)
