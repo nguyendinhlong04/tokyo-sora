@@ -25,6 +25,7 @@ import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
 import { punctualityOf, splitWorkedDay, workedMinutesOf, type PayrollRates } from './domain/payroll'
+import { missingShiftDays } from './domain/timesheet'
 
 export interface ManualEntryInput {
   employeeId: number
@@ -259,6 +260,7 @@ export class TimesheetService {
     ])
 
     const locked = await this.lockedPeriod(branchId, from, to)
+    const today = businessDateOf(new Date(), await this.timezoneOf(branchId))
 
     const rows = people.map(({ employee, fullName }) => {
       const mine = entries.filter((e) => e.employeeId === employee.id)
@@ -300,14 +302,7 @@ export class TimesheetService {
         { worked: 0, otNormal: 0, otRest: 0, otHoliday: 0 },
       )
 
-      /** Ngày có ca mà không có bản ghi công, và cũng không có phép — vắng thật */
-      const missing = myShifts
-        .filter(
-          (s) =>
-            !mine.some((e) => e.workDate === s.workDate) &&
-            !myLeaves.some((l) => l.fromDate <= s.workDate && l.toDate >= s.workDate),
-        )
-        .map((s) => s.workDate)
+      const missing = missingShiftDays(myShifts, mine, myLeaves, today)
 
       return {
         employeeId: employee.id,
