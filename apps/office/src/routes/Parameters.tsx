@@ -306,7 +306,11 @@ function ParameterLine({
             row.scope === 'branch' ? 'bg-accent/15 text-accent' : 'bg-surface-3 text-ink-mute'
           }`}
         >
-          {row.scope === 'branch' ? 'Riêng chi nhánh' : 'Toàn chuỗi'}
+          {row.scope === 'branch'
+            ? 'Riêng chi nhánh'
+            : row.overridable
+              ? 'Toàn chuỗi'
+              : 'Chỉ cấp chuỗi'}
         </span>
         {row.unit ? (
           <span className="text-[length:var(--fs-c1)] text-ink-mute">{row.unit}</span>
@@ -321,9 +325,11 @@ function ParameterLine({
             <Button variant="primary" disabled={disabled} onClick={() => onSave(parse(), 'chain')}>
               Lưu cho chuỗi
             </Button>
-            <Button disabled={disabled} onClick={() => onSave(parse(), 'branch')}>
-              Chỉ chi nhánh này
-            </Button>
+            {row.overridable ? (
+              <Button disabled={disabled} onClick={() => onSave(parse(), 'branch')}>
+                Chỉ chi nhánh này
+              </Button>
+            ) : null}
           </>
         ) : null}
         {!dirty && row.scope === 'branch' ? (

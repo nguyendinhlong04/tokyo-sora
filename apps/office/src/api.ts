@@ -68,6 +68,8 @@ export interface ParameterRow {
   key: string
   unit: string | null
   sensitive: boolean
+  /** false = chỉ sửa ở cấp chuỗi */
+  overridable: boolean
   chainValue: unknown
   branchValue: unknown
   /** Con số engine thật sự đọc cho chi nhánh đang chọn */
