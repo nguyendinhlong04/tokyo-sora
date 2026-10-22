@@ -269,6 +269,43 @@ describe('H8 — phiên kênh chỉ mở việc của chính mình', () => {
     expect(res.statusCode).toBe(403)
   })
 
+  it('route KHÔNG gắn quyền cũng đóng — không xin được token nghe đơn của chi nhánh', async () => {
+    // Trước đây route không khai quyền là mở cho mọi danh tính, kể cả link cá
+    // nhân: cầm link là nghe được luồng đơn và bàn của cả quán qua realtime.
+    const token = await inject({
+      method: 'POST',
+      url: '/api/realtime/token',
+      headers: cookie(hoaCookie),
+    })
+    expect(token.statusCode).toBe(403)
+    expect(token.payload).toContain('Kênh nhân viên')
+
+    const roster = await inject({
+      method: 'GET',
+      url: `/api/auth/staff?branchId=${fx.branchId}`,
+      headers: cookie(hoaCookie),
+    })
+    expect(roster.statusCode).toBe(403)
+  })
+
+  it('hỏi mình là ai và đăng xuất vẫn được — hai cửa mở có chủ ý', async () => {
+    const me = await inject({ method: 'GET', url: '/api/auth/me', headers: cookie(hoaCookie) })
+    expect(me.statusCode, me.payload).toBe(200)
+    expect(me.json<{ scope: string }>().scope).toBe('self')
+
+    // Phiên riêng để đăng xuất — phiên của Hoa còn dùng cho các ca bên dưới
+    const spare = await channelLogin(hoaChannel, fx.pins[fx.cashierId]!)
+    const spareCookie = spare.cookies.find((c) => c.name === 'sora_staff')!.value
+    const out = await inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: cookie(spareCookie),
+    })
+    expect(out.statusCode, out.payload).toBe(201)
+    const after = await inject({ method: 'GET', url: '/api/hr/me', headers: cookie(spareCookie) })
+    expect(after.statusCode).toBe(401)
+  })
+
   it('không xin nghỉ hộ người khác', async () => {
     const res = await inject({
       method: 'POST',

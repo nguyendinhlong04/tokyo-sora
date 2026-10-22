@@ -59,8 +59,9 @@ không sửa ngược, sai sẽ được cộng/trừ ở kỳ sau."*
 
 Phiên mở bằng link cá nhân **chỉ xem được dữ liệu của chính mình** — kể cả thu
 ngân hay bếp trưởng cũng không mở được màn vận hành nào từ điện thoại:
-*"Kênh nhân viên chỉ mở lịch, công và phiếu lương của chính bạn. Việc quản lý
-cần đăng nhập ở máy của quán."* Chấm công từ đây cũng bị chặn — phải ra kiosk.
+*"Kênh nhân viên chỉ mở lịch, công, lương, việc và văn bản của chính bạn. Việc
+quản lý cần đăng nhập ở máy của quán."* Chấm công từ đây cũng bị chặn — phải ra
+kiosk. Link cá nhân cũng không xin được luồng tin trực tiếp (realtime) của quán.
 
 ## 7.2 Kiosk chấm công (`chamcong.tokyosora.vn`)
 

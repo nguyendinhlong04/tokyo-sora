@@ -22,19 +22,29 @@ export const REQUIRED_PERMISSION = 'sora:permission'
  */
 export const RequirePermission = (action: ActionKey) => SetMetadata(REQUIRED_PERMISSION, action)
 
+export const SELF_OPEN = 'sora:self-open'
+/**
+ * Route không gắn quyền mà phiên Kênh nhân viên VẪN được gọi — đăng xuất, hỏi mình
+ * là ai. Mọi route không gắn quyền khác đều đóng với phiên `self`.
+ *
+ * Mở bằng danh sách trắng chứ không đóng bằng danh sách đen: route mới quên gắn
+ * quyền thì người cầm link cá nhân bị chặn, không phải được đi qua. Trước đây
+ * chiều ngược lại: link Kênh nhân viên xin được token realtime và nghe được luồng
+ * đơn của cả chi nhánh.
+ */
+export const SelfOpen = () => SetMetadata(SELF_OPEN, true)
+
+const SELF_DENIED =
+  'Kênh nhân viên chỉ mở lịch, công, lương, việc và văn bản của chính bạn. Việc quản lý cần đăng nhập ở máy của quán.'
+
 @Injectable()
 export class PermissionGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const action = this.reflector.getAllAndOverride<ActionKey>(REQUIRED_PERMISSION, [
-      context.getHandler(),
-      context.getClass(),
-    ])
-    if (!action) return true
-
+    const targets = [context.getHandler(), context.getClass()]
+    const action = this.reflector.getAllAndOverride<ActionKey>(REQUIRED_PERMISSION, targets)
     const req = context.switchToHttp().getRequest<RequestWithActor>()
-    if (!req.actor) throw new ForbiddenException('Chưa xác định được người thao tác')
 
     /**
      * Phiên Kênh nhân viên dừng ở đây với mọi thứ ngoài việc của chính mình.
@@ -44,10 +54,19 @@ export class PermissionGuard implements CanActivate {
      * thì mở được tới đâu. Trộn hai câu đó vào nhau là phải thêm một cột vào bảng
      * §4.2 cho mỗi cách đăng nhập mới.
      */
-    if (req.actor.kind === 'staff' && req.actor.scope === 'self' && action !== SELF_SERVICE_ACTION) {
-      throw new ForbiddenException(
-        'Kênh nhân viên chỉ mở lịch, công và phiếu lương của chính bạn. Việc quản lý cần đăng nhập ở máy của quán.',
-      )
+    const selfSession = req.actor?.kind === 'staff' && req.actor.scope === 'self'
+
+    if (!action) {
+      if (selfSession && !this.reflector.getAllAndOverride<boolean>(SELF_OPEN, targets)) {
+        throw new ForbiddenException(SELF_DENIED)
+      }
+      return true
+    }
+
+    if (!req.actor) throw new ForbiddenException('Chưa xác định được người thao tác')
+
+    if (selfSession && action !== SELF_SERVICE_ACTION) {
+      throw new ForbiddenException(SELF_DENIED)
     }
 
     if (checkPermission(action, actorRoles(req.actor)) === 'deny') {
