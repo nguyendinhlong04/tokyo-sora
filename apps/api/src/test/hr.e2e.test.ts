@@ -693,6 +693,26 @@ describe('H7 — Kỳ lương, năm bước khoá nhau', () => {
     expect(line.netPayVnd).toBe(line.grossPayVnd - line.insuranceVnd - line.taxVnd - line.advanceVnd)
   })
 
+  it('tính nháp lại mà không gửi điều chỉnh thì thưởng, tạm ứng, ghi chú đã nhập giữ nguyên', async () => {
+    // Trước đây H7 bấm "Tính nháp" gửi danh sách rỗng là xoá sạch thưởng đã nhập
+    const res = await inject({
+      method: 'POST',
+      url: `/api/hr/payroll/periods/${periodId}/compute`,
+      headers: bearer(hrManager),
+      payload: {},
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+    const detail = await inject({
+      method: 'GET',
+      url: `/api/hr/payroll/periods/${periodId}`,
+      headers: bearer(hrManager),
+    })
+    const line = detail
+      .json()
+      .lines.find((l: { employeeId: number }) => l.employeeId === cookEmployeeId)
+    expect(line.bonusVnd).toBe(1_000_000)
+  })
+
   it('tính lại được khi còn ở bước nháp', async () => {
     const res = await inject({
       method: 'POST',
@@ -708,7 +728,8 @@ describe('H7 — Kỳ lương, năm bước khoá nhau', () => {
       headers: bearer(hrManager),
     })
     const line = detail.json().lines[0]
-    expect(line.bonusVnd).toBe(0) // thưởng lần trước đã bị dựng lại
+    // Có dòng điều chỉnh cho người này thì dòng đó là toàn bộ điều chỉnh: thưởng bỏ trống = 0
+    expect(line.bonusVnd).toBe(0)
     expect(line.advanceVnd).toBe(500_000)
   })
 
