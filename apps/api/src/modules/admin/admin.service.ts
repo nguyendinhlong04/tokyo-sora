@@ -14,7 +14,7 @@ import {
   tableSessions,
   tables,
 } from '../../db/schema'
-import { assertInvoiceSerial } from '../accounting/domain/accounting'
+import { assertInvoiceSerial } from '../einvoice/domain/serial'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 

@@ -1,10 +1,10 @@
 /**
- * Kế toán — phần tính toán của F2 · F3 · F4 · F6.
+ * Kế toán — phần tính toán của F2 · F4 · F6.
  *
- * Hàm thuần: kiểm ký hiệu hoá đơn, gộp doanh thu theo thuế suất, và quyết định
- * một tháng đã khoá sổ hay chưa. Ba việc nhỏ nhưng cả ba đều là chỗ sai thì phát
- * hiện muộn — sai ký hiệu thì hoá đơn bị cơ quan thuế từ chối, sai thuế suất thì
- * tờ khai sai, sai khoá sổ thì kỳ đã chốt bị sửa sau lưng.
+ * Hàm thuần: gộp doanh thu theo thuế suất, và quyết định một tháng đã khoá sổ hay
+ * chưa. Việc nhỏ nhưng là chỗ sai thì phát hiện muộn — sai thuế suất thì tờ khai
+ * sai, sai khoá sổ thì kỳ đã chốt bị sửa sau lưng. Ký hiệu và số hoá đơn nằm ở
+ * `einvoice/domain/serial.ts`.
  */
 
 /** Tháng dạng YYYY-MM-01 */
@@ -30,39 +30,6 @@ export function monthsInRange(from: string, to: string): string[] {
     cursor = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10)
   }
   return out
-}
-
-/**
- * Ký hiệu hoá đơn điện tử: 6 ký tự, chữ in hoa và số, BẮT BUỘC có chữ M.
- *
- * Chữ M là dấu của hoá đơn khởi tạo từ máy tính tiền (§30.2, NĐ 254/2026/NĐ-CP).
- * Kiểm ở đây để lỗi lộ ra lúc khai cấu hình, không phải lúc cơ quan thuế trả về.
- *
- * *Chi tiết pháp lý cần kế toán xác nhận lại* — bản dựng này chỉ cưỡng chế đúng
- * hai điều tài liệu nêu: sáu ký tự, và có chữ M.
- */
-const SERIAL_RE = /^[0-9A-Z]{6}$/
-
-export function assertInvoiceSerial(serial: string): string {
-  const value = serial.trim().toUpperCase()
-  if (!SERIAL_RE.test(value)) {
-    throw new RangeError(`Ký hiệu hoá đơn phải là 6 ký tự chữ in hoa hoặc số, nhận "${serial}"`)
-  }
-  if (!value.includes('M')) {
-    throw new RangeError(
-      `Ký hiệu "${value}" thiếu chữ M — hoá đơn khởi tạo từ máy tính tiền bắt buộc có ký tự này`,
-    )
-  }
-  return value
-}
-
-/** Số hoá đơn tiếp theo trong một ký hiệu: 8 chữ số, đếm từ 1 */
-export function nextInvoiceNo(lastNo: string | null): string {
-  const next = lastNo === null ? 1 : Number(lastNo) + 1
-  if (!Number.isSafeInteger(next) || next <= 0) {
-    throw new RangeError(`Số hoá đơn cuối không hợp lệ: ${lastNo}`)
-  }
-  return String(next).padStart(8, '0')
 }
 
 export interface VatBucket {

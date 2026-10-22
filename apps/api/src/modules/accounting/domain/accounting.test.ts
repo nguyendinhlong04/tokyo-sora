@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  assertInvoiceSerial,
   firstOfMonth,
   lastOfMonth,
   monthsInRange,
-  nextInvoiceNo,
   reconcile,
   taxSummary,
   vatBuckets,
@@ -24,37 +22,6 @@ describe('lịch tháng', () => {
       '2026-12-01',
       '2027-01-01',
     ])
-  })
-})
-
-describe('ký hiệu hoá đơn điện tử', () => {
-  it('nhận ký hiệu 6 ký tự có chữ M', () => {
-    expect(assertInvoiceSerial('C26MAA')).toBe('C26MAA')
-    expect(assertInvoiceSerial('c26maa')).toBe('C26MAA')
-  })
-
-  it('thiếu chữ M bị chặn — đó là dấu của hoá đơn từ máy tính tiền', () => {
-    expect(() => assertInvoiceSerial('C26AAA')).toThrow(/chữ M/)
-  })
-
-  it('sai độ dài bị chặn', () => {
-    expect(() => assertInvoiceSerial('C26M')).toThrow()
-    expect(() => assertInvoiceSerial('C26MAAA')).toThrow()
-  })
-
-  it('ký tự lạ bị chặn', () => {
-    expect(() => assertInvoiceSerial('C26-MA')).toThrow()
-  })
-})
-
-describe('số hoá đơn', () => {
-  it('bắt đầu từ 1, đủ 8 chữ số', () => {
-    expect(nextInvoiceNo(null)).toBe('00000001')
-  })
-
-  it('tăng dần', () => {
-    expect(nextInvoiceNo('00000001')).toBe('00000002')
-    expect(nextInvoiceNo('00000999')).toBe('00001000')
   })
 })
 

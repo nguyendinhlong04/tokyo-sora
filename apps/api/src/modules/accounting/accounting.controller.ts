@@ -9,7 +9,9 @@ import {
   Query,
   Req,
 } from '@nestjs/common'
+import { InvoiceBuyerSchema } from '@sora/contracts'
 import { z } from 'zod'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { AccountingService } from './accounting.service'
@@ -24,9 +26,16 @@ const Approval = z
   })
   .nullish()
 
+/** Huỷ chỉ còn cho hoá đơn chưa lên cơ quan thuế — đã phát hành thì `replace` */
 const VoidBody = z.object({
   reason: z.string().min(1).max(300),
-  replace: z.boolean().default(false),
+  approval: Approval,
+})
+
+const ReplaceBody = z.object({
+  reason: z.string().min(1).max(300),
+  /** Có mặt thì ghi đè người mua của đơn; null = "Bán cho người tiêu dùng" */
+  buyer: InvoiceBuyerSchema.nullable().optional(),
   approval: Approval,
 })
 
@@ -49,7 +58,10 @@ const LockBody = z.object({
  */
 @Controller('api/accounting')
 export class AccountingController {
-  constructor(private readonly accounting: AccountingService) {}
+  constructor(
+    private readonly accounting: AccountingService,
+    private readonly einvoice: EinvoiceService,
+  ) {}
 
   // ------------------------------------------------------------- F2
 
@@ -78,7 +90,7 @@ export class AccountingController {
   @Post('invoices/issue/:orderId')
   @RequirePermission('accounting.ledger-close-period')
   issue(@Param('orderId', ParseIntPipe) orderId: number, @Req() req: RequestWithActor) {
-    return this.accounting.issue(orderId, req.actor!)
+    return this.einvoice.issueForOrder(orderId, req.actor!)
   }
 
   @Post('invoices/:id/void')
@@ -88,8 +100,19 @@ export class AccountingController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    const { approval, ...input } = VoidBody.parse(body)
-    return this.accounting.voidInvoice(id, input, req.actor!, approval)
+    const { reason, approval } = VoidBody.parse(body)
+    return this.einvoice.voidUnissued(id, reason, req.actor!, approval)
+  }
+
+  @Post('invoices/:id/replace')
+  @RequirePermission('einvoice.void-replace-adjust')
+  replace(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    const { approval, ...input } = ReplaceBody.parse(body)
+    return this.einvoice.replace(id, input, req.actor!, approval)
   }
 
   // ------------------------------------------------------------- F4

@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, ne, sql, type SQLWrapper } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, lte, ne, sql, type SQLWrapper } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
@@ -27,17 +27,9 @@ import {
 } from '../../db/schema'
 import { CorporateService } from '../crm/corporate.service'
 import type { Actor } from '../identity/actor'
-import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
-import {
-  assertInvoiceSerial,
-  firstOfMonth,
-  lastOfMonth,
-  nextInvoiceNo,
-  reconcile,
-  taxSummary,
-  vatBuckets,
-} from './domain/accounting'
+import { assertInvoiceSerial } from '../einvoice/domain/serial'
+import { firstOfMonth, lastOfMonth, reconcile, taxSummary, vatBuckets } from './domain/accounting'
 
 /** Cùng lý do với `reports.service.ts`: tổng tiền cả kỳ vượt tầm int4 */
 const money = (expr: SQLWrapper) => sql<number>`coalesce(sum(${expr}), 0)::float8`
@@ -58,7 +50,6 @@ export class AccountingService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly params: ParamsService,
-    private readonly approvals: ApprovalService,
     private readonly audit: AuditService,
     private readonly corporate: CorporateService,
   ) {}
@@ -213,181 +204,7 @@ export class AccountingService {
   }
 
   /**
-   * Phát hành hoá đơn cho một đơn.
-   *
-   * Số hoá đơn cấp trong TRANSACTION và khoá theo ký hiệu: hai máy tính tiền cùng
-   * bấm in một lúc mà cấp trùng số là một lỗi không sửa được sau khi đã lên cơ
-   * quan thuế.
-   */
-  async issue(orderId: number, actor: Actor) {
-    return this.db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
-      if (!order) throw new NotFoundException('Không có đơn này')
-      if (order.status === 'cancelled') {
-        throw new BadRequestException('Đơn đã huỷ — không phát hành hoá đơn')
-      }
-
-      const [existing] = await tx
-        .select()
-        .from(invoices)
-        .where(
-          and(
-            eq(invoices.orderId, orderId),
-            inArray(invoices.state, ['pending', 'issued', 'failed']),
-          ),
-        )
-      if (existing?.state === 'issued') {
-        throw new ConflictException('Đơn này đã có hoá đơn — phát hành hai lần là sai phạm thuế')
-      }
-
-      const serial = await this.serialOf(order.branchId)
-      if (!serial) {
-        throw new ConflictException({
-          code: 'no_serial',
-          message:
-            'Chi nhánh chưa khai ký hiệu hoá đơn — đặt tham số `einvoice.serial` ở Trung tâm tham số A6',
-        })
-      }
-
-      const result = await this.callProvider(order.displayCode)
-
-      // Cấp số trong cùng transaction, khoá theo ký hiệu để không cấp trùng
-      const [last] = await tx
-        .select({ no: invoices.invoiceNo })
-        .from(invoices)
-        .where(and(eq(invoices.serial, serial), isNotNull(invoices.invoiceNo)))
-        .orderBy(desc(invoices.invoiceNo))
-        .limit(1)
-        .for('update')
-
-      const base = {
-        branchId: order.branchId,
-        orderId,
-        serial,
-        amountSub: order.moneySub,
-        amountVat: order.moneyVat,
-        amountTotal: order.moneyTotal,
-        businessDate: order.businessDate,
-        issuedBy: actor.kind === 'staff' ? actor.staffId : null,
-      }
-
-      const values = result.ok
-        ? {
-            ...base,
-            state: 'issued' as const,
-            invoiceNo: nextInvoiceNo(last?.no ?? null),
-            // Có số là phải có ngày lập (`invoices_numbered_check`)
-            invoiceDate: order.businessDate,
-            taxCode: result.taxCode,
-            issuedAt: new Date(),
-            lastError: null,
-          }
-        : { ...base, state: 'failed' as const, lastError: result.error }
-
-      const [row] = existing
-        ? await tx.update(invoices).set(values).where(eq(invoices.id, existing.id)).returning()
-        : await tx.insert(invoices).values(values).returning()
-
-      await this.audit.write(tx, {
-        actor,
-        action: result.ok ? 'einvoice.issued' : 'einvoice.failed',
-        entity: 'invoice',
-        entityId: String(row!.id),
-        payload: { orderCode: order.displayCode, serial, invoiceNo: row!.invoiceNo },
-      })
-
-      return row!
-    })
-  }
-
-  /**
-   * Huỷ hoặc thay thế hoá đơn — dòng `einvoice.void-replace-adjust` của §4.2.
-   *
-   * Bản gốc KHÔNG bị xoá, chỉ đổi trạng thái và giữ nguyên số đã cấp: hoá đơn đã
-   * lên cơ quan thuế thì số đó tồn tại vĩnh viễn dù nội dung sai.
-   */
-  async voidInvoice(
-    id: number,
-    input: { reason: string; replace: boolean },
-    actor: Actor,
-    approval?: ApprovalInput | null,
-  ) {
-    if (!input.reason?.trim()) throw new BadRequestException('Huỷ hoá đơn bắt buộc ghi lý do')
-
-    return this.db.transaction(async (tx) => {
-      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, id))
-      if (!invoice) throw new NotFoundException('Không có hoá đơn này')
-      if (invoice.state === 'voided' || invoice.state === 'replaced') {
-        throw new ConflictException(`Hoá đơn đã ở trạng thái "${invoice.state}"`)
-      }
-
-      const outcome = await this.approvals.authorize(tx, {
-        actor,
-        action: 'einvoice.void-replace-adjust',
-        entity: 'invoice',
-        entityId: String(id),
-        approval,
-      })
-
-      await tx
-        .update(invoices)
-        .set({
-          state: input.replace ? 'replaced' : 'voided',
-          voidReason: input.reason.trim(),
-          // Ràng buộc CSDL đòi bản ghi duyệt khi huỷ; thay thế thì bản mới mang dấu vết
-          approvalId: outcome.approvalId,
-        })
-        .where(eq(invoices.id, id))
-
-      let replacement = null
-      if (input.replace) {
-        const [order] = await tx.select().from(orders).where(eq(orders.id, invoice.orderId))
-        const [row] = await tx
-          .insert(invoices)
-          .values({
-            branchId: invoice.branchId,
-            orderId: invoice.orderId,
-            serial: invoice.serial,
-            amountSub: order!.moneySub,
-            amountVat: order!.moneyVat,
-            amountTotal: order!.moneyTotal,
-            businessDate: invoice.businessDate,
-            state: 'pending',
-            replacesId: invoice.id,
-            issuedBy: actor.kind === 'staff' ? actor.staffId : null,
-          })
-          .returning()
-        replacement = row!
-      }
-
-      await this.audit.write(tx, {
-        actor,
-        action: input.replace ? 'einvoice.replaced' : 'einvoice.voided',
-        entity: 'invoice',
-        entityId: String(id),
-        payload: { reason: input.reason.trim(), approvalId: outcome.approvalId },
-      })
-
-      return { voided: id, replacement }
-    })
-  }
-
-  /**
-   * Lượt gọi ra nhà cung cấp hoá đơn điện tử.
-   *
-   * CHƯA ĐẤU NỐI. Đây là chỗ duy nhất giả lập trong cả luồng F3, và nó cố tình
-   * nằm riêng một hàm để khi có hợp đồng thật thì thay đúng chỗ này — mọi thứ
-   * khác (cấp số, hàng đợi lỗi, huỷ/thay thế có duyệt) đều đã là thật.
-   */
-  private async callProvider(
-    displayCode: string,
-  ): Promise<{ ok: true; taxCode: string } | { ok: false; error: string }> {
-    return { ok: true, taxCode: `MCQT-${displayCode}` }
-  }
-
-  /**
-   * Ký hiệu của chi nhánh, lấy từ Trung tâm tham số A6 (A9 là cửa vào theo ngữ
-   * cảnh — chưa dựng).
+   * Ký hiệu khai ở A9 của chi nhánh — F3 hiện nó ở đầu sổ.
    *
    * Ký hiệu sai chuẩn là LỖI CẤU HÌNH, không phải lỗi máy chủ: người sửa được nó
    * là kế toán, và họ chỉ sửa được nếu thông báo nói ra sai ở đâu.
@@ -400,7 +217,7 @@ export class AccountingService {
     } catch (err) {
       throw new ConflictException({
         code: 'bad_serial',
-        message: `Ký hiệu hoá đơn khai ở A6 không hợp lệ: ${(err as Error).message}`,
+        message: `Ký hiệu hoá đơn khai ở A9 không hợp lệ: ${(err as Error).message}`,
       })
     }
   }

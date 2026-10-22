@@ -3,7 +3,7 @@
  *
  * Hai thứ phải chứng minh:
  *   1. **Hoá đơn điện tử là sổ có luật**: một đơn một hoá đơn, số cấp không trùng,
- *      huỷ phải có lý do và bản ghi duyệt, bản gốc không mất.
+ *      đã phát hành thì không huỷ mà lập hoá đơn thay thế có lý do, bản gốc không mất.
  *   2. **Khoá sổ có hệ quả thật**: sau khi khoá, BỐN miền khác nhau ngừng nhận
  *      sửa cho kỳ đó — và không có đường mở lại.
  */
@@ -11,14 +11,10 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { hash } from '@node-rs/argon2'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
-import {
-  expenseCategories,
-  orders,
-  parameters,
-  staff,
-  staffRoles,
-} from '../db/schema'
+import { expenseCategories, orderLines, orders, parameters, staff, staffRoles } from '../db/schema'
+import { EINVOICE_PROVIDER, type MockEinvoiceProvider } from '../modules/einvoice/einvoice-provider'
 import { bootTestApp, type Fixtures } from './harness'
 
 let app: NestFastifyApplication
@@ -55,6 +51,11 @@ async function officeLogin(email: string) {
   return res.json<{ token: string }>().token
 }
 
+/**
+ * Đơn đã trả đủ, ghi thẳng vào CSDL. Có một dòng món: hoá đơn ghi từng món nên
+ * đơn không có món thì không lập được hoá đơn. `vat_breakdown` để trống như đơn
+ * tính trước khi có VAT theo nhóm thuế — thuế suất suy từ tiền của đơn.
+ */
 async function makeOrder(code: string, businessDate: string, sub: number, vat: number) {
   const [row] = await db
     .insert(orders)
@@ -72,8 +73,21 @@ async function makeOrder(code: string, businessDate: string, sub: number, vat: n
       businessDate,
     })
     .returning({ id: orders.id })
+  await db.insert(orderLines).values({
+    orderId: row!.id,
+    dishId: 'bachibo',
+    dishCode: 'SORA-BO-001',
+    nameSnapshot: 'Ba chỉ bò',
+    qty: 1,
+    unitPrice: sub,
+    priceTotal: sub,
+    state: 'served',
+  })
   return row!.id
 }
+
+/** Ký hiệu khai ở A9 là mẫu; năm trong ký hiệu đi theo ngày lập hoá đơn (hôm nay) */
+const serialNow = () => `C${businessDateOf(new Date(), 'Asia/Ho_Chi_Minh').slice(2, 4)}MAA`
 
 beforeAll(async () => {
   const boot = await bootTestApp()
@@ -105,6 +119,11 @@ beforeAll(async () => {
 
   await db.insert(parameters).values([
     { key: 'einvoice.serial', branchId: null, value: 'C26MAA', unit: 'ký hiệu' },
+    // A9 khai đủ người bán và bật hoá đơn điện tử
+    { key: 'einvoice.enabled', branchId: null, value: true },
+    { key: 'einvoice.taxCode', branchId: null, value: '0101234567' },
+    { key: 'einvoice.sellerName', branchId: null, value: 'CÔNG TY TNHH TOKYO SORA' },
+    { key: 'einvoice.sellerAddress', branchId: null, value: '12 Trần Thái Tông, Cầu Giấy, Hà Nội' },
     { key: 'expense.pettyCashVnd', branchId: null, value: 2_000_000, unit: 'đồng' },
     { key: 'expense.ownerApprovalVnd', branchId: null, value: 20_000_000, unit: 'đồng' },
     { key: 'expense.assetThresholdVnd', branchId: null, value: 5_000_000, unit: 'đồng' },
@@ -151,10 +170,16 @@ describe('F3 — Sổ hoá đơn điện tử', () => {
 
     const body = res.json()
     expect(body.state).toBe('issued')
-    expect(body.serial).toBe('C26MAA')
+    expect(body.formNo).toBe('1')
+    expect(body.serial).toBe(serialNow())
     expect(body.invoiceNo).toBe('00000001')
-    expect(body.taxCode).toContain('PO-0615-0001')
-    expect(body.amountTotal).toBe(1_080_000)
+    expect(body.authorityCode).toContain(`${serialNow()}00000001`)
+    // Bản giả lập: hoá đơn thử, không lên cơ quan thuế thật
+    expect(body.test).toBe(true)
+    expect(body.document.orderCode).toBe('PO-0615-0001')
+    expect(body.document.buyer).toBeNull()
+    expect(body.document.lines).toHaveLength(1)
+    expect(body.document.amounts.total).toBe(1_080_000)
     invoiceId = body.id
   })
 
@@ -177,37 +202,62 @@ describe('F3 — Sổ hoá đơn điện tử', () => {
     expect(res.json().message).toContain('sai phạm thuế')
   })
 
-  it('huỷ hoá đơn bắt buộc ghi lý do', async () => {
+  it('thay thế bắt buộc ghi lý do', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: `/api/accounting/invoices/${invoiceId}/replace`,
+      headers: bearer(accountant),
+      payload: { reason: '' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('hoá đơn đã lên cơ quan thuế không huỷ được — sai thì lập hoá đơn thay thế', async () => {
     const res = await inject({
       method: 'POST',
       url: `/api/accounting/invoices/${invoiceId}/void`,
       headers: bearer(accountant),
-      payload: { reason: '', replace: false },
+      payload: { reason: 'Khách đổi thông tin xuất hoá đơn' },
     })
-    expect(res.statusCode).toBe(400)
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('invoice_issued')
   })
 
   it('quản lý ca chạm được hoá đơn nhưng PHẢI xin duyệt (dòng △ của §4.2)', async () => {
     const res = await inject({
       method: 'POST',
-      url: `/api/accounting/invoices/${invoiceId}/void`,
+      url: `/api/accounting/invoices/${invoiceId}/replace`,
       headers: bearer(shiftLead),
-      payload: { reason: 'Khách đổi thông tin xuất hoá đơn', replace: false },
+      payload: { reason: 'Khách đổi thông tin xuất hoá đơn' },
     })
     expect(res.statusCode).toBe(400)
     expect(res.json().code).toBe('requires_approval')
   })
 
   it('thay thế: bản cũ chuyển trạng thái và GIỮ NGUYÊN số đã cấp, bản mới trỏ về nó', async () => {
+    // Nhà cung cấp trả lỗi lần này: bản thay thế nằm lại hàng đợi cho F6 bên dưới
+    app.get<MockEinvoiceProvider>(EINVOICE_PROVIDER).failNext('provider_busy', 'Hệ thống thuế bận')
     const res = await inject({
       method: 'POST',
-      url: `/api/accounting/invoices/${invoiceId}/void`,
+      url: `/api/accounting/invoices/${invoiceId}/replace`,
       headers: bearer(accountant),
-      payload: { reason: 'Sai tên người mua', replace: true },
+      payload: {
+        reason: 'Sai tên người mua',
+        buyer: {
+          kind: 'company',
+          taxCode: '0101248141',
+          name: 'CÔNG TY CỔ PHẦN FPT',
+          address: '17 Duy Tân, Cầu Giấy, Hà Nội',
+        },
+      },
     })
     expect(res.statusCode, res.payload).toBe(201)
     expect(res.json().replacement.replacesId).toBe(invoiceId)
-    expect(res.json().replacement.state).toBe('pending')
+    expect(res.json().replacement.state).toBe('failed')
+    expect(res.json().replacement.lastError).toBe('Hệ thống thuế bận')
+    // Bản thay thế mang người mua mới; số được cấp ngay và giữ cho lượt thử sau
+    expect(res.json().replacement.document.buyer.name).toBe('CÔNG TY CỔ PHẦN FPT')
+    expect(res.json().replacement.invoiceNo).toBe('00000003')
 
     const list = await inject({
       method: 'GET',
@@ -257,7 +307,8 @@ describe('F3 — Sổ hoá đơn điện tử', () => {
       headers: bearer(accountant),
     })
     expect(retry.statusCode, retry.payload).toBe(201)
-    expect(retry.json().invoiceNo).toBe('00000003')
+    // 00000003 thuộc về bản thay thế ở trên — số đã cấp không ai lấy lại
+    expect(retry.json().invoiceNo).toBe('00000004')
   })
 })
 
@@ -604,12 +655,15 @@ describe('F6 — Khoá sổ và hệ quả của nó', () => {
       url: `/api/accounting/invoices?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
       headers: bearer(accountant),
     })
-    const pending = list.json().rows.find((r: { state: string }) => r.state === 'pending')
-    await inject({
+    const stuck = list.json().rows.find((r: { state: string }) => r.state === 'failed')
+    const reissued = await inject({
       method: 'POST',
-      url: `/api/accounting/invoices/issue/${pending.orderId}`,
+      url: `/api/accounting/invoices/issue/${stuck.orderId}`,
       headers: bearer(accountant),
     })
+    expect(reissued.statusCode, reissued.payload).toBe(201)
+    // Gửi lại giữ đúng số đã cấp ở lượt hỏng
+    expect(reissued.json()).toMatchObject({ state: 'issued', invoiceNo: '00000003' })
 
     const res = await inject({
       method: 'POST',

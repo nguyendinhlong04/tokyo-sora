@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { VatRateTotals } from './money.js'
 import { isPhone, normalizePhone, PHONE_ERROR } from './phone.js'
 
 /**
@@ -147,4 +148,104 @@ export const VAT_CODE_LABELS: Record<VatCode, string> = {
 export const VAT_RATE_PARAMS: Record<VatCode, string> = {
   standard: 'sales.vatRate',
   alcohol: 'sales.vatRateAlcohol',
+}
+
+// ============================================================== Hoá đơn
+
+export const INVOICE_STATES = ['pending', 'issued', 'failed', 'voided', 'replaced'] as const
+export type InvoiceState = (typeof INVOICE_STATES)[number]
+
+/** Một dòng trên hoá đơn GTGT */
+export interface InvoiceLine {
+  no: number
+  /** `item` = món, phí phục vụ, phí giao · `discount` = chiết khấu / khuyến mại của cả hoá đơn */
+  kind: 'item' | 'discount'
+  name: string
+  /** "phần", "suất"; null với dòng chiết khấu */
+  unit: string | null
+  qty: number
+  unitPrice: number
+  /** Giảm trên chính dòng này (khuyến mãi món) */
+  discount: number
+  /** Thành tiền chưa thuế = qty × unitPrice − discount; âm với dòng chiết khấu */
+  amount: number
+  /** Basis point; null = không tính VAT (phí giao — chờ kế toán xác nhận) */
+  vatRateBp: number | null
+  /** Tên chương trình khuyến mãi, ghi chú tặng… */
+  note: string | null
+}
+
+export interface InvoiceSeller {
+  /** Tên đúng giấy đăng ký doanh nghiệp */
+  name: string
+  taxCode: string
+  address: string
+  /** Địa điểm kinh doanh phát hành hoá đơn (chi nhánh) */
+  branchName: string
+  branchAddress: string | null
+}
+
+export interface InvoiceAmounts {
+  /** Tiền món giá niêm yết */
+  goods: number
+  discount: number
+  service: number
+  ship: number
+  vat: number
+  /** Chênh làm tròn của bill — KHÔNG nằm trong tổng hoá đơn */
+  round: number
+  /** Tổng thanh toán trên hoá đơn = tiền món − giảm + phí + VAT, chưa làm tròn */
+  total: number
+}
+
+/** Toàn bộ nội dung một hoá đơn — thứ gửi nhà cung cấp và thứ in ra */
+export interface InvoiceDocument {
+  orderCode: string
+  seller: InvoiceSeller
+  /** null = "Bán cho người tiêu dùng" */
+  buyer: InvoiceBuyer | null
+  lines: InvoiceLine[]
+  vatBreakdown: VatRateTotals[]
+  amounts: InvoiceAmounts
+  /** TM, CK, Thẻ, Công nợ — ghép bằng "/" khi bill trả nhiều cách */
+  paymentMethod: string
+}
+
+/** Hoá đơn như app đọc (POS P11, iPad T15, web theo dõi đơn, Office F3) */
+export interface InvoiceView {
+  id: number
+  orderId: number
+  state: InvoiceState
+  /** Phát hành bằng bản giả lập — in "HOÁ ĐƠN THỬ", không có giá trị */
+  test: boolean
+  formNo: string
+  serial: string
+  invoiceNo: string | null
+  invoiceDate: string | null
+  issuedAt: string | null
+  /** Mã cơ quan thuế */
+  authorityCode: string | null
+  lookupCode: string | null
+  lookupUrl: string | null
+  replacesId: number | null
+  /** Vì sao chưa phát hành được — thu ngân, kế toán đọc; màn khách không hiện */
+  lastError: string | null
+  /** null khi chưa dựng được nội dung (cấu hình thiếu, đơn rỗng) */
+  document: InvoiceDocument | null
+}
+
+/** Trạng thái hoá đơn của một đơn — một lần hỏi cho cả người mua lẫn hoá đơn */
+export interface InvoiceStatus {
+  /** Chi nhánh đã bật hoá đơn điện tử */
+  enabled: boolean
+  /** Còn sửa được người mua (chưa có hoá đơn phát hành) */
+  editable: boolean
+  buyer: InvoiceBuyer | null
+  invoice: InvoiceView | null
+}
+
+/** "1C26MAA · 00000123" — chưa cấp số thì chỉ ký hiệu */
+export function invoiceNumberLabel(view: Pick<InvoiceView, 'formNo' | 'serial' | 'invoiceNo'>) {
+  const head = `${view.formNo}${view.serial}`
+  return view.invoiceNo ? `${head} · ${view.invoiceNo}` : head
 }

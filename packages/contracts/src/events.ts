@@ -16,6 +16,8 @@ export const WS_TOPICS = {
   configPublished: 'config.published',
   availabilityChanged: 'availability.changed',
   paymentReceived: 'payment.received',
+  /** Hoá đơn điện tử đổi trạng thái — POS P11, iPad T15, web theo dõi đơn hỏi lại */
+  invoiceUpdated: 'invoice.updated',
   printJob: 'print.job',
 } as const
 export type WsTopic = (typeof WS_TOPICS)[keyof typeof WS_TOPICS]

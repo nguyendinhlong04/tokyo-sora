@@ -410,7 +410,8 @@ migration `0031` xoá bảng `table_devices` và cột `qr_token_hash`.
 ### 5.7 Biến môi trường (tên, không giá trị)
 API: `DATABASE_URL`, `DATABASE_MIGRATION_URL`, `TEST_DATABASE_URL`, `SUPABASE_JWT_SECRET`,
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `BANK_WEBHOOK_SECRET` (bắt buộc production),
-`PAYMENT_PROVIDER` (`mock`), `CORS_ORIGINS`, `PORT`, `NODE_ENV`, `LIVE_SCENARIO`.
+`PAYMENT_PROVIDER` (`mock`), `EINVOICE_PROVIDER` (`mock` ở dev; production mặc định `off`),
+`EINVOICE_TIMEOUT_MS`, `CORS_ORIGINS`, `PORT`, `NODE_ENV`, `LIVE_SCENARIO`.
 Front-end: `VITE_STAFF_ORIGIN` (Office cấp link), `SORA_API_URL` (Next gọi API phía
 server). Không commit `.env`, không in secret
 ra log hay chat.
