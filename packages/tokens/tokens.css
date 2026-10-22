@@ -48,6 +48,11 @@
   --sora-washi-200: #efebe1;
   --sora-gold-light: #8a6c24;
 
+  /* ---- Giấy in nhiệt 80mm (bill, hoá đơn) — không theo chủ đề tối của app ----
+     Đầu in nhiệt chỉ có đen hoặc trắng: mực đen tuyền, xám nào cũng thành chấm rỗ. */
+  --sora-print-paper: #ffffff;
+  --sora-print-ink: #000000;
+
   /* ---- Trạng thái ---- */
   --sora-ok: #4a8f63;
   /* Nền đặc cho nút "duyệt": --sora-ok quá sáng để đặt chữ kem lên (3.4:1) */

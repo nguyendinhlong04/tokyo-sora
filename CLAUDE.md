@@ -222,7 +222,9 @@ mất mạng = dải báo + hàng đợi cục bộ, màn thanh toán bị chặ
 mãi §9.6, entry riêng `@sora/ui/PromoTag`; web khai `@source` đúng file đó trong
 `globals.css` vì web không quét cả gói) · `OptimizedImage`/`optimizedSrc` (entry
 `@sora/ui/image`: ảnh Office cho app Vite qua bộ tối ưu của web, bị từ chối thì rơi về ảnh
-gốc — §8.1).
+gốc — §8.1) · `useInvoiceBuyerForm`/`InvoiceBuyerFields` (entry `@sora/ui/InvoiceBuyer`:
+người mua trên hoá đơn + tra MST, kiểm bằng chính `InvoiceBuyerSchema`; cỡ `sm` Office,
+`md` POS/iPad/web — §9.7).
 
 Quy tắc: mọi `<button>` có `type="button"`; variant là `Record<Union,string>` UPPER_CASE;
 không responsive prefix trong gói; app Vite **phải** có `@source '../../../packages/ui/src'`
@@ -402,7 +404,7 @@ migration `0031` xoá bảng `table_devices` và cột `qr_token_hash`.
   `idempotency_key_reused`). Chỉ đơn và trạng thái; **không** cache kết quả đọc.
   `QueryClient` phải đặt `mutations.networkMode: 'always'`: mặc định `'online'` của
   TanStack **hoãn** lệnh ghi khi trình duyệt báo mất mạng — `mutationFn` không chạy, lệnh
-  không vào outbox, reload lúc đó là mất. Đã đặt ở table (22/10/2026); POS và KDS chưa.
+  không vào outbox, reload lúc đó là mất. Đã đặt ở table và POS (22/10/2026); KDS chưa.
 - **PWA:** chỉ `pos` và `kitchen` (`vite-plugin-pwa`, `registerType:'prompt'`, fullscreen
   landscape; precache js/css/html/woff2/png/svg; `/api` không cache trừ KDS `NetworkFirst`
   `/api/recipes`). POS cập nhật khi thu ngân bấm; KDS tự cập nhật khi hàng vé rỗng.
@@ -806,12 +808,20 @@ chỉ ghi khi khách yêu cầu, không thì "Bán cho người tiêu dùng". Mo
   huỷ), chi tiết `GET accounting/invoices/:id`. F6 chặn khoá khi còn tờ chưa lên hay bill
   chưa có tờ. F4: VAT đầu ra theo tờ `issued` (ngày lập) + bill đã trả chưa có tờ
   (`uninvoicedBuckets`, theo ngày kinh doanh).
+- **POS** (`apps/pos/src/components/pay/*`, `routes/Pay.tsx`): P10 hai cột (container query
+  880px) — bảng kê VAT từng thuế suất · khối người mua ĐẶT TRÊN hình thức trả · tiền mặt,
+  thẻ (`pay/card`, qua outbox), chuyển khoản VietQR (hỏi trạng thái 3 s), ghi nợ công ty
+  (`crm/corporate/pick`, PIN quản lý ca qua `components/ApprovalFields.tsx`); P11 trạng
+  thái hoá đơn, phát hành lại, sửa người mua / lập hoá đơn thay thế có PIN. In 80 mm
+  (`components/print/Receipt.tsx`): dựng ngoài cây React, đo chiều dài thật rồi đặt `@page`,
+  token `--sora-print-paper/ink`; tờ chưa phát hành in "Phiếu thanh toán — chưa phải hoá
+  đơn". Trạm thu ngân hỏi `invoices/pending` mỗi 30 s (vừa đếm vừa đẩy gửi lại).
 - **Nhà cung cấp:** `einvoice-provider.ts`, `EINVOICE_PROVIDER` (`mock` ở dev và test · `off`
   mặc định ở production — A9 không cho bật). Bản giả lập trả `test: true` → bill và màn
   khách in "HOÁ ĐƠN THỬ". Chưa ký hợp đồng: adapter thật thêm ở file này, thông tin đăng
   nhập để trong env, không trong `parameters`.
 - **Chưa làm / biết trước:**
-  - Giao diện: POS P10/P11 + in 80 mm, iPad T10/T11/T15, web O5/O6/theo dõi đơn, Office
+  - Giao diện còn lại: iPad T10/T11/T15, web O5/O6/theo dõi đơn, Office
     F3/B15/A9/M2/A6/F4 — mỗi app một PR. Office B15 còn ô chọn chế độ hoá đơn (vô tác dụng).
   - Hoá đơn điều chỉnh, hoàn tiền sau khi xuất, thông báo sai sót 04/SS; người mua nước ngoài
     (hộ chiếu); một bill nhiều người mua (tách ở P9 trước khi trả).
@@ -854,7 +864,7 @@ chỉ ghi khi khách yêu cầu, không thì "Bán cho người tiêu dùng". Mo
 ## 11. Lỗi đã biết và nợ kỹ thuật (xác nhận 21/10/2026 — sửa khi chạm vào, đừng tìm lại)
 
 Ưu tiên cao:
-1. **Nền mờ trong suốt:** `bg-black/70` (`packages/ui/src/Modal.tsx:27`), `bg-black/60`
+1. **Nền mờ trong suốt:** `bg-black/60`
    (`apps/pos/src/routes/OrderDrawer.tsx:91`), `bg-black/50` (`apps/office/src/routes/Sets.tsx:275`),
    `bg-surface-0` (POS `DispatchRail.tsx`, `Reconcile.tsx`, `ShiftClose.tsx`),
    `border-accent-line`, `border-warn-line` — class không tồn tại → dùng `bg-canvas/70`,

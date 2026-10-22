@@ -175,4 +175,12 @@ Không phải cài lại gì. Khi có bản mới:
 Máy in nhiệt 80mm nối LAN. Máy chủ đặt trên cloud không với tới máy in trong quán
 được, nên cần một tiến trình cầu nối chạy trên máy thu ngân
 (`packages/print-bridge`, ghép như một thiết bị loại `bridge`). Chưa dựng ở giai
-đoạn này — tạm thời in hoá đơn bằng chức năng in của trình duyệt.
+đoạn này — bill và hoá đơn in bằng hộp in của trình duyệt:
+
+- Cài driver máy in nhiệt trên máy thu ngân, đặt làm **máy in mặc định**, khổ giấy
+  80 mm. POS tự đặt chiều dài trang đúng bằng tờ bill (không thừa giấy trắng).
+- Thêm `--kiosk-printing` vào lối tắt Edge ở trên để in thẳng, không hiện hộp in:
+  `msedge.exe --kiosk https://pos.tokyo-sora.vn --edge-kiosk-type=fullscreen --kiosk-printing --no-first-run`
+- Bài kiểm: thu một bill thử → **In bill kèm QR tra cứu** → tờ in ra một trang, chữ
+  đen rõ, QR quét được bằng điện thoại (bản giả lập dẫn tới tên miền `.invalid` —
+  không mở được là đúng).

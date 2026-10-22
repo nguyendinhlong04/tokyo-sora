@@ -1,17 +1,24 @@
-import { Button, Card, Money, SectionLabel, useToast } from '@sora/ui'
+import { Button, Card, ErrorState, Money, Skeleton, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
-import { api, type PromoQuote } from '../api'
-
-/** Mệnh giá hay dùng — bấm nhanh thay vì gõ số */
-const QUICK_CASH = [50_000, 100_000, 200_000, 500_000]
+import { api } from '../api'
+import { BillStatement } from '../components/pay/BillStatement'
+import { BuyerCard } from '../components/pay/BuyerCard'
+import { InvoicePanel } from '../components/pay/InvoicePanel'
+import { PaymentPanel } from '../components/pay/PaymentPanel'
+import { PromoCard } from '../components/pay/PromoCard'
+import { printReceipt } from '../components/print/Receipt'
 
 /**
- * P10 Tính tiền · P11 Hoàn tất.
+ * P10 Tính tiền · P11 Hoàn tất & in.
+ *
+ * Hai cột khi đủ chỗ (máy 1280, iPad ngang): bảng kê bên trái, cột việc 420px bên
+ * phải; hẹp hơn (bật dải thu ngân, iPad dọc) thì xếp một cột — container query, vì
+ * độ rộng phụ thuộc dải P16 chứ không chỉ màn hình.
  *
  * Trả đủ thì bàn chuyển "đã thanh toán, chờ dọn" chứ KHÔNG tự đóng — nhân viên dọn
- * xong mới đóng (§20). Nút đóng bàn vì thế nằm riêng, xuất hiện sau khi trả đủ.
+ * xong mới đóng (§20). Cột phải lúc đó thành P11: hoá đơn điện tử, in bill, đóng bàn.
  */
 export function Pay() {
   const { sessionId } = useParams()
@@ -21,29 +28,18 @@ export function Pay() {
   const navigate = useNavigate()
   const toast = useToast()
   const queryClient = useQueryClient()
-
-  const [tendered, setTendered] = useState(0)
   const [change, setChange] = useState<number | null>(null)
 
   const bill = useQuery({ queryKey: ['bill', id], queryFn: () => api.bill(id) })
-
-  const pay = useMutation({
-    mutationFn: (amount: number) => api.payCash(id, amount, tendered || null, tableCode),
-    onSuccess: (result) => {
-      if (!result) {
-        toast('Đang chờ mạng — khoản thu sẽ gửi khi nối lại', 'warn')
-        return
-      }
-      setChange(result.change)
-      setTendered(0)
-      toast(
-        result.paymentState === 'paid' ? 'Đã thu đủ' : `Còn lại ${result.outstanding.toLocaleString('vi-VN')}₫`,
-        'ok',
-      )
-      void queryClient.invalidateQueries({ queryKey: ['bill', id] })
-      void queryClient.invalidateQueries({ queryKey: ['tables'] })
+  const order = useQuery({ queryKey: ['order', id], queryFn: () => api.sessionOrder(id) })
+  const invoice = useQuery({
+    queryKey: ['invoice', id],
+    queryFn: () => api.sessionInvoice(id),
+    // Hoá đơn đang chờ thì hỏi dày: mỗi lượt hỏi cũng là lượt đẩy phát hành (§9.7)
+    refetchInterval: (q) => {
+      const state = q.state.data?.invoice?.state
+      return state === 'pending' ? 4_000 : state === 'failed' ? 20_000 : false
     },
-    onError: (err: Error) => toast(err.message, 'danger'),
   })
 
   const close = useMutation({
@@ -55,6 +51,23 @@ export function Pay() {
     },
     onError: (err: Error) => toast(err.message, 'danger'),
   })
+
+  const onCollected = useCallback((amount: number) => setChange(amount), [])
+
+  if (bill.isError) {
+    return (
+      <div className="mx-auto max-w-xl p-6">
+        <ErrorState
+          message="Không lấy được bảng kê từ máy chủ. Số tiền hiện tại có thể chưa gồm đợt cuối — thử lại trước khi thu tiền."
+          action={
+            <Button variant="primary" onClick={() => void bill.refetch()}>
+              Thử lại
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
 
   const outstanding = bill.data?.outstanding ?? 0
   /**
@@ -79,254 +92,116 @@ export function Pay() {
    */
   const preset = Math.min(Math.max(Number(searchParams.get('thu') ?? 0) || 0, 0), outstanding)
 
-  return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 p-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-[length:var(--fs-t1)] font-semibold text-ink-hi">
-          Tính tiền · Bàn {tableCode}
-        </h1>
-        <Button variant="ghost" onClick={() => void navigate(`/table/${id}?code=${tableCode}`)}>
-          Về đơn
-        </Button>
-      </header>
-
-      <Card className="flex flex-col gap-3 p-5">
-        <Row label="Tổng đơn" value={bill.data?.total ?? 0} strong />
-        <Row label="Đã thu" value={bill.data?.paid ?? 0} />
-        <div className="h-px bg-line-1" />
-        <Row label="Còn phải trả" value={outstanding} strong />
-      </Card>
-
-      {bill.data?.orderId !== undefined && !settled ? (
-        <PromoCard
-          orderId={bill.data.orderId}
-          locked={bill.data.paid > 0}
-          onChanged={() => void queryClient.invalidateQueries({ queryKey: ['bill', id] })}
-        />
-      ) : null}
-
-      {change !== null && change > 0 ? (
-        <Card className="border-ok p-5">
-          <div className="flex items-baseline justify-between">
-            <span className="text-[length:var(--fs-b1)] text-ink-body">Tiền thối khách</span>
-            <Money amount={change} className="text-[length:var(--fs-d3)] text-ok" />
-          </div>
-        </Card>
-      ) : null}
-
-      {!settled ? (
-        <Card className="flex flex-col gap-4 p-5">
-          <SectionLabel>Tiền mặt</SectionLabel>
-          <div className="flex items-baseline justify-between">
-            <span className="text-ink-mute">Khách đưa</span>
-            <Money amount={tendered} className="text-[length:var(--fs-t1)] text-ink-hi" />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_CASH.map((amount) => (
-              <Button key={amount} onClick={() => setTendered((t) => t + amount)}>
-                +{amount.toLocaleString('vi-VN')}
-              </Button>
-            ))}
-            <Button variant="ghost" onClick={() => setTendered(0)}>
-              Xoá
-            </Button>
-          </div>
-          {preset > 0 && preset < outstanding ? (
-            <Button
-              variant="primary"
-              size="lg"
-              block
-              disabled={pay.isPending}
-              onClick={() => pay.mutate(preset)}
-            >
-              Thu phần này · <Money amount={preset} />
-            </Button>
-          ) : null}
-          <Button
-            variant={preset > 0 && preset < outstanding ? 'secondary' : 'primary'}
-            size="lg"
-            block
-            disabled={outstanding === 0 || pay.isPending}
-            onClick={() => pay.mutate(outstanding)}
-          >
-            Thu đủ · <Money amount={outstanding} />
-          </Button>
-        </Card>
-      ) : (
-        <Card className={`flex flex-col gap-4 p-5 ${nothingOrdered ? 'border-line-3' : 'border-ok'}`}>
-          <p
-            className={`text-[length:var(--fs-b1)] ${nothingOrdered ? 'text-ink-body' : 'text-ok'}`}
-          >
-            {nothingOrdered
-              ? 'Bàn này chưa gọi món nào. Đóng lại để trả bàn về trống.'
-              : 'Đã thu đủ. Bàn đang ở trạng thái “chờ dọn” — dọn xong thì đóng bàn.'}
-          </p>
-          <Button variant="primary" size="lg" block disabled={close.isPending} onClick={() => close.mutate()}>
-            Đóng bàn {tableCode}
-          </Button>
-        </Card>
-      )}
-    </div>
-  )
-}
-
-/**
- * Khuyến mãi & voucher (§9.6).
- *
- * Chương trình tự áp đã nằm sẵn trong tiền đơn — khối này cho thu ngân THẤY đơn
- * đang được giảm gì, và là chỗ gắn mã voucher khách đưa. "Kiểm mã" chỉ đọc: thu
- * ngân nói được với khách mã giảm bao nhiêu TRƯỚC khi trừ lượt của mã, và thấy
- * ngay khi chương trình đang áp đã lợi hơn mã — gắn vào chỉ tốn một lượt.
- */
-function PromoCard({
-  orderId,
-  locked,
-  onChanged,
-}: {
-  orderId: number
-  /** Đã có tiền vào đơn — máy chủ không cho đổi mã nữa (`payment_started`) */
-  locked: boolean
-  onChanged: () => void
-}) {
-  const toast = useToast()
-  const queryClient = useQueryClient()
-  const [code, setCode] = useState('')
-  const [tried, setTried] = useState<PromoQuote | null>(null)
-
-  const quote = useQuery({
-    queryKey: ['promo-quote', orderId],
-    queryFn: () => api.promoQuote(orderId),
-  })
-  const refresh = () => {
-    setTried(null)
-    void queryClient.invalidateQueries({ queryKey: ['promo-quote', orderId] })
-    onChanged()
+  const print = (provisional: boolean) => {
+    if (!bill.data) return
+    printReceipt({
+      tableCode,
+      order: order.data?.order ?? null,
+      lines: order.data?.lines ?? [],
+      bill: bill.data,
+      invoice: provisional ? null : (invoice.data?.invoice ?? null),
+      provisional,
+    })
   }
 
-  const check = useMutation({
-    mutationFn: () => api.promoQuote(orderId, code.trim()),
-    onSuccess: setTried,
-    onError: (err: Error) => toast(err.message, 'danger'),
-  })
-  const apply = useMutation({
-    mutationFn: () => api.applyVoucher(orderId, code.trim()),
-    onSuccess: () => {
-      toast(`Đã áp mã ${code.trim().toUpperCase()}`, 'ok')
-      setCode('')
-      refresh()
-    },
-    onError: (err: Error) => toast(err.message, 'danger'),
-  })
-  const remove = useMutation({
-    mutationFn: () => api.removeVoucher(orderId),
-    onSuccess: () => {
-      toast('Đã bỏ mã — lượt dùng trả lại cho mã', 'ok')
-      refresh()
-    },
-    onError: (err: Error) => toast(err.message, 'danger'),
-  })
-
-  const now = quote.data
-  // Mã hợp lệ mà chương trình thắng vẫn là cái đang áp → gắn mã không đổi đồng nào
-  const noGain =
-    tried?.voucher?.accepted === true && tried.bill?.promotionId === now?.bill?.promotionId
-
   return (
-    <Card className="flex flex-col gap-3 p-5">
-      <SectionLabel>Khuyến mãi & voucher</SectionLabel>
-
-      {now && now.lineDiscountVnd > 0 ? (
-        <Row label="Khuyến mãi món · đã trừ trong giá món" value={-now.lineDiscountVnd} />
-      ) : null}
-      {now?.bill ? <Row label={now.bill.name} value={-now.bill.discountVnd} /> : null}
-      {now && now.lineDiscountVnd === 0 && !now.bill ? (
-        <p className="text-[length:var(--fs-b2)] text-ink-mute">Đơn chưa được giảm gì.</p>
-      ) : null}
-      {now?.hint ? (
-        <p className="text-[length:var(--fs-b2)] text-ink-body">
-          Gọi thêm <Money amount={now.hint.missingVnd} className="text-ink-hi" /> để được{' '}
-          {now.hint.name}
-        </p>
-      ) : null}
-
-      {now?.attachedVoucher ? (
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[length:var(--fs-b2)] text-ink-body">
-            Mã đang dùng{' '}
-            <span className="font-mono text-[length:var(--fs-b1)] text-ink-hi">
-              {now.attachedVoucher}
-            </span>
-          </span>
-          <Button disabled={locked || remove.isPending} onClick={() => remove.mutate()}>
-            Bỏ mã
+    <div className="@container mx-auto flex max-w-6xl flex-col gap-5 p-6">
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="text-[length:var(--fs-t1)] font-semibold text-ink-hi">
+          {settled && !nothingOrdered ? 'Hoàn tất & in' : 'Tính tiền'} · Bàn {tableCode}
+        </h1>
+        <div className="flex gap-2">
+          {!settled ? (
+            <Button disabled={!bill.data || nothingOrdered} onClick={() => print(true)}>
+              In tạm tính
+            </Button>
+          ) : null}
+          <Button variant="ghost" onClick={() => void navigate(`/table/${id}?code=${tableCode}`)}>
+            Về đơn
           </Button>
         </div>
-      ) : (
-        <>
-          <div className="flex gap-2">
-            <input
-              value={code}
-              onChange={(e) => {
-                setCode(e.target.value.toUpperCase())
-                setTried(null)
-              }}
-              placeholder="Mã voucher"
-              aria-label="Mã voucher"
-              autoCapitalize="characters"
-              autoComplete="off"
-              disabled={locked}
-              className="h-[var(--hit-target)] min-w-0 flex-1 rounded-sm border border-line-3 bg-surface-3 px-3 font-mono text-ink-hi disabled:text-ink-mute"
-            />
-            <Button
-              disabled={locked || code.trim() === '' || check.isPending}
-              onClick={() => check.mutate()}
-            >
-              Kiểm mã
-            </Button>
-            <Button
-              variant="primary"
-              disabled={locked || code.trim() === '' || apply.isPending}
-              onClick={() => apply.mutate()}
-            >
-              Áp mã
-            </Button>
-          </div>
-          {tried?.voucher ? (
-            tried.voucher.accepted ? (
-              <p className="text-[length:var(--fs-b2)] text-ink-body">
-                {noGain ? (
-                  'Mã dùng được, nhưng chương trình đang áp đã lợi hơn — gắn mã chỉ tốn một lượt.'
-                ) : (
-                  <>
-                    Mã dùng được: {tried.bill?.name} giảm{' '}
-                    <Money amount={tried.bill?.discountVnd ?? 0} className="text-ok" />
-                  </>
-                )}
-              </p>
-            ) : (
-              <p className="text-[length:var(--fs-b2)] text-warn">{tried.voucher.reason}</p>
-            )
+      </header>
+
+      <div className="grid items-start gap-6 @min-[880px]:grid-cols-[minmax(0,1fr)_420px]">
+        <Card className="p-5">
+          <BillStatement order={order.data} bill={bill.data} tableCode={tableCode} />
+        </Card>
+
+        <aside className="flex flex-col gap-4">
+          {change !== null && change > 0 ? (
+            <Card className="border-ok p-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[length:var(--fs-b1)] text-ink-body">Tiền thối khách</span>
+                <Money amount={change} className="text-[length:var(--fs-d3)] text-ok" />
+              </div>
+            </Card>
           ) : null}
-        </>
-      )}
 
-      {locked ? (
-        <p className="text-[length:var(--fs-c1)] text-ink-mute">
-          Bàn đã có lượt trả — gắn hay bỏ mã phải làm trước khi thu tiền.
-        </p>
-      ) : null}
-    </Card>
-  )
-}
-
-function Row({ label, value, strong = false }: { label: string; value: number; strong?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between">
-      <span className={strong ? 'text-ink-hi' : 'text-ink-mute'}>{label}</span>
-      <Money
-        amount={value}
-        className={strong ? 'text-[length:var(--fs-t1)] text-ink-hi' : 'text-ink-body'}
-      />
+          {!bill.data ? (
+            // Chưa biết bàn đã trả hay chưa thì chưa hiện nút thu — tránh "Thu đủ · 0₫" chớp qua
+            <>
+              <Skeleton className="h-28 w-full" />
+              <Skeleton className="h-64 w-full" />
+            </>
+          ) : !settled ? (
+            <>
+              <BuyerCard sessionId={id} status={invoice.data} />
+              {bill.data?.orderId !== undefined ? (
+                <PromoCard
+                  orderId={bill.data.orderId}
+                  locked={bill.data.paid > 0}
+                  onChanged={() => {
+                    void queryClient.invalidateQueries({ queryKey: ['bill', id] })
+                    void queryClient.invalidateQueries({ queryKey: ['order', id] })
+                  }}
+                />
+              ) : null}
+              <PaymentPanel
+                sessionId={id}
+                orderId={bill.data?.orderId}
+                tableCode={tableCode}
+                outstanding={outstanding}
+                preset={preset}
+                einvoiceEnabled={invoice.data?.enabled ?? false}
+                onCollected={onCollected}
+              />
+            </>
+          ) : (
+            <>
+              {nothingOrdered ? null : (
+                <>
+                  <InvoicePanel sessionId={id} orderId={bill.data?.orderId} status={invoice.data} />
+                  <Button variant="primary" size="lg" block onClick={() => print(false)}>
+                    {invoice.data?.invoice?.state === 'issued'
+                      ? 'In bill kèm QR tra cứu'
+                      : 'In phiếu thanh toán'}
+                  </Button>
+                </>
+              )}
+              <Card
+                className={`flex flex-col gap-3 p-4 ${nothingOrdered ? 'border-line-3' : 'border-ok'}`}
+              >
+                <p
+                  className={`text-[length:var(--fs-b1)] ${nothingOrdered ? 'text-ink-body' : 'text-ok'}`}
+                >
+                  {nothingOrdered
+                    ? 'Bàn này chưa gọi món nào. Đóng lại để trả bàn về trống.'
+                    : 'Đã thu đủ. Bàn đang ở trạng thái “chờ dọn” — dọn xong thì đóng bàn.'}
+                </p>
+                <Button
+                  variant={nothingOrdered ? 'primary' : 'secondary'}
+                  size="lg"
+                  block
+                  disabled={close.isPending}
+                  onClick={() => close.mutate()}
+                >
+                  Đóng bàn {tableCode}
+                </Button>
+              </Card>
+            </>
+          )}
+        </aside>
+      </div>
     </div>
   )
 }

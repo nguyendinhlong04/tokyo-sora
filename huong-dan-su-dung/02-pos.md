@@ -107,15 +107,31 @@ Lưu ý:
 
 ## 2.6 Tính tiền (P10) & đóng bàn
 
-Bấm **Tính tiền** ở chân phiếu order. Màn hiện `Tổng đơn` · `Đã thu` ·
-`Còn phải trả`.
+Bấm **Tính tiền** ở chân phiếu order. Bên trái là **bảng kê**: từng món, các phần
+giảm, phí phục vụ, **thuế VAT từng thuế suất** (món ăn 8%, bia rượu 10% — món bia
+rượu có ghi chú dưới tên), tổng hoá đơn, những gì đã thu và **Còn phải thu**. Bên
+phải, từ trên xuống: hoá đơn điện tử · khuyến mãi & voucher · hình thức thanh toán.
+**In tạm tính** (góc trên) in phiếu cho khách xem trước khi trả.
 
+- **Khách lấy hoá đơn công ty — làm TRƯỚC khi thu tiền** (lượt thu đủ là lượt phát
+  hành hoá đơn): khối **Hoá đơn điện tử** → **Nhập thông tin xuất hoá đơn** → chọn
+  **Công ty** → gõ **mã số thuế**: tên và địa chỉ tự điền theo tra cứu (kèm tình
+  trạng theo Cục Thuế — "ngừng hoạt động" thì hỏi lại khách) → thêm email nhận hoá
+  đơn nếu khách đưa → **Lưu thông tin**. **Cá nhân** cần MST hay số định danh thì
+  phải có địa chỉ. Không nhập gì = "Bán cho người tiêu dùng".
 - **Tiền mặt:** bấm các nút mệnh giá **+50.000 / +100.000 / +200.000 /
   +500.000** theo tiền khách đưa → **Thu đủ · {số}** → màn hiện thẻ xanh
   **Tiền thối khách**.
-- **Khách chuyển khoản VietQR:** khách tự trả trên **iPad gắn bàn** (chương 4) — iPad
-  hiện mã VietQR, khách quét bằng app ngân hàng. Tiền về hiện ở màn **đối soát** (P15)
-  — nếu khách đã tự trả một phần, `Đã thu` trên màn tính tiền đã trừ sẵn.
+- **Thẻ:** quẹt trên máy POS ngân hàng đúng số tiền, đợi máy in phiếu chuẩn chi →
+  (gõ số phiếu nếu muốn đối soát) → **Ghi nhận thẻ · {số}**.
+- **Chuyển khoản:** **Tạo mã chuyển khoản** → mã VietQR đúng số còn phải thu hiện to
+  trên màn, khách quét bằng app ngân hàng. Màn tự chuyển khi ngân hàng báo có (chỉ
+  ngân hàng báo mới tính là đã trả). Khách cũng tự trả được trên **iPad gắn bàn**
+  (chương 4) — tiền về hiện ở `Đã thu`, và ở **đối soát** (P15).
+- **Ghi nợ công ty:** tìm công ty theo tên, mã hay MST → chọn thẻ công ty (thấy hạn
+  mức còn lại; công ty quá hạn hay thiếu địa chỉ bị khoá kèm lý do) → gõ **người ký
+  nhận nợ** → **Ghi nợ · {số}**. Thu ngân cần **quản lý ca duyệt PIN** ngay trên máy.
+  Công ty nợ phần còn lại của bill; hoá đơn đứng tên công ty và lập ngay.
 - **Khuyến mãi & voucher:** khối dưới tổng đơn cho thấy đơn đang được giảm gì —
   khuyến mãi món đã trừ sẵn trong giá món, chương trình hoá đơn đứng một dòng
   (tự áp, không cần làm gì). Khách đưa **mã voucher**: gõ mã → **Kiểm mã** (chỉ
@@ -123,9 +139,19 @@ Bấm **Tính tiền** ở chân phiếu order. Màn hiện `Tổng đơn` · `�
   hơn) → **Áp mã**. Gắn nhầm thì **Bỏ mã**, lượt trả lại cho mã. Gắn hay bỏ mã
   phải làm **trước khi thu tiền** — bàn đã có lượt trả thì máy chủ không cho đổi
   tổng nữa.
-- Trả đủ xong bàn chuyển `Đã trả · chờ dọn` — **bàn không tự đóng**. Dọn xong
-  bấm **Đóng bàn {mã}** để trả bàn về `Trống` — iPad của bàn tự về màn chào trong
-  vài giây, giỏ của khách vừa rồi bị xoá.
+- Trả đủ xong màn thành **Hoàn tất & in** (P11). Khối **Hoá đơn điện tử** cho biết:
+  *Đang phát hành…* · *Đã phát hành* (ký hiệu · số, mã cơ quan thuế, mã tra cứu) ·
+  *chưa lên được* (khách **không** phải chờ — bấm **Phát hành lại** sau, hoặc để trạm
+  thu ngân tự đẩy). Bản giả lập ghi nhãn **Hoá đơn thử**. **In bill kèm QR tra cứu**
+  in tờ 80 mm; hoá đơn chưa phát hành thì in "Phiếu thanh toán — chưa phải hoá đơn".
+- Khách đưa MST **sau khi** hoá đơn đã ra: **Lập hoá đơn thay thế** → lý do + người mua
+  mới → quản lý ca duyệt PIN. Hoá đơn cũ giữ số, sang "đã thay thế"; hoá đơn mới lấy
+  số kế tiếp (hoá đơn máy tính tiền sai thì thay thế, không huỷ).
+- Bàn chuyển `Đã trả · chờ dọn` — **bàn không tự đóng**. Dọn xong bấm **Đóng bàn
+  {mã}** để trả bàn về `Trống` — iPad của bàn tự về màn chào trong vài giây, giỏ của
+  khách vừa rồi bị xoá.
+- Phiếu order (P4) có nhãn **HĐ công ty** kèm tên người mua khi khách đã khai xuất
+  hoá đơn — thu ngân thấy trước khi in bill.
 
 ## 2.7 Yêu cầu từ bàn (P12)
 
@@ -228,11 +254,10 @@ Banner đỏ nếu giờ cao điểm mà ngân hàng im hơi quá 15 phút trong
 Để khỏi tìm nút không tồn tại — các mục sau trong thiết kế **chưa dựng** trên POS
 (08/2026):
 
-- Tính tiền: chỉ có **tiền mặt** trên POS (VietQR là khách tự trả trên iPad bàn);
-  chưa có thẻ/ví/ghi nợ công ty, giảm giá tay, ô SĐT tích điểm (voucher thì có —
-  §2.6).
-- **In bill và hoá đơn điện tử chưa có trên POS** (HĐĐT quản lý ở Office; in tạm
-  bằng chức năng in của trình duyệt).
+- Tính tiền: chưa có ví điện tử, giảm giá tay, ô SĐT tích điểm (tiền mặt, thẻ,
+  chuyển khoản, ghi nợ công ty, voucher thì có — §2.6).
+- In bill đi qua hộp in của trình duyệt (máy thu ngân chạy Edge `--kiosk-printing`
+  thì in thẳng — `THIET-BI.md`); chưa có cầu in LAN.
 - Chưa có ô ghi chú theo món khi gọi hộ (ghi chú chỉ đến từ app khách).
 - Chưa có chọn ca / nhập tiền đầu ca khi mở ca (tiền đầu ca đang là 0).
 - Chưa có chuông/âm báo — nhìn số đếm trên các nút.

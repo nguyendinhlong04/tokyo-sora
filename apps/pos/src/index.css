@@ -26,3 +26,32 @@
     display: none;
   }
 }
+
+/*
+  Bill 80 mm (components/print/Receipt.tsx). Trên màn: tờ in dựng ngoài khung nhìn
+  để đo được chiều dài thật. Khi in: chỉ còn tờ in, giấy trắng mực đen — chủ đề
+  tối của app không được lọt ra giấy nhiệt.
+*/
+#sora-print {
+  position: fixed;
+  top: 0;
+  left: -200mm;
+  width: 80mm;
+  visibility: hidden;
+  color: var(--sora-print-ink);
+  background: var(--sora-print-paper);
+}
+
+@media print {
+  html,
+  body {
+    background: var(--sora-print-paper) !important;
+  }
+  body > :not(#sora-print) {
+    display: none !important;
+  }
+  #sora-print {
+    position: static;
+    visibility: visible;
+  }
+}
