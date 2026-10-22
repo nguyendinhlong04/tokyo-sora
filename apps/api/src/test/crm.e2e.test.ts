@@ -19,6 +19,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { hash } from '@node-rs/argon2'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
 import {
   corporateCharges,
@@ -57,6 +58,12 @@ const inject = (opts: Parameters<NestFastifyApplication['inject']>[0]) => app.in
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` })
 
 const TODAY = '2026-08-02'
+/**
+ * Ngày chạy test THẬT theo giờ Việt Nam. Dòng nợ B15 ghi qua API mang ngày này chứ không
+ * phải TODAY, nên khung bảng kê phải kết thúc ở đây — khung cứng tới 31/08/2026 làm dòng
+ * nợ ghi sau ngày đó rơi khỏi bảng kê.
+ */
+const realToday = () => businessDateOf(new Date(), 'Asia/Ho_Chi_Minh')
 const at = (date: string, hour: number, minute = 0) =>
   new Date(`${date}T${String(hour - 7).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`)
 
@@ -1122,7 +1129,7 @@ describe('B15 — Hạn mức, tuổi nợ và cái chặn', () => {
   it('bảng kê chia đúng khoang tuổi nợ và nêu số ngày quá hạn từng dòng', async () => {
     const res = await inject({
       method: 'GET',
-      url: `/api/crm/corporate/${companyId}/statement?from=2026-05-01&to=2026-08-31`,
+      url: `/api/crm/corporate/${companyId}/statement?from=2026-05-01&to=${realToday()}`,
       headers: bearer(accountant),
     })
     expect(res.statusCode, res.payload).toBe(200)
@@ -1136,7 +1143,7 @@ describe('B15 — Hạn mức, tuổi nợ và cái chặn', () => {
   it('gạch nợ quá số còn nợ bị chặn; gạch đúng thì mở lại cửa ghi nợ', async () => {
     const statement = await inject({
       method: 'GET',
-      url: `/api/crm/corporate/${companyId}/statement?from=2026-05-01&to=2026-08-31`,
+      url: `/api/crm/corporate/${companyId}/statement?from=2026-05-01&to=${realToday()}`,
       headers: bearer(accountant),
     })
     const chargeId = statement.json().charges[0].id
@@ -1171,7 +1178,7 @@ describe('B15 — Hạn mức, tuổi nợ và cái chặn', () => {
   it('xoá nợ phải ghi lý do', async () => {
     const statement = await inject({
       method: 'GET',
-      url: `/api/crm/corporate/${companyId}/statement?from=2026-05-01&to=2026-08-31`,
+      url: `/api/crm/corporate/${companyId}/statement?from=2026-05-01&to=${realToday()}`,
       headers: bearer(accountant),
     })
     const open = statement
