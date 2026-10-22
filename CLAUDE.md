@@ -654,7 +654,7 @@ Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
 ## 11. Lỗi đã biết và nợ kỹ thuật (xác nhận 21/10/2026 — sửa khi chạm vào, đừng tìm lại)
 
 Ưu tiên cao:
-1. **Nền mờ trong suốt:** `bg-black/70` (`packages/ui/src/Modal.tsx:27`), `bg-black/60`
+1. **Nền mờ trong suốt:** `bg-black/60`
    (`apps/pos/src/routes/OrderDrawer.tsx:91`), `bg-black/50` (`apps/office/src/routes/Sets.tsx:275`),
    `bg-surface-0` (POS `DispatchRail.tsx`, `Reconcile.tsx`, `ShiftClose.tsx`),
    `border-accent-line`, `border-warn-line` — class không tồn tại → dùng `bg-canvas/70`,
