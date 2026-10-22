@@ -34,7 +34,8 @@ REVOKE UPDATE, DELETE ON
   audit_log,
   approvals,
   journal_entries,
-  parameter_history
+  parameter_history,
+  stock_moves
 FROM sora_app;
 
 -- outbox_events: được đánh dấu đã phát và dọn retention, nội dung bất biến do
