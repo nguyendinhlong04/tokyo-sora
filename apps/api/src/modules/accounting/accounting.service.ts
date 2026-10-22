@@ -276,6 +276,8 @@ export class AccountingService {
             ...base,
             state: 'issued' as const,
             invoiceNo: nextInvoiceNo(last?.no ?? null),
+            // Có số là phải có ngày lập (`invoices_numbered_check`)
+            invoiceDate: order.businessDate,
             taxCode: result.taxCode,
             issuedAt: new Date(),
             lastError: null,

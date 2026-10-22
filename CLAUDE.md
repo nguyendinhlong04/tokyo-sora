@@ -328,6 +328,8 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
 - **Sổ bất biến** (append-only, trigger `sora_append_only` + revoke quyền role `sora_app`
   trong `deploy/db-roles.sql`): `audit_log`, `approvals`, `journal_entries`,
   `parameter_history`, `stock_moves`. Sửa sai = bút toán đảo, không UPDATE.
+  **Hoá đơn đã phát hành** cũng bất biến (trigger `invoices_guard`, `9008`): không xoá, chỉ
+  được chuyển sang `replaced` kèm lý do; số đã cấp không đổi, không huỷ.
 - **Migration:** `db:generate` sinh `migrations/00NN_*.sql`; SQL viết tay đánh số từ
   `9000_` để luôn chạy sau cùng (`9000_guards`, `9001_kitchen_money_guard`,
   `9002_realtime_broadcast`, `9003_realtime_rls`, `9004_stock_moves_guard`, …). Runner

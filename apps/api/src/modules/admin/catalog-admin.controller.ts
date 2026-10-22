@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common'
+import { VAT_CODES } from '@sora/contracts'
 import { z } from 'zod'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
@@ -39,7 +40,8 @@ const DishSchema = z.object({
   basePrice: z.number().int().min(0),
   // Bỏ trống = bán online bằng giá tại quán
   onlinePrice: z.number().int().min(0).nullable().default(null),
-  vatCode: z.string().max(20),
+  // Nhóm thuế suất, không phải chữ tự do: thuế suất của nhóm nằm ở tham số A6
+  vatCode: z.enum(VAT_CODES),
   onlineVisible: z.boolean(),
   tableOrderable: z.boolean(),
   signature: z.boolean(),

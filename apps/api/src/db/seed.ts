@@ -39,6 +39,8 @@ const PARAMETERS: {
   sensitive?: boolean
 }[] = [
   { key: 'sales.vatRate', value: 0, unit: 'tỉ lệ', sensitive: true },
+  /** Bia, rượu (`vat_code = 'alcohol'`) — chịu thuế TTĐB nên không được giảm như món ăn */
+  { key: 'sales.vatRateAlcohol', value: 0, unit: 'tỉ lệ', sensitive: true },
   { key: 'sales.serviceFeeRate', value: 0, unit: 'tỉ lệ', sensitive: true },
   { key: 'sales.roundingUnit', value: 1000, unit: 'đồng' },
   /**
@@ -630,6 +632,8 @@ async function seed(db: Db) {
       /** Huy hiệu 名物 trên W1/W2/W3 — cờ của bếp, không phải của người viết web */
       signature: d.isSignature,
       active: d.active,
+      /** Bia, rượu chịu VAT 10% không được giảm; trà và món ăn theo nhóm thường */
+      vatCode: d.group === 'bia' || d.group === 'ruou' ? 'alcohol' : 'standard',
     }
     await db.insert(s.dishes).values(row).onConflictDoUpdate({ target: s.dishes.id, set: row })
   }

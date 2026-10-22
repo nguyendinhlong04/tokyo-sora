@@ -232,6 +232,13 @@
       "when": 1792657219924,
       "tag": "0032_man_cho_ipad",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792660036147,
+      "tag": "0033_hoa_don_dien_tu",
+      "breakpoints": true
     }
   ]
 }

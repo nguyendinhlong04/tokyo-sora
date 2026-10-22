@@ -120,6 +120,10 @@ export const dishes = pgTable(
      * còn đơn giao thì gánh cả phí sàn nếu bán qua kênh ngoài.
      */
     onlinePrice: bigint('online_price', { mode: 'number' }),
+    /**
+     * Nhóm thuế suất (`VAT_CODES`): món ăn & đồ uống không cồn, hay bia rượu.
+     * Thuế suất của từng nhóm là tham số A6 — xem `VAT_RATE_PARAMS`.
+     */
     vatCode: text('vat_code').notNull().default('standard'),
 
     onlineVisible: boolean('online_visible').notNull().default(false),
@@ -147,6 +151,7 @@ export const dishes = pgTable(
   },
   (t) => [
     check('dishes_kind_check', sql`${t.kind} IN ('dish','set','drink')`),
+    check('dishes_vat_code_check', sql`${t.vatCode} IN ('standard','alcohol')`),
     check(
       'dishes_routing_method_check',
       sql`${t.routingMethod} IS NULL OR ${t.routingMethod} IN ('fixed','song','nuong','linh_hoat')`,

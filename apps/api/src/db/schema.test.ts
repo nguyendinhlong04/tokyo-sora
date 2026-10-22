@@ -487,3 +487,172 @@ describe('Thẻ công thức — quy trình chế biến (M4 · M8)', () => {
     expect(left.rows[0]!.n).toBe(0)
   })
 })
+
+describe('Hoá đơn điện tử (NĐ 254/2026)', () => {
+  /** Mỗi đơn chỉ một hoá đơn còn hiệu lực — mỗi tình huống một đơn riêng */
+  let seq = 0
+  async function newOrder() {
+    seq++
+    const code = `ON-2610-${String(seq).padStart(4, '0')}`
+    const { rows } = await db.query<{ id: number }>(`
+      INSERT INTO orders (display_code, branch_id, channel, type, created_by_kind, business_date)
+        VALUES ('${code}', 'cg', 'pos', 'dinein', 'staff', '2026-10-22')
+      RETURNING id
+    `)
+    return rows[0]!.id
+  }
+
+  /** Hoá đơn đã phát hành, trên một đơn mới */
+  async function issued(no: string) {
+    const orderId = await newOrder()
+    const { rows } = await db.query<{ id: number }>(`
+      INSERT INTO invoices (branch_id, order_id, serial, invoice_no, invoice_date, tax_code,
+                            state, amount_sub, amount_vat, amount_total, business_date, issued_at)
+        VALUES ('cg', ${orderId}, 'C26MAA', '${no}', '2026-10-22', 'MCQT-${no}', 'issued',
+                285000, 22800, 307800, '2026-10-22', now())
+      RETURNING id
+    `)
+    return rows[0]!.id
+  }
+
+  /** Hoá đơn chưa phát hành được, có hoặc chưa có số */
+  async function unissued(state: 'pending' | 'failed', no: string | null = null) {
+    const orderId = await newOrder()
+    const numbered = no === null ? `NULL, NULL` : `'${no}', '2026-10-22'`
+    const { rows } = await db.query<{ id: number }>(`
+      INSERT INTO invoices (branch_id, order_id, serial, invoice_no, invoice_date, state,
+                            amount_sub, amount_vat, amount_total, business_date)
+        VALUES ('cg', ${orderId}, 'C26MAA', ${numbered}, '${state}', 0, 0, 0, '2026-10-22')
+      RETURNING id
+    `)
+    return rows[0]!.id
+  }
+
+  it('món chỉ mang một trong hai nhóm thuế suất', async () => {
+    await expect(db.exec(`UPDATE dishes SET vat_code = '8%' WHERE id = 'bachibo'`)).rejects.toThrow(
+      /dishes_vat_code_check/,
+    )
+    await db.exec(`UPDATE dishes SET vat_code = 'alcohol' WHERE id = 'bachibo'`)
+    await db.exec(`UPDATE dishes SET vat_code = 'standard' WHERE id = 'bachibo'`)
+  })
+
+  it('người mua trên đơn phải là doanh nghiệp hoặc cá nhân có tên', async () => {
+    const orderId = await newOrder()
+    await expect(
+      db.exec(`UPDATE orders SET invoice_buyer = '{"kind":"consumer"}' WHERE id = ${orderId}`),
+    ).rejects.toThrow(/orders_invoice_buyer_check/)
+    await db.exec(`
+      UPDATE orders SET invoice_buyer = '{"kind":"person","name":"Nguyễn Văn An"}' WHERE id = ${orderId};
+      UPDATE orders SET invoice_buyer = NULL WHERE id = ${orderId};
+    `)
+  })
+
+  it('hoá đơn cho doanh nghiệp phải có MST đúng dạng và địa chỉ', async () => {
+    const orderId = await newOrder()
+    const insert = (cols: string, values: string) =>
+      db.exec(`
+        INSERT INTO invoices (branch_id, order_id, serial, state, amount_sub, amount_vat,
+                              amount_total, business_date, buyer_kind, buyer_name, ${cols})
+          VALUES ('cg', ${orderId}, 'C26MAA', 'pending', 0, 0, 0, '2026-10-22', 'company', ${values})
+      `)
+    await expect(insert('buyer_tax_code', `'CÔNG TY FPT', '0101248141'`)).rejects.toThrow(
+      /invoices_buyer_check/,
+    )
+    await expect(
+      insert('buyer_tax_code, buyer_address', `'CÔNG TY X', '001203012345', 'Hà Nội'`),
+    ).rejects.toThrow(/invoices_buyer_check/)
+  })
+
+  it('có số là phải có ngày lập', async () => {
+    const orderId = await newOrder()
+    await expect(
+      db.exec(`
+        INSERT INTO invoices (branch_id, order_id, serial, invoice_no, state, amount_sub,
+                              amount_vat, amount_total, business_date)
+          VALUES ('cg', ${orderId}, 'C26MAA', '00000099', 'failed', 0, 0, 0, '2026-10-22')
+      `),
+    ).rejects.toThrow(/invoices_numbered_check/)
+  })
+
+  it('hoá đơn đã phát hành không sửa được nội dung, không xoá được', async () => {
+    const id = await issued('00000001')
+    await expect(db.exec(`UPDATE invoices SET amount_total = 1 WHERE id = ${id}`)).rejects.toThrow(
+      /đã phát hành — sai thì lập hoá đơn thay thế/,
+    )
+    await expect(
+      db.exec(`UPDATE invoices SET buyer_kind = 'person', buyer_name = 'A' WHERE id = ${id}`),
+    ).rejects.toThrow(/đã phát hành/)
+    await expect(db.exec(`DELETE FROM invoices WHERE id = ${id}`)).rejects.toThrow(
+      /Không xoá hoá đơn/,
+    )
+  })
+
+  it('đã phát hành chỉ chuyển được sang "đã thay thế", kèm lý do; rồi đứng yên mãi', async () => {
+    const id = await issued('00000002')
+    await expect(
+      db.exec(`UPDATE invoices SET state = 'voided', void_reason = 'nhầm' WHERE id = ${id}`),
+    ).rejects.toThrow(/đã phát hành/)
+    await expect(
+      db.exec(`UPDATE invoices SET state = 'replaced' WHERE id = ${id}`),
+    ).rejects.toThrow(/invoices_replaced_check/)
+
+    await db.exec(
+      `UPDATE invoices SET state = 'replaced', void_reason = 'Khách đưa MST công ty' WHERE id = ${id}`,
+    )
+    await expect(
+      db.exec(`UPDATE invoices SET void_reason = 'sửa lý do' WHERE id = ${id}`),
+    ).rejects.toThrow(/không sửa được nữa/)
+  })
+
+  it('số đã cấp không đổi và không huỷ được, kể cả khi lượt gửi thất bại', async () => {
+    const id = await unissued('failed', '00000003')
+    await expect(
+      db.exec(`UPDATE invoices SET invoice_no = '00000004' WHERE id = ${id}`),
+    ).rejects.toThrow(/không đổi số/)
+    // Số đã cấp không được bỏ — huỷ là để lại một lỗ trong dãy số liên tục
+    await expect(
+      db.exec(`UPDATE invoices SET state = 'voided', void_reason = 'bỏ' WHERE id = ${id}`),
+    ).rejects.toThrow(/invoices_numbered_not_voided/)
+    // Gửi lại thì được: tăng số lần thử, không đổi số
+    await db.exec(`UPDATE invoices SET attempts = attempts + 1 WHERE id = ${id}`)
+  })
+
+  it('huỷ hoá đơn chưa cấp số chỉ cần lý do, không cần bản ghi duyệt', async () => {
+    const id = await unissued('pending')
+    await expect(db.exec(`UPDATE invoices SET state = 'voided' WHERE id = ${id}`)).rejects.toThrow(
+      /invoices_void_check/,
+    )
+    await db.exec(
+      `UPDATE invoices SET state = 'voided', void_reason = 'Đơn huỷ trước khi phát hành' WHERE id = ${id}`,
+    )
+  })
+
+  it('một hoá đơn chỉ có một bản thay thế còn hiệu lực', async () => {
+    const original = await issued('00000005')
+    const replacement = async () => {
+      const orderId = await newOrder()
+      await db.exec(`
+        INSERT INTO invoices (branch_id, order_id, serial, state, amount_sub, amount_vat,
+                              amount_total, business_date, replaces_id)
+          VALUES ('cg', ${orderId}, 'C26MAA', 'pending', 0, 0, 0, '2026-10-22', ${original})
+      `)
+    }
+    await replacement()
+    await expect(replacement()).rejects.toThrow(/invoices_one_live_replacement/)
+  })
+
+  it('bộ đếm số giữ số trong khoảng 1–99.999.999', async () => {
+    await expect(
+      db.exec(`INSERT INTO einvoice_counters (serial, last_no) VALUES ('C26MZZ', 100000000)`),
+    ).rejects.toThrow(/einvoice_counters_no_check/)
+  })
+
+  it('danh bạ người mua chỉ nhận MST tổ chức — số định danh cá nhân không vào được', async () => {
+    await expect(
+      db.exec(`INSERT INTO invoice_buyers (tax_code, name, source)
+                 VALUES ('001203012345', 'Nguyễn Văn An', 'invoice')`),
+    ).rejects.toThrow(/invoice_buyers_tax_code_check/)
+    await db.exec(`INSERT INTO invoice_buyers (tax_code, name, source)
+                     VALUES ('0101248141-001', 'Chi nhánh FPT', 'lookup')`)
+  })
+})
