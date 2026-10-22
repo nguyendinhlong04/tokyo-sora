@@ -761,7 +761,8 @@ vào đơn; app chỉ hiển thị.
   `curl -i https://pos.tokyo-sora.vn/api/health` qua proxy; kiểm Realtime bằng chèn một
   dòng `outbox_events` (xem `DEPLOY.md` §Bước 3).
 - Serverless có hệ quả: không cron/poller (ngân hàng dùng webhook; vé hẹn giờ do KDS
-  polling nhả), cache tham số và PIN-throttle **theo từng instance**, pool 1.
+  polling nhả), cache tham số và PIN-throttle **theo từng instance**, pool 1. Cache tham số
+  tự nạp lại sau 60 s: đổi ở A6 thì mọi instance theo kịp trong vòng một phút.
 - `deploy/docker-compose.yml` + `Caddyfile`: giữ để chạy tại chỗ, không xoá, không bảo trì
   ngang hàng (tên miền trong đó còn là `tokyosora.vn`, có `/socket.io` không còn dùng).
 

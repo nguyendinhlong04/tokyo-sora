@@ -5,6 +5,17 @@ import type { Db } from '../db/client'
 import { parameterHistory, parameters } from '../db/schema'
 
 /**
+ * Cache của một instance sống tối đa chừng này rồi tự nạp lại.
+ *
+ * Trên Vercel có nhiều instance chạy song song, mỗi cái một cache. `set()` chỉ
+ * làm mới cache của instance nhận lệnh — instance khác vẫn đọc giá trị cũ cho
+ * tới khi tự nạp lại. Không có hạn thì một instance ấm có thể tính VAT theo thuế
+ * suất cũ, hay cấp hoá đơn theo ký hiệu cũ, hàng giờ sau khi kế toán đã đổi.
+ * 60 giây là độ lệch tối đa chấp nhận được, đổi lại một câu SELECT mỗi phút.
+ */
+const MAX_AGE_MS = 60_000
+
+/**
  * Trung tâm tham số A6 — engine đọc lúc chạy, sửa không cần triển khai lại.
  *
  * Cache in-process vì tham số đọc rất nhiều (mỗi lần tính tiền, mỗi lần dựng vé)
@@ -14,7 +25,10 @@ import { parameterHistory, parameters } from '../db/schema'
 export class ParamsService {
   /** key → (branchId | '*') → value */
   private cache = new Map<string, Map<string, unknown>>()
-  private loaded = false
+  /** 0 = chưa nạp lần nào */
+  private loadedAt = 0
+  /** Lượt nạp đang chạy — các lời gọi đến cùng lúc chờ chung, không SELECT trùng */
+  private loading: Promise<void> | null = null
 
   constructor(@Inject(DB) private readonly db: Db) {}
 
@@ -27,11 +41,15 @@ export class ParamsService {
       next.set(row.key, scopes)
     }
     this.cache = next
-    this.loaded = true
+    this.loadedAt = Date.now()
   }
 
   private async ensureLoaded() {
-    if (!this.loaded) await this.reload()
+    if (Date.now() - this.loadedAt < MAX_AGE_MS) return
+    this.loading ??= this.reload().finally(() => {
+      this.loading = null
+    })
+    await this.loading
   }
 
   /** Giá trị của chi nhánh nếu có ghi đè, ngược lại lấy mặc định cấp chuỗi */
