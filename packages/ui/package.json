@@ -8,7 +8,8 @@
     ".": "./src/index.ts",
     "./QrCode": "./src/QrCode.tsx",
     "./PromoTag": "./src/PromoTag.tsx",
-    "./image": "./src/image.tsx"
+    "./image": "./src/image.tsx",
+    "./InvoiceBuyer": "./src/InvoiceBuyer.tsx"
   },
   "scripts": {
     "dev": "vite",
