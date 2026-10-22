@@ -17,6 +17,8 @@ import {
   journalEntries,
   orders,
   paymentLines,
+  corporateCharges,
+  corporateCustomers,
   payments,
   shifts,
   tableSessions,
@@ -181,6 +183,13 @@ export class PaymentsService {
       .innerJoin(payments, eq(payments.id, paymentLines.paymentId))
       .where(and(eq(payments.orderId, order.id), eq(paymentLines.live, 'yes')))
 
+    // Ghi nợ công ty không phải tiền đã thu, nhưng bill không còn ai phải trả nữa
+    const [charge] = await this.db
+      .select({ amount: corporateCharges.amountVnd, company: corporateCustomers.name })
+      .from(corporateCharges)
+      .innerJoin(corporateCustomers, eq(corporateCustomers.id, corporateCharges.corporateId))
+      .where(eq(corporateCharges.orderId, order.id))
+
     const paid = paidRows.reduce((sum, p) => sum + p.amount, 0)
     return {
       sessionId,
@@ -188,7 +197,8 @@ export class PaymentsService {
       displayCode: order.displayCode,
       total: order.moneyTotal,
       paid,
-      outstanding: Math.max(0, order.moneyTotal - paid),
+      outstanding: Math.max(0, order.moneyTotal - paid - (charge?.amount ?? 0)),
+      corporateCharge: charge ?? null,
       paymentState: order.paymentState,
       payments: paidRows.map((p) => ({ id: p.id, kind: p.kind, amount: p.amount, paidAt: p.paidAt })),
       claimedLines: claimed,
@@ -275,7 +285,7 @@ export class PaymentsService {
           amount: input.amount,
           state: 'paid',
           paidAt: now,
-          reference: input.kind === 'card' ? (input.reference?.trim() || null) : null,
+          reference: input.kind === 'card' ? input.reference?.trim() || null : null,
           createdByKind: 'staff',
           createdById: actor.kind === 'staff' ? String(actor.staffId) : null,
           businessDate: shift.businessDate,
@@ -348,9 +358,7 @@ export class PaymentsService {
         paymentState,
         // P11 in bill: tiền thối tính ở đây cho khỏi sai
         change:
-          input.kind === 'cash' && input.tendered
-            ? Math.max(0, input.tendered - input.amount)
-            : 0,
+          input.kind === 'cash' && input.tendered ? Math.max(0, input.tendered - input.amount) : 0,
         invoiceId,
       }
     })

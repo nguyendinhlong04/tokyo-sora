@@ -179,7 +179,6 @@ beforeAll(async () => {
     { key: 'loyalty.tierGoldVnd', value: 20_000_000 },
     { key: 'corporate.defaultCreditLimitVnd', value: 20_000_000, unit: 'đồng' },
     { key: 'corporate.blockAfterOverdueDays', value: 15, unit: 'ngày' },
-    { key: 'corporate.einvoiceMode', value: 'per-bill' },
     { key: 'feedback.complaintStars', value: 3, unit: 'sao' },
     { key: 'feedback.responseHours', value: 24, unit: 'giờ' },
   ])

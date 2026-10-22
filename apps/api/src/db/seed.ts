@@ -153,7 +153,6 @@ const PARAMETERS: {
   // Công nợ khách doanh nghiệp (§29.1 nhóm "Công nợ DN")
   { key: 'corporate.defaultCreditLimitVnd', value: 20_000_000, unit: 'đồng', sensitive: true },
   { key: 'corporate.blockAfterOverdueDays', value: 15, unit: 'ngày', sensitive: true },
-  { key: 'corporate.einvoiceMode', value: 'per-bill', unit: 'per-bill | aggregate' },
 
   // Phản hồi khách (§25 B13) — từ mấy sao trở xuống thì một lượt đánh giá trở
   // thành khiếu nại phải có người xử lý. Ngưỡng nào cũng là một con số lưu động,

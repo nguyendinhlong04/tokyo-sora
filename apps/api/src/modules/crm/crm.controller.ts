@@ -87,7 +87,6 @@ const CorporateBody = z.object({
   paymentTermDays: z.number().int().min(0).max(180).default(30),
   reconcileDay: z.number().int().min(1).max(28).default(1),
   blockAfterOverdueDays: z.number().int().min(0).max(365).nullable().default(null),
-  einvoiceMode: z.enum(['per-bill', 'aggregate']).nullable().default(null),
   active: z.boolean().default(true),
 })
 
@@ -383,6 +382,13 @@ export class CrmController {
     @Query('to') to: string,
   ) {
     return this.corporate.statement(id, BusinessDate.parse(from), BusinessDate.parse(to))
+  }
+
+  /** P10 "Ghi nợ công ty" — ô tìm công ty; R2 qua được cửa vì ở mức △ */
+  @Get('corporate/pick')
+  @RequirePermission('corporate.charge-at-pos')
+  pickCorporate(@Query('q') q?: string) {
+    return this.corporate.pick(q ?? '')
   }
 
   /** P10 "Ghi nợ công ty" — R2 thao tác ở mức △, cần PIN của R7 */

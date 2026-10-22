@@ -71,3 +71,13 @@ SELECT 'sales.vatRateAlcohol', branch_id, value, unit, overridable, sensitive
   FROM parameters
  WHERE key = 'sales.vatRate'
 ON CONFLICT DO NOTHING;
+
+--------------------------------------------------------------------------------
+-- 4. Bỏ chế độ "gộp hoá đơn cuối kỳ" của khách doanh nghiệp (B15).
+--
+--    NĐ 254/2026 không cho nhà hàng lập một hoá đơn tổng cho nhiều bill: bill
+--    ghi nợ công ty là một hoá đơn, lập ngay lúc ghi nợ. Lịch sử tham số còn ở
+--    `parameter_history` (sổ bất biến). Cột `corporate_customers.einvoice_mode`
+--    giữ lại tới khi API bản cũ thôi đọc nó.
+--------------------------------------------------------------------------------
+DELETE FROM parameters WHERE key = 'corporate.einvoiceMode';

@@ -300,6 +300,16 @@ export class EinvoiceService {
         .where(and(eq(invoices.orderId, orderId), inArray(invoices.state, LIVE)))
       const locked = live ? lockOf(live) : null
       if (locked) throw new ConflictException({ ...locked, invoiceId: live!.id })
+      const [charge] = await tx
+        .select({ id: corporateCharges.id })
+        .from(corporateCharges)
+        .where(eq(corporateCharges.orderId, orderId))
+      if (charge) {
+        throw new ConflictException({
+          code: 'invoice_buyer_locked',
+          message: 'Bill đã ghi nợ công ty — hoá đơn đứng tên công ty nợ tiền',
+        })
+      }
 
       await tx.update(orders).set({ invoiceBuyer: clean }).where(eq(orders.id, orderId))
       // Không ghi số định danh hay email vào nhật ký — chỉ ghi loại người mua

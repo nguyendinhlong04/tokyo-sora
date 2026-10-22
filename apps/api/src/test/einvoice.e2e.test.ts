@@ -13,6 +13,8 @@
  *      phát hành; sau đó chỉ còn đường lập hoá đơn thay thế.
  *   5. Gõ MST là có tên, địa chỉ — từ hồ sơ B15, danh bạ của quán hay nguồn ngoài;
  *      số định danh cá nhân không bao giờ đem đi tra.
+ *   6. Ghi nợ công ty là một lượt trả đủ: công ty nợ phần còn lại, hoá đơn đứng
+ *      tên công ty đó và lập ngay — không gộp cuối kỳ.
  */
 import { createHmac } from 'node:crypto'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
@@ -29,6 +31,7 @@ import {
   invoices,
   orders,
   payments,
+  tableSessions,
 } from '../db/schema'
 import { EINVOICE_PROVIDER, type MockEinvoiceProvider } from '../modules/einvoice/einvoice-provider'
 import { TAX_CODE_REGISTRY, type MockTaxCodeRegistry } from '../modules/einvoice/tax-code-registry'
@@ -875,5 +878,148 @@ describe('Tra mã số thuế để điền sẵn người mua', () => {
     const blocked = await publicLookup(COMPANY.taxCode)
     expect(blocked.statusCode).toBe(429)
     expect(blocked.json().code).toBe('too_many_lookups')
+  })
+})
+
+describe('Ghi nợ công ty: hoá đơn đứng tên công ty nợ tiền', () => {
+  let companyId: number
+  let noAddressId: number
+
+  const charge = (corporateId: number, orderId: number, signer: string | null = null) =>
+    inject({
+      method: 'POST',
+      url: '/api/crm/corporate/charges',
+      headers: asManager(),
+      payload: { corporateId, orderId, signer },
+    })
+
+  beforeAll(async () => {
+    const rows = await db
+      .insert(corporateCustomers)
+      .values([
+        {
+          code: 'DN-AB',
+          name: COMPANY.name,
+          taxCode: COMPANY.taxCode,
+          address: COMPANY.address,
+          contactEmail: COMPANY.email,
+          contactName: 'Chị Hà',
+          creditLimitVnd: 50_000_000,
+        },
+        {
+          code: 'DN-THIEU',
+          name: 'CÔNG TY TNHH THIẾU ĐỊA CHỈ',
+          taxCode: '0105555555',
+          creditLimitVnd: 50_000_000,
+        },
+      ])
+      .returning({ id: corporateCustomers.id })
+    companyId = rows[0]!.id
+    noAddressId = rows[1]!.id
+  })
+
+  it('thu ngân tìm công ty ở P10: thấy hạn mức còn lại và hồ sơ thiếu địa chỉ', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: '/api/crm/corporate/pick?q=dn-',
+      headers: auth(),
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    const found = res.json() as { id: number; address: string | null; availableVnd: number }[]
+    expect(found.find((c) => c.id === companyId)).toMatchObject({
+      address: COMPANY.address,
+      availableVnd: 50_000_000,
+      blockedReason: null,
+    })
+    expect(found.find((c) => c.id === noAddressId)?.address).toBeNull()
+  })
+
+  it('khách trả một phần, công ty nợ phần còn lại; hoá đơn cho công ty, bàn chờ dọn', async () => {
+    const { sessionId, orderId } = await tableWith([{ dishId: 'bachibo', qty: 1 }], fx.plainTableId)
+    // Ở bàn khách khai người mua khác — bill ghi nợ thì hoá đơn đứng tên công ty nợ
+    await setBuyer(sessionId, { kind: 'person', name: 'Nguyễn Văn An' })
+    await payCash(sessionId, 100_000)
+
+    const res = await charge(companyId, orderId, 'Anh Minh')
+    expect(res.statusCode, res.payload).toBe(201)
+    expect(res.json().amountVnd).toBe(208_000)
+    expect(res.json().invoice).toMatchObject({ state: 'issued' })
+    expect(res.json().invoice.document.buyer).toMatchObject({
+      kind: 'company',
+      taxCode: COMPANY.taxCode,
+      address: COMPANY.address,
+      contactName: 'Anh Minh',
+    })
+    expect(res.json().invoice.document.paymentMethod).toBe('TM/Công nợ')
+
+    const bill = await inject({
+      method: 'GET',
+      url: `/api/table-sessions/${sessionId}/bill`,
+      headers: auth(),
+    })
+    expect(bill.json()).toMatchObject({
+      paid: 100_000,
+      outstanding: 0,
+      corporateCharge: { company: COMPANY.name, amount: 208_000 },
+    })
+    const [session] = await db.select().from(tableSessions).where(eq(tableSessions.id, sessionId))
+    expect(session!.status).toBe('paid_wait_clear')
+
+    const more = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/pay/cash`,
+      headers: auth(),
+      payload: { amount: 1_000 },
+    })
+    expect(more.statusCode).toBe(409)
+    expect(more.json().code).toBe('already_paid')
+    await closeTable(sessionId)
+  })
+
+  it('hoá đơn chưa lên được: người mua vẫn khoá vào công ty nợ tiền', async () => {
+    const { sessionId, orderId } = await tableWith([{ dishId: 'bachibo', qty: 1 }], fx.plainTableId)
+    provider.failNext('provider_rejected', 'Nhà cung cấp từ chối hoá đơn', false)
+    const res = await charge(companyId, orderId)
+    expect(res.json().invoice).toMatchObject({ state: 'failed' })
+
+    const change = await setBuyer(sessionId, null, auth())
+    expect(change.statusCode).toBe(409)
+    expect(change.json().code).toBe('invoice_buyer_locked')
+
+    expect((await issueAgain(orderId)).json()).toMatchObject({ state: 'issued' })
+    await closeTable(sessionId)
+  })
+
+  it('hồ sơ thiếu địa chỉ khi đã bật hoá đơn điện tử: chưa ghi nợ được', async () => {
+    const { sessionId, orderId } = await tableWith([{ dishId: 'bachibo', qty: 1 }], fx.plainTableId)
+    const res = await charge(noAddressId, orderId)
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('corporate_profile_incomplete')
+    await payCash(sessionId, 308_000)
+    await closeTable(sessionId)
+  })
+
+  it('mã VietQR còn treo hết giá trị khi ghi nợ — tiền tới sau không kéo đơn về "một phần"', async () => {
+    const { sessionId, orderId } = await tableWith([{ dishId: 'bachibo', qty: 1 }], fx.plainTableId)
+    const qr = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${sessionId}/pay/vietqr`,
+      headers: auth(),
+      payload: { amount: 308_000 },
+    })
+    expect(qr.statusCode, qr.payload).toBe(201)
+    expect((await charge(companyId, orderId)).statusCode).toBe(201)
+
+    const [pending] = await db.select().from(payments).where(eq(payments.orderId, orderId))
+    expect(pending!.state).toBe('expired')
+    const late = await bankWebhook({
+      bankRef: 'FT26102200301',
+      vaNumber: qr.json<{ vaNumber: string }>().vaNumber,
+      amount: 308_000,
+    })
+    expect(late.json()).toMatchObject({ matched: false })
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId))
+    expect(order!.paymentState).toBe('paid')
+    await closeTable(sessionId)
   })
 })

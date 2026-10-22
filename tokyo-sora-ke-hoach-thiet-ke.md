@@ -541,7 +541,7 @@ Bốn quy tắc an toàn: bàn **không tự đóng** khi trả xong (chuyển *
 | P7 | Chi tiết đơn bàn | Nhóm theo đợt, trạng thái bếp, *Ra đợt tiếp*, sửa/huỷ |
 | P8 | Huỷ món | Lý do; đã gửi bếp → ô PIN quản lý tại chỗ |
 | P9 | Chuyển/ghép/tách bàn | Chọn món → bàn đích; tách theo món hoặc %; **chuyển bàn khác loại → xác nhận định tuyến lại** |
-| P10 | Tính tiền | Nếu khách đã tự trả một phần: khối "Đã thu X qua QR lúc HH:MM" ở đầu, chỉ tính phần còn lại; ô **SĐT tích điểm** (hiện số dư + nút *Dùng điểm*, trần theo tham số); giảm giá, voucher, chia bill; hình thức: tiền mặt · thẻ · chuyển khoản · ví · **Ghi nợ công ty** (chọn công ty → kiểm hạn mức & quá hạn → R7 duyệt → khách ký trên máy hoặc in phiếu ký; HĐĐT xuất theo MST công ty — từng bill hoặc gộp bảng kê cuối kỳ, kế toán chọn và xác nhận pháp lý) |
+| P10 | Tính tiền | Nếu khách đã tự trả một phần: khối "Đã thu X qua QR lúc HH:MM" ở đầu, chỉ tính phần còn lại; ô **SĐT tích điểm** (hiện số dư + nút *Dùng điểm*, trần theo tham số); giảm giá, voucher, chia bill; hình thức: tiền mặt · thẻ · chuyển khoản · ví · **Ghi nợ công ty** (chọn công ty → kiểm hạn mức & quá hạn → R7 duyệt → khách ký trên máy hoặc in phiếu ký; ghi nợ phần còn phải trả; HĐĐT xuất theo MST công ty ngay lúc ghi nợ — NĐ 254/2026 không cho nhà hàng gộp hoá đơn cuối kỳ) |
 | P11 | Hoàn tất & in | Tiền thối, in bill kèm **QR tra cứu HĐĐT**; trạng thái *đang phát hành hoá đơn* — lỗi thì cho khách về, phát hành bù (Mục 30.2) |
 | P12 | Yêu cầu từ bàn | Hàng đợi T9, sắp theo thời gian chờ |
 | P13 | Đặt bàn hôm nay | Danh sách rút gọn từ R1: xác nhận đến, gán bàn — bản đầy đủ ở module Đặt bàn |
@@ -751,7 +751,7 @@ Mỗi tham số có: mã · tên · giá trị · đơn vị · **phạm vi** (c
 | Chi phí | **Hạn mức chi vặt** · **ngưỡng ghi nhận tài sản** · **ngưỡng chủ duyệt** · ngưỡng food cost xanh/vàng/đỏ |
 | Vai trò | Giảm giá tối đa theo vai trò · hạn mức duyệt theo vai trò (đồng bộ tab A2) |
 | Tích điểm | Tỷ lệ tích · tỷ lệ quy đổi · trần đổi mỗi giao dịch · hạn điểm · ngưỡng ba hạng |
-| Công nợ DN | Hạn mức nợ mặc định · số ngày quá hạn thì chặn ghi nợ · chế độ xuất HĐĐT (từng bill / gộp) |
+| Công nợ DN | Hạn mức nợ mặc định · số ngày quá hạn thì chặn ghi nợ |
 | Bảo trì | Chu kỳ mặc định theo nhóm thiết bị · nhắc trước N ngày |
 
 H6 (cơ chế lương) và các màn cấu hình khác là **cửa vào theo ngữ cảnh** của cùng bộ tham số — sửa ở đâu cũng là sửa một chỗ.
@@ -924,7 +924,7 @@ Soi hệ thống theo hai vòng đời: **vòng đời đồng tiền** (vào t�
 | Hạng mục | Đã đưa vào đâu | Logic cốt lõi |
 |---|---|---|
 | **Tích điểm & hạng thành viên** | B14 cấu hình · B12 tab Điểm & hạng · P10 ô SĐT + nút Dùng điểm · T15 dòng điểm vừa tích · Trung tâm tham số nhóm Tích điểm | Điểm chỉ sinh từ sự kiện `thanh-toan.nhan` — không cộng tay được; huỷ bill tự thu hồi; hạng theo chi tiêu 12 tháng trượt; đổi điểm có trần mỗi giao dịch |
-| **Công nợ khách doanh nghiệp** | B15 hồ sơ & hạn mức · P10 hình thức Ghi nợ công ty (duyệt + ký) · F5 tab Phải thu · F7 tách dồn tích/dòng tiền | Doanh thu ghi nhận ngay (dồn tích), tiền về mới vào dòng tiền; quá hạn N ngày tự chặn ghi nợ mới; bảng kê cuối kỳ gửi công ty; HĐĐT theo MST công ty — chế độ từng bill/gộp do kế toán chọn |
+| **Công nợ khách doanh nghiệp** | B15 hồ sơ & hạn mức · P10 hình thức Ghi nợ công ty (duyệt + ký) · F5 tab Phải thu · F7 tách dồn tích/dòng tiền | Doanh thu ghi nhận ngay (dồn tích), tiền về mới vào dòng tiền; quá hạn N ngày tự chặn ghi nợ mới; bảng kê cuối kỳ gửi công ty; HĐĐT theo MST công ty, mỗi bill một hoá đơn lập ngay lúc ghi nợ (NĐ 254/2026 không cho gộp) |
 | **Bảo trì thiết bị định kỳ** | C4 tab Bảo trì · nhắc trên C1 · phiếu chi tự sinh khoản mục sửa chữa | Lịch chu kỳ theo tài sản; đến hạn sinh việc; hoàn thành là có chứng từ chi phí luôn — không ghi hai lần |
 
 ## G.3 Cố tình không làm — và vì sao

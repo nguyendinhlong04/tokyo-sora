@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { EinvoiceModule } from '../einvoice/einvoice.module'
 import { OrderingModule } from '../ordering/ordering.module'
 import { CorporateService } from './corporate.service'
 import { CrmController } from './crm.controller'
@@ -15,10 +16,11 @@ import { PromotionsService } from './promotions.service'
  * lại là hai chỗ sẽ báo con số khác.
  *
  * Nhập `OrderingModule` vì gắn voucher là tính lại tiền đơn, và tiền đơn chỉ có
- * một nơi tính (`recomputeTotals`). Chiều ngược lại không có — không vòng.
+ * một nơi tính (`recomputeTotals`). Chiều ngược lại không có — không vòng. Nhập
+ * `EinvoiceModule` vì ghi nợ công ty là một lượt "trả đủ": lập hoá đơn ngay.
  */
 @Module({
-  imports: [OrderingModule],
+  imports: [OrderingModule, EinvoiceModule],
   controllers: [CrmController],
   providers: [PromotionsService, CustomersService, FeedbackService, CorporateService],
   exports: [CustomersService, CorporateService],
