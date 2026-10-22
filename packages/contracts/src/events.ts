@@ -55,6 +55,3 @@ export const rooms = {
   config: (branchId: string) => `branch:${branchId}:config`,
   print: (branchId: string) => `branch:${branchId}:print`,
 } as const
-
-/** Header idempotency — bắt buộc trên mọi POST/PATCH ghi từ client có outbox */
-export const IDEMPOTENCY_HEADER = 'idempotency-key'

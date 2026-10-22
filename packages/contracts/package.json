@@ -14,6 +14,7 @@
       "default": "./dist/index.js"
     }
   },
+  "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.cjs.json && node emit-cjs-marker.mjs",
     "typecheck": "tsc --noEmit",

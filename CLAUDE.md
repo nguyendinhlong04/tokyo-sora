@@ -60,7 +60,8 @@ còn ghi `tokyosora.vn` — đó là chỗ lệch, không phải tên miền th�
 - `contracts` — hợp đồng dữ liệu: zod schema, enum, tiền VND (`computeOrderTotals`,
   `formatVnd`, `roundToUnit`), ma trận quyền (`ROLES`, `ACTIONS`, `can`, `needsApproval`),
   tên topic/room realtime. Build ra `dist/` (gitignore) → **phải build trước** khi
-  typecheck/build API và app. Import nội bộ trong gói bắt buộc có đuôi `.js`.
+  typecheck/build API và app. Import nội bộ trong gói bắt buộc có đuôi `.js`. Cùng `core`
+  khai `"sideEffects": false` — thêm file vào hai gói thì theo hai quy tắc ở §8.
 - `core` — runtime trình duyệt cho các SPA: `apiFetch` (gắn `x-sora-device`,
   `idempotency-key`), `session` (localStorage `sora.device.token`), **outbox** Dexie/IndexedDB
   gửi lại khi có mạng, `ember` (thang than hồng), `server-clock`, `safeHref` (chỉ cho link
@@ -613,9 +614,23 @@ làm và cách áp lại cho các app khác: **§8.1**. Sora Table dùng chung b
   cho web.
 - Ảnh thumbnail (176–400px) ≤ 40 KB · thẻ 4:3 (800px) ≤ 120 KB · hero/chi tiết (1600px)
   ≤ 250 KB · tổng ảnh một màn thực đơn ≤ 1,5 MB · JS mỗi SPA ≤ 250 KB gzip, web ≤ 200 KB.
-- Office (22/10/2026, tách chunk theo màn — §6): chunk đầu 176 KB gzip sau khi gộp nhánh tổ
-  chức và hoá đơn điện tử (164 KB trên gd1 riêng), mỗi màn thêm 2–11 KB khi mở lần đầu;
+- Office (22/10/2026, tách chunk theo màn — §6): chunk đầu 122 KB gzip sau khi gộp nhánh tổ
+  chức và hoá đơn điện tử (112 KB trên gd1 riêng), mỗi màn thêm 2–11 KB khi mở lần đầu;
   trước đó một chunk 281 KB.
+- `@sora/contracts` và `@sora/core` khai `"sideEffects": false` (22/10/2026): bundler bỏ cả
+  file mà app không dùng export nào. zod còn ở form người mua hoá đơn `@sora/ui/InvoiceBuyer`
+  (POS, iPad bàn, web O5/O7, Office F3) — nơi thật sự parse — và ở M1 Office: `DishEditor`
+  dùng `VAT_CODES` của `invoice.ts`, file dựng `InvoiceBuyerSchema` ở cấp module (trái quy tắc
+  2 dưới đây). Dexie rời Office và staff (không dùng outbox). Chunk đầu, kB gzip trước → sau:
+  Office 176 → 122 · staff 156 → 102 · KDS 137 → 117 · kiosk 128 → 108 · POS 192 và table 187
+  gần như giữ nguyên (form người mua); web: First Load JS của 8 trang giảm 19–22 kB (trang
+  chủ 142 → 121).
+  Giữ được nhờ hai quy tắc:
+  1. Không file nào trong hai gói được trông vào "import là chạy" (polyfill, đăng ký toàn
+     cục, `import './x'` trần). Cần thì liệt kê đúng file đó trong `"sideEffects"`.
+  2. Hằng và hàm mà client dùng **không** đặt chung file với schema zod dựng ở cấp module
+     (`domain.ts`, `events.ts`): dùng một export của file là bundler giữ luôn các lệnh dựng
+     schema, kéo theo cả zod (~18 kB gzip). Vì vậy `IDEMPOTENCY_HEADER` nằm riêng ở `http.ts`.
 
 **Quy tắc ảnh (áp cho mọi app, mọi ảnh mới):**
 1. **Không bao giờ phát ảnh gốc.** Mọi ảnh đi qua một đường ống sinh biến thể
