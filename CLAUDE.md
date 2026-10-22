@@ -416,9 +416,22 @@ migration `0031` xoá bảng `table_devices` và cột `qr_token_hash`.
 - **Ghi offline:** `enqueue` của `@sora/core` (Dexie `sora-outbox`, FIFO, header
   `idempotency-key`); server `IdempotencyInterceptor` so hash body (khác → 409
   `idempotency_key_reused`). Chỉ đơn và trạng thái; **không** cache kết quả đọc.
-  `QueryClient` phải đặt `mutations.networkMode: 'always'`: mặc định `'online'` của
-  TanStack **hoãn** lệnh ghi khi trình duyệt báo mất mạng — `mutationFn` không chạy, lệnh
-  không vào outbox, reload lúc đó là mất. Đã đặt ở table (22/10/2026); POS và KDS chưa.
+- **TanStack Query tự hoãn lệnh ghi khi mất mạng** (mặc định v5 `networkMode: 'online'`):
+  sau sự kiện `offline`, `useMutation` dừng **trước** khi gọi `mutationFn` — `enqueue` không
+  chạy, IndexedDB không có dòng nào, nút đứng ở `isPending`, toast "đã xếp hàng" không bao
+  giờ hiện, tải lại trang là mất lệnh (lệnh hoãn chỉ nằm trong bộ nhớ). QueryClient của app
+  ghi qua outbox (`pos`, `kitchen`, `table`) **phải** đặt `mutations: { networkMode: 'always' }`;
+  nhờ vậy lệnh cố ý gọi thẳng `apiFetch` (chuyển/ghép bàn, đánh dấu yêu cầu đã xử lý) cũng
+  báo lỗi ngay thay vì nằm chờ mạng. Office, Kênh nhân viên không dùng outbox nên chưa đặt:
+  mất mạng thì lệnh ghi ở đó treo `isPending` tới khi có mạng lại. Kiosk không dùng
+  `useMutation` — chấm công gọi thẳng `apiFetch` và tự báo mất mạng.
+- **Thử mất mạng:** đừng tắt API — proxy Vite trả 500 chứ không phải lỗi mạng, outbox đánh
+  dòng `failed` thay vì giữ `pending`. Trong Console: thay `window.fetch` bằng hàm trả
+  `Promise.reject(new TypeError('Failed to fetch'))` cho lệnh không phải GET, rồi
+  `Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false })` và
+  `dispatchEvent(new Event('offline'))` → mỗi lệnh ghi thành một dòng `pending` trong
+  IndexedDB `sora-outbox` › `rows`. Trả `fetch` gốc, `delete navigator.onLine`,
+  `dispatchEvent(new Event('online'))` → hàng đợi gửi theo thứ tự, mỗi `idempotency-key` một lần.
 - **PWA:** `pos`, `kitchen` và `table` (`vite-plugin-pwa`, `registerType:'prompt'`; precache
   js/css/html/woff2/png/svg; `/api` không cache trừ KDS `NetworkFirst` `/api/recipes`). POS
   cập nhật khi thu ngân bấm; KDS tự cập nhật khi hàng vé rỗng; table chỉ áp bản mới ở màn

@@ -29,6 +29,12 @@ const queryClient = new QueryClient({
       },
       refetchOnWindowFocus: true,
     },
+    mutations: {
+      // Không để thư viện tự hoãn lệnh ghi khi trình duyệt báo mất mạng (mặc định
+      // của nó). Hoãn ở đây thì cú chạm Bắt đầu/Xong, Báo hết chỉ nằm trong bộ nhớ,
+      // không vào hàng đợi offline — màn tải lại (mất điện, bản PWA mới) là mất.
+      networkMode: 'always',
+    },
   },
 })
 
