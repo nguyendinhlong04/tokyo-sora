@@ -1,3 +1,4 @@
+import type { AssignmentKind, OrgAssignmentRow, OrgChart, OrgUnitKind, Role } from '@sora/contracts'
 import { apiFetch } from '@sora/core'
 
 export interface OfficeStaff {
@@ -3161,4 +3162,66 @@ export const api = {
     note: string | null
   }) =>
     apiFetch<{ id: number }>('/api/crm/corporate/settlements', { method: 'POST', body: input }),
+
+  // ---- N2 · N3 Sơ đồ tổ chức — kiểu lấy từ @sora/contracts, không viết tay
+
+  orgChart: (date?: string) => apiFetch<OrgChart>(`/api/org/chart${date ? `?date=${date}` : ''}`),
+
+  orgPositionHistory: (positionId: number) =>
+    apiFetch<OrgAssignmentRow[]>(`/api/org/positions/${positionId}/history`),
+
+  createOrgUnit: (input: OrgUnitInput) =>
+    apiFetch<{ id: number }>('/api/org/units', { method: 'POST', body: input }),
+
+  updateOrgUnit: (
+    id: number,
+    patch: Partial<Omit<OrgUnitInput, 'kind' | 'branchId'>> & { active?: boolean },
+  ) => apiFetch<{ id: number }>(`/api/org/units/${id}`, { method: 'PUT', body: patch }),
+
+  createPosition: (input: PositionInput) =>
+    apiFetch<{ id: number }>('/api/org/positions', { method: 'POST', body: input }),
+
+  updatePosition: (
+    id: number,
+    patch: Partial<Omit<PositionInput, 'unitId'>> & { active?: boolean },
+  ) => apiFetch<{ id: number }>(`/api/org/positions/${id}`, { method: 'PUT', body: patch }),
+
+  assignPosition: (input: {
+    staffIds: number[]
+    positionId: number
+    kind: AssignmentKind
+    fromDate: string
+    note: string
+    replaceMain?: boolean
+  }) => apiFetch<{ created: number[] }>('/api/org/assignments', { method: 'POST', body: input }),
+
+  endAssignment: (id: number, input: { toDate: string; note: string }) =>
+    apiFetch<{ id: number }>(`/api/org/assignments/${id}/end`, { method: 'POST', body: input }),
+
+  applyOrgStandard: (target: string) =>
+    apiFetch<{ unitsCreated: number; positionsCreated: number }>('/api/org/apply-standard', {
+      method: 'POST',
+      body: { target },
+    }),
+}
+
+export interface OrgUnitInput {
+  parentId: number
+  kind: Exclude<OrgUnitKind, 'cong-ty'>
+  name: string
+  branchId: string | null
+  stationId: string | null
+  sort: number
+}
+
+export interface PositionInput {
+  unitId: number
+  title: string
+  isHead: boolean
+  headcount: number
+  suggestedRole: Role | null
+  duties: string[]
+  authorities: string[]
+  requirements: string[]
+  sort: number
 }

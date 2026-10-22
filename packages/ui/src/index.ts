@@ -8,3 +8,4 @@ export { OrderTicket, type OrderTicketProps, type TicketItemView } from './Order
 export { MenuItemCard, type MenuItemCardProps } from './MenuItemCard'
 export { QrCode } from './QrCode'
 export { OutboxBanner } from './OutboxBanner'
+export { EmberBar } from './EmberBar'

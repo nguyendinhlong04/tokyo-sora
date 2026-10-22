@@ -36,8 +36,15 @@ const PERMISSION_MARK: Record<Permission, { mark: string; className: string; tit
   deny: { mark: '–', className: 'text-line-4', title: 'Không được phép' },
 }
 
-/** Ba nhóm của tài liệu: §4.2 vận hành, §4.2b nhân sự, §4.2b chi phí & báo cáo */
+/**
+ * Nhóm của tài liệu: §4.2 vận hành, §4.2b nhân sự, §4.2b chi phí & báo cáo,
+ * §4.2c tổ chức & điều hành. Thứ tự là thứ tự thử — nhóm cuối hứng phần còn lại.
+ */
 const GROUPS: { label: string; test: (action: ActionKey) => boolean }[] = [
+  {
+    label: 'Tổ chức & điều hành (§4.2c)',
+    test: (a) => a.startsWith('org.'),
+  },
   {
     label: 'Nhân sự (§4.2b)',
     test: (a) =>

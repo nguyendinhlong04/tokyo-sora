@@ -9,7 +9,7 @@ nhân sự (R13), marketing (R9), bếp trưởng (R5), thủ kho (R6).
 - Đăng nhập bằng **Chi nhánh + Email + Mật khẩu** (nút **Vào Office**) — không
   cần thiết bị ghép. **Phiên mở đúng một chi nhánh**; vai trò cấp chuỗi muốn
   làm việc ở chi nhánh khác thì đăng nhập lại.
-- Cột trái là menu 9 nhóm dạng accordion (một nhóm mở tại một thời điểm; nhóm
+- Cột trái là menu 10 nhóm dạng accordion (một nhóm mở tại một thời điểm; nhóm
   chứa trang đang xem tự mở). Ô **"Lọc menu…"** gõ là trải phẳng kết quả — gõ
   "kho" hay "S5" đều ra. Menu chỉ hiện màn mà vai trò của bạn dùng được.
 - Route mặc định là **M1 · Món và set**.
@@ -103,6 +103,37 @@ flowchart LR
   Không ai một mình đưa được tiền lương ra khỏi quỹ: nhân sự trình, kế toán
   kiểm, chủ duyệt và phát. Quản lý ca thấy *công* nhưng không bao giờ thấy
   *lương*.
+
+## 6.4b Tổ chức & điều hành (N2 · N3)
+
+Sơ đồ tổ chức là trục của giao việc, văn bản, báo cáo và KPI: **cấp trên trực
+tiếp** của một người là người ngồi ghế **trưởng** của đơn vị gần nhất phía trên.
+
+| Màn | Dùng để |
+|---|---|
+| **N2 · Sơ đồ tổ chức** | Cây đơn vị (công ty → khối/phòng → chi nhánh → bộ phận → tổ). Mỗi thẻ đơn vị liệt kê chức danh: người đang giữ, **thực có/định biên**, thanh than hồng (càng nóng càng thiếu người — đỏ là ghế trưởng trống). Bố cục **Dọc/Ngang**, thu phóng, **tìm người** (mở nhánh và đưa thẻ ra giữa), lọc chi nhánh, **In sơ đồ** (A3 ngang) |
+| **N3 · Chức danh & định biên** | Cùng dữ liệu dạng bảng: lọc "chỉ ghế còn trống", cột vai trò gợi ý báo người giữ ghế chưa có quyền ở A1 |
+
+**Bắt đầu nhanh — dựng theo mẫu chuẩn:** nút **Dựng khung chuỗi theo mẫu** tạo Ban
+điều hành, Khối văn phòng (Kế toán, Nhân sự, Marketing), Khối vận hành; dải
+**"Chi nhánh chưa có trên sơ đồ"** có nút **Dựng … theo mẫu** cho từng chi nhánh
+(Sảnh, Bếp với sáu tổ theo trạm ST-01…ST-06, Kho), kèm **mô tả công việc** ba
+phần (trách nhiệm · quyền hạn · tiêu chuẩn) cho từng chức danh. Áp lại không nhân
+đôi; sửa tay sau khi áp không bị ghi đè. Nội dung mẫu là bản nháp — duyệt lại
+trước khi dùng làm căn cứ tuyển dụng.
+
+- **Gán người vào ghế:** bấm một chức danh → tab **Người giữ** → chọn người, chức
+  danh chính hay kiêm nhiệm, từ ngày, **lý do** (bắt buộc với gán tay). Người đang
+  giữ chức chính khác thì hệ thống hỏi **Điều chuyển** — chức cũ đóng đúng ngày
+  nhận chức mới. **Không ai tự gán chức cho mình.**
+- **Kết thúc chức danh** ghi ngày thôi giữ và lý do. Lịch sử giữ chức không xoá,
+  không sửa ngược (tab **Lịch sử**).
+- **Hồ sơ H1 đi theo sơ đồ:** người đã có ghế thì cột Chức danh ở H1 lấy từ sơ đồ
+  và chỉ đọc — đổi bằng điều chuyển ở N2.
+- **Sơ đồ không cấp quyền.** Mỗi chức danh có vai trò gợi ý (R1–R13); người giữ
+  ghế chưa có vai trò đó thì sơ đồ nhắc, việc cấp vẫn làm ở **A1**.
+- **Ai thấy gì:** R10 · R11 · R13 thấy và sửa cả chuỗi; quản lý ca chỉ thấy cây
+  chi nhánh của mình, không sửa được; R1–R4 không mở Office.
 
 ## 6.5 Chi phí & tài sản (C1–C5)
 

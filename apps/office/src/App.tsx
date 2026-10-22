@@ -1,7 +1,7 @@
 import type { ActionKey } from '@sora/contracts'
-import { ToastProvider } from '@sora/ui'
+import { Skeleton, ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router'
 import { ConfigBranchProvider } from './components/config-branch'
 import { PublishConfig } from './components/publish-config'
@@ -57,6 +57,14 @@ import { Schedule } from './routes/Schedule'
 import { StockLevels, StockOverview } from './routes/Stock'
 import { Today } from './routes/Today'
 import { SessionProvider, useSession } from './session-context'
+
+/**
+ * Nhóm Tổ chức & điều hành (N…) tải theo yêu cầu: bản dựng Office đã vượt ngân
+ * sách JS của §8 trước khi có nhóm này, nên phần mới không được làm gói chính
+ * nặng thêm — người chỉ làm kho hay kế toán không phải tải sơ đồ tổ chức.
+ */
+const OrgChart = lazy(() => import('./routes/OrgChart').then((m) => ({ default: m.OrgChart })))
+const Positions = lazy(() => import('./routes/Positions').then((m) => ({ default: m.Positions })))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5_000, refetchOnWindowFocus: true } },
@@ -117,6 +125,13 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
       { to: '/nghi-phep', label: 'H5 · Nghỉ phép & đổi ca', need: 'schedule.publish' },
       { to: '/co-che-luong', label: 'H6 · Cơ chế lương', need: 'payroll.configure' },
       { to: '/ky-luong', label: 'H7 · Kỳ lương', need: 'payroll.view-others' },
+    ],
+  },
+  {
+    group: 'Tổ chức & điều hành',
+    items: [
+      { to: '/so-do-to-chuc', label: 'N2 · Sơ đồ tổ chức', need: 'org.view' },
+      { to: '/chuc-danh', label: 'N3 · Chức danh & định biên', need: 'org.view' },
     ],
   },
   {
@@ -254,6 +269,8 @@ export function App() {
                 <Route path="/nghi-phep" element={<Leaves />} />
                 <Route path="/co-che-luong" element={<PayrollRules />} />
                 <Route path="/ky-luong" element={<Payroll />} />
+                <Route path="/so-do-to-chuc" element={<OrgChart />} />
+                <Route path="/chuc-danh" element={<Positions />} />
                 <Route path="/chi-phi-tong-quan" element={<ExpenseOverview />} />
                 <Route path="/chi-phi" element={<Expenses />} />
                 <Route path="/dinh-ky" element={<RecurringExpenses />} />
@@ -339,8 +356,8 @@ function Shell() {
     : visible
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-canvas font-sans text-ink-body">
-      <aside className="flex w-64 flex-none flex-col border-r border-line-1 bg-surface-1">
+    <div className="flex h-dvh overflow-hidden bg-canvas font-sans text-ink-body print:h-auto print:overflow-visible">
+      <aside className="flex w-64 flex-none flex-col border-r border-line-1 bg-surface-1 print:hidden">
         <div className="flex-none border-b border-line-1 px-5 py-4">
           <div className="flex items-baseline gap-2">
             <span className="font-jp text-[length:var(--fs-b2)] text-accent">東京空</span>
@@ -454,17 +471,30 @@ function Shell() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:overflow-visible">
         {/* Bộ lọc chi nhánh của nhóm báo cáo và chi nhánh đang cấu hình của
             nhóm cài đặt đều sống theo phiên đăng nhập: đăng xuất là Shell rơi
             về <Login /> và cả hai lựa chọn tự reset theo provider. Hai context
             cố ý tách nhau — xem chú thích ở components/config-branch.tsx. */}
         <ReportBranchProvider>
           <ConfigBranchProvider>
-            <Outlet />
+            <Suspense fallback={<RouteSkeleton />}>
+              <Outlet />
+            </Suspense>
           </ConfigBranchProvider>
         </ReportBranchProvider>
       </div>
+    </div>
+  )
+}
+
+/** Đang tải mã của một màn tải theo yêu cầu: khung đúng hình đầu trang + bảng (§13) */
+function RouteSkeleton() {
+  return (
+    <div className="grid gap-4 px-8 pt-6">
+      <Skeleton className="h-7 w-72" />
+      <Skeleton className="h-4 w-[520px]" />
+      <Skeleton className="mt-4 h-[320px]" />
     </div>
   )
 }

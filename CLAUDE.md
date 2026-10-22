@@ -63,7 +63,7 @@ còn ghi `tokyosora.vn` — đó là chỗ lệch, không phải tên miền th�
 - `core` — runtime trình duyệt cho các SPA: `apiFetch` (gắn `x-sora-device`,
   `idempotency-key`), `session` (localStorage `sora.device.token`), **outbox** Dexie/IndexedDB
   gửi lại khi có mạng, `ember` (thang than hồng), `server-clock`. API không dùng gói này.
-- `ui` — 16 thành phần dùng chung + `useToast` (§4.6). Ship TS thô, không build.
+- `ui` — 17 thành phần dùng chung + `useToast` (§4.6). Ship TS thô, không build.
 - `tokens` — `tokens.css` là **nguồn duy nhất** của màu, cỡ chữ, bo góc, chuyển động;
   `fonts.css` + `fonts/*.woff2` self-host, sinh bằng `scripts/fetch-fonts` (không sửa tay).
 - `config` — `tsconfig.base.json` (strict, `noUncheckedIndexedAccess`, bundler resolution).
@@ -214,7 +214,8 @@ mất mạng = dải báo + hàng đợi cục bộ, màn thanh toán bị chặ
 `Modal` · `ToastProvider`/`useToast(push(msg, tone))` · `Card` · `SectionLabel` ·
 `EmptyState` · `ErrorState` · `Skeleton` · `Badge` · `Money` · `TableTile` (P2) ·
 `OrderTicket` (K2) · `MenuItemCard` (P4 — cố ý **không ảnh**) · `OutboxBanner` ·
-`QrCode` (entry riêng `@sora/ui/QrCode` để web không kéo Dexie).
+`QrCode` (entry riêng `@sora/ui/QrCode` để web không kéo Dexie) · `EmberBar` (thanh than
+hồng: độ dài = tỉ lệ, màu = độ "nóng"; nơi gọi luôn in chữ đi kèm).
 
 Quy tắc: mọi `<button>` có `type="button"`; variant là `Record<Union,string>` UPPER_CASE;
 không responsive prefix trong gói; app Vite **phải** có `@source '../../../packages/ui/src'`
@@ -414,7 +415,9 @@ ra log hay chat.
 - Trạng thái máy chủ: TanStack Query (`staleTime` 5 s, `refetchInterval` theo màn). Trạng
   thái cục bộ: React Context + sessionStorage (giỏ `sora.table.cart`, nháp đơn web
   `sora.web.order`). Không thêm store toàn cục.
-- Màn hình theo mã thiết kế (T/P/K/O/R/W/M/S/B/H/C/F/A) — ghi mã ở đầu file.
+- Màn hình theo mã thiết kế (T/P/K/O/R/W/M/S/B/H/C/F/A, và N cho Tổ chức & điều hành —
+  `tokyo-sora-ke-hoach-thiet-ke.md` §26b) — ghi mã ở đầu file. Màn nhóm N tải theo yêu cầu
+  (`React.lazy` trong `App.tsx`): bản dựng Office đã vượt ngân sách JS của §8 từ trước.
 - Thiết bị đích theo app (§1) quyết định bố cục; không có media query theo hướng xoay.
   Khi một thành phần phải chạy ở nhiều khổ (POS iPad/điện thoại — §9.3) ưu tiên
   **container query** hơn `lg:` toàn trang.
