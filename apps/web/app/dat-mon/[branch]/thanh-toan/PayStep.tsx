@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ApiError, apiGet, apiPost, type CreatedOrder, type Quote } from '../../../../lib/api'
 import { useOrder } from '../../order-context'
+import { usePromos } from '../../promotions'
 
 /**
  * O6 — đặt đơn rồi trả trước.
@@ -14,7 +15,8 @@ import { useOrder } from '../../order-context'
  * cầm theo cả tiền món của khách.
  */
 export function PayStep({ branchId }: { branchId: string }) {
-  const { draft, sub, clear } = useOrder()
+  const { draft, clear } = useOrder()
+  const promos = usePromos()
   const router = useRouter()
   const [quote, setQuote] = useState<Quote | null>(null)
   const [busy, setBusy] = useState(false)
@@ -32,6 +34,8 @@ export function PayStep({ branchId }: { branchId: string }) {
   }, [branchId, draft.mode, draft.ward])
 
   const ship = quote?.inZone ? quote.feeVnd : 0
+  // Đúng phép tính máy chủ sẽ chạy — số trên nút bấm là số mã QR sẽ đòi (§9.6)
+  const pricing = promos.priceCart(draft.lines, { mode: draft.mode, ship })
 
   /**
    * Đặt đơn. Máy chủ tính lại toàn bộ tiền — con số hiện ở đây chỉ để khách biết
@@ -74,8 +78,9 @@ export function PayStep({ branchId }: { branchId: string }) {
     <main className="mx-auto max-w-2xl px-4 pt-6 pb-32">
       <h1 className="font-display text-[length:var(--fs-d3)] font-light text-ink-hi">Thanh toán</h1>
       <p className="mt-2.5 text-[length:var(--fs-b1)] text-ink-mute">
-        Tổng {formatVnd(sub + ship)}
+        Tổng {formatVnd(pricing.money.total)}
         {draft.mode === 'delivery' ? ` (gồm ${formatVnd(ship)} phí giao)` : ''}
+        {pricing.money.discount > 0 ? ` · đã giảm ${formatVnd(pricing.money.discount)}` : ''}
       </p>
 
       {/* Chia đôi con số ngay tại đây, trước khi khách bấm: người giao chỉ cầm phí
@@ -90,7 +95,7 @@ export function PayStep({ branchId }: { branchId: string }) {
             {draft.mode === 'delivery' ? 'Tiền món — trả ngay bước sau' : 'Tiền món'}
           </span>
           <span className="font-mono text-[length:var(--fs-t2)] text-accent-ink">
-            {formatVnd(sub)}
+            {formatVnd(pricing.prepay)}
           </span>
         </div>
         {draft.mode === 'delivery' ? (
@@ -123,7 +128,7 @@ export function PayStep({ branchId }: { branchId: string }) {
             onClick={submit}
             className="h-14 w-full rounded-sm bg-accent-strong text-[length:var(--fs-b1)] font-semibold text-on-accent disabled:bg-transparent disabled:text-ink-mute disabled:outline disabled:outline-line-4"
           >
-            {busy ? 'Đang gửi đơn…' : `Đặt đơn và trả ${formatVnd(sub)}`}
+            {busy ? 'Đang gửi đơn…' : `Đặt đơn và trả ${formatVnd(pricing.prepay)}`}
           </button>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import type { BillHint } from '@sora/contracts'
 import { apiFetch, enqueue } from '@sora/core'
 
 export interface StaffOption {
@@ -137,6 +138,18 @@ export interface SessionOrder {
   }
   lines: OrderLineRow[]
   batches: { batchNo: number; state: 'held' | 'fired' }[]
+}
+
+/** P10 — phần giảm đang có trên đơn, và kết quả chấm thử một mã voucher (§9.6) */
+export interface PromoQuote {
+  /** Mã đang gắn trên đơn */
+  attachedVoucher: string | null
+  /** Khuyến mãi món — đã nằm sẵn trong giá từng dòng */
+  lineDiscountVnd: number
+  bill: { promotionId: number; code: string; name: string; discountVnd: number } | null
+  hint: BillHint | null
+  /** Chỉ có khi hỏi kèm một mã */
+  voucher: { code: string; accepted: boolean; reason: string | null } | null
 }
 
 export interface Bill {
@@ -366,6 +379,28 @@ export const api = {
     apiFetch<SessionOrder | null>(`/api/table-sessions/${sessionId}/order`),
 
   bill: (sessionId: number) => apiFetch<Bill>(`/api/table-sessions/${sessionId}/bill`),
+
+  /**
+   * P10 khuyến mãi & voucher. KHÔNG qua hàng đợi offline như các lệnh ghi khác:
+   * gắn mã là đổi tổng tiền ngay trước lúc thu, mà màn thu tiền vốn bị chặn khi
+   * mất mạng — để lệnh nằm chờ thì thu ngân thu theo một con số sắp đổi.
+   */
+  promoQuote: (orderId: number, voucher?: string) =>
+    apiFetch<PromoQuote>(
+      `/api/crm/promotions/quote?order=${orderId}${voucher ? `&voucher=${encodeURIComponent(voucher)}` : ''}`,
+    ),
+
+  applyVoucher: (orderId: number, voucherCode: string) =>
+    apiFetch<{ changed: boolean }>('/api/crm/promotions/apply-voucher', {
+      method: 'POST',
+      body: { orderId, voucherCode },
+    }),
+
+  removeVoucher: (orderId: number) =>
+    apiFetch<{ changed: boolean }>('/api/crm/promotions/remove-voucher', {
+      method: 'POST',
+      body: { orderId },
+    }),
 
   /** P5 — thứ tự 20 ô bàn phím nhanh; tên và giá vẫn lấy từ config bundle */
   quickKeys: (branchId: string) =>

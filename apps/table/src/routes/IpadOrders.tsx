@@ -1,11 +1,10 @@
-import { Button, Money, Skeleton } from '@sora/ui'
+import { Button, Money, PromoTag, Skeleton } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { api, type Dish, type OrderLineRow } from '../api'
 import { useCart } from '../cart-context'
 import { BackLink } from '../components/PayHeader'
-import { PromoTag } from '../components/PromoTag'
 import { StoryDialog } from '../components/StoryDialog'
 import { IconBook, IconPlus, IconWarning } from '../icons'
 import { useMenu } from '../menu'
@@ -323,7 +322,7 @@ function LineRow({ line, onStory }: { line: OrderLineRow; onStory: (() => void) 
         </p>
         {sub || badge ? (
           <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[length:var(--fs-c1)] text-ink-mute">
-            {badge ? <PromoTag label={badge} compact /> : null}
+            {badge ? <PromoTag label={badge} size="sm" /> : null}
             {sub}
           </p>
         ) : null}

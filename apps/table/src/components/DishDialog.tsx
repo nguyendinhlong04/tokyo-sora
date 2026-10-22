@@ -1,4 +1,4 @@
-import { Button, Money } from '@sora/ui'
+import { Button, Money, PromoTag } from '@sora/ui'
 import { useEffect, useState } from 'react'
 import type { Dish, ModifierGroup } from '../api'
 import { useCart } from '../cart-context'
@@ -7,7 +7,6 @@ import type { SetCourse, SetExtra } from '../menu'
 import { usePromos } from '../promotions'
 import { DishArt } from './DishArt'
 import { DishLine } from './DishLine'
-import { PromoTag } from './PromoTag'
 
 /**
  * T3 Chi tiết món trên iPad — hộp thoại hai cột giữa màn.

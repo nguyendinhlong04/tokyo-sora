@@ -180,6 +180,15 @@ export class OnlineService {
         .filter((c) => c.onlineVisible)
         .map((c) => ({ id: c.id, nameVi: c.nameVi, kanji: c.kanji, imageUrl: c.imageUrl })),
       dishes: menu,
+      /**
+       * Hai tham số còn thiếu để web tự cộng ra ĐÚNG tổng máy chủ sẽ tính, bằng
+       * chính `computeOrderTotals` (§9.6): giá khuyến mãi lẻ đồng thì làm tròn mới
+       * khớp số tiền mã QR đòi. Phí phục vụ chỉ thu ăn tại chỗ nên không có ở đây.
+       */
+      pricing: {
+        vatRate: await this.params.getNumber('sales.vatRate', 0, branchId),
+        roundingUnit: await this.params.getNumber('sales.roundingUnit', 1000, branchId),
+      },
     }
   }
 
@@ -575,6 +584,8 @@ export class OnlineService {
         sub: order.moneySub,
         // Dòng món in giá SAU giảm món; giảm hoá đơn khách phải thấy là một dòng riêng
         billDiscount: order.moneyBillDiscount,
+        // Giá giảm lẻ đồng thì có làm tròn — thiếu dòng này cộng tay không ra tổng
+        round: order.moneyRound,
         vat: order.moneyVat,
         ship: order.moneyShip,
         total: order.moneyTotal,

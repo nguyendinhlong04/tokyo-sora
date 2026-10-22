@@ -59,6 +59,13 @@ Những chặn khách sẽ gặp (đều là hành vi đúng):
 - Món `Tạm hết` không đặt được; món "ngon nhất trong 30 phút" có dòng nhắc chọn
   khung giờ gần.
 
+Khuyến mãi (soạn ở Office **B11**, chạy chung với iPad tại bàn và quầy): món đang
+được giảm hiện giá giảm màu cam, giá gốc gạch ngang và nhãn chương trình ("Giờ
+vàng", "−15%", "Mua 2 tặng 1"…). Giỏ trừ sẵn giảm món, chương trình hoá đơn đứng
+một dòng, kèm gợi ý "Đặt thêm X để được ưu đãi hoá đơn". Số ở nút **Đặt đơn và
+trả** đúng bằng số mã QR đòi — kể cả phần làm tròn khi giá giảm lẻ đồng. Đơn tối
+thiểu của vùng giao vẫn so trên tiền món **giá niêm yết**.
+
 Thanh toán & theo dõi:
 
 - **Chuyển khoản VietQR** — "Đơn xuống bếp ngay khi ngân hàng báo có", hoặc

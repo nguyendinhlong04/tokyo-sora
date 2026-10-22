@@ -1,4 +1,4 @@
-import { Button, Money, useToast } from '@sora/ui'
+import { Button, Money, PromoTag, useToast } from '@sora/ui'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode, type RefObject } from 'react'
 import { api } from '../api'
@@ -7,7 +7,6 @@ import { IconCheck, IconMinus, IconPencil, IconPlus } from '../icons'
 import { clock } from '../order-status'
 import type { CartPricing } from '../promotions'
 import { useTableSession } from '../table-context'
-import { PromoTag } from './PromoTag'
 
 /** T7 hiện bấy lâu rồi cột trở lại giỏ (§9.1) */
 const SENT_MS = 2000
@@ -243,7 +242,7 @@ export function CartColumn({
                 {/* Nhãn ở hàng riêng: chen vào hàng tuỳ chọn thì cột 304px vỡ thành ba dòng */}
                 {deal?.badge ? (
                   <p className="pb-1.5">
-                    <PromoTag label={deal.badge} compact />
+                    <PromoTag label={deal.badge} size="sm" />
                   </p>
                 ) : null}
                 {line.note ? (
@@ -293,7 +292,7 @@ export function CartColumn({
       <div className="flex-none border-t border-accent/16 px-5 pt-3 pb-4">
         {pricing.hint ? (
           <p className="mb-2 flex items-center gap-2 text-[length:var(--fs-c1)] leading-snug text-ink-body">
-            <PromoTag label={pricing.hint.badge} compact />
+            <PromoTag label={pricing.hint.badge} size="sm" />
             <span>
               Gọi thêm <Money amount={pricing.hint.missingVnd} className="text-ink-hi" /> để được ưu
               đãi hoá đơn

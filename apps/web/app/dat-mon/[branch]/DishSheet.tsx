@@ -1,14 +1,21 @@
 'use client'
 
 import { formatVnd } from '@sora/contracts'
+import { PromoTag } from '@sora/ui/PromoTag'
 import { useEffect, useState } from 'react'
 import { SiteImage } from '../../../components/SiteImage'
 import type { OnlineDish } from '../../../lib/api'
 import { useOrder } from '../order-context'
+import { usePromos } from '../promotions'
 
 /** O3 — chi tiết món, mở từ thực đơn */
 export function DishSheet({ dish, onClose }: { dish: OnlineDish; onClose: () => void }) {
   const { add } = useOrder()
+  const promos = usePromos()
+  const offer = dish.soldOut ? null : promos.offerOf(dish)
+  const cheaper = offer !== null && offer.price < dish.price
+  // Giỏ vẫn giữ giá niêm yết (máy chủ chấm lại lúc đặt); nút báo giá khách sẽ trả
+  const unit = cheaper ? offer.price : dish.price
   const [qty, setQty] = useState(1)
   const [note, setNote] = useState('')
 
@@ -56,9 +63,26 @@ export function DishSheet({ dish, onClose }: { dish: OnlineDish; onClose: () => 
               {dish.nameJa}
             </p>
           ) : null}
-          <p className="mt-3.5 font-mono text-[length:var(--fs-t2)] text-accent-ink">
-            {formatVnd(dish.price)}
+          <p className="mt-3.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5 font-mono">
+            <span
+              className={[
+                'text-[length:var(--fs-t2)]',
+                cheaper ? 'text-ember-2' : 'text-accent-ink',
+              ].join(' ')}
+            >
+              {formatVnd(unit)}
+            </span>
+            {cheaper ? (
+              <span className="text-[length:var(--fs-b1)] text-ink-mute line-through">
+                {formatVnd(dish.price)}
+              </span>
+            ) : null}
           </p>
+          {offer ? (
+            <p className="mt-2">
+              <PromoTag label={offer.badge} />
+            </p>
+          ) : null}
           {dish.shortDesc ? (
             <p className="mt-3 text-[length:var(--fs-b1)] leading-relaxed text-ink-body">
               {dish.shortDesc}
@@ -136,7 +160,7 @@ export function DishSheet({ dish, onClose }: { dish: OnlineDish; onClose: () => 
             }}
             className="h-14 flex-1 rounded-sm bg-accent-strong text-[length:var(--fs-b1)] font-semibold text-on-accent disabled:bg-transparent disabled:text-ink-mute disabled:outline disabled:outline-line-4"
           >
-            Thêm · {formatVnd(dish.price * qty)}
+            Thêm · {formatVnd(unit * qty)}
           </button>
         </div>
       </div>

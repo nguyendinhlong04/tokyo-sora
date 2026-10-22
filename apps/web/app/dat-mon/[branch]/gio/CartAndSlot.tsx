@@ -1,10 +1,12 @@
 'use client'
 
 import { formatVnd } from '@sora/contracts'
+import { PromoTag } from '@sora/ui/PromoTag'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { apiGet, type Quote, type Slot } from '../../../../lib/api'
 import { useOrder } from '../../order-context'
+import { usePromos } from '../../promotions'
 
 /** Giờ treo tường của một khung, theo múi giờ máy khách — khách và quán cùng ở VN */
 const hhmm = (iso: string) =>
@@ -41,6 +43,11 @@ export function CartAndSlot({ branchId }: { branchId: string }) {
 
   const ship = quote?.inZone ? quote.feeVnd : 0
   const firstOpen = slots.find((s) => s.open)
+  const promos = usePromos()
+  const pricing = useMemo(
+    () => promos.priceCart(draft.lines, { mode: draft.mode, ship }),
+    [promos, draft.lines, draft.mode, ship],
+  )
 
   /* Gom khung theo giờ treo tường. Giữ nguyên thứ tự máy chủ trả về — khung đầu
      tiên của mảng là khung sớm nhất, nên `Map` cứ chèn tới đâu là đúng thứ tự
@@ -112,42 +119,63 @@ export function CartAndSlot({ branchId }: { branchId: string }) {
       </div>
 
       <div className="mt-3">
-        {draft.lines.map((line) => (
-          <div key={`${line.dishId}#${line.note}`} className="border-b border-surface-4 py-3.5">
-            <div className="flex items-start gap-3">
-              <span className="min-w-0 flex-1 text-[length:var(--fs-b1)] font-semibold text-ink-hi">
-                {line.name}
-              </span>
-              <span className="flex-none font-mono text-[length:var(--fs-b1)] text-accent-ink">
-                {formatVnd(line.price * line.qty)}
-              </span>
+        {draft.lines.map((line, index) => {
+          const deal = pricing.lines[index]
+          const off = deal?.discount ?? 0
+          return (
+            <div key={`${line.dishId}#${line.note}`} className="border-b border-surface-4 py-3.5">
+              <div className="flex items-start gap-3">
+                <span className="min-w-0 flex-1 text-[length:var(--fs-b1)] font-semibold text-ink-hi">
+                  {line.name}
+                </span>
+                <span className="flex flex-none flex-col items-end font-mono">
+                  {off > 0 ? (
+                    <span className="text-[length:var(--fs-b2)] text-ink-mute line-through">
+                      {formatVnd(line.price * line.qty)}
+                    </span>
+                  ) : null}
+                  <span
+                    className={[
+                      'text-[length:var(--fs-b1)]',
+                      off > 0 ? 'text-ember-2' : 'text-accent-ink',
+                    ].join(' ')}
+                  >
+                    {formatVnd(line.price * line.qty - off)}
+                  </span>
+                </span>
+              </div>
+              {deal?.badge ? (
+                <p className="mt-1.5">
+                  <PromoTag label={deal.badge} size="sm" />
+                </p>
+              ) : null}
+              {line.note ? (
+                <p className="mt-1.5 pl-3 text-[length:var(--fs-c1)] text-warn">▸ {line.note}</p>
+              ) : null}
+              <div className="mt-3 flex h-11 w-fit items-center rounded-sm border border-line-3">
+                <button
+                  type="button"
+                  aria-label={`Bớt ${line.name}`}
+                  onClick={() => setQty(line.dishId, line.qty - 1)}
+                  className="h-full w-11 text-[length:var(--fs-t2)] text-accent-ink"
+                >
+                  −
+                </button>
+                <span className="min-w-8 text-center font-mono text-[length:var(--fs-b1)] text-ink-hi">
+                  {line.qty}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Thêm ${line.name}`}
+                  onClick={() => setQty(line.dishId, line.qty + 1)}
+                  className="h-full w-11 text-[length:var(--fs-t2)] text-accent-ink"
+                >
+                  +
+                </button>
+              </div>
             </div>
-            {line.note ? (
-              <p className="mt-1.5 pl-3 text-[length:var(--fs-c1)] text-warn">▸ {line.note}</p>
-            ) : null}
-            <div className="mt-3 flex h-11 w-fit items-center rounded-sm border border-line-3">
-              <button
-                type="button"
-                aria-label={`Bớt ${line.name}`}
-                onClick={() => setQty(line.dishId, line.qty - 1)}
-                className="h-full w-11 text-[length:var(--fs-t2)] text-accent-ink"
-              >
-                −
-              </button>
-              <span className="min-w-8 text-center font-mono text-[length:var(--fs-b1)] text-ink-hi">
-                {line.qty}
-              </span>
-              <button
-                type="button"
-                aria-label={`Thêm ${line.name}`}
-                onClick={() => setQty(line.dishId, line.qty + 1)}
-                className="h-full w-11 text-[length:var(--fs-t2)] text-accent-ink"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <section className="pt-7">
@@ -207,15 +235,35 @@ export function CartAndSlot({ branchId }: { branchId: string }) {
         </div>
       </section>
 
+      {/* Tiền món là tổng các dòng ở trên (đã trừ khuyến mãi món); khuyến mãi hoá
+          đơn đứng riêng một dòng — cộng tay vẫn ra đúng tổng mã QR sẽ đòi (§9.6) */}
       <section className="pt-7">
-        <Row label="Tạm tính" value={sub} />
+        <Row label="Tiền món" value={pricing.linesTotal} />
+        {pricing.bill ? (
+          <Row label={pricing.bill.name} value={-pricing.bill.discount} promo />
+        ) : null}
+        {pricing.money.vat > 0 ? <Row label="Thuế VAT" value={pricing.money.vat} /> : null}
         {draft.mode === 'delivery' ? <Row label="Phí giao" value={ship} /> : null}
+        {pricing.money.round !== 0 ? <Row label="Làm tròn" value={pricing.money.round} /> : null}
         <div className="mt-2 flex items-baseline justify-between border-t border-accent/16 pt-4">
           <span className="text-[length:var(--fs-b1)] font-semibold text-ink-hi">Tổng</span>
           <span className="font-mono text-[length:var(--fs-t1)] text-accent-ink">
-            {formatVnd(sub + ship)}
+            {formatVnd(pricing.money.total)}
           </span>
         </div>
+        {pricing.money.discount > 0 ? (
+          <p className="mt-1.5 text-right text-[length:var(--fs-b2)] text-ember-2">
+            Bạn được giảm {formatVnd(pricing.money.discount)}
+          </p>
+        ) : null}
+        {pricing.hint ? (
+          <p className="mt-3 flex flex-wrap items-center gap-2 text-[length:var(--fs-b2)] text-ink-body">
+            <PromoTag label={pricing.hint.badge} size="sm" />
+            Đặt thêm {formatVnd(pricing.hint.missingVnd)} để được ưu đãi hoá đơn
+          </p>
+        ) : null}
+        {/* Đơn tối thiểu so trên tiền món GIÁ NIÊM YẾT, đúng như máy chủ kiểm
+            (`below_min_order`): khuyến mãi không làm đơn rớt khỏi vùng giao */}
         {quote?.inZone === true && sub < quote.minOrderVnd ? (
           <p className="mt-3 rounded-md border border-warn bg-warn/8 p-4 text-[length:var(--fs-b1)] text-gold-200">
             Vùng {quote.zone.name} nhận đơn từ {formatVnd(quote.minOrderVnd)} tiền món — còn thiếu{' '}
@@ -236,7 +284,7 @@ export function CartAndSlot({ branchId }: { branchId: string }) {
                 : 'bg-accent-strong text-on-accent',
             ].join(' ')}
           >
-            Tiếp tục · {formatVnd(sub + ship)}
+            Tiếp tục · {formatVnd(pricing.money.total)}
           </Link>
         </div>
       </div>
@@ -300,11 +348,24 @@ export function CartAndSlot({ branchId }: { branchId: string }) {
   )
 }
 
-function Row({ label, value }: { label: string; value: number }) {
+function Row({ label, value, promo = false }: { label: string; value: number; promo?: boolean }) {
   return (
-    <div className="flex justify-between py-1.5">
-      <span className="text-[length:var(--fs-b1)] text-ink-body">{label}</span>
-      <span className="font-mono text-[length:var(--fs-b1)] text-ink-hi">{formatVnd(value)}</span>
+    <div className="flex justify-between gap-3 py-1.5">
+      <span
+        className={['text-[length:var(--fs-b1)]', promo ? 'text-ember-2' : 'text-ink-body'].join(
+          ' ',
+        )}
+      >
+        {label}
+      </span>
+      <span
+        className={[
+          'flex-none font-mono text-[length:var(--fs-b1)]',
+          promo ? 'text-ember-2' : 'text-ink-hi',
+        ].join(' ')}
+      >
+        {formatVnd(value)}
+      </span>
     </div>
   )
 }

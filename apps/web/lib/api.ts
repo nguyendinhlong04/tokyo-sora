@@ -5,6 +5,8 @@
  * của Next. Trên máy chủ Next (server component): phải là địa chỉ tuyệt đối vì
  * `fetch` của Node không có khái niệm "trang hiện tại".
  */
+import type { PromoClock, PromotionRule } from '@sora/contracts'
+
 const SERVER_ORIGIN = process.env.SORA_API_URL ?? 'http://localhost:3000'
 
 export function apiUrl(path: string): string {
@@ -74,10 +76,24 @@ export interface OnlineDish {
   bestWithin30: boolean
 }
 
+/** Hai tham số để web tự cộng ra đúng tổng máy chủ sẽ tính (`computeOrderTotals`) */
+export interface MenuPricing {
+  vatRate: number
+  roundingUnit: number
+}
+
 export interface OnlineMenu {
   branch: Branch
   categories: { id: string; nameVi: string; kanji: string | null }[]
   dishes: OnlineDish[]
+  pricing: MenuPricing
+}
+
+/** Khuyến mãi đang chạy của chi nhánh, kèm giờ chi nhánh do máy chủ tính (§9.6) */
+export interface LivePromotions {
+  clock: PromoClock
+  maxDiscountRate: number
+  rules: PromotionRule[]
 }
 
 export interface DeliveryZone {
@@ -123,6 +139,7 @@ export interface TrackedOrder {
     sub: number
     /** Giảm hoá đơn (§9.6) — giảm món đã nằm sẵn trong giá từng dòng */
     billDiscount: number
+    round: number
     vat: number
     ship: number
     total: number

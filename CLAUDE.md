@@ -216,7 +216,9 @@ mất mạng = dải báo + hàng đợi cục bộ, màn thanh toán bị chặ
 `Modal` · `ToastProvider`/`useToast(push(msg, tone))` · `Card` · `SectionLabel` ·
 `EmptyState` · `ErrorState` · `Skeleton` · `Badge` · `Money` · `TableTile` (P2) ·
 `OrderTicket` (K2) · `MenuItemCard` (P4 — cố ý **không ảnh**) · `OutboxBanner` ·
-`QrCode` (entry riêng `@sora/ui/QrCode` để web không kéo Dexie).
+`QrCode` (entry riêng `@sora/ui/QrCode` để web không kéo Dexie) · `PromoTag` (nhãn khuyến
+mãi §9.6, entry riêng `@sora/ui/PromoTag`; web khai `@source` đúng file đó trong
+`globals.css` vì web không quét cả gói).
 
 Quy tắc: mọi `<button>` có `type="button"`; variant là `Record<Union,string>` UPPER_CASE;
 không responsive prefix trong gói; app Vite **phải** có `@source '../../../packages/ui/src'`
@@ -643,7 +645,7 @@ Mục tiêu bản dựng lại (giữ nguyên API; đổi client):
 6. POS ba khổ (§9.3).
 Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
 Chen ngay sau giao diện iPad, theo yêu cầu 22/10/2026: **khuyến mãi áp dụng chung** (§9.6) —
-xong phần API, B11 và iPad cùng ngày; còn hiển thị ở web và ô voucher ở POS.
+xong cùng ngày: API, B11, iPad, web và ô voucher ở POS.
 
 ### 9.6 Khuyến mãi áp dụng chung (chốt và làm 22/10/2026)
 Một bộ chấm cho mọi kênh: `packages/contracts/src/promotions.ts` (test `promotions.test.ts`),
@@ -673,11 +675,19 @@ vào đơn; app chỉ hiển thị.
 - **Voucher:** chỉ chương trình hoá đơn đòi mã. `POST /api/crm/promotions/apply-voucher`
   (`order.create`, khách chỉ đơn bàn mình): gắn `orders.voucher_code_id`, trừ lượt ngay trên
   dòng mã đã khoá, gắn lại cùng mã là no-op, đổi mã thì trả lượt; rồi tính lại tiền.
-  `GET /api/crm/promotions/quote?order=&voucher=` chỉ đọc.
+  `POST …/remove-voucher` gỡ mã và trả lượt. Gắn/bỏ chỉ được khi đơn **chưa có lượt trả**
+  nào, kể cả lượt VietQR đang chờ (409 `payment_started`) — mã QR đã in số tiền cũ.
+  `GET /api/crm/promotions/quote?order=&voucher=` chỉ đọc, trả cả `attachedVoucher`. POS
+  P10: khối "Khuyến mãi & voucher" — **Kiểm mã** (chấm thử, chưa trừ lượt) · **Áp mã** ·
+  **Bỏ mã**.
 - **App đọc** `GET /api/crm/promotions/live?branch=` (công khai) → `{clock, maxDiscountRate,
   rules}`, không có chương trình cần mã; `clock` = giờ chi nhánh do máy chủ tính, app hỏi
   lại mỗi phút. iPad: `PromotionsProvider` ở `IpadShell`, `PromoTag` (cam than + ngọn lửa),
-  giỏ ước bằng `priceNewLines`, gợi ý "gọi thêm X để được ưu đãi hoá đơn".
+  giỏ ước bằng `priceNewLines`, gợi ý "gọi thêm X để được ưu đãi hoá đơn". Web: provider
+  ở `app/dat-mon/[branch]/layout.tsx`, lấy sẵn khi dựng trang trên máy chủ (không nhảy giá)
+  rồi hỏi lại mỗi phút; `/api/online/menu` trả kèm `pricing {vatRate, roundingUnit}` để
+  web chạy chính `computeOrderTotals` — số trên nút "Đặt đơn và trả" = số mã QR đòi, kể cả
+  làm tròn khi giá giảm lẻ đồng.
 - **Báo cáo:** `promotion_redemptions` một dòng cho mỗi (đơn, chương trình) = số đang giảm,
   ghi lại mỗi lần tính tiền (unique `promotion_redemptions_order_promo`) — B8 đọc bảng này.
   Ma trận món (`dishStats`) dùng `price_total` = sau giảm món.
@@ -685,8 +695,8 @@ vào đơn; app chỉ hiển thị.
   Mã, nhãn & pháp lý · Lịch chạy), 7 mẫu nhà hàng hay chạy, xem trước bằng chính bộ chấm.
   Soạn ≠ bật (R9 soạn, R11/R10 bật); đang chạy phải tạm dừng mới sửa.
 - **Chưa làm / biết trước:**
-  - Web chưa in giá giảm ở thực đơn và giỏ (đơn web vẫn được giảm khi đặt; trang theo dõi
-    đơn có dòng giảm hoá đơn). POS P4/P10 chưa có ô nhập voucher (API có rồi).
+  - Trang thương hiệu (W1/W2 `/thuc-don`) chưa in giá giảm — chưa biết chi nhánh, mà
+    chương trình theo chi nhánh và giờ. Khách ở iPad/web chưa có ô tự nhập voucher.
   - Hoá đơn điện tử (`invoices`) chưa có cột chiết khấu — NĐ 123/2020 bắt hiện chiết khấu
     thương mại; làm khi nối nhà cung cấp HĐĐT.
   - Chia bill theo món (`split/claim`) cộng `price_total`: đã trừ giảm món, chưa chia giảm
@@ -748,6 +758,10 @@ Thấp hơn:
 - Ba cách format tiền (`formatVnd`, `<Money>` Intl, `toLocaleString`+'₫' ở POS) → chuẩn
   về `formatVnd` + `font-mono tabular-nums`.
 - POS `soldOut` bỏ qua `limited` còn 0 (`TableOrder.tsx:292`), table thì xử lý.
+- Giá online lệch giá tính tiền: `/api/online/menu` in `onlinePrice` (ưu tiên giá online chi
+  nhánh → giá chi nhánh → giá online chuỗi → giá tại quán) nhưng đơn web tính theo
+  `catalog.dishesByIds` (`o?.price ?? basePrice`, bỏ qua `onlinePrice`). Chỉ lộ khi Office
+  khai giá online khác giá tại quán.
 - Dead code: `issueQrToken` (`apps/pos/src/api.ts:667`), `POST /api/table-sessions/:id/qr-token`
   + `/exchange`, `screens/Holding.tsx` (K4); `pnpm-workspace.yaml`
   liệt kê `e2e` không tồn tại.

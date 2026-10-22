@@ -1,9 +1,8 @@
-import { Money } from '@sora/ui'
+import { Money, PromoTag } from '@sora/ui'
 import type { Dish } from '../api'
 import { usePromos } from '../promotions'
 import { AddButton, QtyStepper } from './AddButton'
 import { DishArt } from './DishArt'
-import { PromoTag } from './PromoTag'
 
 /**
  * Thẻ món trong lưới ba cột của iPad (T2).

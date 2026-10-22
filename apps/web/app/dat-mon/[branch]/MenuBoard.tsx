@@ -1,6 +1,7 @@
 'use client'
 
 import { formatVnd } from '@sora/contracts'
+import { PromoTag } from '@sora/ui/PromoTag'
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DishCounter } from '../../../components/DishCounter'
@@ -8,6 +9,7 @@ import { MenuIndex } from '../../../components/MenuIndex'
 import { SiteImage } from '../../../components/SiteImage'
 import type { OnlineDish, OnlineMenu } from '../../../lib/api'
 import { useOrder } from '../order-context'
+import { usePromos } from '../promotions'
 import { DishSheet } from './DishSheet'
 
 /**
@@ -17,7 +19,13 @@ import { DishSheet } from './DishSheet'
  * nằm ở thanh ghim đáy — ngón cái với tới được.
  */
 export function MenuBoard({ menu }: { menu: OnlineMenu }) {
-  const { draft, loaded, set, add, setQty, qtyOf, syncToBranch, count, sub } = useOrder()
+  const { draft, loaded, set, add, setQty, qtyOf, syncToBranch, count } = useOrder()
+  const promos = usePromos()
+  // Chưa biết phí giao ở đây — tạm tính là tiền món sau khuyến mãi, như máy chủ sẽ tính
+  const pricing = useMemo(
+    () => promos.priceCart(draft.lines, { mode: draft.mode, ship: 0 }),
+    [promos, draft.lines, draft.mode],
+  )
   const [open, setOpen] = useState<OnlineDish | null>(null)
   const [dropped, setDropped] = useState<string[]>([])
 
@@ -128,76 +136,93 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
               ) : null}
             </header>
 
-            {group.dishes.map((dish) => (
-              <div
-                key={dish.id}
-                className="flex h-26 items-center gap-3.5 border-b border-surface-4"
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpen(dish)}
-                  /* `min-w-0` là bắt buộc, không phải cho đẹp: mặc định flex-item
+            {group.dishes.map((dish) => {
+              const offer = dish.soldOut ? null : promos.offerOf(dish)
+              const cheaper = offer !== null && offer.price < dish.price
+              return (
+                /* `min-h` chứ không cao cứng: món khuyến mãi có thêm nhãn ở hàng giá,
+                 điện thoại hẹp thì hàng đó xuống dòng */
+                <div
+                  key={dish.id}
+                  className="flex min-h-26 items-center gap-3.5 border-b border-surface-4 py-1.5"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpen(dish)}
+                    /* `min-w-0` là bắt buộc, không phải cho đẹp: mặc định flex-item
                      có `min-width:auto` nên không co dưới bề rộng nội dung, mà
                      `truncate` bên trong là `nowrap` — min-content của nó bằng CẢ
                      câu mô tả. Thiếu một chữ này thì trên điện thoại hàng món đẩy
                      nút + ra ngoài màn hình. */
-                  className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
-                >
-                  {/* Có ảnh thì hiện ảnh, chưa có thì ô chữ kanji như cũ — đường
+                    className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
+                  >
+                    {/* Có ảnh thì hiện ảnh, chưa có thì ô chữ kanji như cũ — đường
                       dẫn khai ở Office M1 nên bổ sung ảnh cho một món là chỗ này
                       tự đổi, không phải sửa mã.
                       `<span>` chứ không phải `<div>` như `DishGlyph`: cả ô nằm
                       TRONG một `<button>`, mà button chỉ được chứa phrasing
                       content. */}
-                  <span className="grid h-22 w-22 flex-none place-items-center overflow-hidden rounded-md border border-line-1 bg-[radial-gradient(120%_100%_at_50%_20%,var(--sora-line-1)_0%,var(--sora-surface-4)_74%)]">
-                    {dish.imageUrl ? (
-                      <SiteImage
-                        src={dish.imageUrl}
-                        alt=""
-                        sizes="88px"
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      <span className="font-jp text-[40px] leading-none text-gold-900">
-                        {dish.kana ?? '空'}
-                      </span>
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[length:var(--fs-t2)] font-semibold text-ink-hi">
-                      {dish.nameVi}
+                    <span className="grid h-22 w-22 flex-none place-items-center overflow-hidden rounded-md border border-line-1 bg-[radial-gradient(120%_100%_at_50%_20%,var(--sora-line-1)_0%,var(--sora-surface-4)_74%)]">
+                      {dish.imageUrl ? (
+                        <SiteImage
+                          src={dish.imageUrl}
+                          alt=""
+                          sizes="88px"
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <span className="font-jp text-[40px] leading-none text-gold-900">
+                          {dish.kana ?? '空'}
+                        </span>
+                      )}
                     </span>
-                    {dish.shortDesc ? (
-                      <span className="mt-1 block truncate text-[length:var(--fs-b2)] text-ink-body">
-                        {dish.shortDesc}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[length:var(--fs-t2)] font-semibold text-ink-hi">
+                        {dish.nameVi}
                       </span>
-                    ) : null}
-                    <span className="mt-1.5 flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-[length:var(--fs-b1)] text-accent-ink">
-                        {formatVnd(dish.price)}
-                      </span>
-                      {dish.soldOut ? (
-                        <span className="inline-flex h-5.5 items-center rounded-pill border border-danger px-2 text-[length:var(--fs-c2)] font-semibold text-danger">
-                          Tạm hết
+                      {dish.shortDesc ? (
+                        <span className="mt-1 block truncate text-[length:var(--fs-b2)] text-ink-body">
+                          {dish.shortDesc}
                         </span>
                       ) : null}
-                      {/* Nhãn "ngon nhất trong 30 phút" để ở màn chi tiết: gần như
+                      <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span
+                          className={[
+                            'font-mono text-[length:var(--fs-b1)]',
+                            cheaper ? 'text-ember-2' : 'text-accent-ink',
+                          ].join(' ')}
+                        >
+                          {formatVnd(cheaper ? offer.price : dish.price)}
+                        </span>
+                        {cheaper ? (
+                          <span className="font-mono text-[length:var(--fs-b2)] text-ink-mute line-through">
+                            {formatVnd(dish.price)}
+                          </span>
+                        ) : null}
+                        {offer ? <PromoTag label={offer.badge} size="sm" /> : null}
+                        {dish.soldOut ? (
+                          <span className="inline-flex h-5.5 items-center rounded-pill border border-danger px-2 text-[length:var(--fs-c2)] font-semibold text-danger">
+                            Tạm hết
+                          </span>
+                        ) : null}
+                        {/* Nhãn "ngon nhất trong 30 phút" để ở màn chi tiết: gần như
                           cả nhóm Nướng đều rời vỉ than, gắn lên từng dòng thì
                           mười dòng liền nhau cùng một nhãn và nhãn hết nghĩa */}
+                      </span>
                     </span>
-                  </span>
-                </button>
-                {/* Đúng cái nút của W1 · W2 · W3: số phần nằm TRONG thanh đếm
+                  </button>
+                  {/* Đúng cái nút của W1 · W2 · W3: số phần nằm TRONG thanh đếm
                     chứ không còn là nhãn dán chồng lên góc nút vuông. */}
-                <DishCounter
-                  name={dish.nameVi}
-                  qty={qtyOf(dish.id)}
-                  onAdd={() => add(dish)}
-                  onBot={() => setQty(dish.id, qtyOf(dish.id) - 1)}
-                  disabled={dish.soldOut}
-                />
-              </div>
-            ))}
+                  <DishCounter
+                    name={dish.nameVi}
+                    qty={qtyOf(dish.id)}
+                    onAdd={() => add(dish)}
+                    onBot={() => setQty(dish.id, qtyOf(dish.id) - 1)}
+                    disabled={dish.soldOut}
+                  />
+                </div>
+              )
+            })}
           </section>
         ))}
       </div>
@@ -227,32 +252,59 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
             </p>
           ) : (
             <div className="mt-4 flex flex-col gap-3">
-              {draft.lines.map((line) => (
-                <div key={line.dishId} className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    aria-label={`Bớt ${line.name}`}
-                    onClick={() => setQty(line.dishId, line.qty - 1)}
-                    className="h-8 w-8 rounded-sm border border-line-3 text-ink-body"
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center font-mono text-ink-hi">{line.qty}</span>
-                  <span className="flex-1 text-[length:var(--fs-b2)] text-ink-body">
-                    {line.name}
-                  </span>
-                  <span className="font-mono text-[length:var(--fs-b2)] text-accent-ink">
-                    {formatVnd(line.price * line.qty)}
-                  </span>
-                </div>
-              ))}
+              {draft.lines.map((line, index) => {
+                const off = pricing.lines[index]?.discount ?? 0
+                return (
+                  <div key={`${line.dishId}#${line.note}`} className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label={`Bớt ${line.name}`}
+                      onClick={() => setQty(line.dishId, line.qty - 1)}
+                      className="h-8 w-8 rounded-sm border border-line-3 text-ink-body"
+                    >
+                      −
+                    </button>
+                    <span className="w-6 text-center font-mono text-ink-hi">{line.qty}</span>
+                    <span className="flex-1 text-[length:var(--fs-b2)] text-ink-body">
+                      {line.name}
+                    </span>
+                    <span className="flex flex-col items-end font-mono">
+                      {off > 0 ? (
+                        <span className="text-[length:var(--fs-c1)] text-ink-mute line-through">
+                          {formatVnd(line.price * line.qty)}
+                        </span>
+                      ) : null}
+                      <span
+                        className={[
+                          'text-[length:var(--fs-b2)]',
+                          off > 0 ? 'text-ember-2' : 'text-accent-ink',
+                        ].join(' ')}
+                      >
+                        {formatVnd(line.price * line.qty - off)}
+                      </span>
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           )}
 
+          {pricing.bill ? (
+            <div className="mt-4 flex items-baseline justify-between gap-3 text-[length:var(--fs-b2)]">
+              <span className="text-ember-2">{pricing.bill.name}</span>
+              <span className="font-mono text-ember-2">{formatVnd(-pricing.bill.discount)}</span>
+            </div>
+          ) : null}
+          {pricing.hint ? (
+            <p className="mt-3 flex flex-wrap items-center gap-2 text-[length:var(--fs-c1)] text-ink-body">
+              <PromoTag label={pricing.hint.badge} size="sm" />
+              Đặt thêm {formatVnd(pricing.hint.missingVnd)} để được ưu đãi
+            </p>
+          ) : null}
           <div className="mt-5 flex items-baseline justify-between border-t border-line-1 pt-4">
             <span className="text-[length:var(--fs-b2)] text-ink-mute">Tạm tính</span>
             <span className="font-mono text-[length:var(--fs-t2)] text-ink-hi">
-              {formatVnd(sub)}
+              {formatVnd(pricing.money.total)}
             </span>
           </div>
           <Link
@@ -277,7 +329,9 @@ export function MenuBoard({ menu }: { menu: OnlineMenu }) {
             <p className="font-mono text-[length:var(--fs-b1)] text-ink-hi">
               {count > 0 ? `${count} món` : 'Giỏ đang trống'}
             </p>
-            <p className="font-mono text-[length:var(--fs-c1)] text-ink-mute">{formatVnd(sub)}</p>
+            <p className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+              {formatVnd(pricing.money.total)}
+            </p>
           </div>
           <div className="flex flex-none items-center gap-2">
             {count > 0 ? (

@@ -18,12 +18,14 @@ import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
 import { isUniqueViolation } from '../../common/pg-error'
+import type { Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
   branches,
   categories,
   dishes,
   orders,
+  payments,
   promotionRedemptions,
   promotions,
   staff,
@@ -473,6 +475,14 @@ export class PromotionsService {
     const ctx = await contextOf(this.db, order, this.params)
     if (voucher) ctx.voucherPromotionIds = [voucher.promotionId]
 
+    const [attached] =
+      order.voucherCodeId === null
+        ? []
+        : await this.db
+            .select({ code: voucherCodes.code })
+            .from(voucherCodes)
+            .where(eq(voucherCodes.id, order.voucherCodeId))
+
     const rules = (
       await rulesOn(
         this.db,
@@ -487,6 +497,8 @@ export class PromotionsService {
     const named = new Map(rules.map((r) => [r.id, r]))
 
     return {
+      /** Mã đang gắn trên đơn — P10 hiện để thu ngân thấy và bỏ được nếu gắn nhầm */
+      attachedVoucher: attached?.code ?? null,
       lineDiscountVnd: lines.reduce((sum, l) => sum + l.discountVnd, 0),
       bill: bill
         ? {
@@ -524,9 +536,7 @@ export class PromotionsService {
         .for('update')
       if (!order) throw new NotFoundException('Không có đơn này')
       assertOwnTableSession(actor, order.tableSessionId ?? 0)
-      if (order.status === 'cancelled' || order.paymentState === 'paid') {
-        throw new ConflictException('Đơn đã huỷ hoặc đã trả đủ — không gắn mã được nữa')
-      }
+      await this.assertVoucherChangeable(tx, order)
 
       const code = input.voucherCode.trim().toUpperCase()
       const [voucher] = await tx
@@ -580,7 +590,62 @@ export class PromotionsService {
     })
   }
 
+  /**
+   * Gỡ mã khỏi đơn — thu ngân gõ nhầm mã của khách khác thì phải sửa được, và
+   * lượt dùng phải trả về cho mã đó chứ không mất trắng.
+   */
+  async removeVoucher(orderId: number, actor: Actor) {
+    return this.db.transaction(async (tx) => {
+      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update')
+      if (!order) throw new NotFoundException('Không có đơn này')
+      assertOwnTableSession(actor, order.tableSessionId ?? 0)
+      if (order.voucherCodeId === null) return { orderId, changed: false }
+      await this.assertVoucherChangeable(tx, order)
+
+      const [voucher] = await tx
+        .update(voucherCodes)
+        .set({ usedCount: sql`${voucherCodes.usedCount} - 1` })
+        .where(eq(voucherCodes.id, order.voucherCodeId))
+        .returning({ code: voucherCodes.code })
+      await tx.update(orders).set({ voucherCodeId: null }).where(eq(orders.id, orderId))
+      const money = await this.ordering.recomputeTotals(tx, orderId, order.branchId)
+
+      await this.audit.write(tx, {
+        actor,
+        action: 'promotion.voucher-removed',
+        entity: 'order',
+        entityId: String(orderId),
+        payload: { voucher: voucher?.code ?? null },
+      })
+      return { orderId, changed: true, money }
+    })
+  }
+
   // ================================================================== Nội bộ
+
+  /**
+   * Đổi mã là đổi TỔNG của đơn, nên chỉ được khi chưa có đồng nào đi qua đơn đó.
+   *
+   * Lượt trả đang chờ cũng tính: mã VietQR đã in số tiền cũ, đổi tổng lúc đó là
+   * ngân hàng báo về một số không còn khớp với bill. Muốn gắn mã thì gắn trước khi
+   * tạo mã QR hay thu tiền mặt.
+   */
+  private async assertVoucherChangeable(tx: Tx, order: typeof orders.$inferSelect) {
+    if (order.status === 'cancelled') {
+      throw new ConflictException('Đơn đã huỷ — không đổi mã được nữa')
+    }
+    const [started] = await tx
+      .select({ id: payments.id })
+      .from(payments)
+      .where(and(eq(payments.orderId, order.id), inArray(payments.state, ['pending', 'paid'])))
+      .limit(1)
+    if (order.paymentState !== 'unpaid' || started) {
+      throw new ConflictException({
+        code: 'payment_started',
+        message: 'Bàn đã có lượt trả tiền — gắn hay bỏ mã phải làm trước khi thu tiền',
+      })
+    }
+  }
 
   private async liveVoucher(code: string, businessDate: string) {
     const [row] = await this.db

@@ -214,6 +214,14 @@ export class CrmController {
     return this.promotions.applyVoucher(parsed, req.actor!)
   }
 
+  /** Gỡ mã gắn nhầm — trả lượt cho mã, tính lại tiền. Cùng quyền với gắn mã */
+  @Post('promotions/remove-voucher')
+  @RequirePermission('order.create')
+  removeVoucher(@Body() body: unknown, @Req() req: RequestWithActor) {
+    const parsed = z.object({ orderId: z.number().int().positive() }).parse(body)
+    return this.promotions.removeVoucher(parsed.orderId, req.actor!)
+  }
+
   // ============================================================== B12 · Sổ khách
 
   @Get('customers')

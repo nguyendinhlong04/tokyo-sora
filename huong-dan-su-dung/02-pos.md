@@ -117,6 +117,13 @@ Bấm **Tính tiền** ở chân phiếu order. Màn hiện `Tổng đơn` · `�
 - **Khách chuyển khoản VietQR:** khách tự quét **mã QR bàn** và trả trong app
   trên điện thoại (chương 4). Tiền về hiện ở màn **đối soát** (P15) — nếu khách
   đã tự trả một phần, `Đã thu` trên màn tính tiền đã trừ sẵn.
+- **Khuyến mãi & voucher:** khối dưới tổng đơn cho thấy đơn đang được giảm gì —
+  khuyến mãi món đã trừ sẵn trong giá món, chương trình hoá đơn đứng một dòng
+  (tự áp, không cần làm gì). Khách đưa **mã voucher**: gõ mã → **Kiểm mã** (chỉ
+  xem, chưa trừ lượt — biết mã giảm bao nhiêu, hay chương trình đang áp đã lợi
+  hơn) → **Áp mã**. Gắn nhầm thì **Bỏ mã**, lượt trả lại cho mã. Gắn hay bỏ mã
+  phải làm **trước khi thu tiền** — bàn đã có lượt trả thì máy chủ không cho đổi
+  tổng nữa.
 - Trả đủ xong bàn chuyển `Đã trả · chờ dọn` — **bàn không tự đóng**. Dọn xong
   bấm **Đóng bàn {mã}** để trả bàn về `Trống` (token QR của khách cũng hết hạn
   lúc này).
@@ -223,7 +230,8 @@ Banner đỏ nếu giờ cao điểm mà ngân hàng im hơi quá 15 phút trong
 (08/2026):
 
 - Tính tiền: chỉ có **tiền mặt** trên POS (VietQR là khách tự trả qua app bàn);
-  chưa có thẻ/ví/ghi nợ công ty, voucher, giảm giá, ô SĐT tích điểm.
+  chưa có thẻ/ví/ghi nợ công ty, giảm giá tay, ô SĐT tích điểm (voucher thì có —
+  §2.6).
 - **In bill và hoá đơn điện tử chưa có trên POS** (HĐĐT quản lý ở Office; in tạm
   bằng chức năng in của trình duyệt).
 - Chưa có ô ghi chú theo món khi gọi hộ (ghi chú chỉ đến từ app khách).

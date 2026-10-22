@@ -575,6 +575,78 @@ describe('B11 — Lô voucher và giới hạn lượt', () => {
     expect(denied.json().message).toContain('hết lượt')
   })
 
+  it('quote nói đơn đang gắn mã nào; bỏ mã thì lượt trả về cho mã và đơn tính lại tiền', async () => {
+    const orderId = await makeOrder({
+      code: 'KM-ORDER-6',
+      sub: 500_000,
+      channel: 'pos',
+      paid: false,
+      lines: oneDish,
+    })
+    const voucher = 'SORA8-0003'
+    const applied = await inject({
+      method: 'POST',
+      url: '/api/crm/promotions/apply-voucher',
+      headers: bearer(owner),
+      payload: { orderId, voucherCode: voucher },
+    })
+    expect(applied.statusCode, applied.payload).toBe(201)
+
+    const quoted = await inject({
+      method: 'GET',
+      url: `/api/crm/promotions/quote?order=${orderId}`,
+      headers: bearer(owner),
+    })
+    expect(quoted.json()).toMatchObject({
+      attachedVoucher: voucher,
+      bill: { code: 'KM-VOUCHER', discountVnd: 200_000 },
+    })
+
+    const removed = await inject({
+      method: 'POST',
+      url: '/api/crm/promotions/remove-voucher',
+      headers: bearer(owner),
+      payload: { orderId },
+    })
+    expect(removed.statusCode, removed.payload).toBe(201)
+    // Hết mã thì chương trình tự áp lợi nhất còn lại là 25% của 500k
+    expect(removed.json()).toMatchObject({ changed: true, money: { discount: 125_000 } })
+
+    const batch = await inject({
+      method: 'GET',
+      url: `/api/crm/promotions/${promoId}/vouchers`,
+      headers: bearer(owner),
+    })
+    expect(batch.json().find((v: { code: string }) => v.code === voucher).usedCount).toBe(0)
+  })
+
+  it('bàn đã có lượt trả đang chờ thì không gắn mã — mã QR đã in số tiền cũ', async () => {
+    const orderId = await makeOrder({
+      code: 'KM-ORDER-7',
+      sub: 500_000,
+      channel: 'pos',
+      paid: false,
+      lines: oneDish,
+    })
+    await db.insert(payments).values({
+      branchId: fx.branchId,
+      orderId,
+      kind: 'vietqr',
+      amount: 375_000,
+      state: 'pending',
+      createdByKind: 'staff',
+      businessDate: TODAY,
+    })
+    const res = await inject({
+      method: 'POST',
+      url: '/api/crm/promotions/apply-voucher',
+      headers: bearer(owner),
+      payload: { orderId, voucherCode: 'SORA8-0002' },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('payment_started')
+  })
+
   it('đơn đã trả đủ thì không gắn mã được nữa', async () => {
     const paid = await makeOrder({
       code: 'KM-ORDER-5',
