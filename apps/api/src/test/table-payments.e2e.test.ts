@@ -8,6 +8,7 @@
 import { createHmac } from 'node:crypto'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { IDEMPOTENCY_HEADER } from '@sora/contracts'
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
 import { ParamsService } from '../common/params.service'
@@ -18,6 +19,7 @@ import {
   parameters,
   payments,
   tableFeedback,
+  tableRequests,
   ticketItems,
 } from '../db/schema'
 import { ConfigBundleService } from '../modules/config-bundle/config-bundle.service'
@@ -511,6 +513,19 @@ describe('3. Gọi nhân viên (T9 → P12)', () => {
     expect(after.json<{ requests: { id: number }[] }>().requests.some((r) => r.id === first.id)).toBe(
       false,
     )
+
+    // Bấm lần hai (máy khác chưa kịp tải lại) là no-op: người và mốc xử lý giữ
+    // nguyên — thời gian phản hồi bàn là số đo của ca, ghi đè là đo sai
+    const [before] = await db.select().from(tableRequests).where(eq(tableRequests.id, first.id))
+    const again = await inject({
+      method: 'POST',
+      url: `/api/table-requests/${first.id}/done`,
+      headers: staffAuth(),
+    })
+    expect(again.statusCode, again.payload).toBe(201)
+    expect(again.json<{ changed: boolean }>().changed).toBe(false)
+    const [still] = await db.select().from(tableRequests).where(eq(tableRequests.id, first.id))
+    expect(still!.handledAt?.getTime()).toBe(before!.handledAt?.getTime())
   })
 })
 

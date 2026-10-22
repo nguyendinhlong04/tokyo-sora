@@ -96,6 +96,11 @@ export class TableRequestService {
     }
   }
 
+  /**
+   * Chỉ yêu cầu còn MỞ mới đổi: hai máy cùng bấm (máy kia chưa kịp tải lại) thì
+   * lần sau là no-op — người và mốc xử lý đầu tiên giữ nguyên, vì "bàn chờ bao
+   * lâu mới có người tới" là số đo của ca.
+   */
   async markDone(requestId: number, actor: Actor) {
     const [row] = await this.db
       .update(tableRequests)
@@ -104,9 +109,14 @@ export class TableRequestService {
         handledBy: actor.kind === 'staff' ? actor.staffId : null,
         handledAt: new Date(),
       })
-      .where(eq(tableRequests.id, requestId))
+      .where(and(eq(tableRequests.id, requestId), eq(tableRequests.state, 'open')))
       .returning({ id: tableRequests.id })
-    if (!row) throw new NotFoundException('Không có yêu cầu này')
-    return { id: row.id, done: true }
+    if (row) return { id: row.id, done: true, changed: true }
+    const [existing] = await this.db
+      .select({ id: tableRequests.id })
+      .from(tableRequests)
+      .where(eq(tableRequests.id, requestId))
+    if (!existing) throw new NotFoundException('Không có yêu cầu này')
+    return { id: existing.id, done: true, changed: false }
   }
 }
