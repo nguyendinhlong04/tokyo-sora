@@ -344,10 +344,12 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   (KPI "việc đúng hạn" đếm trên đó); checklist chỉ tích khi việc `open`. Việc định kỳ sinh
   bằng `INSERT … ON CONFLICT DO NOTHING` trên `tasks_one_per_occurrence` (mẫu, ngày). Không ai
   tự nghiệm thu: CHECK `tasks_review_not_self`.
+- **Điểm khách chấm** đọc từ view `customer_ratings` (`9010`): gộp `feedback` (B13) và
+  `table_feedback` (T15), một phiếu mỗi bữa — đừng đếm hai bảng riêng.
 - **Migration:** `db:generate` sinh `migrations/00NN_*.sql`; SQL viết tay đánh số từ
   `9000_` để luôn chạy sau cùng (`9000_guards`, `9001_kitchen_money_guard`,
   `9002_realtime_broadcast`, `9003_realtime_rls`, `9004_stock_moves_guard`, …,
-  `9007_org_guards`, `9008_document_guards`, `9009_task_guards`). Runner
+  `9007_org_guards`, `9008_document_guards`, `9009_task_guards`, `9010_customer_ratings`). Runner
   riêng `src/db/migrate.ts` chạy mọi file một lần theo tên, ghi `_sora_migrations`.
   **Không có down**; file đã chạy thì sửa không có tác dụng → luôn thêm file mới.
   Vercel build **không** chạy migration — chạy tay trước khi deploy API.

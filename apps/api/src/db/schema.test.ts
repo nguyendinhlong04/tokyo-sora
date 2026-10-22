@@ -686,6 +686,42 @@ describe('Văn bản — đóng băng từ lúc trình ký, biên nhận ghi m�
   })
 })
 
+describe('customer_ratings — một bữa ăn một phiếu chấm sao', () => {
+  it('phiên đã có phiếu B13 thì phiếu chấm tại bàn của phiên đó không tính thêm', async () => {
+    await db.exec(`
+      INSERT INTO table_sessions (branch_id, table_id, status, business_date, closed_at)
+        SELECT 'cg', id, 'closed', '2026-10-20', now() FROM tables WHERE code = 'A4';
+      INSERT INTO table_sessions (branch_id, table_id, status, business_date, closed_at)
+        SELECT 'cg', id, 'closed', '2026-10-20', now() FROM tables WHERE code = 'A4';
+    `)
+    const sessions = (
+      await db.query<{ id: number }>(
+        `SELECT id FROM table_sessions WHERE business_date = '2026-10-20' ORDER BY id`,
+      )
+    ).rows.map((r) => r.id)
+    const [both, tableOnly] = sessions as [number, number]
+    await db.exec(`
+      INSERT INTO orders (display_code, branch_id, channel, type, created_by_kind, business_date,
+                          table_session_id)
+        VALUES ('ON-2610-0901', 'cg', 'table', 'dinein', 'customer', '2026-10-20', ${both});
+      INSERT INTO feedback (branch_id, order_id, stars, source, business_date)
+        SELECT 'cg', id, 2, 'table', '2026-10-20' FROM orders WHERE display_code = 'ON-2610-0901';
+      INSERT INTO table_feedback (branch_id, table_session_id, stars, business_date)
+        VALUES ('cg', ${both}, 3, '2026-10-20'), ('cg', ${tableOnly}, 5, '2026-10-20');
+    `)
+    const rows = (
+      await db.query<{ origin: string; stars: number; table_session_id: number }>(
+        `SELECT origin, stars, table_session_id FROM customer_ratings
+          WHERE business_date = '2026-10-20' ORDER BY table_session_id`,
+      )
+    ).rows
+    expect(rows).toEqual([
+      { origin: 'feedback', stars: 2, table_session_id: both },
+      { origin: 'table_feedback', stars: 5, table_session_id: tableOnly },
+    ])
+  })
+})
+
 describe('Việc — không tự nghiệm thu, việc đã đóng là hồ sơ, checklist chốt khi nộp', () => {
   const hoa = `(SELECT id FROM staff WHERE code = 'NV01')`
   const minh = `(SELECT id FROM staff WHERE code = 'NV09')`
