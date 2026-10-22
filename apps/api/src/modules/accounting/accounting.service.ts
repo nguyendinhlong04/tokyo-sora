@@ -326,7 +326,32 @@ export class AccountingService {
 
   // ==================================================== F4 · Báo cáo thuế
 
+  /**
+   * VAT đầu ra theo HOÁ ĐƠN đã phát hành, xếp theo ngày lập (`invoice_date`) — tờ
+   * khai kê hoá đơn bán ra theo ngày lập, và một bill món ăn 8% + bia 10% là hai
+   * dòng thuế suất đúng như in trên tờ hoá đơn.
+   *
+   * Bill đã trả mà chưa có tờ nào lên thuế (trước ngày bật hoá đơn điện tử, hay hoá
+   * đơn còn kẹt) vẫn là doanh thu phải khai: cộng theo ngày kinh doanh của đơn, và
+   * tách riêng ở `uninvoicedBuckets` để kế toán thấy phần chưa có chứng từ.
+   */
   async taxReport(branchId: string, from: string, to: string) {
+    const invoiceRows = await this.db
+      .select({
+        netVnd: sql<number>`(${invoices.amountSub} - ${invoices.amountDiscount} + ${invoices.amountService})::float8`,
+        vatVnd: sql<number>`${invoices.amountVat}::float8`,
+        breakdown: invoices.vatBreakdown,
+      })
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.branchId, branchId),
+          eq(invoices.state, 'issued'),
+          gte(invoices.invoiceDate, from),
+          lte(invoices.invoiceDate, to),
+        ),
+      )
+
     const orderRows = await this.db
       .select({
         netVnd: sql<number>`(${orders.moneySub} - ${orders.moneyDiscount} + ${orders.moneyService})::float8`,
@@ -339,17 +364,25 @@ export class AccountingService {
           eq(orders.branchId, branchId),
           gte(orders.businessDate, from),
           lte(orders.businessDate, to),
+          eq(orders.paymentState, 'paid'),
           ne(orders.status, 'cancelled'),
+          sql`not exists (
+            select 1 from ${invoices} i where i.order_id = ${orders.id} and i.state = 'issued'
+          )`,
         ),
       )
 
-    const buckets = vatBuckets(
-      orderRows.map((r) => ({
-        netVnd: Number(r.netVnd),
-        vatVnd: Number(r.vatVnd),
-        breakdown: r.breakdown,
-      })),
-    )
+    const invoiced = invoiceRows.map((r) => ({
+      netVnd: Number(r.netVnd),
+      vatVnd: Number(r.vatVnd),
+      breakdown: r.breakdown,
+    }))
+    const uninvoiced = orderRows.map((r) => ({
+      netVnd: Number(r.netVnd),
+      vatVnd: Number(r.vatVnd),
+      breakdown: r.breakdown,
+    }))
+    const buckets = vatBuckets([...invoiced, ...uninvoiced])
 
     /**
      * VAT đầu vào lấy từ SỔ HOÁ ĐƠN C5, không từ con số gõ trên phiếu chi.
@@ -384,8 +417,16 @@ export class AccountingService {
         ),
       )
 
-    const [invoiced] = await this.db
-      .select({ total: money(invoices.amountTotal), count: sql<number>`count(*)::int` })
+    /**
+     * Đối chiếu cùng một nền với doanh thu hệ thống: theo ngày kinh doanh của đơn,
+     * và cộng lại phần làm tròn — tờ hoá đơn ghi số chính xác, bill thu số đã làm
+     * tròn, cộng hai thứ mới bằng tiền của đơn.
+     */
+    const [issuedTotals] = await this.db
+      .select({
+        total: money(sql`${invoices.amountTotal} + ${invoices.amountRound}`),
+        count: sql<number>`count(*)::int`,
+      })
       .from(invoices)
       .where(
         and(
@@ -416,6 +457,9 @@ export class AccountingService {
       from,
       to,
       buckets,
+      /** Hai phần của `buckets`: theo hoá đơn đã phát hành · bill đã trả chưa có hoá đơn */
+      invoicedBuckets: vatBuckets(invoiced),
+      uninvoicedBuckets: vatBuckets(uninvoiced),
       summary: taxSummary({
         vatOutVnd,
         vatInVnd: Number(vatIn?.vat ?? 0),
@@ -423,9 +467,9 @@ export class AccountingService {
       }),
       /** Đối chiếu tổng HĐĐT vs doanh thu hệ thống — lệch là đỏ (§28 F4) */
       reconciliation: {
-        ...reconcile(Number(system?.total ?? 0), Number(invoiced?.total ?? 0)),
+        ...reconcile(Number(system?.total ?? 0), Number(issuedTotals?.total ?? 0)),
         systemOrders: Number(system?.count ?? 0),
-        issuedInvoices: Number(invoiced?.count ?? 0),
+        issuedInvoices: Number(issuedTotals?.count ?? 0),
       },
       /** Bao nhiêu tờ hoá đơn đứng sau con số khấu trừ — kế toán cần biết trước khi ký tờ khai */
       vatInInvoices: Number(vatIn?.count ?? 0),

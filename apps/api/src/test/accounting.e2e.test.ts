@@ -9,11 +9,19 @@
  */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { hash } from '@node-rs/argon2'
-import { eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
-import { expenseCategories, orderLines, orders, parameters, staff, staffRoles } from '../db/schema'
+import {
+  expenseCategories,
+  invoices,
+  orderLines,
+  orders,
+  parameters,
+  staff,
+  staffRoles,
+} from '../db/schema'
 import { EINVOICE_PROVIDER, type MockEinvoiceProvider } from '../modules/einvoice/einvoice-provider'
 import { bootTestApp, type Fixtures } from './harness'
 
@@ -402,19 +410,36 @@ describe('F2 — Nhật ký doanh thu & điều chỉnh', () => {
 // ---------------------------------------------------------------- F4
 
 describe('F4 — Báo cáo thuế', () => {
-  it('tách doanh thu theo thuế suất', async () => {
-    const res = await inject({
-      method: 'GET',
-      url: `/api/accounting/tax-report?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
-      headers: bearer(accountant),
-    })
-    expect(res.statusCode, res.payload).toBe(200)
+  /**
+   * Hai bill tháng 6, hoá đơn lập HÔM NAY (ngày chạy test): tờ hoá đơn khai theo
+   * ngày lập, nên bill có tờ đã phát hành rời khỏi tháng 6. Bill kia chưa có tờ nào
+   * lên thuế (bản thay thế còn kẹt) — vẫn phải khai, nằm ở phần "chưa có hoá đơn".
+   */
+  it('tách doanh thu theo thuế suất: theo hoá đơn đã lập, cộng bill chưa có hoá đơn', async () => {
+    const report = (from: string, to: string) =>
+      inject({
+        method: 'GET',
+        url: `/api/accounting/tax-report?branch=${fx.branchId}&from=${from}&to=${to}`,
+        headers: bearer(accountant),
+      })
+    const june = await report('2026-06-01', '2026-06-30')
+    expect(june.statusCode, june.payload).toBe(200)
+    const body = june.json()
+    expect(body.invoicedBuckets).toEqual([])
+    expect(body.uninvoicedBuckets).toEqual([{ rate: 0.08, netVnd: 1_000_000, vatVnd: 80_000 }])
+    expect(body.buckets).toEqual(body.uninvoicedBuckets)
+    expect(body.summary.vatOutVnd).toBe(80_000)
 
-    const body = res.json()
-    expect(body.buckets).toHaveLength(1)
-    expect(body.buckets[0].rate).toBe(0.08)
-    expect(body.buckets[0].netVnd).toBe(1_500_000)
-    expect(body.summary.vatOutVnd).toBe(120_000)
+    // Ngày lập của các tờ đã phát hành: đúng bằng tổng VAT trên chính các tờ đó
+    const today = businessDateOf(new Date(), 'Asia/Ho_Chi_Minh')
+    const [issued] = await db
+      .select({ vat: sql<number>`coalesce(sum(${invoices.amountVat}), 0)::int` })
+      .from(invoices)
+      .where(and(eq(invoices.state, 'issued'), eq(invoices.invoiceDate, today)))
+    const now = (await report(today, today)).json()
+    const vatOf = (buckets: { vatVnd: number }[]) => buckets.reduce((s, b) => s + b.vatVnd, 0)
+    expect(vatOf(now.invoicedBuckets)).toBe(Number(issued!.vat))
+    expect(Number(issued!.vat)).toBeGreaterThan(0)
   })
 
   /**
@@ -498,7 +523,8 @@ describe('F4 — Báo cáo thuế', () => {
       headers: bearer(accountant),
     })
     expect(res.json().summary.vatInVnd).toBe(100_000)
-    expect(res.json().summary.vatPayableVnd).toBe(20_000)
+    // Ra 80.000 − vào 100.000: âm là khấu trừ chuyển kỳ sau
+    expect(res.json().summary.vatPayableVnd).toBe(-20_000)
     expect(res.json().vatInInvoices).toBe(1)
   })
 
