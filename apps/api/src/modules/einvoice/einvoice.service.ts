@@ -595,6 +595,37 @@ export class EinvoiceService {
     return { processed: rows.length, issued, failed, remaining: Number(rest?.n ?? 0) }
   }
 
+  /** F3 ngăn chi tiết: nội dung đầy đủ một tờ và mọi tờ của cùng đơn (thay thế, huỷ) */
+  async detail(invoiceId: number) {
+    const [found] = await this.db
+      .select({ invoice: invoices, orderCode: orders.displayCode })
+      .from(invoices)
+      .innerJoin(orders, eq(orders.id, invoices.orderId))
+      .where(eq(invoices.id, invoiceId))
+    if (!found) throw new NotFoundException('Không có hoá đơn này')
+
+    const history = await this.db
+      .select({
+        id: invoices.id,
+        state: invoices.state,
+        serial: invoices.serial,
+        invoiceNo: invoices.invoiceNo,
+        invoiceDate: invoices.invoiceDate,
+        replacesId: invoices.replacesId,
+        voidReason: invoices.voidReason,
+        issuedAt: invoices.issuedAt,
+      })
+      .from(invoices)
+      .where(eq(invoices.orderId, found.invoice.orderId))
+      .orderBy(asc(invoices.id))
+
+    return {
+      orderCode: found.orderCode,
+      invoice: this.view(found.invoice),
+      history: history.map((h) => ({ ...h, issuedAt: h.issuedAt?.toISOString() ?? null })),
+    }
+  }
+
   /** Tới lượt thử tự động chưa: chưa thử lần nào thì tới ngay, hỏng thì giãn dần */
   private due(row: InvoiceRow): boolean {
     if (row.state !== 'pending' && row.state !== 'failed') return false

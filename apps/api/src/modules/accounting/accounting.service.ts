@@ -5,7 +5,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { and, asc, desc, eq, gte, inArray, lte, ne, sql, type SQLWrapper } from 'drizzle-orm'
+import type { InvoiceState } from '@sora/contracts'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  lte,
+  ne,
+  or,
+  sql,
+  type SQL,
+  type SQLWrapper,
+} from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
@@ -30,6 +45,14 @@ import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 import { assertInvoiceSerial } from '../einvoice/domain/serial'
 import { firstOfMonth, lastOfMonth, reconcile, taxSummary, vatBuckets } from './domain/accounting'
+
+/** Bộ lọc của sổ F3 */
+export interface InvoiceBookFilters {
+  state?: InvoiceState
+  buyer?: 'consumer' | 'company' | 'person'
+  /** MST, tên người mua, số hoá đơn hay mã đơn */
+  q?: string
+}
 
 /** Cùng lý do với `reports.service.ts`: tổng tiền cả kỳ vượt tầm int4 */
 const money = (expr: SQLWrapper) => sql<number>`coalesce(sum(${expr}), 0)::float8`
@@ -145,26 +168,120 @@ export class AccountingService {
 
   // ================================================ F3 · Sổ hoá đơn điện tử
 
-  async invoices(branchId: string, from: string, to: string) {
+  /**
+   * Sổ hoá đơn của một khoảng ngày. Không trả nội dung đầy đủ từng tờ (`snapshot`)
+   * — một tháng vài nghìn tờ; xem từng tờ ở `EinvoiceService.detail`.
+   */
+  async invoices(branchId: string, from: string, to: string, filters: InvoiceBookFilters = {}) {
+    const conditions: SQL[] = [
+      eq(invoices.branchId, branchId),
+      gte(invoices.businessDate, from),
+      lte(invoices.businessDate, to),
+    ]
+    if (filters.state) conditions.push(eq(invoices.state, filters.state))
+    if (filters.buyer) conditions.push(eq(invoices.buyerKind, filters.buyer))
+    const q = filters.q?.trim()
+    if (q) {
+      const like = `%${q}%`
+      conditions.push(
+        or(
+          ilike(invoices.buyerName, like),
+          ilike(invoices.buyerTaxCode, like),
+          ilike(invoices.invoiceNo, like),
+          ilike(orders.displayCode, like),
+        )!,
+      )
+    }
+
     const rows = await this.db
-      .select({ invoice: invoices, orderCode: orders.displayCode, issuedByName: staff.fullName })
+      .select({
+        id: invoices.id,
+        branchId: invoices.branchId,
+        orderId: invoices.orderId,
+        orderCode: orders.displayCode,
+        formNo: invoices.formNo,
+        serial: invoices.serial,
+        invoiceNo: invoices.invoiceNo,
+        invoiceDate: invoices.invoiceDate,
+        taxCode: invoices.taxCode,
+        lookupCode: invoices.lookupCode,
+        state: invoices.state,
+        lastError: invoices.lastError,
+        attempts: invoices.attempts,
+        buyerKind: invoices.buyerKind,
+        buyerName: invoices.buyerName,
+        buyerTaxCode: invoices.buyerTaxCode,
+        amountSub: invoices.amountSub,
+        amountVat: invoices.amountVat,
+        amountTotal: invoices.amountTotal,
+        replacesId: invoices.replacesId,
+        voidReason: invoices.voidReason,
+        issuedAt: invoices.issuedAt,
+        issuedByName: staff.fullName,
+        businessDate: invoices.businessDate,
+      })
       .from(invoices)
       .innerJoin(orders, eq(orders.id, invoices.orderId))
       .leftJoin(staff, eq(staff.id, invoices.issuedBy))
+      .where(and(...conditions))
+      .orderBy(desc(invoices.id))
+
+    /** Hoá đơn chưa lên được của cả chi nhánh — không theo khoảng ngày đang xem */
+    const queue = await this.db
+      .select({ id: invoices.id, orderCode: orders.displayCode, error: invoices.lastError })
+      .from(invoices)
+      .innerJoin(orders, eq(orders.id, invoices.orderId))
+      .where(and(eq(invoices.branchId, branchId), inArray(invoices.state, ['pending', 'failed'])))
+      .orderBy(asc(invoices.id))
+      .limit(100)
+
+    /**
+     * Hoá đơn đã lên cơ quan thuế mà đơn sau đó bị huỷ — tờ hoá đơn vẫn còn hiệu
+     * lực, doanh thu thì không. Kế toán phải xử lý (thay thế, điều chỉnh) bằng tay.
+     */
+    const needsAction = await this.db
+      .select({
+        id: invoices.id,
+        orderCode: orders.displayCode,
+        serial: invoices.serial,
+        invoiceNo: invoices.invoiceNo,
+      })
+      .from(invoices)
+      .innerJoin(orders, eq(orders.id, invoices.orderId))
       .where(
         and(
           eq(invoices.branchId, branchId),
-          gte(invoices.businessDate, from),
-          lte(invoices.businessDate, to),
+          eq(invoices.state, 'issued'),
+          eq(orders.status, 'cancelled'),
         ),
       )
-      .orderBy(desc(invoices.id))
+      .orderBy(asc(invoices.id))
 
-    /** Bill đã trả đủ mà chưa có hoá đơn nào — nguồn thật của hàng đợi F3 */
-    const missing = await this.db
+    return {
+      branchId,
+      serial: await this.serialOf(branchId),
+      rows: rows.map((row) => ({ ...row, issuedAt: row.issuedAt?.toISOString() ?? null })),
+      queue,
+      missing: await this.missingInvoices(branchId, from, to),
+      needsAction,
+    }
+  }
+
+  /**
+   * Bill đã trả đủ mà chưa có hoá đơn còn hiệu lực — tính từ ngày chi nhánh bật hoá
+   * đơn điện tử (`einvoice.enabledFrom`, ghi lần đầu bật ở A9). Trước ngày đó quán
+   * chưa lập hoá đơn từ máy tính tiền, bill cũ không phải là "thiếu". Đơn giao chưa
+   * giao xong thì chưa tới lúc lập.
+   */
+  private async missingInvoices(branchId: string, from: string, to: string) {
+    const enabledFrom = await this.params.get('einvoice.enabledFrom', branchId)
+    if (typeof enabledFrom !== 'string' || enabledFrom === '') return []
+    const start = enabledFrom > from ? enabledFrom : from
+    return this.db
       .select({
         orderId: orders.id,
         displayCode: orders.displayCode,
+        channel: orders.channel,
         moneySub: orders.moneySub,
         moneyVat: orders.moneyVat,
         moneyTotal: orders.moneyTotal,
@@ -174,10 +291,11 @@ export class AccountingService {
       .where(
         and(
           eq(orders.branchId, branchId),
-          gte(orders.businessDate, from),
+          gte(orders.businessDate, start),
           lte(orders.businessDate, to),
           eq(orders.paymentState, 'paid'),
           ne(orders.status, 'cancelled'),
+          sql`(${orders.type} <> 'delivery' OR ${orders.status} = 'done')`,
           sql`not exists (
             select 1 from ${invoices} i
             where i.order_id = ${orders.id} and i.state in ('pending','issued','failed')
@@ -185,22 +303,6 @@ export class AccountingService {
         ),
       )
       .orderBy(asc(orders.id))
-
-    return {
-      branchId,
-      serial: await this.serialOf(branchId),
-      rows: rows.map(({ invoice, orderCode, issuedByName }) => ({
-        ...invoice,
-        orderCode,
-        issuedByName,
-        issuedAt: invoice.issuedAt?.toISOString() ?? null,
-      })),
-      /** Hoá đơn cần phát hành lại — bill đã in, hoá đơn chưa lên thuế */
-      queue: rows
-        .filter(({ invoice }) => invoice.state === 'pending' || invoice.state === 'failed')
-        .map(({ invoice, orderCode }) => ({ id: invoice.id, orderCode, error: invoice.lastError })),
-      missing,
-    }
   }
 
   /**
@@ -528,12 +630,17 @@ export class AccountingService {
         ),
       )
 
+    const missing = await this.missingInvoices(branchId, from, to)
+
     const blockers: string[] = []
     if (Number(drafts?.n ?? 0) > 0) {
       blockers.push(`${drafts!.n} phiếu chi còn chờ duyệt (C2)`)
     }
     if (Number(pendingInvoices?.n ?? 0) > 0) {
       blockers.push(`${pendingInvoices!.n} hoá đơn chưa phát hành được (F3)`)
+    }
+    if (missing.length > 0) {
+      blockers.push(`${missing.length} bill đã trả chưa có hoá đơn (F3)`)
     }
     if (Number(openPayroll?.n ?? 0) > 0) {
       blockers.push(`${openPayroll!.n} kỳ lương chưa phát xong (H7)`)

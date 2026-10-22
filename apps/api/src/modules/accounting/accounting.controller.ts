@@ -9,7 +9,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common'
-import { InvoiceBuyerSchema } from '@sora/contracts'
+import { BUYER_KINDS, INVOICE_STATES, InvoiceBuyerSchema } from '@sora/contracts'
 import { z } from 'zod'
 import { EinvoiceService } from '../einvoice/einvoice.service'
 import type { RequestWithActor } from '../identity/auth.guard'
@@ -25,6 +25,13 @@ const Approval = z
     reason: z.string().min(1).max(300),
   })
   .nullish()
+
+/** Bộ lọc sổ F3: trạng thái, loại người mua (consumer = "Bán cho người tiêu dùng"), tìm */
+const BookQuery = z.object({
+  state: z.enum(INVOICE_STATES).optional(),
+  buyer: z.enum(['consumer', ...BUYER_KINDS]).optional(),
+  q: z.string().max(60).optional(),
+})
 
 /** Huỷ chỉ còn cho hoá đơn chưa lên cơ quan thuế — đã phát hành thì `replace` */
 const VoidBody = z.object({
@@ -82,12 +89,25 @@ export class AccountingController {
 
   @Get('invoices')
   @RequirePermission('accounting.ledger-close-period')
-  invoices(@Query('branch') branch: string, @Query('from') from: string, @Query('to') to: string) {
+  invoices(
+    @Query('branch') branch: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query() query: Record<string, unknown>,
+  ) {
     return this.accounting.invoices(
       this.requireBranch(branch),
       BusinessDate.parse(from),
       BusinessDate.parse(to),
+      BookQuery.parse(query),
     )
+  }
+
+  /** F3 ngăn chi tiết: nội dung đầy đủ một tờ và các tờ cùng đơn (thay thế, huỷ) */
+  @Get('invoices/:id')
+  @RequirePermission('accounting.ledger-close-period')
+  invoice(@Param('id', ParseIntPipe) id: number) {
+    return this.einvoice.detail(id)
   }
 
   @Post('invoices/issue/:orderId')

@@ -32,6 +32,8 @@ let secondOrderId: number
 let invoiceId: number
 /** Hoá đơn của đơn tháng 7 — quản lý ca thay thế ở cuối nhóm F3 */
 let thirdInvoiceId: number
+/** Bill tháng 6 trả rồi mà chưa có hoá đơn — chặn khoá sổ ở F6 */
+let uninvoicedOrderId: number
 /** Phiếu chi và tờ hoá đơn đầu vào của nhóm bài C5 · F4 */
 let voucherId: number
 let inputInvoiceId: number
@@ -126,6 +128,8 @@ beforeAll(async () => {
     { key: 'einvoice.taxCode', branchId: null, value: '0101234567' },
     { key: 'einvoice.sellerName', branchId: null, value: 'CÔNG TY TNHH TOKYO SORA' },
     { key: 'einvoice.sellerAddress', branchId: null, value: '12 Trần Thái Tông, Cầu Giấy, Hà Nội' },
+    // Ngày bật hoá đơn điện tử: bill trả trước ngày này không bị coi là "thiếu hoá đơn"
+    { key: 'einvoice.enabledFrom', branchId: null, value: '2026-06-01' },
     { key: 'expense.pettyCashVnd', branchId: null, value: 2_000_000, unit: 'đồng' },
     { key: 'expense.ownerApprovalVnd', branchId: null, value: 20_000_000, unit: 'đồng' },
     { key: 'expense.assetThresholdVnd', branchId: null, value: 5_000_000, unit: 'đồng' },
@@ -151,15 +155,20 @@ afterAll(async () => {
 // ---------------------------------------------------------------- F3
 
 describe('F3 — Sổ hoá đơn điện tử', () => {
-  it('bill đã trả mà chưa có hoá đơn nằm ở danh sách còn thiếu', async () => {
+  it('bill đã trả mà chưa có hoá đơn nằm ở danh sách còn thiếu — tính từ ngày bật', async () => {
+    // Bill tháng 5, trước ngày chi nhánh bật hoá đơn điện tử
+    await makeOrder('PO-0520-0001', '2026-05-20', 300_000, 24_000)
     const res = await inject({
       method: 'GET',
-      url: `/api/accounting/invoices?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30`,
+      url: `/api/accounting/invoices?branch=${fx.branchId}&from=2026-05-01&to=2026-06-30`,
       headers: bearer(accountant),
     })
     expect(res.statusCode, res.payload).toBe(200)
     expect(res.json().serial).toBe('C26MAA')
-    expect(res.json().missing).toHaveLength(2)
+    expect(res.json().missing.map((m: { displayCode: string }) => m.displayCode)).toEqual([
+      'PO-0615-0001',
+      'PO-0615-0002',
+    ])
   })
 
   it('phát hành: cấp số 8 chữ số và nhận mã cơ quan thuế', async () => {
@@ -303,6 +312,35 @@ describe('F3 — Sổ hoá đơn điện tử', () => {
     thirdInvoiceId = retry.json().id
   })
 
+  it('lọc sổ theo trạng thái, người mua, MST; ngăn chi tiết có lịch sử thay thế', async () => {
+    const book = (query: string) =>
+      inject({
+        method: 'GET',
+        url: `/api/accounting/invoices?branch=${fx.branchId}&from=2026-06-01&to=2026-06-30&${query}`,
+        headers: bearer(accountant),
+      })
+    const replaced = await book('state=replaced')
+    expect(replaced.json().rows.map((r: { id: number }) => r.id)).toEqual([invoiceId])
+
+    const company = await book('buyer=company')
+    expect(company.json().rows).toHaveLength(1)
+    const row = company.json().rows[0]
+    expect(row).toMatchObject({ buyerTaxCode: '0101248141', replacesId: invoiceId })
+    // Sổ không chở nội dung đầy đủ từng tờ — xem ở ngăn chi tiết
+    expect(row).not.toHaveProperty('snapshot')
+    expect((await book('q=0101248141')).json().rows).toHaveLength(1)
+    expect((await book('state=lung-tung')).statusCode).toBe(400)
+
+    const detail = await inject({
+      method: 'GET',
+      url: `/api/accounting/invoices/${row.id}`,
+      headers: bearer(accountant),
+    })
+    expect(detail.statusCode, detail.payload).toBe(200)
+    expect(detail.json().invoice.document.buyer.name).toBe('CÔNG TY CỔ PHẦN FPT')
+    expect(detail.json().history.map((h: { id: number }) => h.id)).toEqual([invoiceId, row.id])
+  })
+
   it('quản lý ca lập hoá đơn thay thế thẳng, không cần ai duyệt (§4.2)', async () => {
     const res = await inject({
       method: 'POST',
@@ -312,6 +350,29 @@ describe('F3 — Sổ hoá đơn điện tử', () => {
     })
     expect(res.statusCode, res.payload).toBe(201)
     expect(res.json().replacement).toMatchObject({ state: 'issued', replacesId: thirdInvoiceId })
+  })
+
+  it('hoá đơn đã lên thuế mà đơn bị huỷ sau đó: nằm ở mục cần xử lý', async () => {
+    const orderX = await makeOrder('PO-0720-0009', '2026-07-20', 100_000, 8_000)
+    const issued = await inject({
+      method: 'POST',
+      url: `/api/accounting/invoices/issue/${orderX}`,
+      headers: bearer(accountant),
+    })
+    expect(issued.statusCode, issued.payload).toBe(201)
+    await db
+      .update(orders)
+      .set({ status: 'cancelled', cancelReason: 'Khách đổi ý sau khi in bill' })
+      .where(eq(orders.id, orderX))
+
+    const res = await inject({
+      method: 'GET',
+      url: `/api/accounting/invoices?branch=${fx.branchId}&from=2026-07-01&to=2026-07-31`,
+      headers: bearer(accountant),
+    })
+    expect(res.json().needsAction).toEqual([
+      expect.objectContaining({ id: issued.json().id, orderCode: 'PO-0720-0009' }),
+    ])
   })
 })
 
@@ -641,7 +702,8 @@ describe('F6 — Khoá sổ và hệ quả của nó', () => {
     expect(res.json().message).toContain('chưa kết thúc')
   })
 
-  it('chặn khoá khi còn hoá đơn chưa phát hành được', async () => {
+  it('chặn khoá khi còn hoá đơn chưa phát hành được, hay bill đã trả chưa có hoá đơn', async () => {
+    uninvoicedOrderId = await makeOrder('PO-0625-0005', '2026-06-25', 200_000, 16_000)
     const res = await inject({
       method: 'POST',
       url: '/api/accounting/periods/lock',
@@ -650,6 +712,7 @@ describe('F6 — Khoá sổ và hệ quả của nó', () => {
     })
     expect(res.statusCode).toBe(409)
     expect(res.json().message).toContain('hoá đơn chưa phát hành')
+    expect(res.json().message).toContain('1 bill đã trả chưa có hoá đơn')
   })
 
   it('dọn xong hàng đợi thì khoá được', async () => {
@@ -667,6 +730,12 @@ describe('F6 — Khoá sổ và hệ quả của nó', () => {
     expect(reissued.statusCode, reissued.payload).toBe(201)
     // Gửi lại giữ đúng số đã cấp ở lượt hỏng
     expect(reissued.json()).toMatchObject({ state: 'issued', invoiceNo: '00000003' })
+    const late = await inject({
+      method: 'POST',
+      url: `/api/accounting/invoices/issue/${uninvoicedOrderId}`,
+      headers: bearer(accountant),
+    })
+    expect(late.statusCode, late.payload).toBe(201)
 
     const res = await inject({
       method: 'POST',
