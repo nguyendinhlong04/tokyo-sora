@@ -25,6 +25,7 @@ import {
 import { CustomersService } from '../crm/customers.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
+import { alreadyPaid } from './payments.service'
 import { prepayDueOf } from '../ordering/domain/prepay'
 import { OrderingService } from '../ordering/ordering.service'
 import { MockBankProvider, PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider'
@@ -144,7 +145,7 @@ export class SplitPaymentService {
    */
   async createOrderVietQr(orderId: number, actor: Actor) {
     return this.db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
+      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update')
       if (!order) throw new NotFoundException('Không có đơn này')
       if (order.status === 'cancelled') throw new ConflictException('Đơn đã huỷ')
 
@@ -155,11 +156,13 @@ export class SplitPaymentService {
         prepay > 0 ? prepay : order.moneyTotal,
       )
       if (outstanding <= 0) {
-        throw new ConflictException(
-          prepay > 0 && order.moneyShip > 0
-            ? 'Tiền món đã trả đủ — còn phí giao thì trả cho người giao khi nhận hàng'
-            : 'Đơn đã trả đủ',
-        )
+        throw new ConflictException({
+          code: 'already_paid',
+          message:
+            prepay > 0 && order.moneyShip > 0
+              ? 'Tiền món đã trả đủ — còn phí giao thì trả cho người giao khi nhận hàng'
+              : 'Đơn đã trả đủ',
+        })
       }
 
       const [row] = await tx
@@ -386,8 +389,15 @@ export class SplitPaymentService {
     if (!session) throw new NotFoundException('Không có phiên bàn này')
     if (session.status === 'closed') throw new ConflictException('Phiên bàn đã đóng')
 
-    const [order] = await tx.select().from(orders).where(eq(orders.tableSessionId, sessionId))
+    // Khoá đơn: hai điện thoại cùng bấm "trả hết" thì người sau thấy khoản đang chờ
+    // của người trước, không phải cả hai cùng tạo mã đòi đủ tiền
+    const [order] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.tableSessionId, sessionId))
+      .for('update')
     if (!order) throw new NotFoundException('Bàn chưa có đơn nào')
+    if (order.paymentState === 'paid') throw alreadyPaid()
     return { session, order }
   }
 
@@ -470,8 +480,15 @@ export class SplitPaymentService {
     return tickets
   }
 
+  /**
+   * Khoá dòng đơn TRƯỚC khi cộng tiền đã thu. Hai webhook trả nốt hai phần của một
+   * bill chia đôi về cùng lúc: không khoá thì mỗi bên chỉ thấy khoản của mình, cả
+   * hai tính ra "trả một phần" — đơn kẹt ở đó mãi, bàn không sang chờ dọn và hoá
+   * đơn không bao giờ được lập. Khoá rồi thì bên sau đợi bên trước commit, và câu
+   * cộng tiền của nó thấy đủ cả hai khoản.
+   */
   private async refreshOrderPaymentState(tx: Tx, orderId: number) {
-    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update')
     if (!order) return 'unpaid'
 
     const rows = await tx

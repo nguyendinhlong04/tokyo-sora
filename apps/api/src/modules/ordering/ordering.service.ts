@@ -84,6 +84,22 @@ function rerouteMessage(lines: number, fromGrill: boolean): string {
     : `${lines} món đang bếp nướng hộ sẽ chuyển sang bàn có bếp than — khách tự nướng. Tiếp tục?`
 }
 
+/**
+ * Đơn đã trả đủ thì món và tiền của nó đứng yên.
+ *
+ * Thêm món vào bill đã trả đủ thì đơn vẫn "đã trả" mà tiền thì thiếu — đóng bàn
+ * là mất khoản đó; huỷ món thì quán đang giữ tiền thừa của khách. Hoá đơn điện tử
+ * lập lúc trả đủ cũng không còn khớp với bill.
+ */
+function assertNotPaid(order: { paymentState: string }) {
+  if (order.paymentState === 'paid') {
+    throw new ConflictException({
+      code: 'order_paid',
+      message: 'Đơn đã thanh toán đủ — không thêm hay huỷ món được nữa',
+    })
+  }
+}
+
 export interface AddLineInput {
   dishId: string
   qty: number
@@ -146,6 +162,9 @@ export class OrderingService {
     return this.db.transaction(async (tx) => {
       const session = await this.liveSession(tx, sessionId)
       const order = await this.ensureOrder(tx, session, actor)
+      // Khoá đơn: lượt thu tiền đang chạy song song phải xong trước, rồi mới biết đơn đã trả đủ chưa
+      const [locked] = await tx.select().from(orders).where(eq(orders.id, order.id)).for('update')
+      assertNotPaid(locked!)
 
       const events: DomainEvent[] = []
       await this.appendLines(tx, { order, branchId: session.branchId, inputs, actor })
@@ -785,7 +804,12 @@ export class OrderingService {
         throw new ConflictException('Món đã phục vụ — dùng luồng hoàn tiền, không huỷ')
       }
 
-      const [order] = await tx.select().from(orders).where(eq(orders.id, line.orderId))
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, line.orderId))
+        .for('update')
+      assertNotPaid(order!)
       const alreadySent = line.state !== 'draft'
 
       const { approvalId } = alreadySent

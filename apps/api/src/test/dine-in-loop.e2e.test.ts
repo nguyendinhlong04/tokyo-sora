@@ -6,13 +6,15 @@
  */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { IDEMPOTENCY_HEADER } from '@sora/contracts'
-import { eq } from 'drizzle-orm'
+import { and, eq, ne } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
 import {
   auditLog,
   devices,
   journalEntries,
+  orderLines,
+  orders,
   outboxEvents,
   stockMoves,
   ticketItems,
@@ -761,6 +763,40 @@ describe('7. Thu tiền, đóng bàn, đóng ca (P10 · P11 · P14)', () => {
       .json<{ code: string; session: { status: string } | null }[]>()
       .find((t) => t.code === 'A4')!
     expect(table.session!.status).toBe('paid_wait_clear')
+  })
+
+  it('đã trả đủ: không thu thêm, không thêm hay huỷ món — bill đứng yên', async () => {
+    const again = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${grillSession}/pay/cash`,
+      headers: auth(cashier),
+      payload: { amount: 1_000 },
+    })
+    expect(again.statusCode).toBe(409)
+    expect(again.json()).toMatchObject({ code: 'already_paid' })
+
+    const more = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${grillSession}/lines`,
+      headers: auth(cashier),
+      payload: { lines: [{ dishId: 'miso', qty: 1 }] },
+    })
+    expect(more.statusCode).toBe(409)
+    expect(more.json()).toMatchObject({ code: 'order_paid' })
+
+    const [order] = await db.select().from(orders).where(eq(orders.tableSessionId, grillSession))
+    const [line] = await db
+      .select()
+      .from(orderLines)
+      .where(and(eq(orderLines.orderId, order!.id), ne(orderLines.state, 'voided')))
+    const voided = await inject({
+      method: 'POST',
+      url: `/api/order-lines/${line!.id}/void`,
+      headers: auth(cashier),
+      payload: { reason: 'Khách đổi ý' },
+    })
+    expect(voided.statusCode).toBe(409)
+    expect(voided.json()).toMatchObject({ code: 'order_paid' })
   })
 
   it('mỗi lượt thu ghi một dòng vào sổ doanh thu bất biến', async () => {

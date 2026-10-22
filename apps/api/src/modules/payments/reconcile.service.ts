@@ -708,7 +708,8 @@ export class ReconcileService {
    * trạng thái luôn suy từ tổng tiền đã thu — không ai đặt tay vào.
    */
   private async settleOrder(tx: Tx, orderId: number, forcePaid: boolean) {
-    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
+    // Khoá đơn trước khi cộng tiền — cùng lý do với `refreshOrderPaymentState`
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update')
     if (!order) return 'unpaid'
 
     const paid = await this.paidOf(tx, orderId)

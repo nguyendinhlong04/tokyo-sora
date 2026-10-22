@@ -25,6 +25,11 @@ import { CustomersService } from '../crm/customers.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 
+/** Đơn đã trả đủ — thu thêm là thu hai lần cho một bill */
+export function alreadyPaid() {
+  return new ConflictException({ code: 'already_paid', message: 'Đơn đã trả đủ' })
+}
+
 @Injectable()
 export class PaymentsService {
   constructor(
@@ -211,10 +216,12 @@ export class PaymentsService {
         .where(eq(tableSessions.id, sessionId))
       if (!session) throw new NotFoundException('Không có phiên bàn này')
 
+      // Khoá đơn: hai máy cùng thu nốt một bill thì máy sau thấy khoản của máy trước
       const [order] = await tx
         .select()
         .from(orders)
         .where(eq(orders.tableSessionId, sessionId))
+        .for('update')
       if (!order) throw new NotFoundException('Bàn chưa có đơn nào')
 
       const paidRows = await tx
@@ -224,7 +231,7 @@ export class PaymentsService {
 
       const paidSoFar = Number(paidRows[0]?.paidSoFar ?? 0)
       const outstanding = order.moneyTotal - paidSoFar
-      if (outstanding <= 0) throw new ConflictException('Đơn đã trả đủ')
+      if (order.paymentState === 'paid' || outstanding <= 0) throw alreadyPaid()
       if (input.amount > outstanding) {
         throw new BadRequestException(
           `Thu quá số còn lại (${outstanding}đ) — tiền thừa trả khách, đừng ghi vào đơn`,

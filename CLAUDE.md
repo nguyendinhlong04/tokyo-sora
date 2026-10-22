@@ -289,7 +289,8 @@ phải env.
 
 **Lỗi:** ném Nest exception với `{ code: 'snake_case', message: 'tiếng Việt', …extra }`
 (`reroute_confirm`, `table_reserved`, `requires_approval`, `dish_sold_out`, `bill_has_money`,
-`unpaid`, `period_closed`, `no_open_shift`, `prepay_required`, `config_not_published`).
+`unpaid`, `period_closed`, `no_open_shift`, `prepay_required`, `config_not_published`,
+`already_paid`, `order_paid` — đơn đã trả đủ thì không thu thêm, không thêm hay huỷ món).
 ZodError → 400 `validation_error` + `issues`. Vi phạm constraint → `isUniqueViolation(err,
 '<tên constraint>')` → 409 — **tên constraint là một phần của API**. Mẫu **xác nhận hai
 lần**: lần 1 trả 409 kèm code, client gửi lại với cờ (`confirmReroute`, `ignoreReservation`).
