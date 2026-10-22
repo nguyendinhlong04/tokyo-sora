@@ -545,9 +545,10 @@ ra log hay chat.
   `screen(() => import('./routes/X'), 'X')`; `components/ScreenBoundary.tsx` giữ chỗ bằng
   skeleton khi chunk đang về và báo "Tải lại trang" khi chunk hỏng (tab cũ sau deploy).
   Chỉ N1 (trang mở đầu) và màn đăng nhập ở chunk đầu — **import tĩnh một màn là kéo nó về
-  chunk đầu**. Ngăn nặng chỉ mở theo yêu cầu (ngăn chi tiết F3) thì `lazy` riêng và mở trong
-  `startTransition`: React giữ màn tới khi chunk về, như bấm menu. Đừng bọc nó trong
-  `Suspense` có khung chờ — React 19 giữ khung chờ ít nhất 300 ms dù chunk về sớm hơn nhiều.
+  chunk đầu**. Ngăn nặng chỉ mở theo yêu cầu (ngăn chi tiết F3, form giao việc B13) thì `lazy`
+  riêng và mở trong `startTransition`: React giữ màn tới khi chunk về, như bấm menu. Đừng bọc
+  nó trong `Suspense` riêng, kể cả `fallback={null}` — React 19 giữ khung chờ ít nhất 300 ms
+  dù chunk về sớm hơn nhiều.
 - Thiết bị đích theo app (§1) quyết định bố cục; không có media query theo hướng xoay.
   Khi một thành phần phải chạy ở nhiều khổ (POS iPad/điện thoại — §9.3) ưu tiên
   **container query** hơn `lg:` toàn trang.

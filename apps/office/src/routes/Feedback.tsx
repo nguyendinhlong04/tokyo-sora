@@ -1,7 +1,7 @@
 import { formatVnd } from '@sora/contracts'
 import { Badge, Button, ErrorState, useToast } from '@sora/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { lazy, Suspense, useState } from 'react'
+import { lazy, startTransition, useState } from 'react'
 import { api, type FeedbackItem } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Field, formatDay } from '../components/report'
@@ -155,6 +155,10 @@ function ComplaintCard({ item, branchId }: { item: FeedbackItem; branchId: strin
   const [resolution, setResolution] = useState('')
   const [closing, setClosing] = useState(false)
   const [delegating, setDelegating] = useState(false)
+  // Mở trong `startTransition`: lần đầu React giữ màn tới khi chunk của form về rồi hiện ngăn
+  // luôn, như bấm menu sang màn chưa tải (ScreenBoundary). Đừng bọc form trong Suspense riêng,
+  // kể cả `fallback={null}`: React giữ khung chờ ít nhất 300 ms dù chunk về sớm hơn nhiều.
+  const delegate = () => startTransition(() => setDelegating(true))
 
   const mayRespond = can('feedback.respond')
   const refresh = () => {
@@ -236,9 +240,7 @@ function ComplaintCard({ item, branchId }: { item: FeedbackItem; branchId: strin
 
           {/* Giao việc khắc phục cho người trong phạm vi (bếp, sảnh). Việc xong KHÔNG
               tự đóng khiếu nại: đóng là lời trả lời khách, người phụ trách tự viết. */}
-          {can('task.assign') && !closing ? (
-            <Button onClick={() => setDelegating(true)}>Giao việc…</Button>
-          ) : null}
+          {can('task.assign') && !closing ? <Button onClick={delegate}>Giao việc…</Button> : null}
 
           {closing ? (
             <>
@@ -275,20 +277,18 @@ function ComplaintCard({ item, branchId }: { item: FeedbackItem; branchId: strin
       ) : null}
 
       {delegating ? (
-        <Suspense fallback={null}>
-          <TaskFormDrawer
-            open
-            preset={{
-              title: `Khắc phục khiếu nại ${item.displayCode}`,
-              note: item.comment
-                ? `Khách viết: “${item.comment}”${item.dishes.length > 0 ? `\nBill có: ${item.dishes.map((d) => d.name).join(', ')}` : ''}`
-                : null,
-              entity: 'feedback',
-              entityId: item.id,
-            }}
-            onClose={() => setDelegating(false)}
-          />
-        </Suspense>
+        <TaskFormDrawer
+          open
+          preset={{
+            title: `Khắc phục khiếu nại ${item.displayCode}`,
+            note: item.comment
+              ? `Khách viết: “${item.comment}”${item.dishes.length > 0 ? `\nBill có: ${item.dishes.map((d) => d.name).join(', ')}` : ''}`
+              : null,
+            entity: 'feedback',
+            entityId: item.id,
+          }}
+          onClose={() => setDelegating(false)}
+        />
       ) : null}
     </section>
   )
