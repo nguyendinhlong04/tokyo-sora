@@ -1,7 +1,7 @@
 import { ROLE_LABELS, type OrgChart as OrgChartData } from '@sora/contracts'
 import { Badge, Button, EmptyState, ErrorState, Skeleton, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { api } from '../api'
 import { Field, FilterBar, SegmentedControl, Select } from '../components/form'
@@ -123,6 +123,20 @@ export function OrgChart() {
       window.clearTimeout(timer)
     }
   }, [highlight])
+
+  // Cây dọc rộng hơn khung (chuỗi đủ ba chi nhánh ~3.500px) mà gốc nằm giữa: mở lên
+  // ở mép trái thì người xem thấy một dải trống chỗ thẻ gốc. Đưa gốc ra giữa mỗi lần
+  // đổi bố cục, thu phóng, chi nhánh — không làm lại khi chỉ thu/mở một nhánh.
+  const canvas = useRef<HTMLDivElement>(null)
+  const hasUnits = (data?.units.length ?? 0) > 0
+  useEffect(() => {
+    const el = canvas.current
+    if (!el || !hasUnits) return
+    const frame = requestAnimationFrame(() => {
+      el.scrollLeft = layout === 'doc' ? (el.scrollWidth - el.clientWidth) / 2 : 0
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [hasUnits, layout, zoom, branch])
 
   // Link sâu từ H1 và từ chỗ khác: ?chuc-danh=34 · ?don-vi=12
   const unitParam = Number(params.get('don-vi')) || null
@@ -280,7 +294,10 @@ export function OrgChart() {
                 }
               />
             ) : (
-              <div className="page-org-chart mt-5 overflow-x-auto rounded-md border border-line-1 bg-canvas p-6 print:overflow-visible print:border-0 print:p-0">
+              <div
+                ref={canvas}
+                className="page-org-chart mt-5 overflow-x-auto rounded-md border border-line-1 bg-canvas p-6 print:overflow-visible print:border-0 print:p-0"
+              >
                 <div className="w-max min-w-full" style={{ zoom: Number(zoom) / 100 }}>
                   <OrgTree
                     forest={forest}

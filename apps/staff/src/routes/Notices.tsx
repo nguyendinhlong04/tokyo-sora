@@ -42,12 +42,14 @@ export function Notices() {
           ))}
         </section>
       ) : null}
-      <section className="flex flex-col gap-2">
-        <SectionLabel>Thông báo</SectionLabel>
-        {rest.map((d) => (
-          <NoticeRow key={d.id} doc={d} />
-        ))}
-      </section>
+      {rest.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <SectionLabel>Thông báo</SectionLabel>
+          {rest.map((d) => (
+            <NoticeRow key={d.id} doc={d} />
+          ))}
+        </section>
+      ) : null}
     </div>
   )
 }
