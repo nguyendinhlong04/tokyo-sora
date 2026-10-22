@@ -1,4 +1,13 @@
-import type { PromoClock, PromotionRule, SiteHeroFrame, SiteMenu } from '@sora/contracts'
+import type {
+  InvoiceBuyer,
+  InvoiceStatus,
+  PromoClock,
+  PromotionRule,
+  SiteHeroFrame,
+  SiteMenu,
+  TaxCodeLookupView,
+  VatRateTotals,
+} from '@sora/contracts'
 import { apiFetch, enqueue } from '@sora/core'
 
 export interface TableSession {
@@ -121,6 +130,8 @@ export interface SessionOrder {
     moneyRound: number
     moneyTotal: number
     paymentState: 'unpaid' | 'partial' | 'paid' | 'refunded'
+    /** Một dòng cho mỗi thuế suất — món ăn 8%, bia rượu 10% */
+    vatBreakdown: VatRateTotals[]
   }
   lines: OrderLineRow[]
   batches: { batchNo: number; state: 'held' | 'fired'; firedAt: string | null }[]
@@ -282,6 +293,23 @@ export const api = {
       method: 'POST',
       body: { stars, comment: comment.trim() || null },
     }),
+
+  // --- Hoá đơn điện tử (§9.7). Không qua hàng đợi: người mua phải nằm trên đơn TRƯỚC
+  // lượt trả đủ, mà thanh toán vốn bị chặn khi mất mạng.
+
+  /** Hỏi cũng là đẩy: hoá đơn còn chờ thì máy chủ phát hành rồi mới trả lời */
+  invoice: (sessionId: number) =>
+    apiFetch<InvoiceStatus>(`/api/table-sessions/${sessionId}/invoice`),
+
+  setInvoiceBuyer: (sessionId: number, buyer: InvoiceBuyer | null) =>
+    apiFetch<InvoiceStatus>(`/api/table-sessions/${sessionId}/invoice-buyer`, {
+      method: 'PUT',
+      body: { buyer },
+    }),
+
+  /** Gõ MST là điền sẵn tên, địa chỉ — iPad chỉ nhận tên, địa chỉ, tình trạng */
+  lookupTaxCode: (code: string) =>
+    apiFetch<TaxCodeLookupView>(`/api/tax-codes/${encodeURIComponent(code)}`),
 
   /** T9 gọi nhân viên — không qua hàng đợi: gọi người mà chờ có mạng thì vô nghĩa */
   callStaff: (sessionId: number, kind: RequestKind, note?: string) =>

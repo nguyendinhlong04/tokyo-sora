@@ -73,8 +73,15 @@ flowchart TD
   này** → **Gửi bếp**. Gửi xong cột giỏ tóm tắt đợt vừa gửi hai giây rồi trống lại.
 - **Đơn của bàn (T8 + T10):** nhóm theo **lượt gửi bếp**, mỗi món có trạng thái
   `Bếp đã nhận → Đang làm → Sắp ra → Đã ra` (món huỷ gạch ngang); bên phải là tạm tính
-  (tiền món, khuyến mãi, phí phục vụ, VAT, làm tròn) với hai nút **Thanh toán** và
-  **Gọi thu ngân**.
+  (tiền món, khuyến mãi, phí phục vụ, **VAT từng thuế suất** — món ăn 8%, bia rượu 10% —
+  làm tròn) với hai nút **Thanh toán** và **Gọi thu ngân**.
+- **Xuất hoá đơn công ty** (khối **Hoá đơn** trên nút Thanh toán, ở T10 và T11 — làm
+  **trước khi trả**): chọn **Công ty** → gõ **mã số thuế** → tên và địa chỉ tự điền theo
+  tra cứu, khách kiểm lại → thêm email nhận hoá đơn nếu muốn → **Lưu thông tin**. **Cá
+  nhân** có MST hay số định danh thì cần địa chỉ. Bàn phím ảo mở thì hộp nhập thu gọn, nút
+  Lưu luôn nằm trên bàn phím. Thông tin chỉ dùng cho hoá đơn của bàn đó. Mất mạng thì
+  khối báo *"Cần mạng — gọi thu ngân"*. Chi nhánh chưa bật hoá đơn điện tử thì không có
+  khối này.
 - **Gọi nhân viên (T9)** — nút trên thanh trên ở mọi màn: **Gọi phục vụ · Thêm than**
   (chỉ bàn có bếp) **· Đá · nước · Xin tính tiền · Việc khác** → hiện ở màn *Yêu cầu từ
   bàn* (P12) của POS.
@@ -92,9 +99,14 @@ flowchart TD
   - Khách chuyển **lệch tiền**: *"Nhân viên sẽ tới đối chiếu giúp bạn — chưa cần chuyển
     thêm."* → thu ngân xử lý ở màn đối soát P15 (**Chấp nhận** / **Yêu cầu bù**).
   - Lượt trả **hết hạn**: *"Tạo lại mã mới giúp bạn, tiền chưa bị trừ lượt này."*
-- **Hoá đơn (T15):** phiếu đủ món (món khuyến mãi in giá gốc + dòng giảm), phí, thuế,
-  các lượt trả. Bàn còn nợ thì ghi rõ *"đây vẫn là bản tạm tính"*. Bên phải là thẻ
-  **chấm sao** — đổ về màn *Phản hồi khách* (B13) trên Office.
+- **Hoá đơn (T15):** phiếu đủ món (món khuyến mãi in giá gốc + dòng giảm), phí, thuế
+  từng thuế suất, các lượt trả, MST người bán và dòng **Người mua**. Hoá đơn điện tử đã
+  phát hành thì cuối phiếu có **QR tra cứu** kèm ký hiệu · số và mã tra cứu (bản giả lập
+  ghi *"Hoá đơn thử"*). Bàn còn nợ thì ghi rõ *"đây vẫn là bản tạm tính"*. Bên phải:
+  thẻ **Hoá đơn điện tử** (*đang phát hành* / *đã phát hành* / *"Thu ngân sẽ gửi lại
+  trong hôm nay — bạn không cần chờ"*; thông tin sai thì **Gọi thu ngân sửa** — thu ngân
+  lập hoá đơn thay thế ở POS) và thẻ **chấm sao** — đổ về màn *Phản hồi khách* (B13)
+  trên Office.
 - **Trả đủ:** iPad hiện **Đã thanh toán đủ** — *"Nhân viên sẽ dọn bàn trong ít phút"*,
   kèm **Xem hoá đơn · Gọi thêm món · Gọi nhân viên**.
 

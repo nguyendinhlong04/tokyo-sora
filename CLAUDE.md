@@ -816,13 +816,19 @@ chỉ ghi khi khách yêu cầu, không thì "Bán cho người tiêu dùng". Mo
   (`components/print/Receipt.tsx`): dựng ngoài cây React, đo chiều dài thật rồi đặt `@page`,
   token `--sora-print-paper/ink`; tờ chưa phát hành in "Phiếu thanh toán — chưa phải hoá
   đơn". Trạm thu ngân hỏi `invoices/pending` mỗi 30 s (vừa đếm vừa đẩy gửi lại).
+- **iPad bàn** (`apps/table/src/components/InvoiceBuyer.tsx`): khối "Hoá đơn" ở T10 · T11
+  (trên nút Thanh toán), hộp nhập khung T3 820px; bàn phím ảo mở thì hộp bám mép trên phần
+  còn thấy, cột trái thu thành một dòng, nút Lưu nằm trên bàn phím (`viewport.ts` đọc
+  `visualViewport` — đã thử trên Safari iPadOS ở Simulator). T10/T15 VAT từng thuế suất
+  (`VatRows`); T15 có MST người bán, người mua, QR tra cứu khi đã phát hành, thẻ trạng
+  thái không dùng màu đỏ, "Gọi thu ngân sửa" gửi yêu cầu `khac` kèm số hoá đơn.
 - **Nhà cung cấp:** `einvoice-provider.ts`, `EINVOICE_PROVIDER` (`mock` ở dev và test · `off`
   mặc định ở production — A9 không cho bật). Bản giả lập trả `test: true` → bill và màn
   khách in "HOÁ ĐƠN THỬ". Chưa ký hợp đồng: adapter thật thêm ở file này, thông tin đăng
   nhập để trong env, không trong `parameters`.
 - **Chưa làm / biết trước:**
-  - Giao diện còn lại: iPad T10/T11/T15, web O5/O6/theo dõi đơn, Office
-    F3/B15/A9/M2/A6/F4 — mỗi app một PR. Office B15 còn ô chọn chế độ hoá đơn (vô tác dụng).
+  - Giao diện còn lại: web O5/O6/theo dõi đơn, Office F3/B15/A9/M2/A6/F4 — mỗi app một
+    PR. Office B15 còn ô chọn chế độ hoá đơn (vô tác dụng).
   - Hoá đơn điều chỉnh, hoàn tiền sau khi xuất, thông báo sai sót 04/SS; người mua nước ngoài
     (hộ chiếu); một bill nhiều người mua (tách ở P9 trước khi trả).
   - Chờ kế toán xác nhận: phí giao có chịu VAT không; làm tròn 1.000đ sinh phần thu ngoài hoá

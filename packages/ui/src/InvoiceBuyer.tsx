@@ -111,12 +111,17 @@ export function looksInactive(status: string | null): boolean {
 export function useInvoiceBuyerForm({
   initial,
   lookup,
+  defaultKind = 'consumer',
 }: {
   initial: InvoiceBuyer | null
   /** Không truyền thì không tra — người nhập gõ tay */
   lookup?: (taxCode: string) => Promise<TaxCodeLookupView>
+  /** Loại chọn sẵn khi chưa có người mua — iPad và web mở form là để lấy hoá đơn công ty */
+  defaultKind?: BuyerChoice
 }) {
-  const [draft, setDraft] = useState(() => draftOf(initial))
+  const [draft, setDraft] = useState(() =>
+    initial ? draftOf(initial) : { ...draftOf(null), kind: defaultKind },
+  )
   const [errors, setErrors] = useState<InvoiceBuyerErrors>({})
   const [lookupState, setLookupState] = useState<LookupState>({ status: 'idle' })
   /** Ô người nhập đã tự gõ — kết quả tra không được ghi đè, chỉ gợi ý */

@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { api, type PaymentTicket } from '../api'
+import { InvoiceBuyerRow } from '../components/InvoiceBuyer'
 import { PayHeader } from '../components/PayHeader'
 import { IconCheck, IconLock, IconMinus, IconOffline, IconPlus, IconQr } from '../icons'
 import { myPayments, rememberPayment } from '../my-payments'
@@ -244,6 +245,9 @@ export function IpadPay() {
               Quét bằng app ngân hàng bất kỳ
             </span>
           </span>
+        </div>
+        <div className="mt-3">
+          <InvoiceBuyerRow />
         </div>
         <div className="flex-1" />
         <Button
