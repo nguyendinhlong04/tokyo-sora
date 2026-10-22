@@ -1195,9 +1195,16 @@ describe('B15 — Hạn mức, tuổi nợ và cái chặn', () => {
   })
 
   it('tab Phải thu của F5 đọc đúng con số này, không tính lại', async () => {
+    // Kỳ là tháng đang chạy như mặc định của F5: DN-004 mang ngày chạy thật, mà F5 cắt
+    // sổ ở ngày cuối kỳ — khung cứng một tháng đã qua sẽ không còn thấy dòng nợ này
+    const today = realToday()
+    const from = `${today.slice(0, 7)}-01`
+    const to = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0))
+      .toISOString()
+      .slice(0, 10)
     const res = await inject({
       method: 'GET',
-      url: `/api/accounting/debts?branch=${fx.branchId}&from=2026-08-01&to=2026-08-31`,
+      url: `/api/accounting/debts?branch=${fx.branchId}&from=${from}&to=${to}`,
       headers: bearer(accountant),
     })
     expect(res.statusCode, res.payload).toBe(200)
@@ -1205,5 +1212,105 @@ describe('B15 — Hạn mức, tuổi nợ và cái chặn', () => {
     expect(companies, res.payload).toHaveLength(1)
     expect(companies[0].code).toBe('CT-FPT')
     expect(companies[0].aging.totalVnd).toBe(400_000)
+  })
+})
+
+// ==================================================== F5 · Phải thu tại cuối kỳ
+
+/**
+ * Mở lại F5 của một kỳ đã qua phải ra đúng con số của kỳ đó. Phải thu là số dư tại hết
+ * ngày cuối kỳ: bill ghi nợ sau ngày đó chưa là nợ, tiền về sau ngày đó chưa gạch.
+ *
+ * Dòng nợ nạp thẳng vào CSDL vì API ghi nợ luôn mang ngày chạy thật, mà bài này cần
+ * ngày cố định nằm hai bên 31/08/2026.
+ */
+describe('F5 — Phải thu là số dư tại cuối kỳ, không phải hôm nay', () => {
+  beforeAll(async () => {
+    const created = await inject({
+      method: 'POST',
+      url: '/api/crm/corporate',
+      headers: bearer(accountant),
+      payload: {
+        code: 'CT-VNG',
+        name: 'Công ty VNG',
+        taxCode: '0102345678',
+        creditLimitVnd: 10_000_000,
+        paymentTermDays: 30,
+      },
+    })
+    expect(created.statusCode, created.payload).toBe(201)
+    const corporateId = created.json().id
+
+    const charge = async (code: string, amountVnd: number, chargedOn: string, dueOn: string) => {
+      const orderId = await makeOrder({ code, sub: amountVnd, date: chargedOn, channel: 'pos' })
+      const [row] = await db
+        .insert(corporateCharges)
+        .values({ corporateId, branchId: fx.branchId, orderId, amountVnd, chargedOn, dueOn })
+        .returning({ id: corporateCharges.id })
+      return row!.id
+    }
+    const settle = async (chargeId: number, amountVnd: number, paidOn: string) => {
+      const res = await inject({
+        method: 'POST',
+        url: '/api/crm/corporate/settlements',
+        headers: bearer(accountant),
+        payload: { chargeId, amountVnd, paidOn },
+      })
+      expect(res.statusCode, res.payload).toBe(201)
+    }
+
+    // Bill tháng 7: trả một phần trong tháng 8, phần còn lại sang tháng 9
+    const july = await charge('VNG-07', 1_000_000, '2026-07-10', '2026-08-09')
+    await settle(july, 400_000, '2026-08-20')
+    await settle(july, 600_000, '2026-09-05')
+    // Bill cuối tháng 8 chỉ có lượt trả sau kỳ — cuối tháng 8 dòng này còn nguyên
+    const lateAugust = await charge('VNG-08', 200_000, '2026-08-25', '2026-09-24')
+    await settle(lateAugust, 200_000, '2026-09-10')
+    // Bill tháng 9 — chưa phải nợ của tháng 8
+    await charge('VNG-09', 500_000, '2026-09-03', '2026-10-03')
+  })
+
+  it('dòng nợ ghi sau kỳ không có, tiền trả sau kỳ chưa trừ', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/accounting/debts?branch=${fx.branchId}&from=2026-08-01&to=2026-08-31`,
+      headers: bearer(accountant),
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    const agingByCode = Object.fromEntries(
+      res
+        .json()
+        .receivable.companies.map((c: { code: string; aging: unknown }) => [c.code, c.aging]),
+    )
+    // CT-FPT vắng mặt: DN-001 đã trả ngày 02/08, DN-004 ghi ngày chạy test — sau kỳ
+    expect(agingByCode).toEqual({
+      'CT-VNG': {
+        currentVnd: 200_000, // VNG-08, tới hạn 24/09
+        d0to30Vnd: 600_000, // VNG-07 còn lại sau lượt 20/08, tới 31/08 quá hạn 22 ngày
+        d31to60Vnd: 0,
+        over60Vnd: 0,
+        totalVnd: 800_000,
+        maxOverdueDays: 22,
+      },
+    })
+  })
+
+  it('B15 vẫn nhìn sổ hôm nay: có bill sau kỳ, trừ mọi lượt đã trả', async () => {
+    const list = await inject({
+      method: 'GET',
+      url: '/api/crm/corporate',
+      headers: bearer(accountant),
+    })
+    const vng = list.json().find((c: { code: string }) => c.code === 'CT-VNG')
+    expect(vng.outstandingVnd).toBe(500_000)
+
+    // Bảng kê tháng 8 chỉ liệt kê bill ghi trong tháng 8, còn dư nợ là của hôm nay
+    const statement = await inject({
+      method: 'GET',
+      url: `/api/crm/corporate/${vng.id}/statement?from=2026-08-01&to=2026-08-31`,
+      headers: bearer(accountant),
+    })
+    expect(statement.statusCode, statement.payload).toBe(200)
+    expect(statement.json().totals.outstandingVnd).toBe(500_000)
   })
 })

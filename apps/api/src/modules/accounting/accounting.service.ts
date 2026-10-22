@@ -559,8 +559,8 @@ export class AccountingService {
       )
 
     const receivedVnd = receipts.reduce((sum, r) => sum + Number(r.costVnd), 0)
-    // Tuổi nợ tính tới ngày CUỐI KỲ đang xem, không tới hôm nay: mở lại báo cáo
-    // tháng trước phải ra đúng con số của tháng trước
+    // Số dư và tuổi nợ tại hết ngày CUỐI KỲ đang xem, không tại hôm nay: mở lại báo
+    // cáo tháng trước phải ra đúng con số của tháng trước
     const receivable = await this.corporate.receivables(to)
 
     return {
@@ -579,7 +579,7 @@ export class AccountingService {
       receivable: {
         ...receivable,
         note:
-          'Tuổi nợ đếm từ NGÀY ĐẾN HẠN của từng bill ghi nợ, không từ ngày ăn. Số này của cả chuỗi: một công ty ăn ở ba chi nhánh vẫn nợ một hợp đồng.',
+          'Tuổi nợ đếm từ NGÀY ĐẾN HẠN của từng bill ghi nợ, không từ ngày ăn. Số này của cả chuỗi: một công ty ăn ở ba chi nhánh vẫn nợ một hợp đồng. Là số dư tại hết ngày cuối kỳ đang xem: bill ghi nợ và tiền về sau ngày đó chưa tính, còn B15 luôn là số hôm nay.',
       },
     }
   }

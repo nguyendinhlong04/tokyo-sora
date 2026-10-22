@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm'
 import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
@@ -191,7 +191,8 @@ export class CorporateService {
 
       const defaults = await this.defaults()
       const today = businessDateOf(new Date(), order.timezone)
-      const aging = (await this.balancesFor([company.id], today, tx)).get(company.id) ?? emptyAging()
+      const aging =
+        (await this.balancesFor([company.id], today, { tx })).get(company.id) ?? emptyAging()
       const blockDays = company.blockAfterOverdueDays ?? defaults.blockAfterOverdueDays
 
       const blocked = blockReason(
@@ -405,12 +406,16 @@ export class CorporateService {
   }
 
   /**
-   * Tuổi nợ toàn chuỗi — nguồn cho tab "Phải thu khách DN" của F5.
+   * Tuổi nợ toàn chuỗi tại hết ngày `asOf` — nguồn cho tab "Phải thu khách DN" của F5.
    *
    * Để ở đây chứ không ở `AccountingService` vì dữ liệu là của B15; F5 gọi sang.
    * Nhân đôi phép tính ở hai miền là hẹn ngày hai màn báo hai con số.
+   *
+   * F5 xem theo kỳ nên sổ cắt ở `asOf` = ngày cuối kỳ. Không cắt thì mở lại tháng 8
+   * vào tháng 10 sẽ thấy cả bill tháng 10 và mất khoản tháng 9 mới trả — con số của
+   * một kỳ đã qua đổi theo ngày mở báo cáo.
    */
-  async receivables(today: string) {
+  async receivables(asOf: string) {
     const companies = await this.db
       .select({
         id: corporateCustomers.id,
@@ -424,7 +429,11 @@ export class CorporateService {
       .from(corporateCustomers)
     if (companies.length === 0) return { companies: [], totals: emptyAging() }
 
-    const balances = await this.balancesFor(companies.map((c) => c.id), today)
+    const balances = await this.balancesFor(
+      companies.map((c) => c.id),
+      asOf,
+      { cutOff: true },
+    )
     const rows = companies
       .map((c) => ({ ...c, aging: balances.get(c.id) ?? emptyAging() }))
       .filter((c) => c.aging.totalVnd > 0)
@@ -462,14 +471,26 @@ export class CorporateService {
   }
 
   /**
-   * Dư nợ còn lại của từng dòng, gom thành bốn khoang tuổi nợ.
+   * Dư nợ còn lại của từng dòng, gom thành bốn khoang tuổi nợ đếm tới `today`.
+   *
+   * Mặc định là sổ như đang có — mọi dòng nợ, mọi lượt trả: B15 và cái chặn ghi nợ ở
+   * POS hỏi "lúc này công ty nợ bao nhiêu". `cutOff` (F5) hỏi "hết ngày `today` công ty
+   * nợ bao nhiêu" nên bỏ dòng nợ ghi sau ngày đó và lượt trả sau ngày đó.
    *
    * Cộng phần đã trả bằng LEFT JOIN + GROUP BY chứ không bằng truy vấn con tương
    * quan: `corporate_settlements` cũng có cột `id`, nên một truy vấn con viết
    * `s.charge_id = id` sẽ tự khớp vào `s.id` của chính nó và trả về tổng của một
    * dòng nợ khác — sai lặng lẽ, và sai theo hướng làm dư nợ biến mất.
+   *
+   * Cũng vì LEFT JOIN mà ngày trả lọc trong ON, không ở WHERE: ở WHERE, dòng nợ chưa
+   * có lượt trả nào tới hết ngày đó bị loại cả dòng — đúng những dòng còn nợ nguyên
+   * vẹn lại biến khỏi sổ.
    */
-  private async balancesFor(ids: number[], today: string, tx?: DbOrTx) {
+  private async balancesFor(
+    ids: number[],
+    today: string,
+    { tx, cutOff = false }: { tx?: DbOrTx; cutOff?: boolean } = {},
+  ) {
     const rows = await (tx ?? this.db)
       .select({
         corporateId: corporateCharges.corporateId,
@@ -478,8 +499,19 @@ export class CorporateService {
         settledVnd: sql<number>`coalesce(sum(${corporateSettlements.amountVnd}), 0)::float8`,
       })
       .from(corporateCharges)
-      .leftJoin(corporateSettlements, eq(corporateSettlements.chargeId, corporateCharges.id))
-      .where(inArray(corporateCharges.corporateId, ids))
+      .leftJoin(
+        corporateSettlements,
+        and(
+          eq(corporateSettlements.chargeId, corporateCharges.id),
+          cutOff ? lte(corporateSettlements.paidOn, today) : undefined,
+        ),
+      )
+      .where(
+        and(
+          inArray(corporateCharges.corporateId, ids),
+          cutOff ? lte(corporateCharges.chargedOn, today) : undefined,
+        ),
+      )
       .groupBy(
         corporateCharges.id,
         corporateCharges.corporateId,
