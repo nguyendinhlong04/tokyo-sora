@@ -263,7 +263,9 @@ seed; bootstrap) · `modules/<domain>/` (`*.module.ts`, `*.controller.ts`, `*.se
 
 Module: identity (global) · realtime · config-bundle · ordering (bàn, phiên, dòng, đợt,
 chuyển/ghép/tách, thiết bị bàn, yêu cầu từ bàn) · catalog · kitchen · payments · online ·
-reservations · site · admin · inventory · expenses · hr · accounting · crm · reports.
+reservations · site · admin · inventory · expenses · hr · accounting · crm · reports ·
+org (sơ đồ tổ chức — `OrgService.snapshot()` + hàm thuần `domain/org.ts` trả lời "ai quản
+ai" cho mọi module: `scopeOf`, `inScope`, `managersOf`).
 
 **Controller mỏng:** zod schema ở đầu file; `@Body() body: unknown` → `Schema.parse(body)`;
 query qua `z.coerce`; `ParseIntPipe` cho id; truyền `req.actor!` vào service. Decorator:
@@ -296,7 +298,7 @@ thoại bàn** cookie `sora_table` (`table_devices.state='admitted'`, phiên ch�
 | kds | kiosk | bridge`); (4) 401 trừ `@Public`. Route khách chạm được **phải** gọi
 `assertOwnTableSession(actor, sessionId)`.
 
-Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 58 action
+Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 60 action
 `domain.verb`, mỗi ô `allow | approve | deny`. `PermissionGuard` chỉ chặn `deny`; ô
 `approve` (△) thì service phải `ApprovalService.authorize(tx, …)` với body
 `approval: {approverStaffId, approverPin, reason}` — người duyệt phải khác người làm
@@ -321,9 +323,14 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
 - **Sổ bất biến** (append-only, trigger `sora_append_only` + revoke quyền role `sora_app`
   trong `deploy/db-roles.sql`): `audit_log`, `approvals`, `journal_entries`,
   `parameter_history`, `stock_moves`. Sửa sai = bút toán đảo, không UPDATE.
+- **Lịch sử chức danh** `position_assignments`: khoảng nửa mở `[from_date, to_date)`, mỗi dòng
+  chỉ được ĐÓNG một lần, không xoá (trigger `9007` + REVOKE DELETE). Cây `org_units` không
+  vòng (trigger + `pg_advisory_xact_lock`), một gốc, một đơn vị mỗi chi nhánh, một trưởng
+  mỗi đơn vị (partial unique index).
 - **Migration:** `db:generate` sinh `migrations/00NN_*.sql`; SQL viết tay đánh số từ
   `9000_` để luôn chạy sau cùng (`9000_guards`, `9001_kitchen_money_guard`,
-  `9002_realtime_broadcast`, `9003_realtime_rls`, `9004_stock_moves_guard`, …). Runner
+  `9002_realtime_broadcast`, `9003_realtime_rls`, `9004_stock_moves_guard`, …,
+  `9007_org_guards`). Runner
   riêng `src/db/migrate.ts` chạy mọi file một lần theo tên, ghi `_sora_migrations`.
   **Không có down**; file đã chạy thì sửa không có tác dụng → luôn thêm file mới.
   Vercel build **không** chạy migration — chạy tay trước khi deploy API.

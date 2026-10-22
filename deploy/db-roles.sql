@@ -38,6 +38,11 @@ REVOKE UPDATE, DELETE ON
   stock_moves
 FROM sora_app;
 
+-- Lịch sử giữ chức danh (sơ đồ tổ chức): chỉ được ĐÓNG, không xoá. Trigger 9007
+-- canh nội dung; GRANT ... ON ALL TABLES ở trên cấp lại DELETE mỗi lần chạy file
+-- này, nên dòng thu hồi phải nằm ở đây chứ không chỉ trong migration.
+REVOKE DELETE ON position_assignments FROM sora_app;
+
 -- outbox_events: được đánh dấu đã phát và dọn retention, nội dung bất biến do
 -- trigger sora_outbox_guard canh.
 GRANT SELECT, INSERT, UPDATE, DELETE ON outbox_events TO sora_app;

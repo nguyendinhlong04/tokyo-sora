@@ -12,6 +12,7 @@ import { InventoryModule } from './modules/inventory/inventory.module'
 import { KitchenModule } from './modules/kitchen/kitchen.module'
 import { OnlineModule } from './modules/online/online.module'
 import { OrderingModule } from './modules/ordering/ordering.module'
+import { OrgModule } from './modules/org/org.module'
 import { PaymentsModule } from './modules/payments/payments.module'
 import { RealtimeModule } from './modules/realtime/realtime.module'
 import { ReportsModule } from './modules/reports/reports.module'
@@ -43,6 +44,7 @@ class HealthController {
     InventoryModule,
     ExpensesModule,
     HrModule,
+    OrgModule,
     AccountingModule,
     CrmModule,
     ReportsModule,

@@ -517,3 +517,103 @@ describe('Thẻ công thức — quy trình chế biến (M4 · M8)', () => {
     expect(left.rows[0]!.n).toBe(0)
   })
 })
+
+describe('Sơ đồ tổ chức — cây, chức danh, lịch sử giữ chức danh', () => {
+  const unitId = async (name: string) =>
+    (await db.query<{ id: number }>(`SELECT id FROM org_units WHERE name = '${name}'`)).rows[0]!.id
+
+  it('migration dựng sẵn gốc công ty — và chỉ được có một gốc', async () => {
+    const roots = await db.query<{ kind: string }>(
+      `SELECT kind FROM org_units WHERE parent_id IS NULL`,
+    )
+    expect(roots.rows).toEqual([{ kind: 'cong-ty' }])
+    await expect(
+      db.exec(`INSERT INTO org_units (kind, name) VALUES ('cong-ty', 'Công ty thứ hai')`),
+    ).rejects.toThrow(/org_units_one_root/)
+  })
+
+  it('không đặt được một đơn vị vào dưới chính cây con của nó', async () => {
+    const root = await unitId('Tokyo Sora')
+    await db.exec(
+      `INSERT INTO org_units (parent_id, kind, name) VALUES (${root}, 'khoi', 'Khối A')`,
+    )
+    const a = await unitId('Khối A')
+    await db.exec(`INSERT INTO org_units (parent_id, kind, name) VALUES (${a}, 'phong', 'Phòng B')`)
+    const b = await unitId('Phòng B')
+    await db.exec(`INSERT INTO org_units (parent_id, kind, name) VALUES (${b}, 'to', 'Tổ C')`)
+    const c = await unitId('Tổ C')
+
+    await expect(db.exec(`UPDATE org_units SET parent_id = ${c} WHERE id = ${a}`)).rejects.toThrow(
+      /cây con của nó/,
+    )
+    // Chuyển sang nhánh không liên quan thì được
+    await db.exec(`UPDATE org_units SET parent_id = ${root} WHERE id = ${c}`)
+  })
+
+  it('đơn vị chi nhánh phải mang mã chi nhánh, đơn vị khác thì không', async () => {
+    const root = await unitId('Tokyo Sora')
+    await expect(
+      db.exec(`INSERT INTO org_units (parent_id, kind, name) VALUES (${root}, 'chi-nhanh', 'CG')`),
+    ).rejects.toThrow(/org_units_branch_check/)
+    await expect(
+      db.exec(
+        `INSERT INTO org_units (parent_id, kind, name, branch_id) VALUES (${root}, 'khoi', 'X', 'cg')`,
+      ),
+    ).rejects.toThrow(/org_units_branch_check/)
+  })
+
+  it('một đơn vị chỉ có một trưởng, và trưởng là một người', async () => {
+    const a = await unitId('Khối A')
+    await db.exec(
+      `INSERT INTO positions (unit_id, title, is_head, headcount) VALUES (${a}, 'Giám đốc khối', true, 1)`,
+    )
+    await expect(
+      db.exec(
+        `INSERT INTO positions (unit_id, title, is_head, headcount) VALUES (${a}, 'Phó giám đốc', true, 1)`,
+      ),
+    ).rejects.toThrow(/positions_one_head_per_unit/)
+    await expect(
+      db.exec(
+        `INSERT INTO positions (unit_id, title, is_head, headcount) VALUES (${a}, 'Đồng trưởng', false, 2),
+                                                                           (${a}, 'Trưởng đôi', true, 2)`,
+      ),
+    ).rejects.toThrow(/positions_head_headcount_check/)
+  })
+
+  it('lịch sử chức danh: không xoá, mỗi dòng chỉ đóng một lần, gán tay phải có lý do', async () => {
+    const a = await unitId('Khối A')
+    await db.exec(
+      `INSERT INTO positions (unit_id, title, headcount) VALUES (${a}, 'Chuyên viên', 3)`,
+    )
+    const pos = (
+      await db.query<{ id: number }>(`SELECT id FROM positions WHERE title = 'Chuyên viên'`)
+    ).rows[0]!.id
+    const hoa = `(SELECT id FROM staff WHERE code = 'NV01')`
+
+    await expect(
+      db.exec(
+        `INSERT INTO position_assignments (staff_id, position_id, from_date) VALUES (${hoa}, ${pos}, '2026-10-01')`,
+      ),
+    ).rejects.toThrow(/position_assignments_basis_check/)
+
+    await db.exec(
+      `INSERT INTO position_assignments (staff_id, position_id, from_date, note)
+         VALUES (${hoa}, ${pos}, '2026-10-01', 'Gán tay khi dựng sơ đồ')`,
+    )
+    await expect(
+      db.exec(
+        `INSERT INTO position_assignments (staff_id, position_id, kind, from_date, note)
+           VALUES (${hoa}, (SELECT id FROM positions WHERE title = 'Giám đốc khối'), 'chinh', '2026-10-02', 'x')`,
+      ),
+    ).rejects.toThrow(/position_assignments_one_main/)
+
+    await db.exec(`UPDATE position_assignments SET to_date = '2026-11-01' WHERE staff_id = ${hoa}`)
+    await expect(
+      db.exec(`UPDATE position_assignments SET to_date = '2026-12-01' WHERE staff_id = ${hoa}`),
+    ).rejects.toThrow(/chỉ được đóng một lần/)
+    await expect(
+      db.exec(`UPDATE position_assignments SET note = 'sửa lý do' WHERE staff_id = ${hoa}`),
+    ).rejects.toThrow(/chỉ được đóng một lần/)
+    await expect(db.exec(`DELETE FROM position_assignments`)).rejects.toThrow(/không xoá được/)
+  })
+})

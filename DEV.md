@@ -125,7 +125,9 @@ pnpm --filter @sora/api db:dev-bootstrap
 ```
 
 Lệnh này làm hai việc mà ngoài đời người vận hành làm tay lúc mở quán: tạo thiết bị
-đầu tiên của chi nhánh và phát hành bundle cấu hình. Nó in ra token của từng máy.
+đầu tiên của chi nhánh và phát hành bundle cấu hình. Nó in ra token của từng máy. Trên
+máy dev nó còn dựng **sơ đồ tổ chức theo mẫu chuẩn** (khung chuỗi + từng chi nhánh — N2)
+và đặt PIN cho tài khoản Office (bảng bên dưới). Chạy lại không nhân đôi gì.
 
 Mở app rồi dán vào Console của trình duyệt:
 

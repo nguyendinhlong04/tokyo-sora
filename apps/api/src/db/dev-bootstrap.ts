@@ -18,6 +18,8 @@ import { ParamsService } from '../common/params.service'
 import { createDb } from './client'
 import { branches, devices, staff } from './schema'
 import { ConfigBundleService } from '../modules/config-bundle/config-bundle.service'
+import { AuditService } from '../modules/identity/audit.service'
+import { OrgService } from '../modules/org/org.service'
 
 const DEV_DEVICE_TOKEN = 'dev-device-token'
 
@@ -85,6 +87,14 @@ async function main() {
       .update(staff)
       .set({ email: 'lan@tokyosora.vn', passwordHash: await hash(DEV_OFFICE_PASSWORD) })
       .where(eq(staff.code, 'LAN'))
+
+    // Sơ đồ tổ chức theo mẫu chuẩn — khung chuỗi rồi từng chi nhánh. Idempotent:
+    // chạy lại không nhân đôi, sửa tay trên Office không bị ghi đè
+    const org = new OrgService(db, new AuditService(db))
+    await org.applyStandard('chuoi', { kind: 'system' })
+    for (const b of await db.select({ id: branches.id }).from(branches)) {
+      await org.applyStandard(b.id, { kind: 'system' })
+    }
 
     const params = new ParamsService(db)
     const bundles = new ConfigBundleService(db, params)

@@ -107,23 +107,37 @@ const CRM_ROWS: [ActionKey, string, string][] = [
   ['corporate.settle-writeoff', '...x...x', 'gạch nợ / xoá nợ — R8, mức lớn R10'],
 ]
 
+/**
+ * Bảng §4.2c — Tổ chức & điều hành (thêm 22/10/2026). Bộ cột đầy đủ, cùng thứ
+ * tự với §4.2 nhưng có thêm R13 trước R10 — R13 là người dựng sơ đồ.
+ */
+const ORG_COLUMN_ORDER: Role[] = [
+  'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R11', 'R12', 'R13', 'R10',
+]
+
+const ORG_ROWS: [ActionKey, string][] = [
+  ['org.view', '....xxxxxxxxx'],
+  ['org.manage', '.........x.xx'],
+]
+
 const SYMBOL: Record<string, Permission> = { '.': 'deny', x: 'allow', a: 'approve' }
 
+/**
+ * 57 dòng của §4.2 · §4.2b + `order.mark-served` + các dòng §4.2c.
+ *
+ * Tài liệu §4.2 KHÔNG có dòng nào cho việc mang món ra bàn — thiếu sót lộ ra khi
+ * dựng nút "Đã mang ra": không có khoá quyền nào đúng, nên nó phải mượn tạm khoá
+ * của bếp và hoá ra phục vụ lại không bấm được. Thêm dòng này vào tài liệu khi có
+ * dịp; số `+ 1` dưới đây là chỗ nhắc.
+ */
+const ACTION_COUNT = DOC_ROWS.length + HR_ROWS.length + CRM_ROWS.length + ORG_ROWS.length + 1
+
 describe('Ma trận khớp 1:1 với bảng §4.2 trong tài liệu', () => {
-  it('mã hoá đủ 31 hành động của §4.2 và 16 + 10 của §4.2b, cộng phần bổ sung', () => {
+  it('mã hoá đủ 31 hành động của §4.2, 16 + 10 của §4.2b, các dòng §4.2c, cộng phần bổ sung', () => {
     expect(DOC_ROWS).toHaveLength(31)
     expect(HR_ROWS).toHaveLength(16)
     expect(CRM_ROWS).toHaveLength(10)
-
-    /**
-     * 57 dòng của tài liệu + `order.mark-served`.
-     *
-     * Tài liệu §4.2 KHÔNG có dòng nào cho việc mang món ra bàn — thiếu sót lộ ra
-     * khi dựng nút "Đã mang ra": không có khoá quyền nào đúng, nên nó phải mượn
-     * tạm khoá của bếp và hoá ra phục vụ lại không bấm được. Thêm dòng này vào
-     * tài liệu khi có dịp; con số dưới đây là chỗ nhắc.
-     */
-    expect(Object.keys(ACTIONS)).toHaveLength(58)
+    expect(Object.keys(ACTIONS)).toHaveLength(ACTION_COUNT)
   })
 
   it.each(DOC_ROWS)('%s khớp từng ô', (action, row) => {
@@ -133,13 +147,42 @@ describe('Ma trận khớp 1:1 với bảng §4.2 trong tài liệu', () => {
     })
   })
 
-  it('R13 (quản lý nhân sự) KHÔNG có quyền vận hành nào — chỉ nhân sự', () => {
-    const hrKeys = new Set(HR_ROWS.map(([action]) => action))
+  it('R13 (quản lý nhân sự) KHÔNG có quyền vận hành nào — chỉ nhân sự và tổ chức', () => {
+    const peopleKeys = new Set([...HR_ROWS, ...ORG_ROWS].map(([action]) => action))
     for (const [action] of DOC_ROWS) {
       expect(checkPermission(action, ['R13']), action).toBe('deny')
     }
     const allowed = (Object.keys(ACTIONS) as ActionKey[]).filter((a) => isPermitted(a, ['R13']))
-    expect(allowed.every((a) => hrKeys.has(a))).toBe(true)
+    expect(allowed.every((a) => peopleKeys.has(a))).toBe(true)
+  })
+})
+
+describe('Ma trận khớp 1:1 với bảng §4.2c — Tổ chức & điều hành', () => {
+  it.each(ORG_ROWS)('%s khớp từng ô', (action, row) => {
+    expect(row).toHaveLength(ORG_COLUMN_ORDER.length)
+    ORG_COLUMN_ORDER.forEach((role, i) => {
+      expect(checkPermission(action, [role]), `${action} × ${role}`).toBe(SYMBOL[row[i]!])
+    })
+  })
+
+  it('R1–R4 không mở sơ đồ ở Office — chức danh và cấp trên của họ hiện ở Kênh nhân viên', () => {
+    for (const role of ['R1', 'R2', 'R3', 'R4'] as Role[]) {
+      for (const [action] of ORG_ROWS) {
+        expect(isPermitted(action, [role]), `${action} × ${role}`).toBe(false)
+      }
+      expect(can('staff.view-own-record', [role])).toBe(true)
+    }
+  })
+
+  it('chỉ người nhìn toàn chuỗi mới sửa được sơ đồ — quản lý ca thì không', () => {
+    const editors = ROLES.filter((r) => can('org.manage', [r]))
+    expect(editors).toEqual(['R10', 'R11', 'R13'])
+  })
+
+  it('marketing và điều phối có cửa "của tôi" — nhận việc, đọc văn bản như mọi người', () => {
+    expect(can('staff.view-own-record', ['R9'])).toBe(true)
+    expect(can('staff.view-own-record', ['R12'])).toBe(true)
+    expect(isPermitted('staff.view-own-record', ['R0'])).toBe(false)
   })
 })
 
@@ -279,10 +322,13 @@ describe('Bất biến của mô hình quyền', () => {
     expect(allowed).toEqual([
       'menu.view-price',
       'cms.edit',
+      // Việc của chính mình và sơ đồ tổ chức — như mọi người có tài khoản Office
+      'staff.view-own-record',
       'promo.compose',
       'promo.activate',
       'feedback.respond',
       'customer.view-book',
+      'org.view',
     ])
     // Không một đồng nào, không một dòng tồn kho nào đi qua tay marketing
     expect(isPermitted('bill.discount-upto-10', ['R9'])).toBe(false)
@@ -350,9 +396,9 @@ describe('Duyệt △ — phân tách nhiệm vụ (PHẦN G)', () => {
 })
 
 describe('permissionMatrix — nguồn render màn A2', () => {
-  it('trả đủ 58 dòng (§4.2, §4.2b và phần bổ sung) × 14 vai trò', () => {
+  it('trả đủ mọi dòng (§4.2, §4.2b, §4.2c và phần bổ sung) × 14 vai trò', () => {
     const matrix = permissionMatrix()
-    expect(matrix).toHaveLength(58)
+    expect(matrix).toHaveLength(ACTION_COUNT)
     for (const row of matrix) {
       expect(Object.keys(row.byRole)).toHaveLength(ROLES.length)
     }

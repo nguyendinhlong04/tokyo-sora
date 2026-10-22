@@ -6,7 +6,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm'
+import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
 import { PeriodLockService } from '../../common/period-lock.service'
@@ -18,6 +19,8 @@ import {
   employees,
   payrollLines,
   payrollPeriods,
+  positionAssignments,
+  positions,
   scheduleEntries,
   shiftTemplates,
   staff,
@@ -129,6 +132,28 @@ export class HrService {
   async saveEmployee(input: EmployeeInput, actor: Actor, id?: number) {
     this.assertEmployee(input)
     await this.requireBranch(input.branchId)
+
+    // Người đã ngồi một ghế trên sơ đồ thì chức danh do sơ đồ quản lý: sửa chữ ở
+    // đây sẽ bị lần đồng bộ kế tiếp ghi đè, và hai nơi nói khác nhau về một người
+    const today = businessDateOf(new Date(), 'Asia/Ho_Chi_Minh')
+    const [managed] = await this.db
+      .select({ title: positions.title })
+      .from(positionAssignments)
+      .innerJoin(positions, eq(positions.id, positionAssignments.positionId))
+      .where(
+        and(
+          eq(positionAssignments.staffId, input.staffId),
+          eq(positionAssignments.kind, 'chinh'),
+          lte(positionAssignments.fromDate, today),
+          or(isNull(positionAssignments.toDate), gt(positionAssignments.toDate, today)),
+        ),
+      )
+    if (managed && managed.title !== input.position) {
+      throw new ConflictException({
+        code: 'position_managed_by_org',
+        message: `Chức danh đang do sơ đồ tổ chức quản lý ("${managed.title}") — đổi bằng điều chuyển ở sơ đồ`,
+      })
+    }
 
     return this.db.transaction(async (tx) => {
       try {
