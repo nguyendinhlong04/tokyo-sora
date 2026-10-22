@@ -123,6 +123,9 @@ pnpm --filter @sora/pos build && pnpm --filter @sora/pos preview   # thử servi
 `.editorconfig`/`.gitattributes` = UTF-8, LF. ESLint (`eslint.config.mjs`) **cấm** màu
 tuỳ ý `bg-[#…]` và `dangerouslySetInnerHTML` trong `apps/**/src` và `packages/**/src`.
 `apps/web` không có `src/` nên **nằm ngoài rule** — vẫn phải tự tuân thủ.
+Nhiều file cũ **chưa sạch Prettier** (vd. `HomeHero.tsx`, `uu-dai/page.tsx`): chạy
+`prettier --check` trước; file chưa sạch thì sửa tay đúng chỗ, **không** `--write` cả file —
+nó định dạng lại cả code không liên quan và làm diff khó duyệt.
 
 **Commit:** `type: nội dung tiếng Việt KHÔNG dấu` với `type` ∈ feat · fix · refactor ·
 chore · style · perf · test · deploy · docs. Thân commit giải thích quyết định, có thể
@@ -524,13 +527,11 @@ ra log hay chat.
   (trình duyệt không giữ lại) và token hết hạn 08/2027 → tới lúc đó ảnh chết im lặng.
 - Trên iPad Gen 7 (A10, 3 GB RAM) PNG cỡ này còn tốn bộ nhớ giải mã — lưới 20 món là treo.
 
-**Đã sửa ở `apps/web` (21/10/2026):** mọi ảnh từ Office đi qua `components/SiteImage.tsx`
-→ `next/image` (bộ tối ưu của Vercel, WebP, bộ đệm 31 ngày, kho được phép khai ở
-`lib/image-hosts.ts`); hero chỉ dựng khung đang chiếu/kế/trước, chỉ khung đầu `priority`.
-Đo bản build: hero 2560px còn 58–244 KB, thumbnail 4–75 KB (giảm ~50–1000×). Hệ quả cần
-nhớ: **ghi đè ảnh cùng tên ở kho thì web hiện ảnh cũ tới 31 ngày** — thay ảnh thì tải lên
-tên mới; gói Hobby của Vercel có 5.000 lượt đổi cỡ/tháng (quá là ảnh mới lỗi 402). Các app
-Vite (table, pos…) **chưa** sửa — vẫn phát ảnh gốc.
+**Đã sửa ở `apps/web` — lên production 22/10/2026 (commit `074a7cf`).** Đo trên
+tokyo-sora.vn sau deploy: trang chủ `load` 46 s → **4,2 s**; ảnh khi cuộn hết trang
+98 MB → **1,2 MB** (16 ảnh, lớn nhất 239 KB); lần vào thứ hai 0 KB ảnh qua mạng. Cách
+làm và cách áp lại cho các app khác: **§8.1**. Sora Table dùng chung bộ tối ưu này từ
+22/10/2026 (`@sora/ui/image`, §9.1); Office **chưa** sửa.
 
 **Ngân sách (đo trên Chrome DevTools, throttling 4G, máy chậm 4×):**
 - LCP ≤ 2,5 s (web, table) · tương tác chạm phản hồi ≤ 100 ms (optimistic update, không
@@ -560,6 +561,86 @@ Vite (table, pos…) **chưa** sửa — vẫn phát ảnh gốc.
 **Dữ liệu:** config bundle cache theo version/ETag (đã có), màn hình đọc từ bundle trước
 rồi mới cập nhật phần động (món hết, giá riêng); khi thay polling bằng realtime (§9.4) giữ
 polling 60 s làm dự phòng. Không gọi API trong vòng lặp render; gộp các query cùng màn.
+
+### 8.1 Sổ tay: ảnh tải chậm — đã sửa ở web, áp lại cho giao diện khác
+
+**Nhận ra lỗi trong 1 phút** (thay URL trang cần kiểm):
+
+```bash
+curl -s https://tokyo-sora.vn/ | grep -o '<link rel="preload" as="image"' | wc -l   # > 1 là lỗi
+curl -s https://tokyo-sora.vn/ | grep -o '<img[^>]* src="https://[^"]*' | wc -l    # > 0 = còn phát ảnh gốc
+curl -sI "<URL ảnh trong DB>" | grep -i -E 'content-length|cache-control'           # MB + no-cache = lỗi
+```
+
+Dấu hiệu chung: `<img src>` trỏ thẳng URL nhập ở Office (Google Cloud Storage
+`storage.googleapis.com/tokyo-sora/...` hoặc Supabase `.../storage/v1/object/sign/...?token=`),
+không `srcset`/`sizes`; ảnh PNG vài MB trong ô vài trăm px; nhiều ảnh không `loading="lazy"`.
+
+**Cách web đã sửa — 3 file, đọc trước khi làm cho app khác:**
+- `apps/web/lib/image-hosts.ts` — danh sách kho được phép (`IMAGE_HOSTS`) + `isOptimizable(src)`.
+  `next.config.ts` lấy chính mảng này làm `images.remotePatterns`. Không mở `*.supabase.co`
+  (người ngoài sẽ dùng ké hạn mức đổi cỡ của quán).
+- `apps/web/components/SiteImage.tsx` — mọi ảnh từ Office đi qua đây. Kho được phép →
+  `next/image` (srcset WebP theo `sizes`); URL lạ → `<img loading="lazy">` thường (Office nhận
+  URL tự do, ảnh lạ không được làm vỡ ô). `sizes` bắt buộc = bề rộng ô hiển thị ở từng khổ.
+  `priority` chỉ cho ảnh LCP và **phải kèm `fetchPriority="high"`** (Next 15 không tự suy).
+  `optimizedUrl(src)` cho chỗ chỉ nhận một URL (`poster` của video).
+- `apps/web/next.config.ts` → `images`: `deviceSizes [640, 828, 1080, 1280, 1920, 2560]`,
+  `imageSizes [96, 160, 256, 384]`, `minimumCacheTTL` 31 ngày. Danh sách bề rộng ngắn có chủ ý.
+- Hero (`HomeHero.tsx`): chỉ dựng ảnh của khung đang chiếu + kế + trước; khung đã chiếu giữ lại.
+
+**Áp cho app Vite — table đã làm (22/10/2026, `b1a9c1a`), Office còn lại:**
+1. Dùng chung bộ tối ưu của web: URL `/_next/image?url=<encodeURIComponent(src)>&w=<W>&q=75`,
+   `W` **bắt buộc** thuộc `96 160 256 384 640 828 1080 1280 1920 2560` (khác → 400). Không
+   tự dựng bộ tối ưu thứ hai.
+2. Cùng gốc để CSP `img-src 'self'` và cookie không phải nới: thêm vào `vercel.json` của app,
+   **trước** dòng `/(.*)` → `/index.html`:
+   `{ "source": "/_next/image", "destination": "https://tokyo-sora.vn/_next/image" }`; máy dev
+   thêm proxy Vite `'/_next/image': { target: 'https://tokyo-sora.vn', changeOrigin: true }`.
+   **Chưa kiểm chứng** việc Vercel cho rewrite sang `/_next/image` của project khác — thử
+   trên preview trước. Không được thì dùng URL tuyệt đối `https://tokyo-sora.vn/_next/image…`
+   và thêm `https://tokyo-sora.vn` vào `img-src` của app đó. Table đi đường URL tuyệt đối
+   (`OPTIMIZER` trong `packages/ui/src/image.tsx`); CSP `img-src` và `connect-src` có
+   `https://tokyo-sora.vn`.
+3. Đã có `packages/ui/src/image.tsx` (entry riêng `@sora/ui/image` để web không kéo Dexie —
+   như `@sora/ui/QrCode`): `optimizedSrc`, `pickWidth`, `OptimizedImage`, `forgetCachedImage`.
+   Gói **không** giữ bản sao `IMAGE_HOSTS`: kho lạ thì bộ tối ưu trả lỗi và thẻ ảnh rơi về ảnh
+   gốc. Web vẫn dùng `SiteImage` + `lib/image-hosts.ts` của nó.
+4. Thay từng chỗ: **table** xong — `DishArt.tsx` (thẻ lưới 160/256, chi tiết 384/640),
+   `StoryDialog.tsx`, `IpadIdle.tsx` (1080/1920), `image-cache.ts` tải sẵn ảnh thực đơn ở màn
+   chờ. **office** `routes/Cms.tsx` (hai `<img>` xem trước trong trang quản trị) — ưu tiên
+   thấp. pos, kitchen, staff, kiosk hiện không có ảnh.
+5. Đo lại như mục "Nhận ra lỗi" + số đo trong trình duyệt (đoạn JS dưới), so với ngân sách §8.
+
+**Bẫy đã gặp — đọc để khỏi mất thời gian:**
+- **React tự preload mọi `<img>` không lazy khi render trên máy chủ** (Next/SSR). Năm ảnh hero
+  bị preload là vì vậy. App Vite render ở trình duyệt nên không dính, nhưng vẫn phải lazy.
+- **Bộ tối ưu chạy local (`next start`) cắt sau 7 giây** khi kéo ảnh gốc; mạng ở đây chỉ
+  0,5–1,7 MB/s nên ảnh 7–9 MB hay ra 500. **Không phải lỗi code** — trên Vercel cùng ảnh đó
+  đổi cỡ trong 0,9–2,6 s. Test local: gọi lại vài lần (kết quả cache ở `.next/cache/images`),
+  hoặc thử bằng ảnh gốc nhỏ; kiểm chứng cuối cùng phải trên Vercel.
+- Đo bằng `fetch()` nhớ gửi `Accept: image/webp` — mặc định `*/*` làm bộ tối ưu trả PNG to.
+- Chrome dùng lại ứng viên srcset **lớn hơn đã có trong cache** → đổi khổ màn trong cùng phiên
+  sẽ thấy `w=2560` trên điện thoại. Đo khổ mới thì dùng cửa sổ ẩn danh/hồ sơ sạch.
+- Ô `grid place-items-center` + ảnh `size-full`: ảnh tràn và bị cắt giữa (có từ trước, không
+  phải do bộ tối ưu). Ảnh mới nên đặt trong khối thường, không phải ô grid căn giữa.
+- **Preview của Vercel**: bị khoá bằng đăng nhập (cần tài khoản thuộc team
+  `longnguyendinh2411-4208s-projects`), và project `sora-web` **thiếu `SORA_API_URL` cho
+  Preview** → trang preview trống món. Muốn thử bộ tối ưu trên preview thì gọi thẳng
+  `/_next/image?url=…` trên domain preview; muốn xem trọn trang thì thêm biến đó cho Preview.
+- **Thay ảnh phải đổi tên file**: ảnh đã đổi cỡ được giữ 31 ngày. Gói Hobby: 5.000 lượt đổi
+  cỡ/tháng, quá là ảnh **mới** lỗi 402 (ảnh đã cache vẫn chạy). Lần đầu một ảnh được xem chậm
+  1–2,6 s (đổi cỡ), các lần sau ~0,3 s.
+- Ảnh Supabase signed URL hết hạn 08/2027 — trước hạn phải chuyển sang bucket công khai.
+
+**Đoạn JS đo trong trình duyệt** (mở trang, cuộn hết, dán vào Console):
+
+```js
+const im = performance.getEntriesByType('resource').filter((r) => r.initiatorType === 'img' || r.name.includes('/_next/image'))
+;({ load: Math.round(performance.getEntriesByType('navigation')[0].loadEventEnd), anh: im.length,
+   KB: Math.round(im.reduce((a, r) => a + r.transferSize, 0) / 1024),
+   anhGoc: [...document.images].filter((i) => !i.currentSrc.includes('/_next/image')).length })
+```
 
 ---
 
@@ -727,7 +808,8 @@ Mục tiêu bản dựng lại (giữ nguyên API; đổi client):
    được tên món 24px; rút mạng 2 phút, cắm lại, không nhân đôi, không mất bấm.
 
 ### 9.5 Thứ tự làm đề xuất
-1. Đường ống ảnh + sửa hero/thumbnail web (§8) — thấy ngay, không đụng nghiệp vụ.
+1. Ảnh: web và iPad bàn **xong** (22/10/2026, §8 · §8.1); còn ảnh xem trước ở Office (ưu
+   tiên thấp). Đường ống tải ảnh lên (biến thể băm tên, bucket công khai) vẫn chưa có.
 2. Realtime client dùng chung (`@sora/core`), áp cho KDS trước.
 3. Dựng lại KDS (§9.4).
 4. Thiết bị kind `table` + vòng đời phiên theo bàn + khách tự mở bàn + gỡ QR + màn chờ
