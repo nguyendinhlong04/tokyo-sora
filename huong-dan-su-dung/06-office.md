@@ -19,6 +19,9 @@ nhân sự (R13), marketing (R9), bếp trưởng (R5), thủ kho (R6).
   khiếu nại **quá hạn** hoặc sự cố nghiêm trọng đang mở thì chấm số chuyển đỏ và dòng
   tương ứng ghi rõ. Bấm để xem từng nhóm và đi thẳng tới màn xử lý.
   Số tự cập nhật mỗi phút — chưa có thông báo đẩy.
+- Mỗi màn tải về lần đầu khi mở. Ngay sau khi Office lên bản mới, tab đã mở từ
+  trước có thể báo *"Không tải được màn này"* khi sang một màn chưa mở — bấm
+  **Tải lại trang** để lấy bản mới.
 
 **Ba cách nói "chi nhánh nào"** — nhầm lẫn phổ biến nhất khi mới dùng:
 

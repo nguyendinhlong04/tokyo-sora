@@ -1,92 +1,116 @@
 import type { ActionKey } from '@sora/contracts'
-import { Skeleton, ToastProvider } from '@sora/ui'
+import { ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, useEffect, useMemo, useState, type ComponentType } from 'react'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router'
 import { ConfigBranchProvider } from './components/config-branch'
 import { InboxBell } from './components/InboxBell'
 import { PublishConfig } from './components/publish-config'
 import { ReportBranchProvider } from './components/report'
-import { Debts, InvoiceBook, PeriodClose, RevenueJournal, TaxReport } from './routes/Accounting'
-import { Accounts } from './routes/Accounts'
-import { Attendance } from './routes/Attendance'
-import { AuditLog } from './routes/AuditLog'
-import { Branches } from './routes/Branches'
-import { CashBook } from './routes/CashBook'
-import { Categories } from './routes/Categories'
-import { Cms } from './routes/Cms'
-import { Corporate } from './routes/Corporate'
-import { Assets, ExpenseOverview, RecurringExpenses } from './routes/CostCenter'
-import { Customers } from './routes/Customers'
-import { DeliveryZones } from './routes/DeliveryZones'
-import { Devices } from './routes/Devices'
-import { Dishes } from './routes/Dishes'
-import { EInvoice } from './routes/EInvoice'
-import { Employees } from './routes/Employees'
-import { Expenses } from './routes/Expenses'
-import { Feedback } from './routes/Feedback'
-import { Floorplan } from './routes/Floorplan'
-import { Ingredients } from './routes/Ingredients'
-import { InputInvoices } from './routes/InputInvoices'
-import { Leaves } from './routes/Leaves'
+import { ScreenBoundary } from './components/ScreenBoundary'
 import { Login } from './routes/Login'
-import { LoyaltyRules } from './routes/LoyaltyRules'
-import { PayrollRules } from './routes/PayrollRules'
-import { Promotions } from './routes/Promotions'
-import { PrepEditor, PrepList } from './routes/Prep'
-import { Printers } from './routes/Printers'
-import { PurchaseOrders, Receiving } from './routes/Purchasing'
-import { RecipeHistory } from './routes/RecipeHistory'
-import { ReportCenter } from './routes/ReportCenter'
-import { CostMargin, Revenue, SetsReport } from './routes/RevenueReports'
-import { Roles } from './routes/Roles'
-import { Sets } from './routes/Sets'
-import { Lots, StockCardScreen, WasteReport } from './routes/StockBooks'
-import { Production, StockCount, StockIssues, Transfers } from './routes/StockOps'
-import { Suppliers } from './routes/Suppliers'
-import { Timesheet } from './routes/Timesheet'
-import { MenuMatrix } from './routes/MenuMatrix'
-import { Modifiers } from './routes/Modifiers'
-import { KitchenReport, OnlineReport, StaffReport, TableTurnover } from './routes/OperationsReports'
-import { OnlineMenu } from './routes/OnlineMenu'
-import { Parameters } from './routes/Parameters'
-import { ProfitLoss } from './routes/ProfitLoss'
-import { RecipeEditor, RecipeList } from './routes/Recipes'
-import { ReservationConfig } from './routes/ReservationConfig'
-import { Schedule } from './routes/Schedule'
-import { StockLevels, StockOverview } from './routes/Stock'
-import { Today } from './routes/Today'
+import { MyDesk } from './routes/MyDesk'
 import { SessionProvider, useSession } from './session-context'
 
 /**
- * Nhóm Tổ chức & điều hành (N…) tải theo yêu cầu: bản dựng Office đã vượt ngân
- * sách JS của §8 trước khi có nhóm này, nên phần mới không được làm gói chính
- * nặng thêm — người chỉ làm kho hay kế toán không phải tải sơ đồ tổ chức.
+ * Mỗi file màn là một chunk riêng, tải lần đầu mở màn đó: gộp cả Office vào một
+ * chunk thì đã vượt ngân sách JS 250 KB gzip của §8, và màn nào thêm vào cũng
+ * cộng thẳng vào lần tải đầu của mọi người.
+ *
+ * Chỉ N1 `/ban-lam-viec` và màn đăng nhập ở lại chunk đầu: đường dẫn lạ nào cũng về
+ * `/ban-lam-viec`, nên đó là màn ai đăng nhập cũng thấy trước. Không gộp thêm nhóm
+ * màn — các màn hay mở liền nhau vốn chung một file (danh sách + màn sửa công thức,
+ * F2–F6 ở Accounting, S4–S5 ở Purchasing…) nên đã chung một chunk.
+ *
+ * Màn mới khai ở đây bằng `screen(...)`. Import tĩnh một màn là kéo nó về chunk đầu.
  */
-const OrgChart = lazy(() => import('./routes/OrgChart').then((m) => ({ default: m.OrgChart })))
-const Positions = lazy(() => import('./routes/Positions').then((m) => ({ default: m.Positions })))
-const Documents = lazy(() => import('./routes/Documents').then((m) => ({ default: m.Documents })))
-const DocumentPage = lazy(() =>
-  import('./routes/DocumentPage').then((m) => ({ default: m.DocumentPage })),
-)
-const MyDesk = lazy(() => import('./routes/MyDesk').then((m) => ({ default: m.MyDesk })))
-const Tasks = lazy(() => import('./routes/Tasks').then((m) => ({ default: m.Tasks })))
-const TaskTemplates = lazy(() =>
-  import('./routes/TaskTemplates').then((m) => ({ default: m.TaskTemplates })),
-)
-const WorkReports = lazy(() =>
-  import('./routes/WorkReports').then((m) => ({ default: m.WorkReports })),
-)
-const Incidents = lazy(() => import('./routes/Incidents').then((m) => ({ default: m.Incidents })))
-// H7 tải lười: bảng điều chỉnh thưởng KPI làm màn này nặng lên, mà chỉ R8/R13/R10 mở
-const Payroll = lazy(() => import('./routes/Payroll').then((m) => ({ default: m.Payroll })))
-const KpiTemplates = lazy(() =>
-  import('./routes/KpiTemplates').then((m) => ({ default: m.KpiTemplates })),
-)
-const KpiCycles = lazy(() => import('./routes/KpiCycles').then((m) => ({ default: m.KpiCycles })))
-const Observations = lazy(() =>
-  import('./routes/Observations').then((m) => ({ default: m.Observations })),
-)
+function screen<K extends string, M extends Record<K, ComponentType>>(
+  load: () => Promise<M>,
+  name: K,
+) {
+  return lazy(() => load().then((m) => ({ default: m[name] })))
+}
+
+const Debts = screen(() => import('./routes/Accounting'), 'Debts')
+const InvoiceBook = screen(() => import('./routes/Accounting'), 'InvoiceBook')
+const PeriodClose = screen(() => import('./routes/Accounting'), 'PeriodClose')
+const RevenueJournal = screen(() => import('./routes/Accounting'), 'RevenueJournal')
+const TaxReport = screen(() => import('./routes/Accounting'), 'TaxReport')
+const Accounts = screen(() => import('./routes/Accounts'), 'Accounts')
+const Attendance = screen(() => import('./routes/Attendance'), 'Attendance')
+const AuditLog = screen(() => import('./routes/AuditLog'), 'AuditLog')
+const Branches = screen(() => import('./routes/Branches'), 'Branches')
+const CashBook = screen(() => import('./routes/CashBook'), 'CashBook')
+const Categories = screen(() => import('./routes/Categories'), 'Categories')
+const Cms = screen(() => import('./routes/Cms'), 'Cms')
+const Corporate = screen(() => import('./routes/Corporate'), 'Corporate')
+const Assets = screen(() => import('./routes/CostCenter'), 'Assets')
+const ExpenseOverview = screen(() => import('./routes/CostCenter'), 'ExpenseOverview')
+const RecurringExpenses = screen(() => import('./routes/CostCenter'), 'RecurringExpenses')
+const Customers = screen(() => import('./routes/Customers'), 'Customers')
+const DeliveryZones = screen(() => import('./routes/DeliveryZones'), 'DeliveryZones')
+const Devices = screen(() => import('./routes/Devices'), 'Devices')
+const Dishes = screen(() => import('./routes/Dishes'), 'Dishes')
+const DocumentPage = screen(() => import('./routes/DocumentPage'), 'DocumentPage')
+const Documents = screen(() => import('./routes/Documents'), 'Documents')
+const Incidents = screen(() => import('./routes/Incidents'), 'Incidents')
+const KpiCycles = screen(() => import('./routes/KpiCycles'), 'KpiCycles')
+const KpiTemplates = screen(() => import('./routes/KpiTemplates'), 'KpiTemplates')
+const Observations = screen(() => import('./routes/Observations'), 'Observations')
+const OrgChart = screen(() => import('./routes/OrgChart'), 'OrgChart')
+const Positions = screen(() => import('./routes/Positions'), 'Positions')
+const Tasks = screen(() => import('./routes/Tasks'), 'Tasks')
+const TaskTemplates = screen(() => import('./routes/TaskTemplates'), 'TaskTemplates')
+const WorkReports = screen(() => import('./routes/WorkReports'), 'WorkReports')
+const EInvoice = screen(() => import('./routes/EInvoice'), 'EInvoice')
+const Employees = screen(() => import('./routes/Employees'), 'Employees')
+const Expenses = screen(() => import('./routes/Expenses'), 'Expenses')
+const Feedback = screen(() => import('./routes/Feedback'), 'Feedback')
+const Floorplan = screen(() => import('./routes/Floorplan'), 'Floorplan')
+const Ingredients = screen(() => import('./routes/Ingredients'), 'Ingredients')
+const InputInvoices = screen(() => import('./routes/InputInvoices'), 'InputInvoices')
+const Leaves = screen(() => import('./routes/Leaves'), 'Leaves')
+const LoyaltyRules = screen(() => import('./routes/LoyaltyRules'), 'LoyaltyRules')
+const PayrollRules = screen(() => import('./routes/PayrollRules'), 'PayrollRules')
+const Promotions = screen(() => import('./routes/Promotions'), 'Promotions')
+const PrepEditor = screen(() => import('./routes/Prep'), 'PrepEditor')
+const PrepList = screen(() => import('./routes/Prep'), 'PrepList')
+const Printers = screen(() => import('./routes/Printers'), 'Printers')
+const PurchaseOrders = screen(() => import('./routes/Purchasing'), 'PurchaseOrders')
+const Receiving = screen(() => import('./routes/Purchasing'), 'Receiving')
+const RecipeHistory = screen(() => import('./routes/RecipeHistory'), 'RecipeHistory')
+const ReportCenter = screen(() => import('./routes/ReportCenter'), 'ReportCenter')
+const CostMargin = screen(() => import('./routes/RevenueReports'), 'CostMargin')
+const Revenue = screen(() => import('./routes/RevenueReports'), 'Revenue')
+const SetsReport = screen(() => import('./routes/RevenueReports'), 'SetsReport')
+const Roles = screen(() => import('./routes/Roles'), 'Roles')
+const Sets = screen(() => import('./routes/Sets'), 'Sets')
+const Lots = screen(() => import('./routes/StockBooks'), 'Lots')
+const StockCardScreen = screen(() => import('./routes/StockBooks'), 'StockCardScreen')
+const WasteReport = screen(() => import('./routes/StockBooks'), 'WasteReport')
+const Production = screen(() => import('./routes/StockOps'), 'Production')
+const StockCount = screen(() => import('./routes/StockOps'), 'StockCount')
+const StockIssues = screen(() => import('./routes/StockOps'), 'StockIssues')
+const Transfers = screen(() => import('./routes/StockOps'), 'Transfers')
+const Suppliers = screen(() => import('./routes/Suppliers'), 'Suppliers')
+const Timesheet = screen(() => import('./routes/Timesheet'), 'Timesheet')
+const MenuMatrix = screen(() => import('./routes/MenuMatrix'), 'MenuMatrix')
+const Modifiers = screen(() => import('./routes/Modifiers'), 'Modifiers')
+const KitchenReport = screen(() => import('./routes/OperationsReports'), 'KitchenReport')
+const OnlineReport = screen(() => import('./routes/OperationsReports'), 'OnlineReport')
+const StaffReport = screen(() => import('./routes/OperationsReports'), 'StaffReport')
+const TableTurnover = screen(() => import('./routes/OperationsReports'), 'TableTurnover')
+const OnlineMenu = screen(() => import('./routes/OnlineMenu'), 'OnlineMenu')
+const Parameters = screen(() => import('./routes/Parameters'), 'Parameters')
+const Payroll = screen(() => import('./routes/Payroll'), 'Payroll')
+const ProfitLoss = screen(() => import('./routes/ProfitLoss'), 'ProfitLoss')
+const RecipeEditor = screen(() => import('./routes/Recipes'), 'RecipeEditor')
+const RecipeList = screen(() => import('./routes/Recipes'), 'RecipeList')
+const ReservationConfig = screen(() => import('./routes/ReservationConfig'), 'ReservationConfig')
+const Schedule = screen(() => import('./routes/Schedule'), 'Schedule')
+const StockLevels = screen(() => import('./routes/Stock'), 'StockLevels')
+const StockOverview = screen(() => import('./routes/Stock'), 'StockOverview')
+const Today = screen(() => import('./routes/Today'), 'Today')
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5_000, refetchOnWindowFocus: true } },
@@ -521,23 +545,12 @@ function Shell() {
             cố ý tách nhau — xem chú thích ở components/config-branch.tsx. */}
         <ReportBranchProvider>
           <ConfigBranchProvider>
-            <Suspense fallback={<RouteSkeleton />}>
+            <ScreenBoundary resetKey={pathname}>
               <Outlet />
-            </Suspense>
+            </ScreenBoundary>
           </ConfigBranchProvider>
         </ReportBranchProvider>
       </div>
-    </div>
-  )
-}
-
-/** Đang tải mã của một màn tải theo yêu cầu: khung đúng hình đầu trang + bảng (§13) */
-function RouteSkeleton() {
-  return (
-    <div className="grid gap-4 px-8 pt-6">
-      <Skeleton className="h-7 w-72" />
-      <Skeleton className="h-4 w-[520px]" />
-      <Skeleton className="mt-4 h-[320px]" />
     </div>
   )
 }

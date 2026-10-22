@@ -536,11 +536,15 @@ ra log hay chat.
   thái cục bộ: React Context + sessionStorage (giỏ `sora.table.cart`, nháp đơn web
   `sora.web.order`). Không thêm store toàn cục.
 - Màn hình theo mã thiết kế (T/P/K/O/R/W/M/S/B/H/C/F/A, và N cho Tổ chức & điều hành —
-  `tokyo-sora-ke-hoach-thiet-ke.md` §26b) — ghi mã ở đầu file. Màn nhóm N tải theo yêu cầu
-  (`React.lazy` trong `App.tsx`), H7 cũng vậy: bản dựng Office đã vượt ngân sách JS của §8
-  từ trước — màn mới đừng làm gói chính nặng thêm. Số KPI định dạng bằng `formatKpiValue` /
-  `formatKpiScore` của `@sora/contracts` (milli → "8,5%", "103,6"), không tự chia 1000.
-  Trang mở đầu của Office là **N1 · Bàn làm việc** (`/ban-lam-viec`), không còn là M1.
+  `tokyo-sora-ke-hoach-thiet-ke.md` §26b) — ghi mã ở đầu file. Số KPI định dạng bằng
+  `formatKpiValue` / `formatKpiScore` của `@sora/contracts` (milli → "8,5%", "103,6"), không
+  tự chia 1000. Trang mở đầu của Office là **N1 · Bàn làm việc** (`/ban-lam-viec`), không
+  còn là M1.
+- Office tách chunk theo màn (`React.lazy`): mỗi màn khai trong `App.tsx` bằng
+  `screen(() => import('./routes/X'), 'X')`; `components/ScreenBoundary.tsx` giữ chỗ bằng
+  skeleton khi chunk đang về và báo "Tải lại trang" khi chunk hỏng (tab cũ sau deploy).
+  Chỉ N1 (trang mở đầu) và màn đăng nhập ở chunk đầu — **import tĩnh một màn là kéo nó về
+  chunk đầu**.
 - Thiết bị đích theo app (§1) quyết định bố cục; không có media query theo hướng xoay.
   Khi một thành phần phải chạy ở nhiều khổ (POS iPad/điện thoại — §9.3) ưu tiên
   **container query** hơn `lg:` toàn trang.
@@ -609,6 +613,9 @@ làm và cách áp lại cho các app khác: **§8.1**. Sora Table dùng chung b
   cho web.
 - Ảnh thumbnail (176–400px) ≤ 40 KB · thẻ 4:3 (800px) ≤ 120 KB · hero/chi tiết (1600px)
   ≤ 250 KB · tổng ảnh một màn thực đơn ≤ 1,5 MB · JS mỗi SPA ≤ 250 KB gzip, web ≤ 200 KB.
+- Office (22/10/2026, tách chunk theo màn — §6): chunk đầu 176 KB gzip sau khi gộp nhánh tổ
+  chức và hoá đơn điện tử (164 KB trên gd1 riêng), mỗi màn thêm 2–11 KB khi mở lần đầu;
+  trước đó một chunk 281 KB.
 
 **Quy tắc ảnh (áp cho mọi app, mọi ảnh mới):**
 1. **Không bao giờ phát ảnh gốc.** Mọi ảnh đi qua một đường ống sinh biến thể
@@ -1043,8 +1050,7 @@ chỉ ghi khi khách yêu cầu, không thì "Bán cho người tiêu dùng". Mo
   nhập để trong env, không trong `parameters`.
 - **Chưa làm / biết trước:**
   - Office chưa có ô duyệt PIN — người có quyền △ (thu ngân) gặp `requires_approval` ở F3
-    thì được chỉ sang POS P11. Bundle Office một chunk 289 KB gzip (trước PR này 283 KB),
-    vượt ngân sách 250 KB từ trước — cần tách theo route.
+    thì được chỉ sang POS P11.
   - Hoá đơn điều chỉnh, hoàn tiền sau khi xuất, thông báo sai sót 04/SS; người mua nước ngoài
     (hộ chiếu); một bill nhiều người mua (tách ở P9 trước khi trả).
   - Chờ kế toán xác nhận: phí giao có chịu VAT không; làm tròn 1.000đ sinh phần thu ngoài hoá
