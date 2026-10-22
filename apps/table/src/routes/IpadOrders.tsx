@@ -1,9 +1,10 @@
 import { Button, Money, PromoTag, Skeleton } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
-import { api, type Dish, type OrderLineRow } from '../api'
+import { api, type Dish, type OrderLineRow, type SessionOrder } from '../api'
 import { useCart } from '../cart-context'
+import { InvoiceBuyerRow } from '../components/InvoiceBuyer'
 import { BackLink } from '../components/PayHeader'
 import { StoryDialog } from '../components/StoryDialog'
 import { IconBook, IconPlus, IconWarning } from '../icons'
@@ -184,9 +185,7 @@ export function IpadOrders() {
           {money && money.moneyService > 0 ? (
             <MoneyRow label="Phí phục vụ" amount={money.moneyService} />
           ) : null}
-          {money && money.moneyVat > 0 ? (
-            <MoneyRow label="Thuế VAT" amount={money.moneyVat} />
-          ) : null}
+          {money ? <VatRows money={money} /> : null}
           {money && money.moneyRound !== 0 ? (
             <MoneyRow label="Làm tròn" amount={money.moneyRound} />
           ) : null}
@@ -210,6 +209,9 @@ export function IpadOrders() {
         ) : null}
 
         <div className="flex-1" />
+        <div className="mb-3">
+          <InvoiceBuyerRow />
+        </div>
         {!outbox.online && !settled ? (
           <p className="mb-3 text-[length:var(--fs-c1)] leading-normal text-ink-hi">
             Thanh toán cần mạng ổn định. Vui lòng gọi thu ngân.
@@ -255,6 +257,31 @@ export function IpadOrders() {
       ) : null}
     </div>
   )
+}
+
+/**
+ * Một dòng VAT cho mỗi thuế suất — món ăn 8%, bia rượu 10% — đúng như tờ hoá đơn
+ * sẽ in. Đơn tính trước khi có nhóm thuế chỉ có tổng: một dòng như cũ.
+ */
+export function VatRows({
+  money,
+  Row = MoneyRow,
+}: {
+  money: SessionOrder['order']
+  /** Dòng tiền của nơi đặt — tạm tính trên nền tối, phiếu kraft ở T15 */
+  Row?: (props: { label: string; amount: number }) => ReactNode
+}) {
+  const rows = (money.vatBreakdown ?? []).filter((r) => r.vat > 0)
+  if (rows.length === 0) {
+    return money.moneyVat > 0 ? <Row label="Thuế VAT" amount={money.moneyVat} /> : null
+  }
+  return rows.map((r) => (
+    <Row
+      key={r.rateBp}
+      label={`Thuế VAT ${(r.rateBp / 100).toLocaleString('vi-VN')}%`}
+      amount={r.vat}
+    />
+  ))
 }
 
 function MoneyRow({

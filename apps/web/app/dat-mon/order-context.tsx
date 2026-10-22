@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import type { InvoiceBuyer } from '@sora/contracts'
 import type { OnlineDish } from '../../lib/api'
 import { ORDER_STORAGE_KEY, type DraftLine, type ReceiveMode } from '../../lib/order-draft'
 
@@ -26,6 +27,12 @@ export interface OrderDraft {
   /** ISO khung giờ khách chọn; rỗng = nhận sớm nhất */
   slotAt: string | null
   customer: { name: string; phone: string; note: string }
+  /**
+   * Xuất hoá đơn cho công ty / cá nhân (O5) — null = "Bán cho người tiêu dùng".
+   * Nằm trong `sessionStorage` cùng giỏ, không bao giờ `localStorage`: có thể là số
+   * định danh cá nhân, không được sống qua phiên trên máy dùng chung.
+   */
+  invoiceBuyer: InvoiceBuyer | null
 }
 
 const EMPTY: OrderDraft = {
@@ -36,6 +43,7 @@ const EMPTY: OrderDraft = {
   lines: [],
   slotAt: null,
   customer: { name: '', phone: '', note: '' },
+  invoiceBuyer: null,
 }
 
 interface OrderValue {

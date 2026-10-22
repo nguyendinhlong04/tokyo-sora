@@ -213,7 +213,10 @@ thấy `/api` cùng origin với trang. Nếu gọi chéo thì buộc phải h�
 `SameSite=None`, yếu hơn hẳn.
 
 **Biến môi trường** — project `sora-api` cần: `DATABASE_URL`, `DATABASE_MIGRATION_URL`,
-`SUPABASE_JWT_SECRET`, `BANK_WEBHOOK_SECRET`. Các SPA nghe Realtime (`sora-pos`,
+`SUPABASE_JWT_SECRET`, `BANK_WEBHOOK_SECRET`. `EINVOICE_PROVIDER` để trống ở production
+nghĩa là `off` (chưa đấu nối hoá đơn điện tử — A9 không cho bật); đặt `mock` chỉ ở môi
+trường thử, vì hoá đơn của bản giả lập không lên cơ quan thuế. `TAXCODE_LOOKUP` để trống
+là tra MST qua VietQR (miễn phí, không khoá); `off` nếu không muốn API gọi ra ngoài. Các SPA nghe Realtime (`sora-pos`,
 `sora-kitchen`, `sora-office`, `sora-table`) cần: `VITE_SUPABASE_URL`,
 `VITE_SUPABASE_ANON_KEY`. `sora-staff` và `sora-kiosk` không nghe Realtime nên không
 cần hai biến đó — CSP của chúng cũng đã chặn `*.supabase.co`.

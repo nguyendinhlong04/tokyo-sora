@@ -133,7 +133,8 @@ Vì sao tách Sora Table và Sora POS dù cùng là "gọi món": khách cần �
 | Báo cáo lãi gộp / food cost | – | – | – | – | – | ✓ | – | ✓ | ✓ | – | ✓ | – | ✓ |
 | So sánh liên chi nhánh | – | – | – | – | – | – | – | – | ✓ | – | ✓ | – | ✓ |
 | Sổ kế toán / khoá sổ kỳ | – | – | – | – | – | – | – | – | ✓ | – | – | – | ✓ |
-| Huỷ / thay thế / điều chỉnh HĐĐT | – | – | – | – | – | – | – | △ | ✓ | – | – | – | ✓ |
+| Phát hành / phát hành lại HĐĐT tại quầy | – | – | ✓ | – | – | – | – | ✓ | ✓ | – | – | – | ✓ |
+| Huỷ / thay thế / điều chỉnh HĐĐT | – | – | △ | – | – | – | – | ✓ | ✓ | – | – | – | ✓ |
 | Sửa nội dung website | – | – | – | – | – | – | – | – | – | ✓ | – | – | ✓ |
 | Quản lý tài khoản & quyền | – | – | – | – | – | – | – | – | – | – | – | – | ✓ |
 | Xem nhật ký thao tác | – | – | – | – | – | – | – | ✓ | ✓ | – | ✓ | – | ✓ |
@@ -540,7 +541,7 @@ Bốn quy tắc an toàn: bàn **không tự đóng** khi trả xong (chuyển *
 | P7 | Chi tiết đơn bàn | Nhóm theo đợt, trạng thái bếp, *Ra đợt tiếp*, sửa/huỷ |
 | P8 | Huỷ món | Lý do; đã gửi bếp → ô PIN quản lý tại chỗ |
 | P9 | Chuyển/ghép/tách bàn | Chọn món → bàn đích; tách theo món hoặc %; **chuyển bàn khác loại → xác nhận định tuyến lại** |
-| P10 | Tính tiền | Nếu khách đã tự trả một phần: khối "Đã thu X qua QR lúc HH:MM" ở đầu, chỉ tính phần còn lại; ô **SĐT tích điểm** (hiện số dư + nút *Dùng điểm*, trần theo tham số); giảm giá, voucher, chia bill; hình thức: tiền mặt · thẻ · chuyển khoản · ví · **Ghi nợ công ty** (chọn công ty → kiểm hạn mức & quá hạn → R7 duyệt → khách ký trên máy hoặc in phiếu ký; HĐĐT xuất theo MST công ty — từng bill hoặc gộp bảng kê cuối kỳ, kế toán chọn và xác nhận pháp lý) |
+| P10 | Tính tiền | Nếu khách đã tự trả một phần: khối "Đã thu X qua QR lúc HH:MM" ở đầu, chỉ tính phần còn lại; ô **SĐT tích điểm** (hiện số dư + nút *Dùng điểm*, trần theo tham số); giảm giá, voucher, chia bill; hình thức: tiền mặt · thẻ · chuyển khoản · ví · **Ghi nợ công ty** (chọn công ty → kiểm hạn mức & quá hạn → R7 duyệt → khách ký trên máy hoặc in phiếu ký; ghi nợ phần còn phải trả; HĐĐT xuất theo MST công ty ngay lúc ghi nợ — NĐ 254/2026 không cho nhà hàng gộp hoá đơn cuối kỳ) |
 | P11 | Hoàn tất & in | Tiền thối, in bill kèm **QR tra cứu HĐĐT**; trạng thái *đang phát hành hoá đơn* — lỗi thì cho khách về, phát hành bù (Mục 30.2) |
 | P12 | Yêu cầu từ bàn | Hàng đợi T9, sắp theo thời gian chờ |
 | P13 | Đặt bàn hôm nay | Danh sách rút gọn từ R1: xác nhận đến, gán bàn — bản đầy đủ ở module Đặt bàn |
@@ -595,9 +596,9 @@ Ba quyết định cũ giữ nguyên: không bán cả 78 món online (~40–45 
 | O2 | `/dat-mon/{chi-nhánh}` — Thực đơn online (**index**) | Chỉ món bật `bán online` của chi nhánh, giá kênh online |
 | O3 | Chi tiết món | Như T3 + cảnh báo món dễ nguội |
 | O4 | Giỏ & chọn giờ (noindex) | Nhận ngay / hẹn giờ; chặn khung bếp quá tải theo trần công suất |
-| O5 | Người nhận | Tên, SĐT, địa chỉ, ghi chú |
-| O6 | Thanh toán (noindex) | VietQR qua VA (cùng cơ chế tại bàn) hoặc trả khi nhận |
-| O7 | Thành công & theo dõi | Mã đơn + thanh than hồng: Đã nhận → Bếp đang làm → Đóng gói xong → Đang giao → Hoàn tất. **Nút chính: *Theo dõi đơn qua Messenger*** → mở Page chi nhánh kèm mã đơn (Mục 30.3); phụ: link theo dõi web + SMS/Zalo; khi Hoàn tất: khối đánh giá 1 chạm (→ B13) |
+| O5 | Người nhận | Tên, SĐT, địa chỉ, ghi chú; mục **Xuất hoá đơn công ty (VAT)** không bắt buộc — gõ MST tự điền tên, địa chỉ (chỉ hiện khi chi nhánh bật HĐĐT) |
+| O6 | Thanh toán (noindex) | VietQR qua VA (cùng cơ chế tại bàn) hoặc trả khi nhận; nhắc lại người mua trên hoá đơn kèm *Sửa* |
+| O7 | Thành công & theo dõi | Mã đơn + thanh than hồng: Đã nhận → Bếp đang làm → Đóng gói xong → Đang giao → Hoàn tất. **Nút chính: *Theo dõi đơn qua Messenger*** → mở Page chi nhánh kèm mã đơn (Mục 30.3); phụ: link theo dõi web + SMS/Zalo; khi Hoàn tất: khối đánh giá 1 chạm (→ B13); khối **Hoá đơn VAT** — bổ sung/sửa người mua tới lúc lập, lập xong hiện ký hiệu · số + mã tra cứu |
 
 ### 23.3 Điều phối trong Sora POS (O8 · O9 · O12) — nền tối
 
@@ -723,8 +724,8 @@ Mục tiêu không đổi: mọi đồng tiền có chứng từ, mọi chứng 
 |---|---|---|
 | F1 | Sổ quỹ & đối soát ngân hàng | Tiền mặt: đầu ca → thu → **chi (phiếu chi tiền mặt từ C2)** → cuối ca, khớp kiểm quỹ P14. **Phiếu thu khác** (ngoài bán hàng: thanh lý, bồi thường, thu hộ...) ghi tại đây → đổ vào F2 và dòng Doanh thu khác của F7. Chuyển khoản: từng giao dịch VA khớp bill; nút *Đối chiếu sao kê* qua API vấn tin. |
 | F2 | Nhật ký doanh thu & điều chỉnh | Sổ bất biến: bán, giảm giá, tặng, huỷ, hoàn — kèm người thao tác, người duyệt, lý do. Chỉ đọc. |
-| F3 | Sổ hoá đơn điện tử | Phát hành, trạng thái cơ quan thuế, hàng đợi lỗi + phát hành lại, luồng huỷ/thay thế/điều chỉnh có duyệt. |
-| F4 | Báo cáo thuế | **VAT đầu ra** (từ HĐĐT bán) **− VAT đầu vào** (từ C5) **= VAT phải nộp** · doanh thu theo thuế suất · **TNCN đã khấu trừ** (từ kỳ lương H7) · xuất bảng kê theo kỳ. Đối chiếu tổng HĐĐT vs doanh thu hệ thống — lệch là đỏ. |
+| F3 | Sổ hoá đơn điện tử | Phát hành, trạng thái cơ quan thuế, hàng đợi lỗi + phát hành lại, luồng huỷ/thay thế/điều chỉnh có duyệt. Lọc trạng thái / người mua / MST; ngăn chi tiết đọc nội dung đóng băng và chuỗi thay thế; tờ đã phát hành chỉ thay thế (TT 91 Đ10), huỷ chỉ cho tờ chưa cấp số. |
+| F4 | Báo cáo thuế | **VAT đầu ra** (từ HĐĐT bán) **− VAT đầu vào** (từ C5) **= VAT phải nộp** · doanh thu theo thuế suất (mỗi mức một dòng, tách phần đã có hoá đơn / bill chưa có hoá đơn) · **TNCN đã khấu trừ** (từ kỳ lương H7) · xuất bảng kê theo kỳ. Đối chiếu tổng HĐĐT vs doanh thu hệ thống — lệch là đỏ. |
 | F5 | Công nợ (hai chiều) | **Tab Phải trả NCC:** từ PO/nhập kho và phiếu chi → hạn trả → lịch trả tuần. **Tab Phải thu khách DN:** từ bill ghi nợ (B15) → tuổi nợ → nhắc nợ → gạch nợ khi tiền về F1. |
 | F6 | Khoá sổ & xuất kế toán | Khoá kỳ theo tháng × chi nhánh: sau khoá chặn sửa **cả doanh thu, phiếu chi, bảng công, kỳ lương** kỳ đó — chỉ tạo bút toán điều chỉnh kỳ sau. Xuất chuẩn MISA/Excel. |
 | F7 | **Báo cáo Lãi/Lỗ (P&L)** | Bảng tài chính hợp nhất tự động — **không nhập tay dòng nào**: Doanh thu bán hàng − giảm giá/hoàn + doanh thu khác = **Doanh thu thuần** → − Giá vốn hàng bán (kho) = **Lãi gộp %** → − Nhân sự (H7) − Mặt bằng − Tiện ích − Khấu hao (C4) − Marketing − Phí thanh toán − Vận hành khác − Phân bổ chi phí chuỗi = **Lợi nhuận hoạt động** → − Thuế = **Lợi nhuận ròng**. Kèm chỉ số sống còn F&B: **Prime cost = Giá vốn + Nhân sự**, cảnh báo khi > 60% doanh thu. Mọi dòng **bấm xuống được chứng từ gốc** (drill-down: dòng Tiện ích → danh sách phiếu chi điện nước). PeriodComparator + so chi nhánh small multiples. Hai chế độ xem: **dồn tích** (chi phí theo kỳ phân bổ — mặc định, đúng cho đánh giá lợi nhuận) và **dòng tiền** (theo tiền ra thực, đối chiếu F1). Xuất Excel. |
@@ -750,7 +751,7 @@ Mỗi tham số có: mã · tên · giá trị · đơn vị · **phạm vi** (c
 | Chi phí | **Hạn mức chi vặt** · **ngưỡng ghi nhận tài sản** · **ngưỡng chủ duyệt** · ngưỡng food cost xanh/vàng/đỏ |
 | Vai trò | Giảm giá tối đa theo vai trò · hạn mức duyệt theo vai trò (đồng bộ tab A2) |
 | Tích điểm | Tỷ lệ tích · tỷ lệ quy đổi · trần đổi mỗi giao dịch · hạn điểm · ngưỡng ba hạng |
-| Công nợ DN | Hạn mức nợ mặc định · số ngày quá hạn thì chặn ghi nợ · chế độ xuất HĐĐT (từng bill / gộp) |
+| Công nợ DN | Hạn mức nợ mặc định · số ngày quá hạn thì chặn ghi nợ |
 | Bảo trì | Chu kỳ mặc định theo nhóm thiết bị · nhắc trước N ngày |
 
 H6 (cơ chế lương) và các màn cấu hình khác là **cửa vào theo ngữ cảnh** của cùng bộ tham số — sửa ở đâu cũng là sửa một chỗ.
@@ -796,6 +797,8 @@ VietinBank có cổng Open API tự phục vụ (developer.vietinbank.vn): đăn
 | VNPT / BKAV / FPT | tương đương nhóm giữa | Cân nhắc nếu có sẵn quan hệ |
 
 **Khuyến nghị:** lấy báo giá khối lượng lớn từ **Viettel S-Invoice** và **MISA meInvoice**, quyết theo hai tiêu chí: (1) đơn giá ở mức 50.000–200.000 HĐ/năm, (2) chất lượng API môi trường test. Nếu kế toán chốt dùng phần mềm MISA thì cộng điểm mạnh cho meInvoice; nếu tối ưu chi phí thuần thì S-Invoice.
+
+**Trạng thái (22/10/2026):** phía quán đã dựng xong — tự lập hoá đơn lúc trả đủ, cấp số, người mua, thay thế, hàng chờ gửi lại — qua một lớp nối nhà cung cấp và bản giả lập (CLAUDE.md §9.7). Ký hợp đồng xong thì chỉ viết adapter cho nhà cung cấp được chọn.
 
 **Kiến trúc kết nối (không phụ thuộc nhà cung cấp):** hệ thống có **lớp trừu tượng hoá đơn** — một giao diện chung `phát hành / huỷ / thay thế / điều chỉnh / tra trạng thái`, mỗi nhà cung cấp là một adapter. Đổi nhà cung cấp = viết adapter mới, không đụng P11/T15/F3. Luồng phát hành: thanh toán xong → đẩy hàng đợi phát hành → gọi API ký số (HSM đặt phía nhà cung cấp để không phải cắm USB token từng máy) → nhận số HĐ + mã tra cứu → in QR lên bill + gửi T15. **Lỗi phát hành không được chặn khách ra về** — bill in trước, HĐ phát hành bù qua hàng đợi F3, ghi rõ SLA phát hành bù trong ngày.
 
@@ -923,7 +926,7 @@ Soi hệ thống theo hai vòng đời: **vòng đời đồng tiền** (vào t�
 | Hạng mục | Đã đưa vào đâu | Logic cốt lõi |
 |---|---|---|
 | **Tích điểm & hạng thành viên** | B14 cấu hình · B12 tab Điểm & hạng · P10 ô SĐT + nút Dùng điểm · T15 dòng điểm vừa tích · Trung tâm tham số nhóm Tích điểm | Điểm chỉ sinh từ sự kiện `thanh-toan.nhan` — không cộng tay được; huỷ bill tự thu hồi; hạng theo chi tiêu 12 tháng trượt; đổi điểm có trần mỗi giao dịch |
-| **Công nợ khách doanh nghiệp** | B15 hồ sơ & hạn mức · P10 hình thức Ghi nợ công ty (duyệt + ký) · F5 tab Phải thu · F7 tách dồn tích/dòng tiền | Doanh thu ghi nhận ngay (dồn tích), tiền về mới vào dòng tiền; quá hạn N ngày tự chặn ghi nợ mới; bảng kê cuối kỳ gửi công ty; HĐĐT theo MST công ty — chế độ từng bill/gộp do kế toán chọn |
+| **Công nợ khách doanh nghiệp** | B15 hồ sơ & hạn mức · P10 hình thức Ghi nợ công ty (duyệt + ký) · F5 tab Phải thu · F7 tách dồn tích/dòng tiền | Doanh thu ghi nhận ngay (dồn tích), tiền về mới vào dòng tiền; quá hạn N ngày tự chặn ghi nợ mới; bảng kê cuối kỳ gửi công ty; HĐĐT theo MST công ty, mỗi bill một hoá đơn lập ngay lúc ghi nợ (NĐ 254/2026 không cho gộp) |
 | **Bảo trì thiết bị định kỳ** | C4 tab Bảo trì · nhắc trên C1 · phiếu chi tự sinh khoản mục sửa chữa | Lịch chu kỳ theo tài sản; đến hạn sinh việc; hoàn thành là có chứng từ chi phí luôn — không ghi hai lần |
 
 ## G.3 Cố tình không làm — và vì sao

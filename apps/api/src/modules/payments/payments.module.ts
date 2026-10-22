@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { CrmModule } from '../crm/crm.module'
+import { EinvoiceModule } from '../einvoice/einvoice.module'
 import { OrderingModule } from '../ordering/ordering.module'
 import { MockBankProvider, PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider'
 import { PaymentsController } from './payments.controller'
@@ -32,7 +33,7 @@ function createProvider(): PaymentProvider {
 // là xuống bếp ngay trong chính transaction đó. Chiều phụ thuộc một hướng: CRM và
 // Ordering đều không biết gì về thanh toán, nên không có vòng.
 @Module({
-  imports: [CrmModule, OrderingModule],
+  imports: [CrmModule, OrderingModule, EinvoiceModule],
   controllers: [PaymentsController, SplitPaymentController],
   providers: [
     PaymentsService,

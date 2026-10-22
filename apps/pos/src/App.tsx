@@ -1,5 +1,5 @@
 import { watchConnectivity } from '@sora/core'
-import { Button, OutboxBanner, ToastProvider } from '@sora/ui'
+import { Badge, Button, OutboxBanner, ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
 import {
@@ -173,6 +173,16 @@ function Shell() {
     refetchInterval: 30_000,
   })
 
+  // Trạm thu ngân hỏi hàng hoá đơn chưa lên được — mỗi lượt hỏi cũng đẩy vài tờ tới
+  // lượt (máy chủ không có tiến trình nền), nên đây vừa là con số vừa là nhịp gửi lại.
+  const invoiceQueue = useQuery({
+    queryKey: ['invoice-queue', branchId],
+    queryFn: () => api.invoiceQueue(branchId!),
+    enabled: Boolean(branchId) && Boolean(staff) && station,
+    refetchInterval: 30_000,
+    retry: false,
+  })
+
   if (!ready) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-canvas text-ink-mute">
@@ -189,6 +199,8 @@ function Shell() {
   const bookingsToday = (reservations.data?.reservations ?? []).filter(
     (r) => r.status === 'pending' || r.status === 'confirmed',
   ).length
+  const invoicesFailed = invoiceQueue.data?.counts.failed ?? 0
+  const invoicesWaiting = (invoiceQueue.data?.counts.pending ?? 0) + invoicesFailed
 
   return (
     <div className="min-h-dvh bg-canvas text-ink-body">
@@ -242,6 +254,11 @@ function Shell() {
           <Button variant={station ? 'primary' : 'ghost'} onClick={toggleStation}>
             Trạm thu ngân
           </Button>
+          {station && invoicesWaiting > 0 ? (
+            <Badge tone={invoicesFailed > 0 ? 'warn' : 'neutral'}>
+              {invoicesWaiting} hoá đơn chờ lên thuế
+            </Badge>
+          ) : null}
           {needRefresh ? (
             <button
               type="button"

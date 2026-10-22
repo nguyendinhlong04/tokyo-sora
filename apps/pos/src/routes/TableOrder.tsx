@@ -12,6 +12,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { api, type ConfigDish, type ModifierGroup, type OrderLineRow } from '../api'
+import {
+  ApprovalFields,
+  approvalOf,
+  approvalReady,
+  EMPTY_APPROVAL,
+  needsApprovalError,
+  type ApprovalDraft,
+} from '../components/ApprovalFields'
 import { useSession } from '../session-context'
 
 interface PadLine {
@@ -300,14 +308,27 @@ export function TableOrder() {
 
       {/* Cột phải: phiếu order */}
       <aside className="flex flex-col border-l border-line-1 bg-surface-1">
-        <header className="flex items-center justify-between border-b border-line-1 px-4 py-3">
-          <div className="flex flex-col">
+        <header className="flex items-center justify-between gap-2 border-b border-line-1 px-4 py-3">
+          <div className="flex min-w-0 flex-col">
             <span className="text-[length:var(--fs-t1)] font-semibold text-ink-hi">
               Bàn {tableCode}
             </span>
             {order.data ? (
               <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
                 {order.data.order.displayCode}
+              </span>
+            ) : null}
+            {/* Khách đã khai xuất hoá đơn — thu ngân thấy trước khi in bill */}
+            {order.data?.order.invoiceBuyer ? (
+              <span className="mt-1 flex min-w-0 items-center gap-2">
+                <span className="shrink-0">
+                  <Badge tone="accent">
+                    {order.data.order.invoiceBuyer.kind === 'company' ? 'HĐ công ty' : 'HĐ cá nhân'}
+                  </Badge>
+                </span>
+                <span className="truncate text-[length:var(--fs-c1)] text-ink-body">
+                  {order.data.order.invoiceBuyer.name}
+                </span>
               </span>
             ) : null}
           </div>
@@ -648,51 +669,35 @@ function VoidDialog({
   onDone: () => void
 }) {
   const toast = useToast()
-  const { branchId } = useSession()
   const [reason, setReason] = useState('')
   const [needsApproval, setNeedsApproval] = useState(false)
-  const [approverId, setApproverId] = useState<number | null>(null)
-  const [pin, setPin] = useState('')
-
-  const staffQuery = useQuery({
-    queryKey: ['staff', branchId],
-    queryFn: () => api.staffList(branchId!),
-    enabled: Boolean(branchId) && needsApproval,
-  })
+  const [approval, setApproval] = useState<ApprovalDraft>(EMPTY_APPROVAL)
 
   const submit = async () => {
     if (!line) return
     try {
       await api.voidLine(
         line.id,
-        {
-          reason,
-          approval:
-            needsApproval && approverId
-              ? { approverStaffId: approverId, approverPin: pin, reason }
-              : null,
-        },
+        { reason, approval: needsApproval ? approvalOf(approval, reason) : null },
         `Huỷ ${line.nameSnapshot}`,
       )
       toast('Đã huỷ món', 'ok')
       reset()
       onDone()
     } catch (err) {
-      const apiError = err as { code?: string; message?: string; body?: { code?: string } }
-      if (apiError.body?.code === 'requires_approval' || apiError.code === 'requires_approval') {
+      if (needsApprovalError(err)) {
         setNeedsApproval(true)
         toast('Món đã lên bếp — cần quản lý duyệt', 'warn')
         return
       }
-      toast(apiError.message ?? 'Không huỷ được', 'danger')
+      toast((err as Error).message ?? 'Không huỷ được', 'danger')
     }
   }
 
   const reset = () => {
     setReason('')
     setNeedsApproval(false)
-    setApproverId(null)
-    setPin('')
+    setApproval(EMPTY_APPROVAL)
   }
 
   return (
@@ -715,7 +720,7 @@ function VoidDialog({
           </Button>
           <Button
             variant="danger"
-            disabled={!reason.trim() || (needsApproval && (!approverId || pin.length < 4))}
+            disabled={!reason.trim() || (needsApproval && !approvalReady(approval))}
             onClick={submit}
           >
             Huỷ món
@@ -735,31 +740,11 @@ function VoidDialog({
         </label>
 
         {needsApproval ? (
-          <div className="flex flex-col gap-3 rounded-md border border-warn p-3">
-            <p className="text-[length:var(--fs-b2)] text-warn">
-              Món đã gửi bếp — cần quản lý duyệt. Người duyệt phải khác người xin.
-            </p>
-            <select
-              value={approverId ?? ''}
-              onChange={(e) => setApproverId(Number(e.target.value))}
-              className="h-[var(--hit-target)] rounded-sm border border-line-3 bg-surface-3 px-3 text-ink-hi"
-            >
-              <option value="">Chọn người duyệt</option>
-              {staffQuery.data?.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.fullName} ({p.roles.join(' · ')})
-                </option>
-              ))}
-            </select>
-            <input
-              type="password"
-              inputMode="numeric"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="PIN người duyệt"
-              className="h-[var(--hit-target)] rounded-sm border border-line-3 bg-surface-3 px-3 font-mono text-ink-hi"
-            />
-          </div>
+          <ApprovalFields
+            value={approval}
+            onChange={setApproval}
+            note="Món đã gửi bếp — cần quản lý duyệt. Người duyệt phải khác người xin."
+          />
         ) : null}
       </div>
     </Modal>

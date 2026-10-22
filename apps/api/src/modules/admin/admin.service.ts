@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
+import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { isUniqueViolation } from '../../common/pg-error'
 import { ParamsService } from '../../common/params.service'
@@ -14,21 +15,31 @@ import {
   tableSessions,
   tables,
 } from '../../db/schema'
-import { assertInvoiceSerial } from '../accounting/domain/accounting'
+import { assertInvoiceSerial } from '../einvoice/domain/serial'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 
 /**
  * Khoá tham số của A9. Gom vào một chỗ vì hai nơi cùng đọc chúng: màn A9 và
- * `AccountingService.serialOf` lúc phát hành hoá đơn.
+ * `EinvoiceService` lúc phát hành hoá đơn.
  */
 const EINVOICE = {
   taxCode: 'einvoice.taxCode',
+  /** Tên và địa chỉ người bán đúng như giấy đăng ký doanh nghiệp — in lên mọi hoá đơn */
+  sellerName: 'einvoice.sellerName',
+  sellerAddress: 'einvoice.sellerAddress',
   provider: 'einvoice.provider',
   certSerial: 'einvoice.certificateSerial',
   certExpiry: 'einvoice.certificateExpiry',
   serial: 'einvoice.serial',
   enabled: 'einvoice.enabled',
+  /**
+   * Ngày chi nhánh bật hoá đơn lần đầu. Bill trả trước ngày này không có hoá đơn
+   * máy tính tiền — F3 và F6 không đòi hoá đơn cho chúng, nếu không thì không bao
+   * giờ khoá được những tháng cũ.
+   */
+  enabledFrom: 'einvoice.enabledFrom',
 } as const
 
 export interface TableInput {
@@ -57,6 +68,7 @@ export class AdminService {
     @Inject(DB) private readonly db: Db,
     private readonly params: ParamsService,
     private readonly audit: AuditService,
+    private readonly einvoices: EinvoiceService,
   ) {}
 
   // ------------------------------------------------------------------ A6
@@ -199,8 +211,8 @@ export class AdminService {
     /**
      * Giá trị engine THẬT SỰ đọc: ghi đè của chi nhánh nếu có, ngược lại mặc định
      * chuỗi — cùng quy tắc với `ParamsService.get`, tức là cùng con số mà
-     * `AccountingService.serialOf` dùng lúc phát hành. Hiện một con số khác con số
-     * sẽ được dùng là cách chắc chắn nhất để kế toán tin sai.
+     * `EinvoiceService` dùng lúc phát hành. Hiện một con số khác con số sẽ được
+     * dùng là cách chắc chắn nhất để kế toán tin sai.
      */
     const effective = (key: string) =>
       rows.find((r) => r.key === key && r.branchId === branchId)?.value ?? chain(key)
@@ -210,6 +222,8 @@ export class AdminService {
       branchId,
       chain: {
         taxCode: text(chain(EINVOICE.taxCode)),
+        sellerName: text(chain(EINVOICE.sellerName)),
+        sellerAddress: text(chain(EINVOICE.sellerAddress)),
         provider: text(chain(EINVOICE.provider)),
         certificateSerial: text(chain(EINVOICE.certSerial)),
         certificateExpiry: text(chain(EINVOICE.certExpiry)),
@@ -217,9 +231,12 @@ export class AdminService {
       branch: {
         serial: text(effective(EINVOICE.serial)),
         enabled: effective(EINVOICE.enabled) === true,
+        enabledFrom: text(effective(EINVOICE.enabledFrom)) || null,
       },
       /** Chứng thư hết hạn là hoá đơn ngừng phát hành — cảnh báo trước 30 ngày */
       certificateDaysLeft: daysUntil(text(chain(EINVOICE.certExpiry))),
+      /** Nhà cung cấp máy chủ đang chạy (biến môi trường) — `mock` là hoá đơn thử */
+      runtime: this.einvoices.runtime,
     }
   }
 
@@ -230,14 +247,16 @@ export class AdminService {
    * ký hiệu sai chuẩn nếu lọt qua thì lỗi chỉ lộ ra vào lúc khách đứng chờ hoá
    * đơn ở quầy, và người sửa được nó thì đang ở nhà.
    *
-   * Bật công tắc mà chưa có đủ MST + ký hiệu là bật một cái không chạy được, nên
-   * chặn luôn — thà không bật được còn hơn bật rồi mỗi bill đều rơi vào hàng đợi
-   * lỗi của F3.
+   * Bật công tắc mà chưa đủ MST, tên và địa chỉ người bán, ký hiệu — hoặc máy chủ
+   * chưa đấu nối nhà cung cấp — là bật một cái không chạy được, nên chặn luôn:
+   * thà không bật được còn hơn bật rồi mỗi bill đều rơi vào hàng đợi lỗi của F3.
    */
   async setEinvoice(
     branchId: string,
     input: {
       taxCode?: string
+      sellerName?: string
+      sellerAddress?: string
       provider?: string
       certificateSerial?: string
       certificateExpiry?: string
@@ -249,6 +268,8 @@ export class AdminService {
     const before = await this.einvoice(branchId)
 
     const taxCode = (input.taxCode ?? before.chain.taxCode).trim()
+    const sellerName = (input.sellerName ?? before.chain.sellerName).trim()
+    const sellerAddress = (input.sellerAddress ?? before.chain.sellerAddress).trim()
     const serial = (input.serial ?? before.branch.serial).trim()
     const certExpiry = (input.certificateExpiry ?? before.chain.certificateExpiry).trim()
     const enabled = input.enabled ?? before.branch.enabled
@@ -267,15 +288,35 @@ export class AdminService {
         throw new BadRequestException((err as Error).message)
       }
     }
+    if (normalisedSerial !== '' && input.serial !== undefined) {
+      await this.assertSerialFree(branchId, normalisedSerial)
+    }
     if (enabled && (taxCode === '' || normalisedSerial === '')) {
       throw new ConflictException(
         'Chưa đủ để bật: hoá đơn điện tử cần mã số thuế của chuỗi và ký hiệu riêng của chi nhánh này',
       )
     }
+    if (enabled && (sellerName === '' || sellerAddress === '')) {
+      throw new ConflictException(
+        'Chưa đủ để bật: khai tên và địa chỉ người bán đúng như giấy đăng ký doanh nghiệp — hoá đơn in hai dòng này',
+      )
+    }
+    if (enabled && !before.branch.enabled && this.einvoices.runtime.provider === 'off') {
+      throw new ConflictException({
+        code: 'provider_not_configured',
+        message: 'Máy chủ chưa đấu nối nhà cung cấp hoá đơn điện tử — chưa bật được',
+      })
+    }
 
     const changedBy = actor.kind === 'staff' ? actor.staffId : null
     const writes: { key: string; value: unknown; branchId: string | null }[] = []
     if (input.taxCode !== undefined) writes.push({ key: EINVOICE.taxCode, value: taxCode, branchId: null })
+    if (input.sellerName !== undefined) {
+      writes.push({ key: EINVOICE.sellerName, value: sellerName, branchId: null })
+    }
+    if (input.sellerAddress !== undefined) {
+      writes.push({ key: EINVOICE.sellerAddress, value: sellerAddress, branchId: null })
+    }
     if (input.provider !== undefined) {
       writes.push({ key: EINVOICE.provider, value: input.provider.trim(), branchId: null })
     }
@@ -291,6 +332,16 @@ export class AdminService {
     if (input.enabled !== undefined) {
       writes.push({ key: EINVOICE.enabled, value: enabled, branchId })
     }
+    // Lần bật ĐẦU TIÊN ghi ngày bắt đầu; tắt rồi bật lại không dời mốc đó
+    if (enabled && !before.branch.enabledFrom) {
+      const [branch] = await this.db.select().from(branches).where(eq(branches.id, branchId))
+      if (!branch) throw new NotFoundException(`Không có chi nhánh ${branchId}`)
+      writes.push({
+        key: EINVOICE.enabledFrom,
+        value: businessDateOf(new Date(), branch.timezone),
+        branchId,
+      })
+    }
 
     for (const write of writes) {
       await this.params.set(write.key, write.value, { branchId: write.branchId, changedBy })
@@ -303,6 +354,36 @@ export class AdminService {
       })
     }
     return this.einvoice(branchId)
+  }
+
+  /**
+   * Mỗi địa điểm kinh doanh một ký hiệu (§30.2). Hai chi nhánh chung ký hiệu là
+   * hai nơi bán chen số nhau trong cùng một dãy. So bỏ qua hai số năm: năm thay
+   * theo ngày lập, nên C26MAA và C27MAA sang năm sau là cùng một ký hiệu.
+   */
+  private async assertSerialFree(branchId: string, serial: string) {
+    const rows = await this.db
+      .select({ branchId: parameters.branchId, value: parameters.value })
+      .from(parameters)
+      .where(
+        and(
+          eq(parameters.key, EINVOICE.serial),
+          sql`${parameters.branchId} IS NOT NULL AND ${parameters.branchId} <> ${branchId}`,
+        ),
+      )
+    const sameSeries = (s: string) => `${s[0]}${s.slice(3)}`
+    const taken = rows.find(
+      (r) =>
+        typeof r.value === 'string' &&
+        r.value.trim().length === 6 &&
+        sameSeries(r.value.trim().toUpperCase()) === sameSeries(serial),
+    )
+    if (taken) {
+      throw new ConflictException({
+        code: 'serial_in_use',
+        message: `Ký hiệu ${serial} trùng với chi nhánh ${taken.branchId} — mỗi địa điểm kinh doanh một ký hiệu riêng`,
+      })
+    }
   }
 
   // ----------------------------------------------------------------- A10

@@ -10,12 +10,13 @@
 import { createHmac } from 'node:crypto'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { IDEMPOTENCY_HEADER } from '@sora/contracts'
-import { and, eq, ne } from 'drizzle-orm'
+import { and, desc, eq, ne } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
 import {
   bankEvents,
+  configBundles,
   devices,
   journalEntries,
   payments,
@@ -540,6 +541,40 @@ describe('3b. Thực đơn trên iPad (T2 · T3 · T5)', () => {
     const group = bundle.modifiers.find((g) => g.id === 'yaki-them')
     expect(group?.options.find((o) => o.id === 'yaki-them-toi')?.priceDelta).toBe(15_000)
     expect(bundle.dishes.find((d) => d.id === 'thanbo')?.modifierGroupIds).toContain('yaki-them')
+  })
+
+  it('bundle trên iPad không mang bảng tham số A6 (MST, thuế suất, lương)', async () => {
+    const res = await inject({
+      method: 'GET',
+      url: `/api/config?branch=${fx.branchId}`,
+      headers: ipad(),
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).not.toHaveProperty('params')
+  })
+
+  it('bản phát hành cũ còn chứa tham số cũng bị gỡ lúc trả', async () => {
+    const [latest] = await db
+      .select()
+      .from(configBundles)
+      .where(eq(configBundles.branchId, fx.branchId))
+      .orderBy(desc(configBundles.id))
+      .limit(1)
+    await db
+      .update(configBundles)
+      .set({
+        payload: { ...(latest!.payload as object), params: { 'einvoice.taxCode': '0101234567' } },
+      })
+      .where(eq(configBundles.id, latest!.id))
+
+    const res = await inject({
+      method: 'GET',
+      url: `/api/config?branch=${fx.branchId}`,
+      headers: ipad(),
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).not.toHaveProperty('params')
+    expect(res.json()).toHaveProperty('dishes')
   })
 
   it('khách chọn tuỳ chọn thì chênh giá vào thẳng dòng đơn', async () => {

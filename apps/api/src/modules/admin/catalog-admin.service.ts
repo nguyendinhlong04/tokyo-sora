@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { rooms } from '@sora/contracts'
+import { rooms, type VatCode } from '@sora/contracts'
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
@@ -63,7 +63,7 @@ export interface DishInput {
   basePrice: number
   /** Giá riêng khi bán qua kênh online; null = bán bằng giá tại quán */
   onlinePrice: number | null
-  vatCode: string
+  vatCode: VatCode
   onlineVisible: boolean
   tableOrderable: boolean
   signature: boolean

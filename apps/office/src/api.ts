@@ -1,5 +1,16 @@
-import type { PromotionKind, PromotionScope } from '@sora/contracts'
+import type {
+  BuyerKind,
+  InvoiceBuyer,
+  InvoiceState,
+  InvoiceView,
+  PromotionKind,
+  PromotionScope,
+  TaxCodeLookupView,
+  VatCode,
+} from '@sora/contracts'
 import { apiFetch } from '@sora/core'
+
+export type { InvoiceState } from '@sora/contracts'
 
 export interface OfficeStaff {
   id: number | null
@@ -202,13 +213,23 @@ export interface EinvoiceConfig {
   branchId: string
   chain: {
     taxCode: string
+    /** Tên, địa chỉ người bán đúng giấy đăng ký doanh nghiệp — in trên mọi hoá đơn */
+    sellerName: string
+    sellerAddress: string
     provider: string
     certificateSerial: string
     certificateExpiry: string
   }
-  branch: { serial: string; enabled: boolean }
+  branch: {
+    serial: string
+    enabled: boolean
+    /** Ngày bật lần đầu — bill trước ngày này không đòi hoá đơn (F3, F6) */
+    enabledFrom: string | null
+  }
   /** Số ngày còn lại của chứng thư số; null khi chưa khai */
   certificateDaysLeft: number | null
+  /** Nhà cung cấp máy chủ đang đấu nối (biến môi trường): `off` · `mock` (hoá đơn thử) · tên thật */
+  runtime: { provider: string; live: boolean }
 }
 
 export interface CmsPost {
@@ -859,7 +880,7 @@ export interface DishRow {
   secondaryLabel: string | null
   prepSeconds: number
   basePrice: number
-  vatCode: string
+  vatCode: VatCode
   onlineVisible: boolean
   tableOrderable: boolean
   signature: boolean
@@ -1360,18 +1381,25 @@ export interface JournalView {
   readOnly: boolean
 }
 
-export type InvoiceState = 'pending' | 'issued' | 'failed' | 'voided' | 'replaced'
-
 export interface InvoiceRow {
   id: number
   branchId: string
   orderId: number
   orderCode: string
+  formNo: string
   serial: string
   invoiceNo: string | null
+  invoiceDate: string | null
+  /** Mã của cơ quan thuế */
   taxCode: string | null
+  lookupCode: string | null
   state: InvoiceState
   lastError: string | null
+  attempts: number
+  /** null = "Bán cho người tiêu dùng" */
+  buyerKind: BuyerKind | null
+  buyerName: string | null
+  buyerTaxCode: string | null
   amountSub: number
   amountVat: number
   amountTotal: number
@@ -1384,18 +1412,45 @@ export interface InvoiceRow {
 
 export interface InvoiceBook {
   branchId: string
-  /** Ký hiệu hoá đơn của chi nhánh; null = chưa khai ở A6 */
+  /** Mẫu ký hiệu của chi nhánh; null = chưa khai ở A9 */
   serial: string | null
   rows: InvoiceRow[]
+  /** Hoá đơn chưa lên được của cả chi nhánh — không theo khoảng ngày */
   queue: { id: number; orderCode: string; error: string | null }[]
-  /** Bill đã trả đủ mà chưa có hoá đơn nào */
+  /** Bill đã trả đủ mà chưa có hoá đơn — tính từ ngày bật ở A9 */
   missing: {
     orderId: number
     displayCode: string
+    channel: string
     moneySub: number
     moneyVat: number
     moneyTotal: number
     businessDate: string
+  }[]
+  /** Hoá đơn đã lên thuế mà đơn sau đó bị huỷ — kế toán xử lý bằng tay */
+  needsAction: { id: number; orderCode: string; serial: string; invoiceNo: string | null }[]
+}
+
+/** Bộ lọc sổ F3 — `consumer` = "Bán cho người tiêu dùng" */
+export interface InvoiceBookFilters {
+  state?: InvoiceState
+  buyer?: 'consumer' | BuyerKind
+  q?: string
+}
+
+/** F3 ngăn chi tiết: một tờ hoá đơn và mọi tờ của cùng đơn */
+export interface InvoiceDetail {
+  orderCode: string
+  invoice: InvoiceView
+  history: {
+    id: number
+    state: InvoiceState
+    serial: string
+    invoiceNo: string | null
+    invoiceDate: string | null
+    replacesId: number | null
+    voidReason: string | null
+    issuedAt: string | null
   }[]
 }
 
@@ -1403,7 +1458,10 @@ export interface TaxReport {
   branchId: string
   from: string
   to: string
-  buckets: { rate: number; netVnd: number; vatVnd: number }[]
+  buckets: VatBucket[]
+  /** Hai phần của `buckets`: theo hoá đơn đã phát hành · bill đã trả chưa có hoá đơn */
+  invoicedBuckets: VatBucket[]
+  uninvoicedBuckets: VatBucket[]
   summary: {
     vatOutVnd: number
     vatInVnd: number
@@ -1421,6 +1479,13 @@ export interface TaxReport {
   }
   vatInNote: string
   pitNote: string
+}
+
+export interface VatBucket {
+  /** Tỉ lệ, 0,08 = 8% */
+  rate: number
+  netVnd: number
+  vatVnd: number
 }
 
 export interface DebtReport {
@@ -2057,7 +2122,6 @@ export interface CorporateInput {
   paymentTermDays: number
   reconcileDay: number
   blockAfterOverdueDays: number | null
-  einvoiceMode: 'per-bill' | 'aggregate' | null
   active: boolean
 }
 
@@ -2072,7 +2136,6 @@ export interface AgingBuckets {
 
 export interface CorporateRow extends CorporateInput {
   id: number
-  einvoiceModeEffective: 'per-bill' | 'aggregate'
   blockAfterOverdueDaysEffective: number
   aging: AgingBuckets
   outstandingVnd: number
@@ -2343,6 +2406,8 @@ export const api = {
     branchId: string,
     patch: Partial<{
       taxCode: string
+      sellerName: string
+      sellerAddress: string
       provider: string
       certificateSerial: string
       certificateExpiry: string
@@ -3046,19 +3111,48 @@ export const api = {
       `/api/accounting/journal?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
     ),
 
-  invoiceBook: (branchId: string, from: string, to: string) =>
-    apiFetch<InvoiceBook>(
-      `/api/accounting/invoices?branch=${encodeURIComponent(branchId)}&from=${from}&to=${to}`,
+  invoiceBook: (branchId: string, from: string, to: string, filters: InvoiceBookFilters = {}) => {
+    const params = new URLSearchParams({ branch: branchId, from, to })
+    if (filters.state) params.set('state', filters.state)
+    if (filters.buyer) params.set('buyer', filters.buyer)
+    if (filters.q?.trim()) params.set('q', filters.q.trim())
+    return apiFetch<InvoiceBook>(`/api/accounting/invoices?${params}`)
+  },
+
+  invoiceDetail: (id: number) => apiFetch<InvoiceDetail>(`/api/accounting/invoices/${id}`),
+
+  /** Phát hành (lại) hoá đơn của một đơn — đơn chưa có hoá đơn thì lập mới */
+  issueInvoice: (orderId: number) =>
+    apiFetch<InvoiceView>(`/api/orders/${orderId}/invoice/issue`, { method: 'POST' }),
+
+  /** F3 "Phát hành lại": đẩy lần lượt tối đa `limit` tờ chưa lên được */
+  retryInvoices: (branchId: string, limit = 20) =>
+    apiFetch<{ processed: number; issued: number; failed: number; remaining: number }>(
+      '/api/accounting/invoices/retry',
+      { method: 'POST', body: { branchId, limit } },
     ),
 
-  issueInvoice: (orderId: number) =>
-    apiFetch<InvoiceRow>(`/api/accounting/invoices/issue/${orderId}`, { method: 'POST' }),
+  /** Chỉ cho tờ chưa lên cơ quan thuế và chưa cấp số — đã phát hành thì thay thế */
+  voidInvoice: (id: number, reason: string, approval?: Approval | null) =>
+    apiFetch<{ voided: number }>(`/api/accounting/invoices/${id}/void`, {
+      method: 'POST',
+      body: { reason, approval },
+    }),
 
-  voidInvoice: (id: number, input: { reason: string; replace: boolean }, approval?: Approval | null) =>
-    apiFetch<{ voided: number; replacement: InvoiceRow | null }>(
-      `/api/accounting/invoices/${id}/void`,
+  /** Hoá đơn thay thế (TT 91 Điều 10) — `buyer` có mặt thì ghi đè người mua của đơn */
+  replaceInvoice: (
+    id: number,
+    input: { reason: string; buyer?: InvoiceBuyer | null },
+    approval?: Approval | null,
+  ) =>
+    apiFetch<{ replaced: number; replacement: InvoiceView }>(
+      `/api/accounting/invoices/${id}/replace`,
       { method: 'POST', body: { ...input, approval } },
     ),
+
+  /** Tra MST để điền tên, địa chỉ người mua — cửa của nhân viên (thấy cả email) */
+  lookupTaxCode: (code: string) =>
+    apiFetch<TaxCodeLookupView>(`/api/tax-codes/${encodeURIComponent(code)}`),
 
   taxReport: (branchId: string, from: string, to: string) =>
     apiFetch<TaxReport>(

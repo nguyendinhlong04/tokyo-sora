@@ -442,7 +442,7 @@ export const feedback = pgTable(
  * `credit_limit_vnd` và `block_after_overdue_days` là thứ CHẶN được người ta ghi
  * thêm nợ, nên chúng phải ở hồ sơ chứ không phải trong đầu kế toán. Để NULL ở
  * `block_after_overdue_days` nghĩa là "dùng số chung của chuỗi" trong Trung tâm
- * tham số A6 — cùng cách với `einvoice_mode`.
+ * tham số A6.
  */
 export const corporateCustomers = pgTable(
   'corporate_customers',
@@ -463,7 +463,11 @@ export const corporateCustomers = pgTable(
     reconcileDay: smallint('reconcile_day').notNull().default(1),
     /** NULL = theo tham số `corporate.blockAfterOverdueDays` của A6 */
     blockAfterOverdueDays: smallint('block_after_overdue_days'),
-    /** NULL = theo tham số `corporate.einvoiceMode` của A6 */
+    /**
+     * BỎ DÙNG từ 10/2026: NĐ 254/2026 không cho nhà hàng gộp hoá đơn cuối kỳ — mỗi
+     * bill ghi nợ là một hoá đơn lập ngay. Cột còn lại vì API bản cũ còn đọc nó
+     * trong lúc chuyển phiên bản; xoá bằng migration sau khi bản mới chạy ổn.
+     */
     einvoiceMode: text('einvoice_mode'),
 
     active: boolean('active').notNull().default(true),

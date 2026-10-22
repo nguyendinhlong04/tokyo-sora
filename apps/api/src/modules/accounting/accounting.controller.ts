@@ -9,7 +9,9 @@ import {
   Query,
   Req,
 } from '@nestjs/common'
+import { BUYER_KINDS, INVOICE_STATES, InvoiceBuyerSchema } from '@sora/contracts'
 import { z } from 'zod'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { AccountingService } from './accounting.service'
@@ -24,10 +26,30 @@ const Approval = z
   })
   .nullish()
 
+/** Bộ lọc sổ F3: trạng thái, loại người mua (consumer = "Bán cho người tiêu dùng"), tìm */
+const BookQuery = z.object({
+  state: z.enum(INVOICE_STATES).optional(),
+  buyer: z.enum(['consumer', ...BUYER_KINDS]).optional(),
+  q: z.string().max(60).optional(),
+})
+
+/** Huỷ chỉ còn cho hoá đơn chưa lên cơ quan thuế — đã phát hành thì `replace` */
 const VoidBody = z.object({
   reason: z.string().min(1).max(300),
-  replace: z.boolean().default(false),
   approval: Approval,
+})
+
+const ReplaceBody = z.object({
+  reason: z.string().min(1).max(300),
+  /** Có mặt thì ghi đè người mua của đơn; null = "Bán cho người tiêu dùng" */
+  buyer: InvoiceBuyerSchema.nullable().optional(),
+  approval: Approval,
+})
+
+/** Trần mỗi lượt bấm: mỗi hoá đơn một lượt gọi nhà cung cấp, hàm Vercel sống 30 giây */
+const RetryBody = z.object({
+  branchId: z.string().min(1),
+  limit: z.number().int().min(1).max(20).default(10),
 })
 
 const LockBody = z.object({
@@ -39,17 +61,17 @@ const LockBody = z.object({
 /**
  * Kế toán — F2 · F3 · F4 · F5 · F6.
  *
- * Quyền theo §4.2: mọi màn sổ sách gắn `accounting.ledger-close-period` (R8 · R10),
- * riêng huỷ/thay thế hoá đơn dùng dòng `einvoice.void-replace-adjust` — dòng duy
- * nhất trong ma trận cho quản lý ca R7 chạm tới hoá đơn, và chỉ ở mức △.
- *
- * Phát hành hoá đơn (`issue`) KHÔNG gắn dòng huỷ/thay thế: phát hành là việc bình
- * thường của thu ngân khi in bill, còn huỷ mới là việc phải duyệt. Ở bản dựng này
- * cửa phát hành nằm trong Office nên vẫn để mức kế toán.
+ * Quyền theo §4.2: mọi màn sổ sách gắn `accounting.ledger-close-period` (R8 · R10).
+ * Hoá đơn là việc của quầy nên đi theo dòng riêng: phát hành `einvoice.issue` (thu
+ * ngân trở lên), huỷ/thay thế `einvoice.void-replace-adjust` — thu ngân △, quản lý
+ * ca duyệt bằng PIN ngay tại quầy; POS và F3 gọi chung các cửa này.
  */
 @Controller('api/accounting')
 export class AccountingController {
-  constructor(private readonly accounting: AccountingService) {}
+  constructor(
+    private readonly accounting: AccountingService,
+    private readonly einvoice: EinvoiceService,
+  ) {}
 
   // ------------------------------------------------------------- F2
 
@@ -67,18 +89,48 @@ export class AccountingController {
 
   @Get('invoices')
   @RequirePermission('accounting.ledger-close-period')
-  invoices(@Query('branch') branch: string, @Query('from') from: string, @Query('to') to: string) {
+  invoices(
+    @Query('branch') branch: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query() query: Record<string, unknown>,
+  ) {
     return this.accounting.invoices(
       this.requireBranch(branch),
       BusinessDate.parse(from),
       BusinessDate.parse(to),
+      BookQuery.parse(query),
     )
   }
 
-  @Post('invoices/issue/:orderId')
+  /** F3 ngăn chi tiết: nội dung đầy đủ một tờ và các tờ cùng đơn (thay thế, huỷ) */
+  @Get('invoices/:id')
   @RequirePermission('accounting.ledger-close-period')
+  invoice(@Param('id', ParseIntPipe) id: number) {
+    return this.einvoice.detail(id)
+  }
+
+  @Post('invoices/issue/:orderId')
+  @RequirePermission('einvoice.issue')
   issue(@Param('orderId', ParseIntPipe) orderId: number, @Req() req: RequestWithActor) {
-    return this.accounting.issue(orderId, req.actor!)
+    return this.einvoice.issueForOrder(orderId, req.actor!)
+  }
+
+  /**
+   * Hàng hoá đơn chưa lên được — trạm thu ngân POS hỏi định kỳ, và mỗi lượt hỏi
+   * đẩy vài hoá đơn tới lượt (máy chủ không có tiến trình nền).
+   */
+  @Get('invoices/pending')
+  @RequirePermission('einvoice.issue')
+  pending(@Query('branch') branch: string) {
+    return this.einvoice.queue(this.requireBranch(branch))
+  }
+
+  @Post('invoices/retry')
+  @RequirePermission('accounting.ledger-close-period')
+  retry(@Body() body: unknown, @Req() req: RequestWithActor) {
+    const { branchId, limit } = RetryBody.parse(body)
+    return this.einvoice.retryAll(branchId, limit, req.actor!)
   }
 
   @Post('invoices/:id/void')
@@ -88,8 +140,19 @@ export class AccountingController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    const { approval, ...input } = VoidBody.parse(body)
-    return this.accounting.voidInvoice(id, input, req.actor!, approval)
+    const { reason, approval } = VoidBody.parse(body)
+    return this.einvoice.voidUnissued(id, reason, req.actor!, approval)
+  }
+
+  @Post('invoices/:id/replace')
+  @RequirePermission('einvoice.void-replace-adjust')
+  replace(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    const { approval, ...input } = ReplaceBody.parse(body)
+    return this.einvoice.replace(id, input, req.actor!, approval)
   }
 
   // ------------------------------------------------------------- F4

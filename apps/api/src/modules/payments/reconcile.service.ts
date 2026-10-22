@@ -19,6 +19,7 @@ import {
   tables,
 } from '../../db/schema'
 import { CustomersService } from '../crm/customers.service'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 
@@ -40,6 +41,7 @@ export class ReconcileService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly customers: CustomersService,
+    private readonly einvoice: EinvoiceService,
   ) {}
 
   // ------------------------------------------------------- P14 đóng ca
@@ -714,7 +716,8 @@ export class ReconcileService {
    * trạng thái luôn suy từ tổng tiền đã thu — không ai đặt tay vào.
    */
   private async settleOrder(tx: Tx, orderId: number, forcePaid: boolean) {
-    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
+    // Khoá đơn trước khi cộng tiền — cùng lý do với `refreshOrderPaymentState`
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update')
     if (!order) return 'unpaid'
 
     const paid = await this.paidOf(tx, orderId)
@@ -735,6 +738,8 @@ export class ReconcileService {
         paidVnd: order.moneyTotal,
         businessDate: order.businessDate,
       })
+      // Chỉ xếp hoá đơn; trạm thu ngân hỏi hàng chờ vài chục giây một lần sẽ phát hành
+      await this.einvoice.enqueueForPaidOrder(tx, orderId)
     }
     return state
   }

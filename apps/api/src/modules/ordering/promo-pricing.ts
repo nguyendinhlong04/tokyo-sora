@@ -6,6 +6,7 @@ import {
   type PromotionKind,
   type PromotionRule,
   type PromotionScope,
+  type VatCode,
 } from '@sora/contracts'
 import { and, asc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm'
 import { businessDateOf, minuteOfDayIn, weekdayIn } from '../../common/business-date'
@@ -137,7 +138,7 @@ export async function pricedLinesOf(
   db: DbOrTx,
   orderId: number,
   timezone: string,
-): Promise<(PricedLine & { id: number })[]> {
+): Promise<(PricedLine & { id: number; vatCode: VatCode })[]> {
   const rows = await db
     .select({
       id: orderLines.id,
@@ -149,6 +150,7 @@ export async function pricedLinesOf(
       discountVnd: orderLines.discountVnd,
       promoQty: orderLines.promoQty,
       createdAt: orderLines.createdAt,
+      vatCode: orderLines.vatCode,
     })
     .from(orderLines)
     .innerJoin(dishes, eq(dishes.id, orderLines.dishId))
@@ -172,5 +174,6 @@ export async function pricedLinesOf(
     promotionId: r.promotionId,
     discountVnd: r.discountVnd,
     promoQty: r.promoQty,
+    vatCode: r.vatCode as VatCode,
   }))
 }

@@ -14,8 +14,17 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { hash } from '@node-rs/argon2'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
-import { auditLog, devices, staff, staffRoles, staffSessions } from '../db/schema'
+import {
+  auditLog,
+  branches,
+  devices,
+  parameters,
+  staff,
+  staffRoles,
+  staffSessions,
+} from '../db/schema'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
 import { bootTestApp, type Fixtures } from './harness'
@@ -619,6 +628,19 @@ describe('A9 — Hoá đơn điện tử', () => {
     expect(res.statusCode).toBe(400)
   })
 
+  it('ký hiệu trùng chuỗi của chi nhánh khác bị chặn — năm khác cũng là cùng một dãy', async () => {
+    await db.insert(branches).values({ id: 'hd', name: 'Hà Đông' })
+    await db.insert(parameters).values({ key: 'einvoice.serial', branchId: 'hd', value: 'C26MBA' })
+    const res = await inject({
+      method: 'PUT',
+      url: '/api/admin/einvoice',
+      headers: asOwner(),
+      payload: { branchId: fx.branchId, serial: 'C27MBA' },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('serial_in_use')
+  })
+
   it('khai đủ rồi thì bật được, và mã số thuế là của cả chuỗi', async () => {
     const chain = await inject({
       method: 'PUT',
@@ -643,16 +665,36 @@ describe('A9 — Hoá đơn điện tử', () => {
     })
     expect(serial.json().branch.serial).toBe('C26MAA')
 
-    const on = await inject({
+    // Hoá đơn in tên và địa chỉ người bán — thiếu thì chưa bật được
+    const noSeller = await inject({
       method: 'PUT',
       url: '/api/admin/einvoice',
       headers: asOwner(),
       payload: { branchId: fx.branchId, enabled: true },
     })
-    expect(on.statusCode).toBe(200)
+    expect(noSeller.statusCode).toBe(409)
+    expect(noSeller.json().message).toContain('tên và địa chỉ người bán')
+
+    const on = await inject({
+      method: 'PUT',
+      url: '/api/admin/einvoice',
+      headers: asOwner(),
+      payload: {
+        branchId: fx.branchId,
+        sellerName: 'CÔNG TY TNHH TOKYO SORA',
+        sellerAddress: '12 Trần Thái Tông, Cầu Giấy, Hà Nội',
+        enabled: true,
+      },
+    })
+    expect(on.statusCode, on.payload).toBe(200)
     expect(on.json().branch.enabled).toBe(true)
     expect(on.json().chain.taxCode).toBe('0101234567')
+    expect(on.json().chain.sellerName).toBe('CÔNG TY TNHH TOKYO SORA')
     expect(on.json().certificateDaysLeft).toBeGreaterThan(0)
+    // Lần bật đầu tiên ghi ngày bắt đầu — F3/F6 chỉ đòi hoá đơn cho bill từ ngày này
+    expect(on.json().branch.enabledFrom).toBe(businessDateOf(new Date(), 'Asia/Ho_Chi_Minh'))
+    // Máy chủ test chạy bản giả lập
+    expect(on.json().runtime).toEqual({ provider: 'mock', live: false })
   })
 
   it('ký hiệu khai ở A9 chính là ký hiệu miền kế toán đọc lúc phát hành', async () => {

@@ -16,7 +16,6 @@ import 'dotenv/config'
 import { createHash } from 'node:crypto'
 import { and, asc, eq } from 'drizzle-orm'
 import { Pool } from 'pg'
-import { ParamsService } from '../common/params.service'
 import { createDb } from './client'
 import { assertLocalDatabase, seedDevAccounts } from './dev-accounts'
 import { branches, devices, tables } from './schema'
@@ -93,8 +92,7 @@ async function main() {
       })
     }
 
-    const params = new ParamsService(db)
-    const bundles = new ConfigBundleService(db, params)
+    const bundles = new ConfigBundleService(db)
     const published = await bundles.publish(branch.id, { kind: 'system' })
 
     console.log(

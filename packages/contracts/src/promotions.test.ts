@@ -273,7 +273,12 @@ describe('Chương trình hoá đơn — chấm lại mỗi lần đơn đổi',
       minOrderVnd: 500_000,
       maxDiscountVnd: 50_000,
     })
-    expect(priceBill([r], ctx, at, lines)).toEqual({ promotionId: 1, discountVnd: 50_000 })
+    expect(priceBill([r], ctx, at, lines)).toEqual({
+      promotionId: 1,
+      discountVnd: 50_000,
+      // 50.000 chia theo 570.000 / 45.000 → 46.341,46 / 3.658,54; đồng lẻ về phần lẻ lớn hơn
+      shares: { a: 46_341, b: 3_659 },
+    })
     expect(priceBill([{ ...r, minOrderVnd: 700_000 }], ctx, at, lines)).toBeNull()
   })
 
@@ -284,6 +289,8 @@ describe('Chương trình hoá đơn — chấm lại mỗi lần đơn đổi',
       lines[1]!,
     ]
     expect(priceBill([r], ctx, at, daGiam)?.discountVnd).toBe(4_500)
+    // Dòng đã giảm món không nhận đồng nào của phần giảm hoá đơn
+    expect(priceBill([r], ctx, at, daGiam)?.shares).toEqual({ b: 4_500 })
   })
 
   it('mua 2 tặng 1 gọi một lượt: hai phần phải trả vẫn được giảm hoá đơn', () => {
@@ -295,6 +302,9 @@ describe('Chương trình hoá đơn — chấm lại mỗi lần đơn đổi',
     ]
     expect(priceBill([r], ctx, at, motDong)?.discountVnd).toBe(57_000)
     expect(priceBill([r], ctx, at, haiDong)?.discountVnd).toBe(57_000)
+    // Phần giảm nằm trên các phần phải trả, không trên phần được tặng
+    expect(priceBill([r], ctx, at, motDong)?.shares).toEqual({ a: 57_000 })
+    expect(priceBill([r], ctx, at, haiDong)?.shares).toEqual({ a: 57_000 })
   })
 
   it('giảm số tiền không vượt tiền món và không vượt trần luật', () => {
@@ -321,6 +331,8 @@ describe('Chương trình hoá đơn — chấm lại mỗi lần đơn đổi',
     expect(priceBill([tang], ctx, at, [...lines, kem])).toEqual({
       promotionId: 1,
       discountVnd: 65_000,
+      // Cả phần giảm nằm ở dòng được tặng — hoá đơn ghi nó là hàng khuyến mại
+      shares: { k: 65_000 },
     })
     // Không gọi món tặng thì không có gì để tặng
     expect(priceBill([tang], ctx, at, lines)).toBeNull()

@@ -42,7 +42,7 @@ flowchart TD
     V -- "Mang về" --> O2
     Z --> O2["/dat-mon/{chi-nhánh}<br/>Thực đơn online"]
     O2 --> O4["Giỏ & chọn giờ —<br/>Sớm nhất hoặc khung 15 phút"]
-    O4 --> O5["Người nhận — tên, SĐT, địa chỉ"]
+    O4 --> O5["Người nhận — tên, SĐT, địa chỉ<br/>+ hoá đơn công ty (không bắt buộc)"]
     O5 --> O6["Thanh toán: Chuyển khoản VietQR<br/>hoặc Trả khi nhận"]
     O6 -- "Đặt đơn" --> O7["/dat-mon/don/{token}<br/>Đã nhận đơn + theo dõi 5 nấc"]
     O7 -. "đơn hiện ở POS —<br/>thu ngân Xác nhận · xuống bếp" .-> K["Bếp"]
@@ -70,6 +70,14 @@ một dòng, kèm gợi ý "Đặt thêm X để được ưu đãi hoá đơn".
 trả** đúng bằng số mã QR đòi — kể cả phần làm tròn khi giá giảm lẻ đồng. Đơn tối
 thiểu của vùng giao vẫn so trên tiền món **giá niêm yết**.
 
+Hoá đơn VAT cho công ty (chỉ hiện khi chi nhánh đã bật hoá đơn điện tử ở Office
+**A9**): bước **Người nhận** có mục **Xuất hoá đơn công ty (VAT)** — không bắt
+buộc; để đóng thì hoá đơn ghi "Bán cho người tiêu dùng". Chọn **Công ty** hoặc
+**Cá nhân**; gõ mã số thuế là tự điền tên, địa chỉ theo tra cứu, kèm tình trạng
+theo Cục Thuế. MST hay email sai thì lỗi hiện ngay dưới ô, chưa sang được bước
+thanh toán. Bước **Thanh toán** nhắc lại "Xuất hoá đơn VAT cho …" kèm nút
+**Sửa**. Giỏ và trang theo dõi tách thuế theo thuế suất: món ăn 8%, bia rượu 10%.
+
 Thanh toán & theo dõi:
 
 - **Chuyển khoản VietQR** — "Đơn xuống bếp ngay khi ngân hàng báo có", hoặc
@@ -81,6 +89,13 @@ Thanh toán & theo dõi:
   hàng báo có.
 - Khách nên **lưu đường dẫn theo dõi** (trang tự nhắc). Đơn huỷ hiện lý do +
   "Tiền đã trả sẽ được hoàn — quán gọi lại cho bạn."
+- Khối **Hoá đơn VAT** ở trang theo dõi: trước khi hoá đơn lập (lúc quán nhận đủ
+  tiền; đơn giao: lúc giao xong) khách vẫn **Xuất hoá đơn công ty**, **Sửa thông
+  tin xuất hoá đơn** hoặc **Không xuất hoá đơn công ty nữa**. Lập xong thì hiện ký
+  hiệu · số, mã tra cứu và nút **Tra cứu hoá đơn**; thông tin sai thì gọi quán lập
+  hoá đơn thay thế. Hoá đơn chưa lên được thì trang báo quán sẽ gửi lại trong ngày
+  — khách không phải làm gì. Bản giả lập (chưa ký nhà cung cấp) ghi "Hoá đơn thử —
+  bản giả lập, không có giá trị".
 
 Đơn đổ về POS (cột **Mới** ở bảng điều phối + dải trạm thu ngân) — thu ngân
 **Xác nhận · xuống bếp** thì bếp mới thấy (chương 2 §2.8).

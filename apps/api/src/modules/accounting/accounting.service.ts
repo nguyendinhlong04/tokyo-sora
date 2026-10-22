@@ -5,7 +5,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, ne, sql, type SQLWrapper } from 'drizzle-orm'
+import type { InvoiceState } from '@sora/contracts'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  lte,
+  ne,
+  or,
+  sql,
+  type SQL,
+  type SQLWrapper,
+} from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
@@ -28,17 +43,17 @@ import {
 } from '../../db/schema'
 import { CorporateService } from '../crm/corporate.service'
 import type { Actor } from '../identity/actor'
-import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
-import {
-  assertInvoiceSerial,
-  firstOfMonth,
-  lastOfMonth,
-  nextInvoiceNo,
-  reconcile,
-  taxSummary,
-  vatBuckets,
-} from './domain/accounting'
+import { assertInvoiceSerial } from '../einvoice/domain/serial'
+import { firstOfMonth, lastOfMonth, reconcile, taxSummary, vatBuckets } from './domain/accounting'
+
+/** Bộ lọc của sổ F3 */
+export interface InvoiceBookFilters {
+  state?: InvoiceState
+  buyer?: 'consumer' | 'company' | 'person'
+  /** MST, tên người mua, số hoá đơn hay mã đơn */
+  q?: string
+}
 
 /** Cùng lý do với `reports.service.ts`: tổng tiền cả kỳ vượt tầm int4 */
 const money = (expr: SQLWrapper) => sql<number>`coalesce(sum(${expr}), 0)::float8`
@@ -59,7 +74,6 @@ export class AccountingService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly params: ParamsService,
-    private readonly approvals: ApprovalService,
     private readonly audit: AuditService,
     private readonly corporate: CorporateService,
   ) {}
@@ -155,26 +169,120 @@ export class AccountingService {
 
   // ================================================ F3 · Sổ hoá đơn điện tử
 
-  async invoices(branchId: string, from: string, to: string) {
+  /**
+   * Sổ hoá đơn của một khoảng ngày. Không trả nội dung đầy đủ từng tờ (`snapshot`)
+   * — một tháng vài nghìn tờ; xem từng tờ ở `EinvoiceService.detail`.
+   */
+  async invoices(branchId: string, from: string, to: string, filters: InvoiceBookFilters = {}) {
+    const conditions: SQL[] = [
+      eq(invoices.branchId, branchId),
+      gte(invoices.businessDate, from),
+      lte(invoices.businessDate, to),
+    ]
+    if (filters.state) conditions.push(eq(invoices.state, filters.state))
+    if (filters.buyer) conditions.push(eq(invoices.buyerKind, filters.buyer))
+    const q = filters.q?.trim()
+    if (q) {
+      const like = `%${q}%`
+      conditions.push(
+        or(
+          ilike(invoices.buyerName, like),
+          ilike(invoices.buyerTaxCode, like),
+          ilike(invoices.invoiceNo, like),
+          ilike(orders.displayCode, like),
+        )!,
+      )
+    }
+
     const rows = await this.db
-      .select({ invoice: invoices, orderCode: orders.displayCode, issuedByName: staff.fullName })
+      .select({
+        id: invoices.id,
+        branchId: invoices.branchId,
+        orderId: invoices.orderId,
+        orderCode: orders.displayCode,
+        formNo: invoices.formNo,
+        serial: invoices.serial,
+        invoiceNo: invoices.invoiceNo,
+        invoiceDate: invoices.invoiceDate,
+        taxCode: invoices.taxCode,
+        lookupCode: invoices.lookupCode,
+        state: invoices.state,
+        lastError: invoices.lastError,
+        attempts: invoices.attempts,
+        buyerKind: invoices.buyerKind,
+        buyerName: invoices.buyerName,
+        buyerTaxCode: invoices.buyerTaxCode,
+        amountSub: invoices.amountSub,
+        amountVat: invoices.amountVat,
+        amountTotal: invoices.amountTotal,
+        replacesId: invoices.replacesId,
+        voidReason: invoices.voidReason,
+        issuedAt: invoices.issuedAt,
+        issuedByName: staff.fullName,
+        businessDate: invoices.businessDate,
+      })
       .from(invoices)
       .innerJoin(orders, eq(orders.id, invoices.orderId))
       .leftJoin(staff, eq(staff.id, invoices.issuedBy))
+      .where(and(...conditions))
+      .orderBy(desc(invoices.id))
+
+    /** Hoá đơn chưa lên được của cả chi nhánh — không theo khoảng ngày đang xem */
+    const queue = await this.db
+      .select({ id: invoices.id, orderCode: orders.displayCode, error: invoices.lastError })
+      .from(invoices)
+      .innerJoin(orders, eq(orders.id, invoices.orderId))
+      .where(and(eq(invoices.branchId, branchId), inArray(invoices.state, ['pending', 'failed'])))
+      .orderBy(asc(invoices.id))
+      .limit(100)
+
+    /**
+     * Hoá đơn đã lên cơ quan thuế mà đơn sau đó bị huỷ — tờ hoá đơn vẫn còn hiệu
+     * lực, doanh thu thì không. Kế toán phải xử lý (thay thế, điều chỉnh) bằng tay.
+     */
+    const needsAction = await this.db
+      .select({
+        id: invoices.id,
+        orderCode: orders.displayCode,
+        serial: invoices.serial,
+        invoiceNo: invoices.invoiceNo,
+      })
+      .from(invoices)
+      .innerJoin(orders, eq(orders.id, invoices.orderId))
       .where(
         and(
           eq(invoices.branchId, branchId),
-          gte(invoices.businessDate, from),
-          lte(invoices.businessDate, to),
+          eq(invoices.state, 'issued'),
+          eq(orders.status, 'cancelled'),
         ),
       )
-      .orderBy(desc(invoices.id))
+      .orderBy(asc(invoices.id))
 
-    /** Bill đã trả đủ mà chưa có hoá đơn nào — nguồn thật của hàng đợi F3 */
-    const missing = await this.db
+    return {
+      branchId,
+      serial: await this.serialOf(branchId),
+      rows: rows.map((row) => ({ ...row, issuedAt: row.issuedAt?.toISOString() ?? null })),
+      queue,
+      missing: await this.missingInvoices(branchId, from, to),
+      needsAction,
+    }
+  }
+
+  /**
+   * Bill đã trả đủ mà chưa có hoá đơn còn hiệu lực — tính từ ngày chi nhánh bật hoá
+   * đơn điện tử (`einvoice.enabledFrom`, ghi lần đầu bật ở A9). Trước ngày đó quán
+   * chưa lập hoá đơn từ máy tính tiền, bill cũ không phải là "thiếu". Đơn giao chưa
+   * giao xong thì chưa tới lúc lập.
+   */
+  private async missingInvoices(branchId: string, from: string, to: string) {
+    const enabledFrom = await this.params.get('einvoice.enabledFrom', branchId)
+    if (typeof enabledFrom !== 'string' || enabledFrom === '') return []
+    const start = enabledFrom > from ? enabledFrom : from
+    return this.db
       .select({
         orderId: orders.id,
         displayCode: orders.displayCode,
+        channel: orders.channel,
         moneySub: orders.moneySub,
         moneyVat: orders.moneyVat,
         moneyTotal: orders.moneyTotal,
@@ -184,10 +292,11 @@ export class AccountingService {
       .where(
         and(
           eq(orders.branchId, branchId),
-          gte(orders.businessDate, from),
+          gte(orders.businessDate, start),
           lte(orders.businessDate, to),
           eq(orders.paymentState, 'paid'),
           ne(orders.status, 'cancelled'),
+          sql`(${orders.type} <> 'delivery' OR ${orders.status} = 'done')`,
           sql`not exists (
             select 1 from ${invoices} i
             where i.order_id = ${orders.id} and i.state in ('pending','issued','failed')
@@ -195,198 +304,10 @@ export class AccountingService {
         ),
       )
       .orderBy(asc(orders.id))
-
-    return {
-      branchId,
-      serial: await this.serialOf(branchId),
-      rows: rows.map(({ invoice, orderCode, issuedByName }) => ({
-        ...invoice,
-        orderCode,
-        issuedByName,
-        issuedAt: invoice.issuedAt?.toISOString() ?? null,
-      })),
-      /** Hoá đơn cần phát hành lại — bill đã in, hoá đơn chưa lên thuế */
-      queue: rows
-        .filter(({ invoice }) => invoice.state === 'pending' || invoice.state === 'failed')
-        .map(({ invoice, orderCode }) => ({ id: invoice.id, orderCode, error: invoice.lastError })),
-      missing,
-    }
   }
 
   /**
-   * Phát hành hoá đơn cho một đơn.
-   *
-   * Số hoá đơn cấp trong TRANSACTION và khoá theo ký hiệu: hai máy tính tiền cùng
-   * bấm in một lúc mà cấp trùng số là một lỗi không sửa được sau khi đã lên cơ
-   * quan thuế.
-   */
-  async issue(orderId: number, actor: Actor) {
-    return this.db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId))
-      if (!order) throw new NotFoundException('Không có đơn này')
-      if (order.status === 'cancelled') {
-        throw new BadRequestException('Đơn đã huỷ — không phát hành hoá đơn')
-      }
-
-      const [existing] = await tx
-        .select()
-        .from(invoices)
-        .where(
-          and(
-            eq(invoices.orderId, orderId),
-            inArray(invoices.state, ['pending', 'issued', 'failed']),
-          ),
-        )
-      if (existing?.state === 'issued') {
-        throw new ConflictException('Đơn này đã có hoá đơn — phát hành hai lần là sai phạm thuế')
-      }
-
-      const serial = await this.serialOf(order.branchId)
-      if (!serial) {
-        throw new ConflictException({
-          code: 'no_serial',
-          message:
-            'Chi nhánh chưa khai ký hiệu hoá đơn — đặt tham số `einvoice.serial` ở Trung tâm tham số A6',
-        })
-      }
-
-      const result = await this.callProvider(order.displayCode)
-
-      // Cấp số trong cùng transaction, khoá theo ký hiệu để không cấp trùng
-      const [last] = await tx
-        .select({ no: invoices.invoiceNo })
-        .from(invoices)
-        .where(and(eq(invoices.serial, serial), isNotNull(invoices.invoiceNo)))
-        .orderBy(desc(invoices.invoiceNo))
-        .limit(1)
-        .for('update')
-
-      const base = {
-        branchId: order.branchId,
-        orderId,
-        serial,
-        amountSub: order.moneySub,
-        amountVat: order.moneyVat,
-        amountTotal: order.moneyTotal,
-        businessDate: order.businessDate,
-        issuedBy: actor.kind === 'staff' ? actor.staffId : null,
-      }
-
-      const values = result.ok
-        ? {
-            ...base,
-            state: 'issued' as const,
-            invoiceNo: nextInvoiceNo(last?.no ?? null),
-            taxCode: result.taxCode,
-            issuedAt: new Date(),
-            lastError: null,
-          }
-        : { ...base, state: 'failed' as const, lastError: result.error }
-
-      const [row] = existing
-        ? await tx.update(invoices).set(values).where(eq(invoices.id, existing.id)).returning()
-        : await tx.insert(invoices).values(values).returning()
-
-      await this.audit.write(tx, {
-        actor,
-        action: result.ok ? 'einvoice.issued' : 'einvoice.failed',
-        entity: 'invoice',
-        entityId: String(row!.id),
-        payload: { orderCode: order.displayCode, serial, invoiceNo: row!.invoiceNo },
-      })
-
-      return row!
-    })
-  }
-
-  /**
-   * Huỷ hoặc thay thế hoá đơn — dòng `einvoice.void-replace-adjust` của §4.2.
-   *
-   * Bản gốc KHÔNG bị xoá, chỉ đổi trạng thái và giữ nguyên số đã cấp: hoá đơn đã
-   * lên cơ quan thuế thì số đó tồn tại vĩnh viễn dù nội dung sai.
-   */
-  async voidInvoice(
-    id: number,
-    input: { reason: string; replace: boolean },
-    actor: Actor,
-    approval?: ApprovalInput | null,
-  ) {
-    if (!input.reason?.trim()) throw new BadRequestException('Huỷ hoá đơn bắt buộc ghi lý do')
-
-    return this.db.transaction(async (tx) => {
-      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, id))
-      if (!invoice) throw new NotFoundException('Không có hoá đơn này')
-      if (invoice.state === 'voided' || invoice.state === 'replaced') {
-        throw new ConflictException(`Hoá đơn đã ở trạng thái "${invoice.state}"`)
-      }
-
-      const outcome = await this.approvals.authorize(tx, {
-        actor,
-        action: 'einvoice.void-replace-adjust',
-        entity: 'invoice',
-        entityId: String(id),
-        approval,
-      })
-
-      await tx
-        .update(invoices)
-        .set({
-          state: input.replace ? 'replaced' : 'voided',
-          voidReason: input.reason.trim(),
-          // Ràng buộc CSDL đòi bản ghi duyệt khi huỷ; thay thế thì bản mới mang dấu vết
-          approvalId: outcome.approvalId,
-        })
-        .where(eq(invoices.id, id))
-
-      let replacement = null
-      if (input.replace) {
-        const [order] = await tx.select().from(orders).where(eq(orders.id, invoice.orderId))
-        const [row] = await tx
-          .insert(invoices)
-          .values({
-            branchId: invoice.branchId,
-            orderId: invoice.orderId,
-            serial: invoice.serial,
-            amountSub: order!.moneySub,
-            amountVat: order!.moneyVat,
-            amountTotal: order!.moneyTotal,
-            businessDate: invoice.businessDate,
-            state: 'pending',
-            replacesId: invoice.id,
-            issuedBy: actor.kind === 'staff' ? actor.staffId : null,
-          })
-          .returning()
-        replacement = row!
-      }
-
-      await this.audit.write(tx, {
-        actor,
-        action: input.replace ? 'einvoice.replaced' : 'einvoice.voided',
-        entity: 'invoice',
-        entityId: String(id),
-        payload: { reason: input.reason.trim(), approvalId: outcome.approvalId },
-      })
-
-      return { voided: id, replacement }
-    })
-  }
-
-  /**
-   * Lượt gọi ra nhà cung cấp hoá đơn điện tử.
-   *
-   * CHƯA ĐẤU NỐI. Đây là chỗ duy nhất giả lập trong cả luồng F3, và nó cố tình
-   * nằm riêng một hàm để khi có hợp đồng thật thì thay đúng chỗ này — mọi thứ
-   * khác (cấp số, hàng đợi lỗi, huỷ/thay thế có duyệt) đều đã là thật.
-   */
-  private async callProvider(
-    displayCode: string,
-  ): Promise<{ ok: true; taxCode: string } | { ok: false; error: string }> {
-    return { ok: true, taxCode: `MCQT-${displayCode}` }
-  }
-
-  /**
-   * Ký hiệu của chi nhánh, lấy từ Trung tâm tham số A6 (A9 là cửa vào theo ngữ
-   * cảnh — chưa dựng).
+   * Ký hiệu khai ở A9 của chi nhánh — F3 hiện nó ở đầu sổ.
    *
    * Ký hiệu sai chuẩn là LỖI CẤU HÌNH, không phải lỗi máy chủ: người sửa được nó
    * là kế toán, và họ chỉ sửa được nếu thông báo nói ra sai ở đâu.
@@ -399,18 +320,44 @@ export class AccountingService {
     } catch (err) {
       throw new ConflictException({
         code: 'bad_serial',
-        message: `Ký hiệu hoá đơn khai ở A6 không hợp lệ: ${(err as Error).message}`,
+        message: `Ký hiệu hoá đơn khai ở A9 không hợp lệ: ${(err as Error).message}`,
       })
     }
   }
 
   // ==================================================== F4 · Báo cáo thuế
 
+  /**
+   * VAT đầu ra theo HOÁ ĐƠN đã phát hành, xếp theo ngày lập (`invoice_date`) — tờ
+   * khai kê hoá đơn bán ra theo ngày lập, và một bill món ăn 8% + bia 10% là hai
+   * dòng thuế suất đúng như in trên tờ hoá đơn.
+   *
+   * Bill đã trả mà chưa có tờ nào lên thuế (trước ngày bật hoá đơn điện tử, hay hoá
+   * đơn còn kẹt) vẫn là doanh thu phải khai: cộng theo ngày kinh doanh của đơn, và
+   * tách riêng ở `uninvoicedBuckets` để kế toán thấy phần chưa có chứng từ.
+   */
   async taxReport(branchId: string, from: string, to: string) {
+    const invoiceRows = await this.db
+      .select({
+        netVnd: sql<number>`(${invoices.amountSub} - ${invoices.amountDiscount} + ${invoices.amountService})::float8`,
+        vatVnd: sql<number>`${invoices.amountVat}::float8`,
+        breakdown: invoices.vatBreakdown,
+      })
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.branchId, branchId),
+          eq(invoices.state, 'issued'),
+          gte(invoices.invoiceDate, from),
+          lte(invoices.invoiceDate, to),
+        ),
+      )
+
     const orderRows = await this.db
       .select({
         netVnd: sql<number>`(${orders.moneySub} - ${orders.moneyDiscount} + ${orders.moneyService})::float8`,
         vatVnd: sql<number>`${orders.moneyVat}::float8`,
+        breakdown: orders.vatBreakdown,
       })
       .from(orders)
       .where(
@@ -418,13 +365,25 @@ export class AccountingService {
           eq(orders.branchId, branchId),
           gte(orders.businessDate, from),
           lte(orders.businessDate, to),
+          eq(orders.paymentState, 'paid'),
           ne(orders.status, 'cancelled'),
+          sql`not exists (
+            select 1 from ${invoices} i where i.order_id = ${orders.id} and i.state = 'issued'
+          )`,
         ),
       )
 
-    const buckets = vatBuckets(
-      orderRows.map((r) => ({ netVnd: Number(r.netVnd), vatVnd: Number(r.vatVnd) })),
-    )
+    const invoiced = invoiceRows.map((r) => ({
+      netVnd: Number(r.netVnd),
+      vatVnd: Number(r.vatVnd),
+      breakdown: r.breakdown,
+    }))
+    const uninvoiced = orderRows.map((r) => ({
+      netVnd: Number(r.netVnd),
+      vatVnd: Number(r.vatVnd),
+      breakdown: r.breakdown,
+    }))
+    const buckets = vatBuckets([...invoiced, ...uninvoiced])
 
     /**
      * VAT đầu vào lấy từ SỔ HOÁ ĐƠN C5, không từ con số gõ trên phiếu chi.
@@ -459,8 +418,16 @@ export class AccountingService {
         ),
       )
 
-    const [invoiced] = await this.db
-      .select({ total: money(invoices.amountTotal), count: sql<number>`count(*)::int` })
+    /**
+     * Đối chiếu cùng một nền với doanh thu hệ thống: theo ngày kinh doanh của đơn,
+     * và cộng lại phần làm tròn — tờ hoá đơn ghi số chính xác, bill thu số đã làm
+     * tròn, cộng hai thứ mới bằng tiền của đơn.
+     */
+    const [issuedTotals] = await this.db
+      .select({
+        total: money(sql`${invoices.amountTotal} + ${invoices.amountRound}`),
+        count: sql<number>`count(*)::int`,
+      })
       .from(invoices)
       .where(
         and(
@@ -491,6 +458,9 @@ export class AccountingService {
       from,
       to,
       buckets,
+      /** Hai phần của `buckets`: theo hoá đơn đã phát hành · bill đã trả chưa có hoá đơn */
+      invoicedBuckets: vatBuckets(invoiced),
+      uninvoicedBuckets: vatBuckets(uninvoiced),
       summary: taxSummary({
         vatOutVnd,
         vatInVnd: Number(vatIn?.vat ?? 0),
@@ -498,9 +468,9 @@ export class AccountingService {
       }),
       /** Đối chiếu tổng HĐĐT vs doanh thu hệ thống — lệch là đỏ (§28 F4) */
       reconciliation: {
-        ...reconcile(Number(system?.total ?? 0), Number(invoiced?.total ?? 0)),
+        ...reconcile(Number(system?.total ?? 0), Number(issuedTotals?.total ?? 0)),
         systemOrders: Number(system?.count ?? 0),
-        issuedInvoices: Number(invoiced?.count ?? 0),
+        issuedInvoices: Number(issuedTotals?.count ?? 0),
       },
       /** Bao nhiêu tờ hoá đơn đứng sau con số khấu trừ — kế toán cần biết trước khi ký tờ khai */
       vatInInvoices: Number(vatIn?.count ?? 0),
@@ -707,12 +677,17 @@ export class AccountingService {
         ),
       )
 
+    const missing = await this.missingInvoices(branchId, from, to)
+
     const blockers: string[] = []
     if (Number(drafts?.n ?? 0) > 0) {
       blockers.push(`${drafts!.n} phiếu chi còn chờ duyệt (C2)`)
     }
     if (Number(pendingInvoices?.n ?? 0) > 0) {
       blockers.push(`${pendingInvoices!.n} hoá đơn chưa phát hành được (F3)`)
+    }
+    if (missing.length > 0) {
+      blockers.push(`${missing.length} bill đã trả chưa có hoá đơn (F3)`)
     }
     if (Number(openPayroll?.n ?? 0) > 0) {
       blockers.push(`${openPayroll!.n} kỳ lương chưa phát xong (H7)`)

@@ -5,9 +5,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm'
+import { rooms, type InvoiceBuyer } from '@sora/contracts'
+import { and, asc, desc, eq, ilike, inArray, lte, or, sql } from 'drizzle-orm'
 import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
+import { emit } from '../../common/outbox'
 import { ParamsService } from '../../common/params.service'
 import { isUniqueViolation } from '../../common/pg-error'
 import type { DbOrTx } from '../../common/tx'
@@ -18,11 +20,15 @@ import {
   corporateCustomers,
   corporateSettlements,
   orders,
+  payments,
   staff,
+  tableSessions,
 } from '../../db/schema'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
+import { alreadyPaid } from '../payments/payments.service'
 import { agingOf, daysBetween, type AgingBuckets } from './domain/aging'
 
 export interface CorporateInput {
@@ -37,7 +43,6 @@ export interface CorporateInput {
   paymentTermDays: number
   reconcileDay: number
   blockAfterOverdueDays: number | null
-  einvoiceMode: 'per-bill' | 'aggregate' | null
   active: boolean
 }
 
@@ -62,6 +67,7 @@ export class CorporateService {
     private readonly params: ParamsService,
     private readonly approvals: ApprovalService,
     private readonly audit: AuditService,
+    private readonly einvoice: EinvoiceService,
   ) {}
 
   // =============================================================== Hồ sơ
@@ -83,7 +89,6 @@ export class CorporateService {
       const blockDays = row.blockAfterOverdueDays ?? defaults.blockAfterOverdueDays
       return {
         ...row,
-        einvoiceModeEffective: row.einvoiceMode ?? defaults.einvoiceMode,
         blockAfterOverdueDaysEffective: blockDays,
         aging,
         outstandingVnd: aging.totalVnd,
@@ -113,7 +118,6 @@ export class CorporateService {
         paymentTermDays: input.paymentTermDays,
         reconcileDay: input.reconcileDay,
         blockAfterOverdueDays: input.blockAfterOverdueDays,
-        einvoiceMode: input.einvoiceMode,
         active: input.active,
       }
 
@@ -149,20 +153,71 @@ export class CorporateService {
   // =============================================================== Ghi nợ
 
   /**
+   * P10 "Ghi nợ công ty": tìm công ty, kèm hạn mức còn lại và lý do bị chặn — thu
+   * ngân thấy trước khi bấm, khỏi đợi 409. Lượt ghi nợ vẫn kiểm lại.
+   */
+  async pick(q: string) {
+    const term = q.trim()
+    const rows = await this.db
+      .select()
+      .from(corporateCustomers)
+      .where(
+        and(
+          eq(corporateCustomers.active, true),
+          term
+            ? or(
+                ilike(corporateCustomers.name, `%${term}%`),
+                ilike(corporateCustomers.code, `%${term}%`),
+                ilike(corporateCustomers.taxCode, `%${term}%`),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(asc(corporateCustomers.name))
+      .limit(20)
+    if (rows.length === 0) return []
+
+    const defaults = await this.defaults()
+    const today = businessDateOf(new Date(), 'Asia/Ho_Chi_Minh')
+    const balances = await this.balancesFor(
+      rows.map((r) => r.id),
+      today,
+    )
+    return rows.map((row) => {
+      const aging = balances.get(row.id) ?? emptyAging()
+      const blockDays = row.blockAfterOverdueDays ?? defaults.blockAfterOverdueDays
+      return {
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        taxCode: row.taxCode,
+        /** null = hồ sơ thiếu địa chỉ — chi nhánh đã bật hoá đơn thì chưa ghi nợ được */
+        address: row.address,
+        availableVnd: Math.max(0, row.creditLimitVnd - aging.totalVnd),
+        blockedReason: blockReason(row.active, aging, row.creditLimitVnd, blockDays, 0),
+      }
+    })
+  }
+
+  /**
    * Ghi nợ một bill cho công ty — cửa mà P10 gọi khi thu ngân chọn "Ghi nợ công ty".
    *
    * Quyền `corporate.charge-at-pos` cho R2 ở mức △ nên lượt này cần PIN của R7;
    * R7 và R10 tự bấm thì không. Chữ ký khách (`signer`) là bằng chứng ngoài hệ
    * thống, bản ghi duyệt là bằng chứng trong hệ thống — §4.2b đòi cả hai.
    *
-   * Không sinh dòng `payments`: tiền chưa về thì sổ quỹ không được thấy gì.
+   * Không sinh dòng `payments`: tiền chưa về thì sổ quỹ không được thấy gì. Công ty
+   * nợ PHẦN CÒN LẠI của bill — khách đã trả một phần thì phần đó không nợ lại lần
+   * hai. Bill coi như trả đủ: bàn sang chờ dọn, và hoá đơn lập ngay cho chính công
+   * ty đó (NĐ 254/2026 không cho nhà hàng gộp hoá đơn cuối kỳ).
    */
   async charge(
     input: { corporateId: number; orderId: number; signer: string | null },
     actor: Actor,
     approval?: ApprovalInput | null,
   ) {
-    return this.db.transaction(async (tx) => {
+    const { charge, invoiceId } = await this.db.transaction(async (tx) => {
+      // Khoá đơn: máy khác đang thu tiền mặt bill này thì một trong hai bên phải thấy bên kia
       const [order] = await tx
         .select({
           id: orders.id,
@@ -171,16 +226,25 @@ export class CorporateService {
           moneyTotal: orders.moneyTotal,
           paymentState: orders.paymentState,
           status: orders.status,
-          businessDate: orders.businessDate,
+          tableSessionId: orders.tableSessionId,
+          invoiceBuyer: orders.invoiceBuyer,
           timezone: branches.timezone,
         })
         .from(orders)
         .innerJoin(branches, eq(branches.id, orders.branchId))
         .where(eq(orders.id, input.orderId))
+        .for('update', { of: orders })
       if (!order) throw new NotFoundException('Không có đơn này')
       if (order.status === 'cancelled') throw new ConflictException('Đơn đã huỷ')
-      if (order.paymentState === 'paid') throw new ConflictException('Đơn đã thanh toán')
+      if (order.paymentState === 'paid') throw alreadyPaid()
       if (order.moneyTotal <= 0) throw new BadRequestException('Đơn chưa có tiền để ghi nợ')
+
+      const [received] = await tx
+        .select({ paid: sql<number>`coalesce(sum(${payments.amount}), 0)::int` })
+        .from(payments)
+        .where(and(eq(payments.orderId, order.id), eq(payments.state, 'paid')))
+      const outstanding = order.moneyTotal - Number(received?.paid ?? 0)
+      if (outstanding <= 0) throw alreadyPaid()
 
       const [company] = await tx
         .select()
@@ -200,9 +264,16 @@ export class CorporateService {
         aging,
         company.creditLimitVnd,
         blockDays,
-        order.moneyTotal,
+        outstanding,
       )
       if (blocked) throw new ConflictException(blocked)
+
+      if (!company.address && (await this.einvoice.enabledFor(order.branchId))) {
+        throw new ConflictException({
+          code: 'corporate_profile_incomplete',
+          message: `Hồ sơ ${company.name} thiếu địa chỉ — hoá đơn bắt buộc có địa chỉ người mua. Kế toán bổ sung ở B15`,
+        })
+      }
 
       const outcome = await this.approvals.authorize(tx, {
         actor,
@@ -213,6 +284,7 @@ export class CorporateService {
       })
 
       const dueOn = addDays(today, company.paymentTermDays)
+      const signer = input.signer?.trim() || null
       let charge
       try {
         const [row] = await tx
@@ -221,10 +293,10 @@ export class CorporateService {
             corporateId: company.id,
             branchId: order.branchId,
             orderId: order.id,
-            amountVnd: order.moneyTotal,
+            amountVnd: outstanding,
             chargedOn: today,
             dueOn,
-            signer: input.signer?.trim() || null,
+            signer,
             approvalId: outcome.approvalId,
             createdBy: actor.kind === 'staff' ? actor.staffId : null,
           })
@@ -235,8 +307,55 @@ export class CorporateService {
         throw err
       }
 
-      // Bill đã xong với khách: công ty nợ, không phải người ngồi bàn nợ
-      await tx.update(orders).set({ paymentState: 'paid' }).where(eq(orders.id, order.id))
+      /**
+       * Mã VietQR còn treo của bill này hết giá trị: tiền chuyển tới sau lúc ghi nợ
+       * là giao dịch chưa khớp ở P15 (hoàn cho khách), không được kéo đơn về "trả
+       * một phần".
+       */
+      await tx
+        .update(payments)
+        .set({ state: 'expired' })
+        .where(and(eq(payments.orderId, order.id), eq(payments.state, 'pending')))
+
+      // Bill đã xong với khách: công ty nợ, không phải người ngồi bàn nợ. Hoá đơn
+      // đứng tên công ty nợ tiền, dù ở bàn khách đã khai người mua khác.
+      const buyer: InvoiceBuyer | null = company.address
+        ? {
+            kind: 'company',
+            taxCode: company.taxCode,
+            name: company.name,
+            address: company.address,
+            email: company.contactEmail ?? undefined,
+            contactName: signer ?? company.contactName ?? undefined,
+            corporateId: company.id,
+          }
+        : order.invoiceBuyer
+      await tx
+        .update(orders)
+        .set({ paymentState: 'paid', invoiceBuyer: buyer })
+        .where(eq(orders.id, order.id))
+      if (order.tableSessionId) {
+        await tx
+          .update(tableSessions)
+          .set({ status: 'paid_wait_clear' })
+          .where(eq(tableSessions.id, order.tableSessionId))
+      }
+      const invoiceId = await this.einvoice.enqueueForPaidOrder(tx, order.id)
+
+      await emit(tx, {
+        branchId: order.branchId,
+        topic: 'table.paid',
+        rooms: [
+          rooms.tables(order.branchId),
+          ...(order.tableSessionId ? [rooms.tableSession(order.tableSessionId)] : []),
+        ],
+        payload: {
+          sessionId: order.tableSessionId,
+          orderId: order.id,
+          paymentState: 'paid',
+          outstanding: 0,
+        },
+      })
 
       await this.audit.write(tx, {
         actor,
@@ -247,12 +366,15 @@ export class CorporateService {
         payload: {
           company: company.code,
           order: order.displayCode,
-          amountVnd: order.moneyTotal,
+          amountVnd: outstanding,
           dueOn,
         },
       })
-      return charge
+      return { charge, invoiceId }
     })
+
+    // Sau commit, ngoài transaction — xem EinvoiceService
+    return { ...charge, invoice: await this.einvoice.issueQuietly(invoiceId, actor) }
   }
 
   // ========================================================== Tuổi nợ & gạch nợ
@@ -317,7 +439,6 @@ export class CorporateService {
     return {
       company: {
         ...company,
-        einvoiceModeEffective: company.einvoiceMode ?? defaults.einvoiceMode,
         blockAfterOverdueDaysEffective:
           company.blockAfterOverdueDays ?? defaults.blockAfterOverdueDays,
       },
@@ -463,11 +584,9 @@ export class CorporateService {
       'corporate.defaultCreditLimitVnd': 20_000_000,
       'corporate.blockAfterOverdueDays': 15,
     })
-    const mode = await this.params.get<string>('corporate.einvoiceMode')
     return {
       defaultCreditLimitVnd: nums['corporate.defaultCreditLimitVnd'],
       blockAfterOverdueDays: nums['corporate.blockAfterOverdueDays'],
-      einvoiceMode: mode === 'aggregate' ? 'aggregate' : 'per-bill',
     }
   }
 

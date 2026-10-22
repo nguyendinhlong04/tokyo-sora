@@ -1,8 +1,19 @@
-import { Inject, Injectable, type OnModuleInit } from '@nestjs/common'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common'
+import { and, eq, isNull } from 'drizzle-orm'
 import { DB } from './db.module'
 import type { Db } from '../db/client'
 import { parameterHistory, parameters } from '../db/schema'
+
+/**
+ * Cache của một instance sống tối đa chừng này rồi tự nạp lại.
+ *
+ * Trên Vercel có nhiều instance chạy song song, mỗi cái một cache. `set()` chỉ
+ * làm mới cache của instance nhận lệnh — instance khác vẫn đọc giá trị cũ cho
+ * tới khi tự nạp lại. Không có hạn thì một instance ấm có thể tính VAT theo thuế
+ * suất cũ, hay cấp hoá đơn theo ký hiệu cũ, hàng giờ sau khi kế toán đã đổi.
+ * 60 giây là độ lệch tối đa chấp nhận được, đổi lại một câu SELECT mỗi phút.
+ */
+const MAX_AGE_MS = 60_000
 
 /**
  * Trung tâm tham số A6 — engine đọc lúc chạy, sửa không cần triển khai lại.
@@ -14,7 +25,10 @@ import { parameterHistory, parameters } from '../db/schema'
 export class ParamsService implements OnModuleInit {
   /** key → (branchId | '*') → value */
   private cache = new Map<string, Map<string, unknown>>()
-  private loaded = false
+  /** 0 = chưa nạp lần nào */
+  private loadedAt = 0
+  private loading: Promise<void> | null = null
+  private readonly logger = new Logger(ParamsService.name)
 
   constructor(@Inject(DB) private readonly db: Db) {}
 
@@ -43,11 +57,34 @@ export class ParamsService implements OnModuleInit {
       next.set(row.key, scopes)
     }
     this.cache = next
-    this.loaded = true
+    this.loadedAt = Date.now()
   }
 
   private async ensureLoaded() {
-    if (!this.loaded) await this.reload()
+    if (this.loadedAt === 0) {
+      // Chưa có bản nào để trả — lần nạp đầu buộc phải chờ
+      await this.startReload()
+      return
+    }
+    if (Date.now() - this.loadedAt < MAX_AGE_MS) return
+    /**
+     * Hết hạn thì nạp lại NỀN, lượt đọc này dùng bản đang có. Lượt đọc hay nằm
+     * trong transaction (tính tiền, phát hành hoá đơn), mà trên Vercel pool chỉ có
+     * một kết nối và transaction đang giữ nó: chờ nạp ở đây là chờ chính mình, kẹt
+     * tới khi pg hết giờ (10 s) và request thành 500. Nạp nền thì xếp hàng tới lúc
+     * transaction trả kết nối; hỏng thì giữ bản cũ, lượt đọc sau thử lại.
+     */
+    this.startReload().catch((err: Error) => {
+      this.logger.warn(`Nạp lại tham số hỏng, dùng bản cũ: ${err.message}`)
+    })
+  }
+
+  /** Lượt nạp đang chạy — các lời gọi đến cùng lúc chờ chung, không SELECT trùng */
+  private startReload(): Promise<void> {
+    this.loading ??= this.reload().finally(() => {
+      this.loading = null
+    })
+    return this.loading
   }
 
   /** Giá trị của chi nhánh nếu có ghi đè, ngược lại lấy mặc định cấp chuỗi */
@@ -74,19 +111,6 @@ export class ParamsService implements OnModuleInit {
     for (const key of Object.keys(keys) as K[]) {
       out[key] = await this.getNumber(key, keys[key], branchId)
     }
-    return out
-  }
-
-  /** Mọi tham số áp dụng cho một chi nhánh — nguồn cho config bundle và màn A6 */
-  async allForBranch(branchId: string): Promise<Record<string, unknown>> {
-    const rows = await this.db
-      .select()
-      .from(parameters)
-      .where(or(isNull(parameters.branchId), eq(parameters.branchId, branchId)))
-    const out: Record<string, unknown> = {}
-    // Mặc định trước, ghi đè theo chi nhánh sau
-    for (const row of rows.filter((r) => r.branchId === null)) out[row.key] = row.value
-    for (const row of rows.filter((r) => r.branchId !== null)) out[row.key] = row.value
     return out
   }
 

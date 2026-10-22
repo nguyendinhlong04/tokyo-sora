@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { CrmModule } from '../crm/crm.module'
+import { EinvoiceModule } from '../einvoice/einvoice.module'
 import { IdentityModule } from '../identity/identity.module'
 import { AccountingController } from './accounting.controller'
 import { AccountingService } from './accounting.service'
@@ -15,7 +16,7 @@ import { AccountingService } from './accounting.service'
  * kế toán nên chiều phụ thuộc vẫn một hướng.
  */
 @Module({
-  imports: [IdentityModule, CrmModule],
+  imports: [IdentityModule, CrmModule, EinvoiceModule],
   controllers: [AccountingController],
   providers: [AccountingService],
   exports: [AccountingService],

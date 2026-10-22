@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  assertInvoiceSerial,
   firstOfMonth,
   lastOfMonth,
   monthsInRange,
-  nextInvoiceNo,
   reconcile,
   taxSummary,
   vatBuckets,
@@ -24,37 +22,6 @@ describe('lịch tháng', () => {
       '2026-12-01',
       '2027-01-01',
     ])
-  })
-})
-
-describe('ký hiệu hoá đơn điện tử', () => {
-  it('nhận ký hiệu 6 ký tự có chữ M', () => {
-    expect(assertInvoiceSerial('C26MAA')).toBe('C26MAA')
-    expect(assertInvoiceSerial('c26maa')).toBe('C26MAA')
-  })
-
-  it('thiếu chữ M bị chặn — đó là dấu của hoá đơn từ máy tính tiền', () => {
-    expect(() => assertInvoiceSerial('C26AAA')).toThrow(/chữ M/)
-  })
-
-  it('sai độ dài bị chặn', () => {
-    expect(() => assertInvoiceSerial('C26M')).toThrow()
-    expect(() => assertInvoiceSerial('C26MAAA')).toThrow()
-  })
-
-  it('ký tự lạ bị chặn', () => {
-    expect(() => assertInvoiceSerial('C26-MA')).toThrow()
-  })
-})
-
-describe('số hoá đơn', () => {
-  it('bắt đầu từ 1, đủ 8 chữ số', () => {
-    expect(nextInvoiceNo(null)).toBe('00000001')
-  })
-
-  it('tăng dần', () => {
-    expect(nextInvoiceNo('00000001')).toBe('00000002')
-    expect(nextInvoiceNo('00000999')).toBe('00001000')
   })
 })
 
@@ -92,6 +59,25 @@ describe('doanh thu theo thuế suất', () => {
 
   it('danh sách rỗng ra bảng rỗng', () => {
     expect(vatBuckets([])).toEqual([])
+  })
+
+  it('bill có món ăn 8% và bia 10% ra hai dòng, không ra một thuế suất pha', () => {
+    const buckets = vatBuckets([
+      {
+        netVnd: 684_000,
+        vatVnd: 58_140,
+        breakdown: [
+          { rateBp: 800, net: 513_000, vat: 41_040 },
+          { rateBp: 1000, net: 171_000, vat: 17_100 },
+        ],
+      },
+      // Đơn tính trước khi có nhóm thuế: suy thuế suất từ tổng như cũ
+      { netVnd: 500_000, vatVnd: 40_000, breakdown: [] },
+    ])
+    expect(buckets).toEqual([
+      { rate: 0.08, netVnd: 1_013_000, vatVnd: 81_040 },
+      { rate: 0.1, netVnd: 171_000, vatVnd: 17_100 },
+    ])
   })
 })
 

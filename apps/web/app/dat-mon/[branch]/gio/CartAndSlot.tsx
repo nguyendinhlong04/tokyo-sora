@@ -242,7 +242,16 @@ export function CartAndSlot({ branchId }: { branchId: string }) {
         {pricing.bill ? (
           <Row label={pricing.bill.name} value={-pricing.bill.discount} promo />
         ) : null}
-        {pricing.money.vat > 0 ? <Row label="Thuế VAT" value={pricing.money.vat} /> : null}
+        {/* Một dòng cho mỗi thuế suất — bia rượu 10%, món ăn 8% — đúng như hoá đơn sẽ in */}
+        {pricing.money.byRate
+          .filter((r) => r.vat > 0)
+          .map((r) => (
+            <Row
+              key={r.rateBp}
+              label={`Thuế VAT ${(r.rateBp / 100).toLocaleString('vi-VN')}%`}
+              value={r.vat}
+            />
+          ))}
         {draft.mode === 'delivery' ? <Row label="Phí giao" value={ship} /> : null}
         {pricing.money.round !== 0 ? <Row label="Làm tròn" value={pricing.money.round} /> : null}
         <div className="mt-2 flex items-baseline justify-between border-t border-accent/16 pt-4">

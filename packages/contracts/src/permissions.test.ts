@@ -50,7 +50,8 @@ const DOC_ROWS: [ActionKey, string][] = [
   ['report.margin-foodcost', '.....x.xx.x.x'],
   ['report.compare-branches', '........x.x.x'],
   ['accounting.ledger-close-period', '........x...x'],
-  ['einvoice.void-replace-adjust', '.......ax...x'],
+  ['einvoice.issue', '..x....xx...x'],
+  ['einvoice.void-replace-adjust', '..a....xx...x'],
   ['cms.edit', '.........x..x'],
   ['admin.manage-accounts-roles', '............x'],
   ['audit.view-log', '.......xx.x.x'],
@@ -110,20 +111,20 @@ const CRM_ROWS: [ActionKey, string, string][] = [
 const SYMBOL: Record<string, Permission> = { '.': 'deny', x: 'allow', a: 'approve' }
 
 describe('Ma trận khớp 1:1 với bảng §4.2 trong tài liệu', () => {
-  it('mã hoá đủ 31 hành động của §4.2 và 16 + 10 của §4.2b, cộng phần bổ sung', () => {
-    expect(DOC_ROWS).toHaveLength(31)
+  it('mã hoá đủ 32 hành động của §4.2 và 16 + 10 của §4.2b, cộng phần bổ sung', () => {
+    expect(DOC_ROWS).toHaveLength(32)
     expect(HR_ROWS).toHaveLength(16)
     expect(CRM_ROWS).toHaveLength(10)
 
     /**
-     * 57 dòng của tài liệu + `order.mark-served`.
+     * 58 dòng của tài liệu + `order.mark-served`.
      *
      * Tài liệu §4.2 KHÔNG có dòng nào cho việc mang món ra bàn — thiếu sót lộ ra
      * khi dựng nút "Đã mang ra": không có khoá quyền nào đúng, nên nó phải mượn
      * tạm khoá của bếp và hoá ra phục vụ lại không bấm được. Thêm dòng này vào
      * tài liệu khi có dịp; con số dưới đây là chỗ nhắc.
      */
-    expect(Object.keys(ACTIONS)).toHaveLength(58)
+    expect(Object.keys(ACTIONS)).toHaveLength(59)
   })
 
   it.each(DOC_ROWS)('%s khớp từng ô', (action, row) => {
@@ -350,9 +351,9 @@ describe('Duyệt △ — phân tách nhiệm vụ (PHẦN G)', () => {
 })
 
 describe('permissionMatrix — nguồn render màn A2', () => {
-  it('trả đủ 58 dòng (§4.2, §4.2b và phần bổ sung) × 14 vai trò', () => {
+  it('trả đủ 59 dòng (§4.2, §4.2b và phần bổ sung) × 14 vai trò', () => {
     const matrix = permissionMatrix()
-    expect(matrix).toHaveLength(58)
+    expect(matrix).toHaveLength(59)
     for (const row of matrix) {
       expect(Object.keys(row.byRole)).toHaveLength(ROLES.length)
     }

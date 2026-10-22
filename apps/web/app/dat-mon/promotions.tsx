@@ -7,12 +7,14 @@ import {
   nextBillHint,
   priceBill,
   priceNewLines,
+  rateToBp,
   type BillHint,
   type DishOffer,
   type NewPricingLine,
   type OrderTotals,
   type PromoClock,
   type PromoContext,
+  type VatCode,
 } from '@sora/contracts'
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { apiGet, type LivePromotions, type MenuPricing } from '../../lib/api'
@@ -32,6 +34,8 @@ export interface PricingDish {
   id: string
   categoryId: string | null
   price: number
+  /** Thẻ món O2 không cần; giỏ O4 · O6 cần để cộng VAT theo đúng thuế suất của món */
+  vatCode?: VatCode
 }
 
 export interface WebCartPricing {
@@ -140,11 +144,21 @@ export function PromotionsProvider({
         })
         const bill = priceBill(rules, ctx, clock, withDeals)
         const itemDiscount = withDeals.reduce((sum, l) => sum + l.discountVnd, 0)
+        const rateBp = {
+          standard: rateToBp(pricing.vatRate),
+          alcohol: rateToBp(pricing.vatRateAlcohol ?? pricing.vatRate),
+        }
 
+        // Đúng cách máy chủ tính (`recomputeTotals`): mỗi dòng mang phần giảm và thuế
+        // suất của nó — bill có bia thì thuế 10% tính riêng phần bia
         const money = computeOrderTotals({
-          lines: lines.map((l) => ({ qty: l.qty, unitPrice: l.price })),
-          discount: itemDiscount + (bill?.discountVnd ?? 0),
-          vatRate: pricing.vatRate,
+          lines: withDeals.map((l) => ({
+            qty: l.qty,
+            unitPrice: l.unitPrice,
+            discount: l.discountVnd,
+            billDiscount: bill?.shares[l.key] ?? 0,
+            vatRateBp: rateBp[dishById.get(l.dishId)?.vatCode ?? 'standard'],
+          })),
           ship,
           roundingUnit: pricing.roundingUnit,
         })

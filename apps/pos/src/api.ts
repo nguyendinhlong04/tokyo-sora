@@ -1,4 +1,12 @@
-import type { BillHint } from '@sora/contracts'
+import type {
+  BillHint,
+  InvoiceBuyer,
+  InvoiceStatus,
+  InvoiceView,
+  TaxCodeLookupView,
+  VatCode,
+  VatRateTotals,
+} from '@sora/contracts'
 import { apiFetch, enqueue } from '@sora/core'
 
 export interface StaffOption {
@@ -125,6 +133,10 @@ export interface OrderLineRow {
   setLabel: string | null
   portionLabel: string | null
   state: 'draft' | 'queued' | 'cooking' | 'ready' | 'served' | 'voided'
+  /** Giảm món đã trừ trong `priceTotal` (§9.6) */
+  discountVnd: number
+  vatCode: VatCode
+  modifiers: { name: string; priceDelta: number }[] | null
 }
 
 export interface SessionOrder {
@@ -133,8 +145,16 @@ export interface SessionOrder {
     displayCode: string
     status: string
     moneySub: number
+    moneyDiscount: number
+    moneyBillDiscount: number
+    moneyService: number
+    moneyVat: number
+    moneyRound: number
     moneyTotal: number
+    /** Một dòng cho mỗi thuế suất — món ăn 8%, bia rượu 10% */
+    vatBreakdown: VatRateTotals[]
     paymentState: string
+    invoiceBuyer: InvoiceBuyer | null
   }
   lines: OrderLineRow[]
   batches: { batchNo: number; state: 'held' | 'fired' }[]
@@ -160,6 +180,46 @@ export interface Bill {
   paid: number
   outstanding: number
   paymentState?: string
+  payments?: { id: number; kind: PaymentKind; amount: number; paidAt: string | null }[]
+  /** Phần công ty nợ (P10 "Ghi nợ công ty") — không phải tiền đã thu */
+  corporateCharge?: { company: string; amount: number } | null
+}
+
+export type PaymentKind = 'cash' | 'vietqr' | 'card' | 'cod'
+
+/** Khoản thu tại quầy xong: trả đủ thì có luôn hoá đơn (hoặc null khi chưa phát hành được) */
+export interface CollectResult {
+  paymentState: string
+  outstanding: number
+  change: number
+  invoice: InvoiceView | null
+}
+
+/** Ô tìm công ty ở P10 "Ghi nợ công ty" */
+export interface CorporatePick {
+  id: number
+  code: string
+  name: string
+  taxCode: string
+  /** null = hồ sơ thiếu địa chỉ — chi nhánh bật hoá đơn thì chưa ghi nợ được */
+  address: string | null
+  availableVnd: number
+  blockedReason: string | null
+}
+
+/** Mã chuyển khoản VietQR của một lượt thu tại bàn */
+export interface VietQrTicket {
+  id: number
+  amount: number
+  vaNumber: string
+  qrString: string
+  expiresAt: string
+}
+
+export interface Approval {
+  approverStaffId: number
+  approverPin: string
+  reason: string
 }
 
 export interface ModifierGroup {
@@ -379,6 +439,63 @@ export const api = {
     apiFetch<SessionOrder | null>(`/api/table-sessions/${sessionId}/order`),
 
   bill: (sessionId: number) => apiFetch<Bill>(`/api/table-sessions/${sessionId}/bill`),
+
+  // --- Hoá đơn điện tử (§9.7). KHÔNG qua hàng đợi offline: màn thu tiền bị chặn khi
+  // mất mạng, và người mua phải nằm trên đơn TRƯỚC lượt thu đủ tiền.
+
+  sessionInvoice: (sessionId: number) =>
+    apiFetch<InvoiceStatus>(`/api/table-sessions/${sessionId}/invoice`),
+
+  setInvoiceBuyer: (sessionId: number, buyer: InvoiceBuyer | null) =>
+    apiFetch<InvoiceStatus>(`/api/table-sessions/${sessionId}/invoice-buyer`, {
+      method: 'PUT',
+      body: { buyer },
+    }),
+
+  lookupTaxCode: (code: string) =>
+    apiFetch<TaxCodeLookupView>(`/api/tax-codes/${encodeURIComponent(code)}`),
+
+  issueInvoice: (orderId: number) =>
+    apiFetch<InvoiceView>(`/api/orders/${orderId}/invoice/issue`, { method: 'POST' }),
+
+  replaceInvoice: (
+    invoiceId: number,
+    body: { reason: string; buyer?: InvoiceBuyer | null; approval?: Approval | null },
+  ) =>
+    apiFetch<{ replaced: number; replacement: InvoiceView }>(
+      `/api/accounting/invoices/${invoiceId}/replace`,
+      { method: 'POST', body },
+    ),
+
+  /** Trạm thu ngân: hoá đơn chưa lên được — mỗi lượt hỏi đẩy vài tờ tới lượt */
+  invoiceQueue: (branchId: string) =>
+    apiFetch<{ counts: { pending: number; failed: number } }>(
+      `/api/accounting/invoices/pending?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  createVietQr: (sessionId: number, amount: number) =>
+    apiFetch<VietQrTicket>(`/api/table-sessions/${sessionId}/pay/vietqr`, {
+      method: 'POST',
+      body: { amount },
+    }),
+
+  paymentStatus: (paymentId: number) =>
+    apiFetch<{ id: number; state: string; amount: number }>(`/api/payments/${paymentId}/status`),
+
+  corporatePick: (q: string) =>
+    apiFetch<CorporatePick[]>(`/api/crm/corporate/pick?q=${encodeURIComponent(q)}`),
+
+  /** Ghi nợ cần biết ngay có phải xin duyệt không — không qua hàng đợi */
+  corporateCharge: (body: {
+    corporateId: number
+    orderId: number
+    signer: string | null
+    approval?: Approval | null
+  }) =>
+    apiFetch<{ amountVnd: number; invoice: InvoiceView | null }>('/api/crm/corporate/charges', {
+      method: 'POST',
+      body,
+    }),
 
   /**
    * P10 khuyến mãi & voucher. KHÔNG qua hàng đợi offline như các lệnh ghi khác:
@@ -691,11 +808,20 @@ export const api = {
     }),
 
   payCash: (sessionId: number, amount: number, tendered: number | null, tableCode: string) =>
-    enqueue<{ paymentState: string; outstanding: number; change: number }>({
+    enqueue<CollectResult>({
       method: 'POST',
       path: `/api/table-sessions/${sessionId}/pay/cash`,
       payload: { amount, tendered },
       label: `Thu tiền bàn ${tableCode}`,
+    }),
+
+  /** Bấm sau khi máy POS ngân hàng in phiếu chuẩn chi — tiền đã được duyệt */
+  payCard: (sessionId: number, amount: number, reference: string | null, tableCode: string) =>
+    enqueue<CollectResult>({
+      method: 'POST',
+      path: `/api/table-sessions/${sessionId}/pay/card`,
+      payload: { amount, reference },
+      label: `Thu thẻ bàn ${tableCode}`,
     }),
 
   /**

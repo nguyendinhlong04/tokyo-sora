@@ -1,10 +1,10 @@
 /**
- * Kế toán — phần tính toán của F2 · F3 · F4 · F6.
+ * Kế toán — phần tính toán của F2 · F4 · F6.
  *
- * Hàm thuần: kiểm ký hiệu hoá đơn, gộp doanh thu theo thuế suất, và quyết định
- * một tháng đã khoá sổ hay chưa. Ba việc nhỏ nhưng cả ba đều là chỗ sai thì phát
- * hiện muộn — sai ký hiệu thì hoá đơn bị cơ quan thuế từ chối, sai thuế suất thì
- * tờ khai sai, sai khoá sổ thì kỳ đã chốt bị sửa sau lưng.
+ * Hàm thuần: gộp doanh thu theo thuế suất, và quyết định một tháng đã khoá sổ hay
+ * chưa. Việc nhỏ nhưng là chỗ sai thì phát hiện muộn — sai thuế suất thì tờ khai
+ * sai, sai khoá sổ thì kỳ đã chốt bị sửa sau lưng. Ký hiệu và số hoá đơn nằm ở
+ * `einvoice/domain/serial.ts`.
  */
 
 /** Tháng dạng YYYY-MM-01 */
@@ -32,39 +32,6 @@ export function monthsInRange(from: string, to: string): string[] {
   return out
 }
 
-/**
- * Ký hiệu hoá đơn điện tử: 6 ký tự, chữ in hoa và số, BẮT BUỘC có chữ M.
- *
- * Chữ M là dấu của hoá đơn khởi tạo từ máy tính tiền (§30.2, NĐ 254/2026/NĐ-CP).
- * Kiểm ở đây để lỗi lộ ra lúc khai cấu hình, không phải lúc cơ quan thuế trả về.
- *
- * *Chi tiết pháp lý cần kế toán xác nhận lại* — bản dựng này chỉ cưỡng chế đúng
- * hai điều tài liệu nêu: sáu ký tự, và có chữ M.
- */
-const SERIAL_RE = /^[0-9A-Z]{6}$/
-
-export function assertInvoiceSerial(serial: string): string {
-  const value = serial.trim().toUpperCase()
-  if (!SERIAL_RE.test(value)) {
-    throw new RangeError(`Ký hiệu hoá đơn phải là 6 ký tự chữ in hoa hoặc số, nhận "${serial}"`)
-  }
-  if (!value.includes('M')) {
-    throw new RangeError(
-      `Ký hiệu "${value}" thiếu chữ M — hoá đơn khởi tạo từ máy tính tiền bắt buộc có ký tự này`,
-    )
-  }
-  return value
-}
-
-/** Số hoá đơn tiếp theo trong một ký hiệu: 8 chữ số, đếm từ 1 */
-export function nextInvoiceNo(lastNo: string | null): string {
-  const next = lastNo === null ? 1 : Number(lastNo) + 1
-  if (!Number.isSafeInteger(next) || next <= 0) {
-    throw new RangeError(`Số hoá đơn cuối không hợp lệ: ${lastNo}`)
-  }
-  return String(next).padStart(8, '0')
-}
-
 export interface VatBucket {
   /** Thuế suất dạng tỉ lệ: 0.08 = 8% */
   rate: number
@@ -76,22 +43,39 @@ export interface VatBucket {
 /**
  * Gộp doanh thu theo THUẾ SUẤT cho tờ khai.
  *
- * Suy thuế suất từ cặp (doanh thu, VAT) của từng đơn chứ không đọc `vatCode` của
- * món: một đơn có nhiều món khác thuế suất thì con số trên đơn mới là thứ đã thật
- * sự tính, còn mã thuế của món chỉ là thứ dùng để tính ra nó. Làm tròn về 4 chữ số
- * để 0,08000001 và 0,08 không thành hai dòng khác nhau trên tờ khai.
+ * Đơn tính từ khi có VAT theo nhóm thuế mang sẵn tiền từng thuế suất
+ * (`orders.vat_breakdown`): một bill có món ăn 8% và bia 10% ra đúng hai dòng.
+ * Suy thuế suất từ tổng của bill như trước thì ra một thuế suất "pha" kiểu 8,6% —
+ * không có dòng nào như vậy trên tờ khai.
+ *
+ * Đơn cũ hơn chỉ có tổng: suy thuế suất từ cặp (doanh thu, VAT) của đơn — hồi đó
+ * cả đơn một thuế suất nên phép suy là đúng. Làm tròn về 4 chữ số để 0,08000001
+ * và 0,08 không thành hai dòng khác nhau trên tờ khai.
  */
 export function vatBuckets(
-  orders: readonly { netVnd: number; vatVnd: number }[],
+  orders: readonly {
+    netVnd: number
+    vatVnd: number
+    /** `orders.vat_breakdown`; rỗng hoặc thiếu với đơn tính trước khi có nhóm thuế */
+    breakdown?: readonly { rateBp: number; net: number; vat: number }[]
+  }[],
 ): VatBucket[] {
   const byRate = new Map<number, VatBucket>()
+  const add = (rate: number, netVnd: number, vatVnd: number) => {
+    const bucket = byRate.get(rate) ?? { rate, netVnd: 0, vatVnd: 0 }
+    bucket.netVnd += netVnd
+    bucket.vatVnd += vatVnd
+    byRate.set(rate, bucket)
+  }
 
   for (const order of orders) {
-    const rate = order.netVnd === 0 ? 0 : Math.round((order.vatVnd / order.netVnd) * 10_000) / 10_000
-    const bucket = byRate.get(rate) ?? { rate, netVnd: 0, vatVnd: 0 }
-    bucket.netVnd += order.netVnd
-    bucket.vatVnd += order.vatVnd
-    byRate.set(rate, bucket)
+    if (order.breakdown && order.breakdown.length > 0) {
+      for (const part of order.breakdown) add(part.rateBp / 10_000, part.net, part.vat)
+      continue
+    }
+    const rate =
+      order.netVnd === 0 ? 0 : Math.round((order.vatVnd / order.netVnd) * 10_000) / 10_000
+    add(rate, order.netVnd, order.vatVnd)
   }
 
   return [...byRate.values()].sort((a, b) => a.rate - b.rate)

@@ -57,6 +57,8 @@ const PARAMETERS: {
   sensitive?: boolean
 }[] = [
   { key: 'sales.vatRate', value: 0, unit: 'tỉ lệ', sensitive: true },
+  /** Bia, rượu (`vat_code = 'alcohol'`) — chịu thuế TTĐB nên không được giảm như món ăn */
+  { key: 'sales.vatRateAlcohol', value: 0, unit: 'tỉ lệ', sensitive: true },
   { key: 'sales.serviceFeeRate', value: 0, unit: 'tỉ lệ', sensitive: true },
   { key: 'sales.roundingUnit', value: 1000, unit: 'đồng' },
   /**
@@ -171,7 +173,6 @@ const PARAMETERS: {
   // Công nợ khách doanh nghiệp (§29.1 nhóm "Công nợ DN")
   { key: 'corporate.defaultCreditLimitVnd', value: 20_000_000, unit: 'đồng', sensitive: true },
   { key: 'corporate.blockAfterOverdueDays', value: 15, unit: 'ngày', sensitive: true },
-  { key: 'corporate.einvoiceMode', value: 'per-bill', unit: 'per-bill | aggregate' },
 
   // Phản hồi khách (§25 B13) — từ mấy sao trở xuống thì một lượt đánh giá trở
   // thành khiếu nại phải có người xử lý. Ngưỡng nào cũng là một con số lưu động,
@@ -676,6 +677,8 @@ async function writeSeed(db: Tx, dir: string) {
       /** Huy hiệu 名物 trên W1/W2/W3 — cờ của bếp, không phải của người viết web */
       signature: d.isSignature,
       active: d.active,
+      /** Bia, rượu chịu VAT 10% không được giảm; trà và món ăn theo nhóm thường */
+      vatCode: d.group === 'bia' || d.group === 'ruou' ? 'alcohol' : 'standard',
     }
     await db.insert(s.dishes).values(row).onConflictDoUpdate({ target: s.dishes.id, set: row })
   }

@@ -5,11 +5,17 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
+  Req,
   UseInterceptors,
 } from '@nestjs/common'
+import { InvoiceBuyerSchema } from '@sora/contracts'
+import type { FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
+import { EinvoiceService } from '../einvoice/einvoice.service'
+import { TaxCodesService } from '../einvoice/tax-codes.service'
 import { Public } from '../identity/auth.guard'
 import type { Actor } from '../identity/actor'
 import { SplitPaymentService } from '../payments/split-payment.service'
@@ -34,11 +40,25 @@ const CreateBody = z.object({
     address: z.string().max(300).nullish(),
     ward: z.string().max(120).nullish(),
     note: z.string().max(300).nullish(),
+    /** O5 "Xuất hoá đơn công ty" — không bắt buộc */
+    invoiceBuyer: InvoiceBuyerSchema.nullish(),
   }),
   lines: z.array(LineBody).min(1).max(50),
   slotMode: z.enum(['asap', 'scheduled']),
   slotAt: z.string().nullish(),
 })
+
+/** null = "Bán cho người tiêu dùng" */
+const BuyerBody = z.object({ buyer: InvoiceBuyerSchema.nullable() })
+
+/** IP của khách: Vercel ghi đè `x-real-ip` / `x-forwarded-for`, không tự khai được */
+function clientIp(req: FastifyRequest): string {
+  const real = req.headers['x-real-ip']
+  if (typeof real === 'string' && real) return real
+  const forwarded = req.headers['x-forwarded-for']
+  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim()
+  return first || req.ip
+}
 
 /** Khách web: không tài khoản, không thiết bị — chỉ biết họ đang đặt ở chi nhánh nào */
 const guestOf = (branchId: string): Actor => ({ kind: 'guest', branchId })
@@ -56,6 +76,8 @@ export class OnlineController {
   constructor(
     private readonly online: OnlineService,
     private readonly payments: SplitPaymentService,
+    private readonly einvoice: EinvoiceService,
+    private readonly taxCodes: TaxCodesService,
   ) {}
 
   /** O1: chi nhánh đang bán online */
@@ -119,10 +141,33 @@ export class OnlineController {
     return this.payments.createOrderVietQr(order.id, guestOf(order.branchId))
   }
 
+  /**
+   * O5: khách gõ MST công ty là điền sẵn tên, địa chỉ. Công khai nên chỉ trả tên,
+   * địa chỉ, tình trạng; giới hạn theo IP. Sau proxy Vercel, IP lấy từ header của
+   * Vercel — sai thì nhiều khách chung một hạn mức, không ai đọc được gì thêm.
+   */
+  @Public()
+  @Get('tax-codes/:code')
+  lookupTaxCode(@Param('code') code: string, @Req() req: FastifyRequest) {
+    return this.taxCodes.lookup(code, { key: `ip:${clientIp(req)}`, staff: false })
+  }
+
   /** O7: theo dõi đơn bằng mã trả về lúc đặt */
   @Public()
   @Get('track/:token')
   track(@Param('token') token: string) {
     return this.online.track(token)
+  }
+
+  /**
+   * O7: khách bổ sung hay sửa thông tin xuất hoá đơn sau khi đặt — được tới lúc
+   * hoá đơn phát hành. Cũng mở bằng mã theo dõi, như lượt trả tiền.
+   */
+  @Public()
+  @Put('track/:token/invoice-buyer')
+  async setInvoiceBuyer(@Param('token') token: string, @Body() body: unknown) {
+    const { buyer } = BuyerBody.parse(body)
+    const order = await this.online.orderIdOfTrackToken(token)
+    return this.einvoice.setBuyerForOrder(order.id, buyer, guestOf(order.branchId))
   }
 }

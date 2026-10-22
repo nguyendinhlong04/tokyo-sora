@@ -15,6 +15,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
+import type { InvoiceBuyer, VatRateTotals } from '@sora/contracts'
 import { dishes } from './catalog'
 import { branches, staff } from './identity'
 import { tableSessions } from './floorplan'
@@ -67,6 +68,18 @@ export const orders = pgTable(
     /** Mã voucher gắn vào đơn — mở khoá chương trình cần mã (B11) */
     voucherCodeId: bigint('voucher_code_id', { mode: 'number' }),
     pricingBundleVersion: text('pricing_bundle_version'),
+    /**
+     * Tiền theo từng thuế suất (`OrderTotals.byRate`), ghi mỗi lần tính lại đơn.
+     * Hoá đơn GTGT ghi thuế theo từng thuế suất (NĐ 254/2026) — hoá đơn lấy đúng
+     * con số bill đã tính, không tự tính lại ra một số khác.
+     */
+    vatBreakdown: jsonb('vat_breakdown').$type<VatRateTotals[]>().notNull().default([]),
+    /**
+     * Người mua khách yêu cầu ghi trên hoá đơn (`InvoiceBuyer`); NULL = "Bán cho
+     * người tiêu dùng". POS, iPad bàn, web cùng ghi vào đây TRƯỚC khi hoá đơn phát
+     * hành — lúc phát hành nó được đóng băng vào `invoices`.
+     */
+    invoiceBuyer: jsonb('invoice_buyer').$type<InvoiceBuyer>(),
 
     paymentState: text('payment_state').notNull().default('unpaid'),
     cancelReason: text('cancel_reason'),
@@ -119,6 +132,13 @@ export const orders = pgTable(
       'orders_bill_discount_check',
       sql`${t.moneyBillDiscount} >= 0 AND ${t.moneyBillDiscount} <= ${t.moneyDiscount}
           AND (${t.billPromotionId} IS NULL) = (${t.moneyBillDiscount} = 0)`,
+    ),
+    // Chốt nông: zod (`InvoiceBuyerSchema`) mới là chỗ kiểm thật, CSDL chỉ chặn rác
+    check(
+      'orders_invoice_buyer_check',
+      sql`${t.invoiceBuyer} IS NULL OR (jsonb_typeof(${t.invoiceBuyer}) = 'object'
+          AND ${t.invoiceBuyer}->>'kind' IN ('company','person')
+          AND coalesce(${t.invoiceBuyer}->>'name', '') <> '')`,
     ),
     // Bảng điều phối O8: chỉ quét đơn đang sống
     index('orders_dispatch_idx')
@@ -206,6 +226,8 @@ export const orderLines = pgTable(
     promoQty: integer('promo_qty').notNull().default(0),
     /** [{optionId, name, priceDelta}] đóng băng lúc tạo */
     modifiers: jsonb('modifiers'),
+    /** Nhóm thuế suất của món, đóng băng lúc gọi như giá (`VAT_CODES`) */
+    vatCode: text('vat_code').notNull().default('standard'),
 
     note: text('note'),
     /** Nhãn set để bếp biết các món ra cùng lúc */
@@ -223,6 +245,7 @@ export const orderLines = pgTable(
   },
   (t) => [
     check('order_lines_kind_check', sql`${t.kind} IN ('dish','set_parent')`),
+    check('order_lines_vat_code_check', sql`${t.vatCode} IN ('standard','alcohol')`),
     check(
       'order_lines_state_check',
       sql`${t.state} IN ('draft','queued','cooking','ready','served','voided')`,

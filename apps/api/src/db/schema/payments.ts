@@ -43,6 +43,8 @@ export const payments = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     /** Mã giao dịch ngân hàng — UNIQUE chính là chốt chặn webhook lặp */
     bankRef: text('bank_ref').unique(),
+    /** Số phiếu / mã chuẩn chi của máy POS ngân hàng khi khách quẹt thẻ — để đối soát */
+    reference: text('reference'),
     paidAt: timestamp('paid_at', { withTimezone: true }),
 
     createdByKind: text('created_by_kind').notNull(),

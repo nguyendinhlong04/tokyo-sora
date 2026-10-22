@@ -1,23 +1,27 @@
-import { Button, Money } from '@sora/ui'
+import { buyerLabelOf, invoiceNumberLabel, type InvoiceStatus } from '@sora/contracts'
+import { Button, Money, QrCode } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { api } from '../api'
+import { useInvoiceStatus } from '../components/InvoiceBuyer'
 import { PayHeader } from '../components/PayHeader'
 import { RatingCard } from '../components/RatingCard'
 import { useMenu } from '../menu'
 import { clock } from '../order-status'
 import { moneyOf, usePromos } from '../promotions'
 import { useTableSession } from '../table-context'
+import { VatRows } from './IpadOrders'
 import { Frame } from './IpadPay'
+import { useIpadCall } from './IpadShell'
 
 /**
- * T15 Hoá đơn trên iPad — phiếu giấy kraft bên trái, lời cảm ơn và chấm sao
- * bên phải.
+ * T15 Hoá đơn trên iPad — phiếu giấy kraft bên trái, trạng thái hoá đơn điện tử,
+ * lời cảm ơn và chấm sao bên phải.
  *
- * KHÔNG in số hoá đơn điện tử, mã tra cứu hay điểm tích luỹ:
- * HĐĐT phải do nhà cung cấp cấp mã mới tra được trên hệ thống thuế, còn điểm cần
- * danh tính khách mà máy ở bàn không có. In ra một mã không tra được gì thì tệ
- * hơn là không in.
+ * Ký hiệu, số và QR tra cứu chỉ hiện khi hoá đơn ĐÃ phát hành — mã do nhà cung
+ * cấp trả về, tra được trên hệ thống thuế (§9.7). Chưa phát hành thì không in một
+ * mã chưa tồn tại. Điểm tích luỹ vẫn không có: cần danh tính khách mà máy ở bàn
+ * không có.
  *
  * Món được khuyến mãi in GIÁ GỐC rồi một dòng giảm ngay dưới, như hoá đơn có
  * chiết khấu (§9.6): khách đối được từng món với thực đơn, và cộng tay vẫn ra tổng.
@@ -27,6 +31,7 @@ export function IpadInvoice() {
   const navigate = useNavigate()
   const menu = useMenu(session.branchId)
   const promos = usePromos()
+  const status = useInvoiceStatus()
 
   const order = useQuery({
     queryKey: ['order', session.id],
@@ -43,6 +48,9 @@ export function IpadInvoice() {
     (l) => l.parentLineId === null && l.state !== 'voided',
   )
   const settled = bill.data ? bill.data.outstanding === 0 && bill.data.total > 0 : false
+  const invoice = status.data?.invoice ?? null
+  const issued = invoice?.state === 'issued' && invoice.document ? invoice : null
+  const buyer = issued?.document?.buyer ?? status.data?.buyer ?? null
 
   return (
     <Frame
@@ -74,6 +82,11 @@ export function IpadInvoice() {
               {[menu.branch.name, menu.branch.address].filter(Boolean).join(' · ')}
             </p>
           ) : null}
+          {issued?.document ? (
+            <p className="mt-0.5 font-mono text-[length:var(--fs-c1)] text-kraft-ink-2">
+              MST {issued.document.seller.taxCode}
+            </p>
+          ) : null}
           <div className="my-3.5 border-t border-dashed border-kraft-ink/35" />
           <p className="text-[length:var(--fs-c1)] font-semibold tracking-[0.12em] uppercase">
             {settled ? 'Hoá đơn' : 'Tạm tính'}
@@ -81,6 +94,12 @@ export function IpadInvoice() {
           {money ? (
             <p className="mt-0.5 font-mono text-[length:var(--fs-c1)] text-kraft-ink-2">
               {money.displayCode} · Bàn {session.table.code} · {session.guestCount} khách
+            </p>
+          ) : null}
+          {status.data?.enabled ? (
+            <p className="mt-1 text-[length:var(--fs-c1)] text-kraft-ink-2">
+              Người mua: {buyerLabelOf(buyer)}
+              {buyer?.taxCode ? ` · MST ${buyer.taxCode}` : ''}
             </p>
           ) : null}
           <div className="mt-3.5 mb-2 border-t border-dashed border-kraft-ink/35" />
@@ -112,9 +131,7 @@ export function IpadInvoice() {
           {money && money.moneyService > 0 ? (
             <ReceiptRow label="Phí phục vụ" amount={money.moneyService} />
           ) : null}
-          {money && money.moneyVat > 0 ? (
-            <ReceiptRow label="Thuế VAT" amount={money.moneyVat} />
-          ) : null}
+          {money ? <VatRows money={money} Row={ReceiptRow} /> : null}
           {money && money.moneyRound !== 0 ? (
             <ReceiptRow label="Làm tròn" amount={money.moneyRound} />
           ) : null}
@@ -143,12 +160,32 @@ export function IpadInvoice() {
               ))}
             </div>
           ) : null}
+          {issued?.lookupUrl ? (
+            <div className="mt-4 flex items-center gap-3.5 border-t border-dashed border-kraft-ink/35 pt-4">
+              <QrCode value={issued.lookupUrl} size={96} label="Mã QR tra cứu hoá đơn điện tử" />
+              <p className="min-w-0 text-[length:var(--fs-c1)] leading-normal">
+                Hoá đơn điện tử
+                <span className="block font-mono">{invoiceNumberLabel(issued)}</span>
+                {issued.lookupCode ? (
+                  <span className="block font-mono text-kraft-ink-2">
+                    Mã tra cứu {issued.lookupCode}
+                  </span>
+                ) : null}
+                <span className="block text-kraft-ink-2">
+                  {issued.test
+                    ? 'Hoá đơn thử — không có giá trị'
+                    : 'Quét để tra cứu trên hệ thống thuế'}
+                </span>
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-width:none]">
           <h2 className="font-display text-[length:var(--fs-d3)] leading-[1.15] font-light text-ink-hi">
             Cảm ơn bạn đã đến Tokyo Sora.
           </h2>
+          {settled && status.data?.enabled ? <InvoiceCard status={status.data} /> : null}
           <RatingCard sessionId={session.id} />
           <div className="min-h-4 flex-1" />
           <Button size="lg" block onClick={() => void navigate(settled ? '/' : '/don')}>
@@ -157,6 +194,52 @@ export function IpadInvoice() {
         </div>
       </div>
     </Frame>
+  )
+}
+
+/**
+ * Trạng thái hoá đơn điện tử của bàn. Không bao giờ dùng màu đỏ: hoá đơn chưa lên
+ * được là việc của quầy, khách đã trả xong và không phải chờ.
+ */
+function InvoiceCard({ status }: { status: InvoiceStatus }) {
+  const call = useIpadCall()
+  const invoice = status.invoice
+  const label = invoice ? invoiceNumberLabel(invoice) : ''
+
+  return (
+    <div className="mt-4 rounded-md border border-line-1 bg-surface-3 px-4 py-3.5">
+      <p className="text-[length:var(--fs-c1)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+        Hoá đơn điện tử
+      </p>
+      {invoice?.state === 'issued' ? (
+        <>
+          <p className="mt-1 text-[length:var(--fs-b2)] text-ink-hi">
+            Đã phát hành · <span className="font-mono">{label}</span>
+          </p>
+          {status.buyer?.email ? (
+            <p className="mt-0.5 text-[length:var(--fs-c1)] text-ink-mute">
+              Bản hoá đơn gửi về {status.buyer.email}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            disabled={call.calling}
+            onClick={() => call.call('khac', `Sửa hoá đơn ${label}`)}
+            className="mt-1 -ml-1 h-11 px-1 text-left text-[length:var(--fs-b2)] text-ink-body underline decoration-line-3 underline-offset-4"
+          >
+            Thông tin hoá đơn sai? Gọi thu ngân sửa
+          </button>
+        </>
+      ) : invoice?.state === 'failed' ? (
+        <p className="mt-1 text-[length:var(--fs-b2)] leading-normal text-ink-body">
+          Thu ngân sẽ gửi lại hoá đơn trong hôm nay — bạn không cần chờ.
+        </p>
+      ) : (
+        <p className="mt-1 text-[length:var(--fs-b2)] text-ink-body">
+          Đang phát hành hoá đơn điện tử…
+        </p>
+      )}
+    </div>
   )
 }
 

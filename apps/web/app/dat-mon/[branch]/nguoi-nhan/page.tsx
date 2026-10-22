@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { apiGet, type OnlineMenu } from '../../../../lib/api'
 import { RecipientForm } from './RecipientForm'
 
 export const metadata: Metadata = {
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 
 export default async function RecipientPage({ params }: { params: Promise<{ branch: string }> }) {
   const { branch } = await params
-  return <RecipientForm branchId={branch} />
+  // Cùng địa chỉ khung chi nhánh đã gọi — Next gộp thành một lượt trong lần dựng
+  const menu = await apiGet<OnlineMenu>(
+    `/api/online/menu?branch=${encodeURIComponent(branch)}`,
+  ).catch(() => null)
+  return <RecipientForm branchId={branch} einvoiceEnabled={menu?.einvoiceEnabled ?? false} />
 }

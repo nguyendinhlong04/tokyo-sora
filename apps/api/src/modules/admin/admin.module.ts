@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { EinvoiceModule } from '../einvoice/einvoice.module'
 import { IdentityModule } from '../identity/identity.module'
 import { InventoryModule } from '../inventory/inventory.module'
 import { AccessAdminController } from './access-admin.controller'
@@ -21,8 +22,9 @@ import { SiteAdminController } from './site-admin.controller'
 import { SiteAdminService } from './site-admin.service'
 
 @Module({
-  // M1 đọc giá vốn từ kho để hiện food cost ngay trên danh sách món
-  imports: [IdentityModule, InventoryModule],
+  // M1 đọc giá vốn từ kho để hiện food cost ngay trên danh sách món; A9 hỏi máy
+  // chủ đang chạy nhà cung cấp hoá đơn nào
+  imports: [IdentityModule, InventoryModule, EinvoiceModule],
   controllers: [
     AdminController,
     AccessAdminController,

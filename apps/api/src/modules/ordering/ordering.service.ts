@@ -47,6 +47,7 @@ import { explodeSet, SetSelectionError, type SetSelection } from '../kitchen/dom
 import type { ServiceContext } from '../kitchen/domain/routing'
 import { syncSetParents } from './set-parent'
 import { clockOf, contextOf, heldFor, pricedLinesOf, ruleOf, rulesOn } from './promo-pricing'
+import { vatRatesOf } from './vat-rates'
 import {
   buildTickets,
   type OrderChannel,
@@ -81,6 +82,22 @@ function rerouteMessage(lines: number, fromGrill: boolean): string {
   return fromGrill
     ? `${lines} món đang ở bàn có bếp than sẽ chuyển sang bếp nướng hộ (lâu thêm khoảng 8 phút). Tiếp tục?`
     : `${lines} món đang bếp nướng hộ sẽ chuyển sang bàn có bếp than — khách tự nướng. Tiếp tục?`
+}
+
+/**
+ * Đơn đã trả đủ thì món và tiền của nó đứng yên.
+ *
+ * Thêm món vào bill đã trả đủ thì đơn vẫn "đã trả" mà tiền thì thiếu — đóng bàn
+ * là mất khoản đó; huỷ món thì quán đang giữ tiền thừa của khách. Hoá đơn điện tử
+ * lập lúc trả đủ cũng không còn khớp với bill.
+ */
+function assertNotPaid(order: { paymentState: string }) {
+  if (order.paymentState === 'paid') {
+    throw new ConflictException({
+      code: 'order_paid',
+      message: 'Đơn đã thanh toán đủ — không thêm hay huỷ món được nữa',
+    })
+  }
 }
 
 export interface AddLineInput {
@@ -145,6 +162,9 @@ export class OrderingService {
     return this.db.transaction(async (tx) => {
       const session = await this.liveSession(tx, sessionId)
       const order = await this.ensureOrder(tx, session, actor)
+      // Khoá đơn: lượt thu tiền đang chạy song song phải xong trước, rồi mới biết đơn đã trả đủ chưa
+      const [locked] = await tx.select().from(orders).where(eq(orders.id, order.id)).for('update')
+      assertNotPaid(locked!)
 
       const events: DomainEvent[] = []
       await this.appendLines(tx, { order, branchId: session.branchId, inputs, actor })
@@ -317,6 +337,8 @@ export class OrderingService {
           priceTotal: unitPrice * input.qty,
           modifiers: modifiers.length ? modifiers : null,
           note: input.note ?? null,
+          // Cả set theo nhóm thuế của set — giá của set nằm ở dòng này
+          vatCode: dish.vatCode,
           state: 'draft',
         })
         .returning({ id: orderLines.id })
@@ -384,6 +406,7 @@ export class OrderingService {
           note: child.note,
           setLabel: child.setLabel,
           portionLabel: child.portionLabel,
+          vatCode: childDish.vatCode,
           state: 'draft',
         })
       }
@@ -404,6 +427,8 @@ export class OrderingService {
         priceTotal: unitPrice * input.qty,
         modifiers: modifiers.length ? modifiers : null,
         note: input.note ?? null,
+        // Đóng băng như giá: Office đổi nhóm thuế của món không làm đổi đơn đã gọi
+        vatCode: dish.vatCode,
         state: 'draft',
       })
       .returning({ id: orderLines.id })
@@ -798,7 +823,12 @@ export class OrderingService {
         throw new ConflictException('Món đã phục vụ — dùng luồng hoàn tiền, không huỷ')
       }
 
-      const [order] = await tx.select().from(orders).where(eq(orders.id, line.orderId))
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, line.orderId))
+        .for('update')
+      assertNotPaid(order!)
       const alreadySent = line.state !== 'draft'
 
       const { approvalId } = alreadySent
@@ -1097,6 +1127,16 @@ export class OrderingService {
               actor,
             })
           : null
+
+      // Người mua khai ở bàn nguồn đi theo món sang bàn đích — trừ khi bàn đích đã khai riêng
+      if (sourceOrder?.invoiceBuyer) {
+        await tx
+          .update(orders)
+          .set({ invoiceBuyer: sourceOrder.invoiceBuyer })
+          .where(
+            and(eq(orders.tableSessionId, targetSessionId), sql`${orders.invoiceBuyer} IS NULL`),
+          )
+      }
 
       const now = new Date()
       await tx
@@ -1667,9 +1707,21 @@ export class OrderingService {
       lines,
     )
     const lineDiscount = lines.reduce((sum, l) => sum + l.discountVnd, 0)
+    const rates = await vatRatesOf(this.params, branchId)
 
     const money = computeOrderTotals({
-      lines: lines.map<OrderLineInput>((l) => ({ qty: l.qty, unitPrice: l.unitPrice })),
+      /**
+       * Mỗi dòng mang phần giảm của nó và thuế suất của nhóm thuế đã đóng băng: hoá
+       * đơn GTGT ghi thuế theo từng thuế suất, nên phần giảm hoá đơn phải biết rơi
+       * vào món ăn bao nhiêu, bia rượu bao nhiêu (`priceBill().shares`).
+       */
+      lines: lines.map<OrderLineInput>((l) => ({
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        discount: l.discountVnd,
+        billDiscount: bill?.shares[l.key] ?? 0,
+        vatRateBp: rates[l.vatCode],
+      })),
       // Tiền món giữ GIÁ NIÊM YẾT, mọi phần giảm (món + hoá đơn) nằm ở `money_discount`:
       // báo cáo và hoá đơn cần thấy cả doanh thu gộp lẫn chiết khấu
       discount: lineDiscount + (bill?.discountVnd ?? 0),
@@ -1677,7 +1729,6 @@ export class OrderingService {
         order.type === 'dinein'
           ? await this.params.getNumber('sales.serviceFeeRate', 0, branchId)
           : 0,
-      vatRate: await this.params.getNumber('sales.vatRate', 0, branchId),
       ship: order.moneyShip,
       roundingUnit: await this.params.getNumber('sales.roundingUnit', 1000, branchId),
     })
@@ -1691,6 +1742,7 @@ export class OrderingService {
         moneyVat: money.vat,
         moneyRound: money.round,
         moneyTotal: money.total,
+        vatBreakdown: money.byRate,
         billPromotionId: bill?.promotionId ?? null,
         moneyBillDiscount: bill?.discountVnd ?? 0,
         version: sql`${orders.version} + 1`,
