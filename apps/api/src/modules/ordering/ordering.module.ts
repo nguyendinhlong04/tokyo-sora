@@ -5,13 +5,13 @@ import { FloorplanService } from './floorplan.service'
 import { OrderingController } from './ordering.controller'
 import { OrderingService } from './ordering.service'
 import { QuickKeysService } from './quick-keys.service'
-import { TableDeviceController } from './table-device.controller'
-import { TableDeviceService } from './table-device.service'
 import { TableRequestService } from './table-request.service'
 import { TableSessionController } from './table-session.controller'
+import { TableTerminalController } from './table-terminal.controller'
+import { TableTerminalService } from './table-terminal.service'
 
 @Module({
-  controllers: [OrderingController, TableSessionController, TableDeviceController],
+  controllers: [OrderingController, TableSessionController, TableTerminalController],
   providers: [
     OrderingService,
     FloorplanService,
@@ -19,7 +19,7 @@ import { TableSessionController } from './table-session.controller'
     TableRequestService,
     FeedbackService,
     QuickKeysService,
-    TableDeviceService,
+    TableTerminalService,
   ],
   exports: [
     OrderingService,
@@ -27,7 +27,6 @@ import { TableSessionController } from './table-session.controller'
     CatalogService,
     TableRequestService,
     FeedbackService,
-    TableDeviceService,
   ],
 })
 export class OrderingModule {}

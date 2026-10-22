@@ -64,6 +64,11 @@ function claimsFor(actor: Actor): RealtimeClaims {
         sora_session: null,
       }
     case 'device':
+      // iPad của bàn chưa mở chưa có phiên nào để nghe — mà claim thiết bị thì RLS
+      // mở cho cả kênh đơn và sơ đồ bàn của chi nhánh
+      if (actor.deviceKind === 'table') {
+        throw new ServiceUnavailableException('iPad của bàn chưa mở không nghe kênh nào')
+      }
       return {
         role: 'authenticated',
         sub: `device:${actor.deviceId}`,

@@ -6,10 +6,17 @@ import { api, type PaymentTicket } from '../api'
 import { PayHeader } from '../components/PayHeader'
 import { IconCheck, IconLock, IconMinus, IconOffline, IconPlus, IconQr } from '../icons'
 import { myPayments, rememberPayment } from '../my-payments'
+import { useOutbox } from '../outbox'
 import { useTableSession } from '../table-context'
 import { useIpadCall } from './IpadShell'
-import { useOutbox } from './Shell'
-import { MODES, type Mode } from './Split'
+
+type Mode = 'all' | 'even' | 'pick'
+
+const MODES: { mode: Mode; name: string; hint: string }[] = [
+  { mode: 'all', name: 'Trả hết', hint: 'Một người trả trọn số còn lại của bàn.' },
+  { mode: 'even', name: 'Chia đều', hint: 'Chia số còn lại thành các phần bằng nhau.' },
+  { mode: 'pick', name: 'Chọn món mình trả', hint: 'Chỉ trả những món bạn ăn.' },
+]
 
 /**
  * T11 Chọn cách trả · T12 Chọn món mình trả — trên iPad.

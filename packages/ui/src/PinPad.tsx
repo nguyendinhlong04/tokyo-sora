@@ -5,6 +5,11 @@ interface PinPadProps {
   onComplete: (pin: string) => void
   disabled?: boolean
   error?: string | null
+  /**
+   * Hiện số đã nhập thay cho chấm. Chỉ cho mã ghép thiết bị — mã quản lý đọc to
+   * cho người lắp máy, sống 10 phút, dùng một lần — không bao giờ cho PIN.
+   */
+  reveal?: boolean
 }
 
 /**
@@ -13,7 +18,13 @@ interface PinPadProps {
  * Phím to hơn hẳn nút thường: nhân viên bấm vội, tay có thể ướt hoặc dính dầu.
  * Không hiện số đã nhập — chỉ hiện chấm, vì màn POS quay ra phía khách.
  */
-export function PinPad({ length = 4, onComplete, disabled = false, error }: PinPadProps) {
+export function PinPad({
+  length = 4,
+  onComplete,
+  disabled = false,
+  error,
+  reveal = false,
+}: PinPadProps) {
   const [pin, setPin] = useState('')
 
   const press = (digit: string) => {
@@ -32,16 +43,25 @@ export function PinPad({ length = 4, onComplete, disabled = false, error }: PinP
   return (
     <div className="flex flex-col items-center gap-6">
       <div className="flex gap-3" aria-label={`Đã nhập ${pin.length} trên ${length} số`}>
-        {Array.from({ length }, (_, i) => (
-          <span
-            key={i}
-            className={[
-              'h-4 w-4 rounded-pill border transition-colors',
-              i < pin.length ? 'border-accent bg-accent' : 'border-line-3',
-            ].join(' ')}
-            style={{ transitionDuration: 'var(--dur-micro)' }}
-          />
-        ))}
+        {Array.from({ length }, (_, i) =>
+          reveal ? (
+            <span
+              key={i}
+              className="flex h-14 w-11 items-center justify-center rounded-md border border-line-3 bg-surface-3 font-mono text-[length:var(--fs-t1)] text-ink-hi"
+            >
+              {pin[i] ?? ''}
+            </span>
+          ) : (
+            <span
+              key={i}
+              className={[
+                'h-4 w-4 rounded-pill border transition-colors',
+                i < pin.length ? 'border-accent bg-accent' : 'border-line-3',
+              ].join(' ')}
+              style={{ transitionDuration: 'var(--dur-micro)' }}
+            />
+          ),
+        )}
       </div>
 
       {error ? (

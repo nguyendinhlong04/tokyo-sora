@@ -1,6 +1,6 @@
 /**
  * Kịch bản end-to-end: đi hết vòng đời một món trên CSDL THẬT, qua đúng các
- * đường HTTP mà điện thoại khách và màn bếp gọi.
+ * đường HTTP mà iPad tại bàn và màn bếp gọi.
  *
  *     LIVE_SCENARIO=1 pnpm --filter @sora/api test src/vong-doi-mon.test.ts
  *
@@ -8,9 +8,12 @@
  * thật — để nó chạy lẫn trong `pnpm test` là có ngày ai đó thả một đơn ma vào
  * giữa giờ cao điểm. Phải khai biến môi trường mới chạy.
  *
- * Kịch bản: khách quét mã → gọi món → gửi bếp → bếp làm → bếp xong → người chạy
- * bấm "Đã mang ra". Sau MỖI bước đều hỏi lại đúng đường mà điện thoại khách gọi,
+ * Kịch bản: iPad của bàn thấy bàn vừa mở → gọi món → gửi bếp → bếp làm → bếp xong
+ * → người chạy bấm "Đã mang ra". Sau MỖI bước đều hỏi lại đúng đường mà iPad gọi,
  * để xem khách nhìn thấy gì.
+ *
+ * Bàn đã có iPad thật thì kịch bản dừng ngay (mỗi bàn một iPad đang chạy) — chọn
+ * bàn khác bằng `LIVE_TABLE=<mã bàn>`.
  *
  * Cố ý gọi cả Sukiyaki — món đa trạm, nồi một trạm khay thịt một trạm. Đây là ca
  * dễ sai nhất: xong một nửa mà báo khách "sắp ra" là khách chờ hụt.
@@ -27,17 +30,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from './bootstrap'
 
 const BRANCH = 'cg'
-const TABLE = '05'
-
-/** Địa chỉ mạng quán đọc từ tham số A6 — đừng viết cứng, quán đổi đường truyền là hỏng */
-let trongQuan = ''
+const TABLE = process.env.LIVE_TABLE ?? '05'
 
 let app: NestFastifyApplication
 let pool: Pool
 let sessionId = 0
 let orderId = 0
 let kdsToken = ''
-let khach: Record<string, string> = {}
+/** Token của iPad thử gắn bàn — gửi qua `x-sora-device` y như iPad thật */
+let ipadToken = ''
 
 const server = () => app.getHttpAdapter().getInstance()
 
@@ -46,7 +47,7 @@ async function khachThay(): Promise<Record<string, string>> {
   const res = await server().inject({
     method: 'GET',
     url: `/api/table-sessions/${sessionId}/order`,
-    cookies: khach,
+    headers: { 'x-sora-device': ipadToken },
   })
   const body = res.json<{ lines: { nameSnapshot: string; state: string }[] }>()
   return Object.fromEntries(body.lines.map((l) => [l.nameSnapshot, l.state]))
@@ -67,18 +68,6 @@ async function moBanVaGhepBep() {
   await app.init()
   await server().ready()
 
-  const { rows: mang } = await pool.query<{ value: string }>(
-    `SELECT value #>> '{}' AS value FROM parameters
-      WHERE key = 'table.branchNetworks' AND branch_id = $1`,
-    [BRANCH],
-  )
-  trongQuan = (mang[0]?.value ?? '').split(',')[0]?.trim() ?? ''
-  if (!trongQuan) {
-    throw new Error(
-      `Chi nhánh ${BRANCH} chưa khai table.branchNetworks ở màn A6 — kịch bản cần nó để giả lập máy đang ở trong quán`,
-    )
-  }
-
   const { rows } = await pool.query(
     `INSERT INTO table_sessions (branch_id, table_id, guest_count, business_date)
        SELECT $1, id, 2, current_date FROM tables WHERE branch_id = $1 AND code = $2
@@ -94,9 +83,15 @@ async function moBanVaGhepBep() {
     `INSERT INTO devices (branch_id, kind, name, token_hash) VALUES ($1,'kds','Màn bếp thử',$2)`,
     [BRANCH, createHash('sha256').update(kdsToken).digest('hex')],
   )
-  console.log(
-    `\nĐã mở bàn ${TABLE} (lượt ăn #${sessionId}), ghép một màn bếp, coi ${trongQuan} là trong quán\n`,
+
+  // iPad thử gắn đúng bàn này — bàn đã có iPad thật thì CSDL từ chối (mỗi bàn một iPad)
+  ipadToken = randomBytes(32).toString('base64url')
+  await pool.query(
+    `INSERT INTO devices (branch_id, kind, name, table_id, token_hash)
+       SELECT $1, 'table', 'iPad thử', id, $3 FROM tables WHERE branch_id = $1 AND code = $2`,
+    [BRANCH, TABLE, createHash('sha256').update(ipadToken).digest('hex')],
   )
+  console.log(`\nĐã mở bàn ${TABLE} (lượt ăn #${sessionId}), ghép một màn bếp và một iPad thử\n`)
 }
 
 async function donDep() {
@@ -108,13 +103,14 @@ async function donDep() {
     await pool.query(`DELETE FROM tickets WHERE order_id = $1`, [orderId])
     await pool.query(`DELETE FROM order_lines WHERE order_id = $1`, [orderId])
     await pool.query(`DELETE FROM order_batches WHERE order_id = $1`, [orderId])
-    await pool.query(`DELETE FROM table_devices WHERE table_session_id = $1`, [sessionId])
     await pool.query(`DELETE FROM orders WHERE id = $1`, [orderId])
     await pool.query(`UPDATE table_sessions SET status='closed', closed_at=now() WHERE id = $1`, [
       sessionId,
     ])
-    await pool.query(`UPDATE devices SET revoked_at = now() WHERE name = 'Màn bếp thử'`)
-    console.log('\nDọn dẹp: xoá đơn, vé, máy khách; đóng bàn; thu hồi màn bếp')
+    await pool.query(
+      `UPDATE devices SET revoked_at = now() WHERE name IN ('Màn bếp thử', 'iPad thử') AND revoked_at IS NULL`,
+    )
+    console.log('\nDọn dẹp: xoá đơn, vé; đóng bàn; thu hồi màn bếp và iPad thử')
   }
   await app?.close()
   await pool?.end()
@@ -128,23 +124,20 @@ describe.skipIf(!process.env.LIVE_SCENARIO)(
 
     let veCua: Record<number, string[]> = {}
 
-    it('1 · khách quét mã, vào thẳng vì đang ở trong quán', async () => {
+    it('1 · iPad của bàn thấy ngay phiên vừa mở', async () => {
       const res = await server().inject({
-        method: 'POST',
-        url: '/api/table-devices/join',
-        headers: { 'x-forwarded-for': trongQuan, 'content-type': 'application/json' },
-        payload: { branchId: BRANCH, tableCode: TABLE },
+        method: 'GET',
+        url: '/api/table-terminal',
+        headers: { 'x-sora-device': ipadToken },
       })
-      expect(res.json().state).toBe('admitted')
-      khach = Object.fromEntries(res.cookies.map((c) => [c.name, c.value]))
+      expect(res.json().session.id).toBe(sessionId)
     })
 
     it('2 · khách gọi Ba chỉ bò và Sukiyaki', async () => {
       const res = await server().inject({
         method: 'POST',
         url: `/api/table-sessions/${sessionId}/lines`,
-        headers: { 'content-type': 'application/json' },
-        cookies: khach,
+        headers: { 'content-type': 'application/json', 'x-sora-device': ipadToken },
         payload: {
           lines: [
             { dishId: 'bachi', qty: 1 },
@@ -163,7 +156,7 @@ describe.skipIf(!process.env.LIVE_SCENARIO)(
       const res = await server().inject({
         method: 'POST',
         url: `/api/table-sessions/${sessionId}/send`,
-        cookies: khach,
+        headers: { 'x-sora-device': ipadToken },
       })
       expect(res.statusCode).toBe(201)
 

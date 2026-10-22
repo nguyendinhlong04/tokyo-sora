@@ -61,7 +61,8 @@ export function IpadPayQr() {
     if (!paid) return
     void queryClient.invalidateQueries({ queryKey: ['bill', session.id] })
     void queryClient.invalidateQueries({ queryKey: ['order', session.id] })
-    void queryClient.invalidateQueries({ queryKey: ['session', session.id] })
+    // Trả đủ thì bàn sang "chờ dọn" — iPad đọc trạng thái đó ở câu hỏi bàn
+    void queryClient.invalidateQueries({ queryKey: ['terminal'] })
   }, [paid, queryClient, session.id])
 
   const toMethods = { label: 'Cách trả', onClick: () => void navigate('/tra-tien') }

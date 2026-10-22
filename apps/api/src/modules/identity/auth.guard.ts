@@ -16,7 +16,6 @@ export const Public = () => SetMetadata(IS_PUBLIC, true)
 
 /** Tên cookie/header — cookie là đường chính, header để thiết bị và test dùng */
 export const STAFF_COOKIE = 'sora_staff'
-export const TABLE_COOKIE = 'sora_table'
 export const DEVICE_HEADER = 'x-sora-device'
 
 export interface RequestWithActor extends FastifyRequest {
@@ -25,9 +24,9 @@ export interface RequestWithActor extends FastifyRequest {
 
 /**
  * Dựng `Actor` từ credential gửi lên. Thứ tự ưu tiên:
- *   1. Phiên nhân viên (đã đăng nhập ca) — mang vai trò nghiệp vụ
- *   2. Phiên bàn (khách quét QR) — vai trò R0
- *   3. Thiết bị đã ghép — chưa ai đăng nhập, chỉ làm được việc của thiết bị
+ *   1. iPad gắn bàn — bàn đang có phiên thì thành KHÁCH của đúng phiên đó (R0)
+ *   2. Phiên nhân viên (đã đăng nhập ca) — mang vai trò nghiệp vụ
+ *   3. Thiết bị đã ghép khác — chưa ai đăng nhập, chỉ làm được việc của thiết bị
  *
  * Token nhân viên PHẢI đi kèm thiết bị hợp lệ: phiên gắn cứng với `deviceId` lúc
  * đăng nhập, nên thiết bị bị thu hồi là phiên chết theo.
@@ -61,6 +60,36 @@ export class AuthGuard implements CanActivate {
     const device =
       typeof deviceToken === 'string' ? await this.identity.resolveDevice(deviceToken) : null
 
+    if (device?.kind === 'table' && device.tableId !== null) {
+      /**
+       * iPad bàn đi theo BÀN, không theo một phiên đã ghi sẵn: tra phiên đang sống
+       * mỗi lần gọi. Bàn mở là iPad thành khách của phiên đó; bàn đóng là iPad
+       * mất quyền với đơn cũ ngay lần gọi kế tiếp — không có token nào phải thu.
+       *
+       * Đứng TRƯỚC phiên nhân viên: iPad không bao giờ vào ca (`login` chặn), nên
+       * cookie nhân viên đi kèm token iPad chỉ có thể là cookie lạc — trên
+       * `localhost` cookie không phân biệt cổng — và iPad vẫn phải là iPad của bàn.
+       */
+      const sessionId = await this.identity.liveSessionOfTable(device.tableId)
+      if (sessionId !== null) {
+        return {
+          kind: 'customer',
+          tableSessionId: sessionId,
+          branchId: device.branchId,
+          deviceId: device.id,
+          tableId: device.tableId,
+        }
+      }
+      return {
+        kind: 'device',
+        deviceId: device.id,
+        branchId: device.branchId,
+        stationId: null,
+        deviceKind: device.kind,
+        tableId: device.tableId,
+      }
+    }
+
     const staffToken = readCredential(req, STAFF_COOKIE)
     if (staffToken) {
       const actor = await this.identity.resolveStaffSession(staffToken)
@@ -85,12 +114,6 @@ export class AuthGuard implements CanActivate {
           roles: [...new Set([...actor.roles, ...(deviceActor ? actorRoles(deviceActor) : [])])],
         }
       }
-    }
-
-    const tableToken = readCredential(req, TABLE_COOKIE)
-    if (tableToken) {
-      const actor = await this.identity.resolveTableToken(tableToken)
-      if (actor) return actor
     }
 
     if (device) {

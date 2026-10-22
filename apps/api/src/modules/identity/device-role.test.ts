@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actorRoles, type Actor } from './actor'
+import { actorRoles, assertOwnTableSession, type Actor } from './actor'
 
 const kdsDevice = (stationId: string | null): Actor => ({
   kind: 'device',
@@ -39,5 +39,42 @@ describe('Màn bếp đã ghép mang quyền nhân viên bếp', () => {
 
   it('tác vụ nền không mang quyền nghiệp vụ nào', () => {
     expect(actorRoles({ kind: 'system' })).toEqual([])
+  })
+})
+
+/**
+ * iPad gắn bàn (§9.1): bàn đang có phiên thì nó là khách R0 của đúng phiên đó;
+ * bàn chưa mở thì nó là thiết bị KHÔNG có vai trò nào và không mở được phiên nào.
+ */
+describe('iPad gắn bàn', () => {
+  const ipadNoSession: Actor = {
+    kind: 'device',
+    deviceId: 3,
+    branchId: 'cg',
+    stationId: null,
+    deviceKind: 'table',
+    tableId: 7,
+  }
+  const ipadInSession: Actor = {
+    kind: 'customer',
+    tableSessionId: 21,
+    branchId: 'cg',
+    deviceId: 3,
+    tableId: 7,
+  }
+
+  it('bàn chưa mở: không vai trò, không đọc được phiên nào', () => {
+    expect(actorRoles(ipadNoSession)).toEqual([])
+    expect(() => assertOwnTableSession(ipadNoSession, 21)).toThrow()
+  })
+
+  it('bàn đang mở: R0 của đúng phiên bàn mình, không phải bàn khác', () => {
+    expect(actorRoles(ipadInSession)).toEqual(['R0'])
+    expect(() => assertOwnTableSession(ipadInSession, 21)).not.toThrow()
+    expect(() => assertOwnTableSession(ipadInSession, 22)).toThrow()
+  })
+
+  it('máy thu ngân vẫn đọc được mọi bàn — họ phải nhìn cả sàn', () => {
+    expect(() => assertOwnTableSession(posDevice, 22)).not.toThrow()
   })
 })

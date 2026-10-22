@@ -3,9 +3,9 @@ import { IconMinus, IconPlus } from '../icons'
 /**
  * Nút + của thẻ món trên iPad: ô vàng 32px vẽ ra, vùng chạm vẫn 44px.
  *
- * Bản điện thoại dùng `DishCounter` hình viên thuốc nằm cuối dòng món. Ở lưới ba
- * cột, nút nằm trên hàng giá của thẻ — ô vuông bo 4 cùng nhịp với mọi nút khác
- * trên màn, và nhỏ lại để tên món chứ không phải nút là thứ mắt đọc trước.
+ * Ở lưới ba cột, nút nằm trên hàng giá của thẻ — ô vuông bo 4 cùng nhịp với mọi
+ * nút khác trên màn, và nhỏ lại để tên món chứ không phải nút là thứ mắt đọc
+ * trước.
  *
  * `onAdd` nhận chính nút vừa bấm: nhãn "+1" bay từ đúng chỗ ngón tay vào giỏ.
  */

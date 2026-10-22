@@ -1086,7 +1086,6 @@ export class OrderingService {
           status: 'closed',
           closedAt: now,
           closedBy: actor.kind === 'staff' ? actor.staffId : null,
-          qrTokenHash: null,
         })
         .where(eq(tableSessions.id, sourceSessionId))
 

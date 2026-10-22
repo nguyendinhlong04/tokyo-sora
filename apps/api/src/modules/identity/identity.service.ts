@@ -1,6 +1,7 @@
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2'
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -10,6 +11,7 @@ import type { Role } from '@sora/contracts'
 import { and, eq, gt, isNotNull, isNull, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
+import { isUniqueViolation } from '../../common/pg-error'
 import type { Db } from '../../db/client'
 import {
   devices,
@@ -18,13 +20,15 @@ import {
   staff,
   staffRoles,
   staffSessions,
-  tableDevices,
+  tables,
   tableSessions,
 } from '../../db/schema'
 import type { Actor, StaffActor } from './actor'
 import { hashToken, newPairingCode, newToken } from './tokens'
 
-export type DeviceKind = 'pos' | 'cashier' | 'kds' | 'kiosk' | 'bridge'
+export type DeviceKind = 'pos' | 'cashier' | 'kds' | 'kiosk' | 'bridge' | 'table'
+
+const ONE_IPAD_PER_TABLE = 'Bàn này đã có iPad đang chạy — ngắt máy cũ ở A4 rồi mới ghép máy mới'
 
 /**
  * Chống dò PIN. Đếm trong bộ nhớ tiến trình vì hệ thống chạy một process trên một
@@ -73,13 +77,39 @@ export class IdentityService {
 
   // ---------------------------------------------------------------- Thiết bị
 
-  /** A4/K1: quản lý sinh mã 6 số, đọc cho người đứng ở máy nhập */
+  /**
+   * A4/K1: quản lý sinh mã 6 số, đọc cho người đứng ở máy nhập.
+   *
+   * iPad bàn (`kind = 'table'`) bắt buộc chọn bàn ngay lúc sinh mã: mã ghép là
+   * thứ DUY NHẤT nói iPad đứng ở bàn nào, chứ không phải người cầm máy tự khai.
+   * Kiểm trước "bàn đã có iPad" để báo ngay ở Office, thay vì để người lắp máy gõ
+   * xong mã mới bị từ chối — chỉ mục unique ở CSDL mới là chốt chặn thật.
+   */
   async createPairingCode(input: {
     branchId: string
     kind: DeviceKind
     stationId?: string | null
+    tableId?: number | null
     createdBy?: number | null
   }): Promise<{ code: string; expiresAt: Date }> {
+    const tableId = input.kind === 'table' ? (input.tableId ?? null) : null
+    if (input.kind === 'table') {
+      if (tableId === null) throw new BadRequestException('iPad tại bàn phải chọn bàn')
+      const [table] = await this.db
+        .select({ branchId: tables.branchId, active: tables.active })
+        .from(tables)
+        .where(eq(tables.id, tableId))
+      if (!table || table.branchId !== input.branchId) {
+        throw new BadRequestException('Bàn không thuộc chi nhánh này')
+      }
+      if (!table.active) throw new BadRequestException('Bàn đang tắt — bật lại ở A3 trước')
+      const [live] = await this.db
+        .select({ id: devices.id })
+        .from(devices)
+        .where(and(eq(devices.tableId, tableId), isNull(devices.revokedAt)))
+      if (live) throw new ConflictException(ONE_IPAD_PER_TABLE)
+    }
+
     const ttlMinutes = await this.params.getNumber('auth.pairingCodeTtlMinutes', 10, input.branchId)
     const expiresAt = new Date(Date.now() + ttlMinutes * 60_000)
 
@@ -93,6 +123,7 @@ export class IdentityService {
         branchId: input.branchId,
         kind: input.kind,
         stationId: input.stationId ?? null,
+        tableId,
         expiresAt,
         createdBy: input.createdBy ?? null,
       })
@@ -125,18 +156,27 @@ export class IdentityService {
         .returning({ code: pairingCodes.code })
       if (used.length === 0) throw new UnauthorizedException('Mã ghép vừa được dùng ở máy khác')
 
-      const [device] = await tx
-        .insert(devices)
-        .values({
-          branchId: row.branchId,
-          kind: row.kind,
-          name,
-          stationId: row.stationId,
-          tokenHash: hashToken(token),
-          pairedBy: row.createdBy,
-        })
-        .returning({ id: devices.id })
-      return { token, deviceId: device!.id }
+      try {
+        const [device] = await tx
+          .insert(devices)
+          .values({
+            branchId: row.branchId,
+            kind: row.kind,
+            name,
+            stationId: row.stationId,
+            tableId: row.tableId,
+            tokenHash: hashToken(token),
+            pairedBy: row.createdBy,
+          })
+          .returning({ id: devices.id })
+        return { token, deviceId: device!.id }
+      } catch (err) {
+        // Mã sinh lúc bàn còn trống, nhưng có người ghép máy khác vào bàn trước
+        if (isUniqueViolation(err, 'devices_one_live_table')) {
+          throw new ConflictException(ONE_IPAD_PER_TABLE)
+        }
+        throw err
+      }
     })
   }
 
@@ -507,30 +547,19 @@ export class IdentityService {
   }
 
   /**
-   * Token của MÁY khách → actor khách; chết khi phiên bàn đóng.
+   * Phiên đang sống của một bàn — thứ quyết định iPad của bàn đó là ai.
    *
-   * Chỉ máy ĐÃ VÀO BÀN mới thành khách. Máy đang chờ duyệt có cookie hợp lệ
-   * nhưng KHÔNG được là actor: nó chưa chứng minh được đang ngồi ở bàn, nên
-   * không được gọi món, không được đọc đơn, không được trả tiền hộ ai.
-   *
-   * Vì thế mọi chốt chặn sẵn có của khách tại bàn không phải sửa gì — chúng nhận
-   * diện qua `kind === 'customer'`, và cái điều kiện "đã vào bàn" được gói trọn
-   * ở đúng câu truy vấn này (LUONG-QR-BAN.md).
+   * Tra theo BÀN mỗi lần chứ không gắn phiên vào thiết bị: chuyển bàn (P9) đổi
+   * `table_id` của phiên, ghép bàn đóng phiên nguồn — iPad phải đi theo bàn đang
+   * đứng, không theo phiên cũ. Mục `table_sessions_one_live_per_table` bảo đảm có
+   * nhiều nhất một dòng.
    */
-  async resolveTableToken(token: string): Promise<Actor | null> {
+  async liveSessionOfTable(tableId: number): Promise<number | null> {
     const [row] = await this.db
-      .select({ sessionId: tableSessions.id, branchId: tableSessions.branchId })
-      .from(tableDevices)
-      .innerJoin(tableSessions, eq(tableSessions.id, tableDevices.tableSessionId))
-      .where(
-        and(
-          eq(tableDevices.tokenHash, hashToken(token)),
-          eq(tableDevices.state, 'admitted'),
-          sql`${tableSessions.status} <> 'closed'`,
-        ),
-      )
-    if (!row) return null
-    return { kind: 'customer', tableSessionId: row.sessionId, branchId: row.branchId }
+      .select({ id: tableSessions.id })
+      .from(tableSessions)
+      .where(and(eq(tableSessions.tableId, tableId), sql`${tableSessions.status} <> 'closed'`))
+    return row?.id ?? null
   }
 
   /** Băm PIN mới (đổi PIN, tạo nhân viên) */

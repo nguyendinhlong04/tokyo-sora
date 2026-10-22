@@ -76,9 +76,9 @@ export const staffRoles = pgTable(
 )
 
 /**
- * Thiết bị đã ghép (tablet POS, máy thu ngân, màn KDS, kiosk chấm công, cầu in).
- * Token là chuỗi ngẫu nhiên 256-bit, CHỈ lưu bản băm — phải thu hồi được từ xa (A4)
- * nên bắt buộc tra CSDL mỗi lần, không dùng JWT tự chứng thực.
+ * Thiết bị đã ghép (tablet POS, máy thu ngân, màn KDS, kiosk chấm công, cầu in,
+ * iPad gắn bàn). Token là chuỗi ngẫu nhiên 256-bit, CHỈ lưu bản băm — phải thu hồi
+ * được từ xa (A4) nên bắt buộc tra CSDL mỗi lần, không dùng JWT tự chứng thực.
  */
 export const devices = pgTable(
   'devices',
@@ -91,13 +91,30 @@ export const devices = pgTable(
     name: text('name').notNull(),
     /** Màn KDS ghim cứng một trạm */
     stationId: text('station_id'),
+    /**
+     * iPad gắn bàn (§9.1) ghim cứng một bàn: đi theo phiên đang sống của bàn này.
+     *
+     * Khoá ngoại tới `tables` khai bằng SQL viết tay (9007) chứ không ở đây: bảng
+     * `tables` nằm ở `floorplan.ts`, mà file đó đã nhập `branches`/`staff` từ file
+     * này — khai ở đây là hai file nhập vòng nhau.
+     */
+    tableId: bigint('table_id', { mode: 'number' }),
     tokenHash: text('token_hash').notNull().unique(),
     pairedBy: bigint('paired_by', { mode: 'number' }).references(() => staff.id),
     pairedAt: timestamp('paired_at', { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
   },
   (t) => [
-    check('devices_kind_check', sql`${t.kind} IN ('pos','cashier','kds','kiosk','bridge')`),
+    check(
+      'devices_kind_check',
+      sql`${t.kind} IN ('pos','cashier','kds','kiosk','bridge','table')`,
+    ),
+    // iPad bàn BẮT BUỘC có bàn, máy khác KHÔNG được có — một iPad không bàn là một
+    // máy khách không biết mình phục vụ ai
+    check('devices_table_check', sql`(${t.kind} = 'table') = (${t.tableId} IS NOT NULL)`),
+    // Mỗi bàn đúng một iPad đang chạy: hai máy trên một bàn là hai giỏ tranh nhau
+    // một đơn. Thay máy thì ngắt máy cũ ở A4 trước
+    uniqueIndex('devices_one_live_table').on(t.tableId).where(sql`revoked_at IS NULL`),
     index('devices_branch_idx').on(t.branchId, t.kind),
   ],
 )
@@ -112,11 +129,16 @@ export const pairingCodes = pgTable(
       .references(() => branches.id),
     kind: text('kind').notNull(),
     stationId: text('station_id'),
+    /** Bàn của iPad sắp ghép — khoá ngoại ở 9007, cùng lý do với `devices.table_id` */
+    tableId: bigint('table_id', { mode: 'number' }),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     usedAt: timestamp('used_at', { withTimezone: true }),
     createdBy: bigint('created_by', { mode: 'number' }).references(() => staff.id),
   },
-  (t) => [check('pairing_codes_code_check', sql`${t.code} ~ '^[0-9]{6}$'`)],
+  (t) => [
+    check('pairing_codes_code_check', sql`${t.code} ~ '^[0-9]{6}$'`),
+    check('pairing_codes_table_check', sql`(${t.kind} = 'table') = (${t.tableId} IS NOT NULL)`),
+  ],
 )
 
 /**

@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common'
 import { z } from 'zod'
 import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
+import { isTableDevice } from '../identity/actor'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { KitchenService } from './kitchen.service'
@@ -41,7 +42,12 @@ export class KitchenController {
     @Query('station') stationQuery?: string,
   ) {
     const actor = req.actor!
-    if (actor.kind === 'system' || actor.kind === 'customer' || actor.kind === 'guest') {
+    if (
+      actor.kind === 'system' ||
+      actor.kind === 'customer' ||
+      actor.kind === 'guest' ||
+      isTableDevice(actor)
+    ) {
       throw new BadRequestException('Không đọc được hàng vé')
     }
 
@@ -61,7 +67,10 @@ export class KitchenController {
   @Get('expo')
   expo(@Req() req: RequestWithActor, @Query('branch') branch?: string) {
     const actor = req.actor!
-    if (actor.kind === 'system') throw new BadRequestException('Không đọc được expo')
+    // Expo thấy đơn của cả bếp — iPad tại bàn theo dõi món qua đơn của bàn mình
+    if (actor.kind === 'system' || actor.kind === 'customer' || isTableDevice(actor)) {
+      throw new BadRequestException('Không đọc được expo')
+    }
     return this.kitchen.expo(branch ?? actor.branchId)
   }
 
@@ -145,10 +154,11 @@ export class KitchenController {
     return this.kitchen.recipe(dishId)
   }
 
-  /** Khách ngồi bàn và tiến trình nền không có việc gì với tài liệu vận hành của bếp */
+  /** Khách ngồi bàn (kể cả iPad của bàn chưa mở) và tiến trình nền không có việc gì với tài liệu bếp */
   private requireKitchenReader(req: RequestWithActor) {
-    const kind = req.actor!.kind
-    if (kind === 'system' || kind === 'customer' || kind === 'guest') {
+    const actor = req.actor!
+    const kind = actor.kind
+    if (kind === 'system' || kind === 'customer' || kind === 'guest' || isTableDevice(actor)) {
       throw new BadRequestException('Không đọc được công thức')
     }
   }

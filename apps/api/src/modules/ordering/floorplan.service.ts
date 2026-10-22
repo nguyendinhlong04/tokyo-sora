@@ -12,7 +12,6 @@ import { areas, branches, orders, reservations, tableSessions, tables } from '..
 const RESERVATION_WARN_MINUTES = 90
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
-import { hashToken, newToken } from '../identity/tokens'
 
 @Injectable()
 export class FloorplanService {
@@ -55,6 +54,11 @@ export class FloorplanService {
     const byTable = new Map<number, (typeof rows)[number]>()
     for (const row of rows) if (!byTable.has(row.tableId!)) byTable.set(row.tableId!, row)
     return byTable
+  }
+
+  /** Đặt chỗ sắp tới của MỘT bàn — iPad bàn hỏi trước khi mời khách tự mở bàn */
+  async upcomingReservationOf(table: { id: number; branchId: string }) {
+    return (await this.upcomingReservations(table.branchId)).get(table.id) ?? null
   }
 
   /** P2 sơ đồ bàn: bàn + phiên đang mở + tiền tạm tính + đặt chỗ sắp tới */
@@ -113,9 +117,8 @@ export class FloorplanService {
   }
 
   /**
-   * T1 "bàn nào đây" — điện thoại khách chỉ cầm token, không biết mình ngồi bàn
-   * mấy. Trả đúng phần khách cần thấy để chào bàn, không kèm tiền nong hay ai mở
-   * bàn: những thứ đó có màn riêng và có quyền riêng.
+   * T1 "bàn nào đây" — trả đúng phần khách cần thấy để chào bàn, không kèm tiền
+   * nong hay ai mở bàn: những thứ đó có màn riêng và có quyền riêng.
    */
   async sessionSummary(sessionId: number) {
     const [row] = await this.db
@@ -274,43 +277,11 @@ export class FloorplanService {
   }
 
   /**
-   * Cấp token QR cho phiên bàn (A3 in mã dán bàn · P3 khi mở bàn).
-   *
-   * Chỉ lưu bản băm; token trả về đúng MỘT LẦN để in ra mã QR. Muốn cấp lại thì
-   * sinh token mới — token cũ chết ngay, nên khách bàn trước không đọc được đơn
-   * của khách bàn sau.
-   */
-  async issueQrToken(sessionId: number, actor: Actor): Promise<{ token: string; url: string }> {
-    return this.db.transaction(async (tx) => {
-      const [session] = await tx
-        .select()
-        .from(tableSessions)
-        .where(eq(tableSessions.id, sessionId))
-      if (!session) throw new NotFoundException('Không có phiên bàn này')
-      if (session.status === 'closed') throw new ConflictException('Phiên bàn đã đóng')
-
-      const token = newToken()
-      await tx
-        .update(tableSessions)
-        .set({ qrTokenHash: hashToken(token) })
-        .where(eq(tableSessions.id, sessionId))
-
-      await this.audit.write(tx, {
-        actor,
-        action: 'table.qr-token.issued',
-        entity: 'table_session',
-        entityId: String(sessionId),
-      })
-
-      return { token, url: `/t/${token}` }
-    })
-  }
-
-  /**
    * Đóng bàn sau khi khách trả đủ.
    *
    * Bàn KHÔNG tự đóng khi trả xong (§20): trả đủ thì chuyển "đã thanh toán, chờ
-   * dọn", nhân viên dọn xong mới đóng. Token QR của khách chết đúng lúc này.
+   * dọn", nhân viên dọn xong mới đóng. iPad của bàn mất quyền với phiên này đúng
+   * lúc này và tự quay về màn bàn chưa mở.
    */
   async closeSession(sessionId: number, actor: Actor) {
     return this.db.transaction(async (tx) => {
@@ -338,8 +309,6 @@ export class FloorplanService {
           status: 'closed',
           closedAt: new Date(),
           closedBy: actor.kind === 'staff' ? actor.staffId : null,
-          // Token QR chết theo phiên
-          qrTokenHash: null,
         })
         .where(eq(tableSessions.id, sessionId))
 

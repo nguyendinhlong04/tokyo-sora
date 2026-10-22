@@ -13,7 +13,6 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
 | `DEPLOY.md` | Vercel + Supabase: 8 project, biến môi trường, `ignoreCommand`, kiểm chứng sau deploy |
 | `THIET-BI.md` | Lắp máy tại quán: ghép thiết bị, kiosk mode, bài kiểm 5 phút, cập nhật phần mềm |
 | `tokyo-sora-ke-hoach-thiet-ke.md` | **Bản thiết kế gốc** (§1–34): quyết định đã chốt, RBAC, design system, 139 màn, trạm bếp |
-| `LUONG-QR-BAN.md` | Luồng QR theo điện thoại khách (đang được thay bằng iPad — xem §9) |
 | `huong-dan-su-dung/` | Hướng dẫn người dùng từng app; `01-tong-quan-he-thong.md` là bản đồ tốt nhất |
 | `designs/*.dc.html` | Prototype HTML hi-fi — **tham chiếu**, không copy code |
 
@@ -32,7 +31,7 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
   chạy bản giả lập (`MockBankProvider`); chưa có cầu in; **chưa có app nào nghe
   realtime** — tất cả đang polling (§5.6). Nhánh làm việc: `gd1-xuong-song-van-hanh`.
 - **Định hướng 10/2026** (§9): mỗi bàn một **iPad Gen 7** gắn cố định để khách gọi món
-  và **tự mở bàn** (QR điện thoại **bỏ hẳn**); **bàn đôi** chạy độc lập hoặc ghép; **màn
+  và **tự mở bàn** (QR điện thoại **đã gỡ** 22/10); **bàn đôi** chạy độc lập hoặc ghép; **màn
   chờ chạy quảng cáo** khi bàn chưa mở; POS gọi món của nhân viên chạy tốt trên **cả iPad
   lẫn điện thoại**; **dựng lại màn bếp**; **khuyến mãi áp dụng chung** mọi kênh, giá giảm
   ghi thẳng vào đơn (§9.6); **tốc độ là yêu cầu cứng** — ảnh trên web hiện quá chậm (§8).
@@ -45,7 +44,7 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
 |---|---|---|---|---|---|
 | `apps/api` | `@sora/api` | API NestJS | — | `:3000` | `api.tokyo-sora.vn` (Vercel Function, vùng `sin1`) |
 | `apps/web` | `@sora/web` | Sora Web (Next 15) | Khách online · máy tính + điện thoại | `:3001` | `tokyo-sora.vn` |
-| `apps/table` | `@sora/table` | Sora Table | Khách tại bàn · **iPad gắn bàn** (bố cục iPad đã dựng — §9.1) · điện thoại quét QR **sẽ gỡ** | `:5173` | `ban.tokyo-sora.vn` |
+| `apps/table` | `@sora/table` | Sora Table | Khách tại bàn · **iPad gắn bàn** 1080×810 ngang, ghép kind `table` (§9.1) — không còn bản điện thoại | `:5173` | `ban.tokyo-sora.vn` |
 | `apps/pos` | `@sora/pos` | Sora POS (PWA) | Phục vụ, thu ngân · tablet 11″ ngang + máy thu ngân 22″ → **sắp tới thêm iPad & điện thoại** | `:5174` | `pos.tokyo-sora.vn` |
 | `apps/kitchen` | `@sora/kitchen` | Sora Kitchen / KDS (PWA) | Bếp từng trạm, ra món · TV 32–43″ 1920×1080, Android box | `:5175` | `kds.tokyo-sora.vn` |
 | `apps/office` | `@sora/office` | Sora Office | Chủ, quản lý, kế toán, HR, marketing · desktop 1440+, **nền sáng** | `:5176` | `admin.tokyo-sora.vn` |
@@ -101,8 +100,9 @@ pnpm --filter @sora/pos build && pnpm --filter @sora/pos preview   # thử servi
   `DROP SCHEMA public CASCADE`). Lệnh Docker dựng Postgres test nằm trong `DEV.md`.
 - Thiết bị dev: dán token do `db:dev-bootstrap` in ra vào
   `localStorage.setItem('sora.device.token', …)` rồi reload.
-- Trên `localhost` cookie không phân biệt cổng: mở Sora Table và kiosk ở **cửa sổ ẩn
-  danh** khi đang đăng nhập POS/Office.
+- Trên `localhost` cookie không phân biệt cổng: mở kiosk ở **cửa sổ ẩn danh** khi đang
+  đăng nhập POS/Office. Sora Table không cần — token iPad bàn thắng cookie nhân viên
+  (`dev-table-token` của `db:dev-bootstrap` = iPad bàn đầu tiên; xoá token là về màn ghép).
 
 ---
 
@@ -212,7 +212,8 @@ mất mạng = dải báo + hàng đợi cục bộ, màn thanh toán bị chặ
 
 ### 4.6 `@sora/ui` — dùng trước, thiếu thì thêm vào đây
 `Button` (variant theo **ý định**: `primary` ghi vào hồ sơ · `secondary` viền · `ghost` ·
-`danger` · `success`; size `sm` 36 · `md` = hit-target · `lg` ×1.25 · `xl` ×1.5) · `PinPad` ·
+`danger` · `success`; size `sm` 36 · `md` = hit-target · `lg` ×1.25 · `xl` ×1.5) ·
+`PinPad` (`reveal` hiện số — chỉ cho mã ghép thiết bị, không cho PIN) ·
 `Modal` · `ToastProvider`/`useToast(push(msg, tone))` · `Card` · `SectionLabel` ·
 `EmptyState` · `ErrorState` · `Skeleton` · `Badge` · `Money` · `TableTile` (P2) ·
 `OrderTicket` (K2) · `MenuItemCard` (P4 — cố ý **không ảnh**) · `OutboxBanner` ·
@@ -223,9 +224,9 @@ mãi §9.6, entry riêng `@sora/ui/PromoTag`; web khai `@source` đúng file đ�
 Quy tắc: mọi `<button>` có `type="button"`; variant là `Record<Union,string>` UPPER_CASE;
 không responsive prefix trong gói; app Vite **phải** có `@source '../../../packages/ui/src'`
 trong `index.css` nếu không class của gói không được sinh. Thành phần mới dùng ≥ 2 app →
-đặt trong `@sora/ui`, không copy sang app thứ hai. Bản sao có chủ ý hiện có (sửa cả hai
-bên): `MenuIndex`, `DishCounter` (web ↔ table), `Sheet` (table — bottom sheet một tay,
-không dùng Modal giữa màn trên điện thoại).
+đặt trong `@sora/ui`, không copy sang app thứ hai. `MenuIndex`, `DishCounter` giờ chỉ còn
+ở web — bản sao của table gỡ cùng bố cục điện thoại (10/2026). Màn ghép máy của kitchen và
+kiosk còn tự chép lưới phím; màn ghép mới dùng `PinPad reveal` như iPad bàn.
 
 ### 4.7 Icon và ảnh
 Icon: inline SVG `viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}`,
@@ -293,12 +294,15 @@ Lặp lại một chuyển trạng thái là no-op (`changed:false`). Hàm domai
 
 ### 5.3 Xác thực và phân quyền
 Token là chuỗi ngẫu nhiên, DB chỉ giữ SHA-256 → thu hồi được tức thì. `AuthGuard` (global)
-thử theo thứ tự: (1) **phiên nhân viên** cookie `sora_staff` hoặc Bearer — quyền = vai trò
-người đó tại chi nhánh ∪ vai trò chuỗi ∪ vai trò của **thiết bị đang đứng**; (2) **điện
-thoại bàn** cookie `sora_table` (`table_devices.state='admitted'`, phiên chưa đóng) → actor
-`customer` R0; (3) **thiết bị ghép** header `x-sora-device` (`devices.kind` ∈ `pos | cashier
-| kds | kiosk | bridge`); (4) 401 trừ `@Public`. Route khách chạm được **phải** gọi
-`assertOwnTableSession(actor, sessionId)`.
+thử theo thứ tự: (1) **iPad bàn** — header `x-sora-device` của thiết bị kind `table`: bàn
+có phiên sống thì thành actor `customer` R0 của đúng phiên đó, bàn chưa mở thì là thiết bị
+không vai trò (`isTableDevice`) chỉ gọi được `/api/table-terminal`; luôn thắng cookie nhân
+viên vì iPad không bao giờ vào ca; (2) **phiên nhân viên** cookie `sora_staff` hoặc Bearer —
+quyền = vai trò người đó tại chi nhánh ∪ vai trò chuỗi ∪ vai trò của **thiết bị đang
+đứng**; (3) **thiết bị ghép** khác (`devices.kind` ∈ `pos | cashier | kds | kiosk |
+bridge`); (4) 401 trừ `@Public`. Route khách chạm được **phải** gọi
+`assertOwnTableSession(actor, sessionId)` (chặn cả iPad bàn chưa mở); việc của nhân viên —
+mở bàn bất kỳ, nhả đợt, huỷ dòng, sơ đồ P2, hàng đợi P12, Expo — chặn `customer` và iPad.
 
 Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 58 action
 `domain.verb`, mỗi ô `allow | approve | deny`. `PermissionGuard` chỉ chặn `deny`; ô
@@ -332,7 +336,8 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
 Enum chính (giá trị đúng như CHECK):
 `tables.kind` `standard|grill|private`, `has_grill` + `grill_type` `than|gas|dien` ·
 `table_sessions.status` `open|paid_wait_clear|closed` (tối đa 1 phiên chưa đóng/bàn) ·
-`table_devices.state` `waiting|admitted|rejected` · `table_requests.kind`
+`devices.kind` `pos|cashier|kds|kiosk|bridge|table` (`table` bắt buộc `table_id`, một iPad
+sống mỗi bàn — `devices_one_live_table`) · `table_requests.kind`
 `phuc-vu|them-than|da-nuoc|tinh-tien|khac` · `orders.status`
 `new|confirmed|cooking|ready|delivering|done|cancelled`, `channel` `web|table|pos|grab|shopee|be`,
 `type` `dinein|takeaway|delivery`, `payment_state` `unpaid|partial|paid|refunded` ·
@@ -362,10 +367,14 @@ chuyển bàn khác loại → 409 `reroute_confirm`. Sáu trạm + Expo: xem `h
 dồn mọi dòng sang bàn đích rồi **đóng bàn nguồn**. Cột `table_sessions.merged_table_ids`
 có sẵn nhưng **chưa được đọc/ghi** — bàn đôi ở §9.2 sẽ dùng mô hình khác.
 
-**Luồng QR điện thoại hiện tại:** QR dán cố định `${VITE_TABLE_ORIGIN}/t/<branchId>/<tableCode>`
-→ `POST /api/table-devices/join` (bàn phải mở; Wi-Fi quán theo IP hop `TRUSTED_PROXY_HOPS`;
-không thì chủ bàn duyệt) → cookie `sora_table`. Luồng này **sẽ gỡ hẳn** (chốt 22/10/2026,
-§9.1) cùng lúc với ghép iPad kind `table` — tới lúc đó iPad vẫn vào bàn bằng chính đường này.
+**iPad tại bàn (§9.1):** Office A4 sinh mã kind `table` kèm `tableId` → iPad
+`POST /api/auth/pair` → token thiết bị (localStorage). iPad hỏi `GET /api/table-terminal`
+(bàn · phiên sống · giờ đặt chỗ trong 90′, **không tên**); khách tự mở bàn bằng
+`POST /api/table-terminal/open {guestCount}`: quá sức chứa thì mở đúng sức chứa và trả
+`overCapacity` để iPad gọi nhân viên ghép bàn; có đặt chỗ → 409 `table_reserved` chỉ kèm
+giờ; bàn vừa được mở ở POS → trả luôn phiên đó. Luồng QR điện thoại (`table-devices/*`,
+cookie `sora_table`, kiểm Wi-Fi, chủ bàn duyệt, `qr-token`) **đã gỡ** 22/10/2026 —
+migration `0031` xoá bảng `table_devices` và cột `qr_token_hash`.
 
 ### 5.6 Realtime và offline — hiện trạng cần biết
 - **Phát:** `emit(tx, …)` ghi `outbox_events`; trigger `sora_broadcast_outbox` (migration
@@ -376,7 +385,8 @@ không thì chủ bàn duyệt) → cookie `sora_table`. Luồng này **sẽ g�
   `availability.changed`, `config.published`, `reservation.created`. Bắt kịp:
   `GET /api/realtime/events?after=<seq>` — quy tắc client "**refetch rồi mới stream**".
 - **Nghe: chưa app nào.** Không có `supabase-js`, không gọi `/api/realtime/*`. Tất cả
-  đang **polling** TanStack Query: KDS 5 s · POS 10–30 s · Table 1–20 s · Web 10 s.
+  đang **polling** TanStack Query: KDS 5 s · POS 10–30 s · Table 2–20 s (bàn của iPad:
+  2 s khi chờ dọn · 10 s đang mở · 15 s bàn trống) · Web 10 s.
   Comment trong `apps/kitchen/src/App.tsx`, `apps/pos/src/App.tsx`, `Floorplan.tsx` nói
   realtime là đường chính — **sai**, đừng tin.
 - **Ghi offline:** `enqueue` của `@sora/core` (Dexie `sora-outbox`, FIFO, header
@@ -393,9 +403,9 @@ không thì chủ bàn duyệt) → cookie `sora_table`. Luồng này **sẽ g�
 ### 5.7 Biến môi trường (tên, không giá trị)
 API: `DATABASE_URL`, `DATABASE_MIGRATION_URL`, `TEST_DATABASE_URL`, `SUPABASE_JWT_SECRET`,
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `BANK_WEBHOOK_SECRET` (bắt buộc production),
-`PAYMENT_PROVIDER` (`mock`), `TRUSTED_PROXY_HOPS`, `CORS_ORIGINS`, `PORT`, `NODE_ENV`,
-`LIVE_SCENARIO`. Front-end: `VITE_TABLE_ORIGIN` (POS in QR), `VITE_STAFF_ORIGIN` (Office
-cấp link), `SORA_API_URL` (Next gọi API phía server). Không commit `.env`, không in secret
+`PAYMENT_PROVIDER` (`mock`), `CORS_ORIGINS`, `PORT`, `NODE_ENV`, `LIVE_SCENARIO`.
+Front-end: `VITE_STAFF_ORIGIN` (Office cấp link), `SORA_API_URL` (Next gọi API phía
+server). Không commit `.env`, không in secret
 ra log hay chat.
 
 ---
@@ -499,9 +509,10 @@ polling 60 s làm dự phòng. Không gọi API trong vòng lặp render; gộp 
 
 ## 9. Định hướng mới (10/2026) — điều chỉnh so với bản thiết kế gốc
 
-Phần này **ghi đè** các chỗ tương ứng của `tokyo-sora-ke-hoach-thiet-ke.md` §20–22 và
-`LUONG-QR-BAN.md`. Mục có dấu **[quyết định mở]** là giả định hợp lý cần chủ dự án chốt
-trước khi làm — hỏi, đừng tự chọn im lặng.
+Phần này **ghi đè** các chỗ tương ứng của `tokyo-sora-ke-hoach-thiet-ke.md` §20–22 (cả
+`LUONG-QR-BAN.md` cũ — đã xoá cùng luồng QR, còn trong lịch sử git). Mục có dấu
+**[quyết định mở]** là giả định hợp lý cần chủ dự án chốt trước khi làm — hỏi, đừng tự
+chọn im lặng.
 
 ### 9.1 iPad tại bàn thay cho QR điện thoại
 - **Thiết bị:** mỗi bàn một **iPad (thế hệ 7, 10,2″)** gắn đế, **ngang**, viewport
@@ -513,25 +524,27 @@ trước khi làm — hỏi, đừng tự chọn im lặng.
   Access "Motion"); Wake Lock API dùng được (giữ màn sáng, không cần tắt auto-lock); âm
   thanh cần một lần chạm trước; `100dvh`, container query, `overscroll-behavior`, WebP/AVIF
   đều có; **không** dùng `-webkit-overflow-scrolling`; gọi `navigator.storage.persist()`;
-  JS gọn vì A10/3 GB. Hướng dẫn lắp đặt viết thêm vào `THIET-BI.md` khi làm.
-- **Định danh:** iPad là **thiết bị ghép** (`devices.kind` thêm `'table'`, gắn `table_id`),
-  ghép bằng mã 6 số sinh ở Office A4 có chọn bàn. Xác thực qua lớp 3 của `AuthGuard`
-  (`x-sora-device`) → actor thiết bị-bàn, phạm vi = **phiên đang mở của chính bàn đó**.
-  Không còn cookie `sora_table`, không còn kiểm Wi-Fi, không còn chủ bàn duyệt cho luồng
-  chính. Thu hồi từ xa ở A4 như mọi thiết bị. **Luồng QR điện thoại: gỡ hẳn** (chốt
-  22/10/2026) — gỡ cùng lúc với ghép thiết bị kind `table`, vì iPad đang vào bàn bằng chính
-  luồng đó: `table-devices/*`, cookie `sora_table`, màn `Enter`/`Waiting`/`HostApproval`,
-  bố cục điện thoại của `apps/table`, mã QR ở POS P3.
+  JS gọn vì A10/3 GB. Hướng dẫn lắp đặt: `THIET-BI.md` mục iPad tại bàn.
+- **Định danh (làm xong 22/10/2026):** iPad là **thiết bị ghép** `devices.kind = 'table'`
+  gắn `table_id`, ghép bằng mã 6 số sinh ở Office A4 có chọn bàn (một bàn một iPad sống).
+  iPad đi theo **bàn**, không giữ phiên: `AuthGuard` tra phiên sống của bàn mỗi lần gọi —
+  có phiên thì iPad là khách R0 của đúng phiên đó, chưa mở thì chỉ hỏi được bàn mình và tự
+  mở bàn (`/api/table-terminal`). Thu hồi ở A4 → iPad về màn ghép. Luồng QR điện thoại
+  **đã gỡ hẳn**: `table-devices/*`, cookie `sora_table`, kiểm Wi-Fi, chủ bàn duyệt, bố cục
+  điện thoại của `apps/table`, nút "Mã QR bàn" ở POS.
 - **Vòng đời màn hình** (server quyết định, iPad chỉ render theo phiên của bàn):
-  1. **Bàn chưa mở → màn chờ quảng cáo** (§9.1b).
+  1. **Bàn chưa mở → màn chờ quảng cáo** (§9.1b — chưa làm; tạm thời bàn trống hiện sẵn
+     hộp "Mấy người ăn?").
   2. Mở phiên: nhân viên mở ở POS P3 như hiện tại, **và** khách chạm "Bắt đầu gọi món" trên
      iPad → hỏi số khách → tạo phiên, POS thấy bàn chuyển "có khách" ngay. **Khách được
-     tự mở bàn** (chốt 22/10/2026); bàn có đặt chỗ trong 90′ thì iPad không mở mà mời gọi
-     nhân viên (409 `table_reserved`).
+     tự mở bàn** (chốt 22/10/2026); bàn có đặt chỗ trong 90′ thì iPad không mở, chỉ báo
+     giờ đặt (không tên) và mời gặp nhân viên (409 `table_reserved`) — iPad bàn chưa mở
+     chưa gửi được yêu cầu T9 vì yêu cầu gắn với phiên.
   3. T2 thực đơn → giỏ → gửi bếp → T8 theo dõi → T9 gọi nhân viên (than, đá/nước, phục vụ,
      tính tiền, khác) → T10 tạm tính → VietQR hoặc gọi thu ngân → "Đã thanh toán, chờ dọn".
   4. Nhân viên đóng bàn ở POS → iPad **tự quay về màn chờ** trong ≤ 3 s (cần realtime hoặc
-     polling 2 s khi ở trạng thái `paid_wait_clear`).
+     polling 2 s khi ở trạng thái `paid_wait_clear` — đang dùng polling). Đổi lượt khách thì
+     xoá giỏ, lượt trả và từ khoá tìm của khách trước (`table-context.tsx`).
 - **Bố cục iPad — đã duyệt 22/10/2026** (bản vẽ canvas "Gọi món tại bàn · iPad"; thay bản
   16px/52px trước đó — chủ dự án thấy chữ to, kém tinh tế). Khung thiết kế **1080×740**:
   màn 1080×810 trừ thanh trạng thái và thanh Safari (707 khi mở hai tab — vẫn vừa).
@@ -550,15 +563,15 @@ trước khi làm — hỏi, đừng tự chọn im lặng.
     `data-scale`). Bo 4 nút/ô nhập/nhãn · 8 thẻ · 12 hộp thoại. Không hover, không kéo-thả.
   - Món nướng định tuyến theo bàn: bàn có bếp → "Món ra sống — tự nướng tại bàn"; không
     bếp → "Bếp nướng sẵn, chậm hơn khoảng 8 phút".
-- **Trạng thái 22/10/2026 — đã dựng trong `apps/table`** (bố cục chọn theo bề rộng
-  ≥ 900px ở `src/layout.ts`; màn `routes/Ipad*.tsx`; cùng địa chỉ với bố cục điện thoại):
-  T1 số khách (1–6 + ô "Khác"; quá sức chứa bàn thì gọi nhân viên ghép bàn) · T2–T7 ·
-  T8+T10 chung một màn (nhóm theo **lượt gửi bếp** `sentAt`, không theo `batchNo` — món gọi
-  từ bàn luôn ở đợt 1) · T9 · T11–T15 · T16 kèm 2 món thay · T17 · màn mờ 3 phút ·
-  "Bí quyết thưởng thức" (đọc `/api/site/menu`, chỉ món có bài kể như trang web). **Chưa:**
-  thiết bị kind `table`, màn chờ, khách tự mở bàn, tự về màn chờ, gỡ QR, VI/EN/JA, giá
-  khuyến mãi (§9.6), manifest standalone + Wake Lock, ảnh qua bộ tối ưu (§8 — bắt buộc
-  trước khi lắp iPad thật: lưới đang phát ảnh gốc).
+- **Trạng thái 22/10/2026 — đã dựng trong `apps/table`** (chỉ còn bố cục iPad; màn
+  `routes/Ipad*.tsx`): ghép máy `IpadPair` · T1 số khách (1–6 + ô "Khác") dùng cho cả khách
+  tự mở bàn lẫn bàn nhân viên đã mở, quá sức chứa thì gọi nhân viên ghép bàn, bàn có đặt
+  chỗ thì báo giờ · T2–T7 · T8+T10 chung một màn (nhóm theo **lượt gửi bếp** `sentAt`, không
+  theo `batchNo` — món gọi từ bàn luôn ở đợt 1) · T9 · T11–T15 · T16 kèm 2 món thay · T17 ·
+  màn mờ 3 phút · "Bí quyết thưởng thức" (đọc `/api/site/menu`, chỉ món có bài kể như trang
+  web) · giá khuyến mãi (§9.6) · tự về màn đầu khi đóng bàn. **Chưa:** màn chờ quảng cáo
+  (§9.1b), VI/EN/JA, manifest standalone + Wake Lock, Realtime thay polling, ảnh qua bộ tối
+  ưu (§8 — bắt buộc trước khi lắp iPad thật: lưới đang phát ảnh gốc).
 - **Offline:** giỏ và lệnh gửi qua outbox như hiện tại; màn chờ vẫn hiển thị khi mất mạng
   (nội dung đã cache); thanh toán bị chặn kèm "Vui lòng gọi thu ngân".
 - **Cập nhật phần mềm:** chỉ tự reload khi đang ở **màn chờ** (không bao giờ giữa bữa).
@@ -581,6 +594,9 @@ trước khi làm — hỏi, đừng tự chọn im lặng.
   thấy ở iPad kia (cần realtime hoặc polling ngắn). Ghép ở POS P9 hoặc trên iPad với PIN
   nhân viên; ghép được khi cả hai bàn trống **hoặc** một bàn trống + một bàn đang mở chưa
   có tiền (409 `bill_has_money` như `transfer`).
+- iPad đi theo phiên sống của **bàn** (`IdentityService.liveSessionOfTable`,
+  `TableTerminalService`): ghép đôi phải cho hai chỗ này đọc cả bảng ghép, không thì iPad
+  của bàn phụ thấy bàn mình chưa mở.
 - Vé bếp ghi nhãn bàn **`A4+A5`**; định tuyến `linh_hoat` theo bàn **chính** (bàn ghép
   khác loại bếp → 409 `reroute_confirm`). Trên P2 hai ô bàn nối liền một viền.
 - **Tách** khi đóng phiên, hoặc tách theo món/% như P9 hiện có. Không dùng mẫu "dồn món
@@ -595,8 +611,9 @@ trước khi làm — hỏi, đừng tự chọn im lặng.
   - **600–1023** (iPad dọc 810): hai cột — nhóm món thành thanh ngang cuộn trên lưới, phiếu
     order là **bottom sheet** kéo lên, nút Gửi bếp dính đáy.
   - **< 600** (điện thoại 390): một cột, lưới 2 ô/hàng, thanh nhóm ngang, giỏ là sheet,
-    phím chính ở nửa dưới, thao tác một tay. Modal giữa màn → thay bằng `Sheet` (đưa
-    `Sheet` của table vào `@sora/ui`).
+    phím chính ở nửa dưới, thao tác một tay. Modal giữa màn → thay bằng bottom sheet
+    `Sheet` dựng trong `@sora/ui` (bản của table đã gỡ cùng bố cục điện thoại — lấy lại
+    từ git: `apps/table/src/components/Sheet.tsx`).
 - Thành phần dùng ở nhiều khổ → container query; không nhân đôi màn.
 - Điện thoại nhân viên vẫn là **thiết bị ghép** (mã 6 số, kind `pos`), đăng nhập PIN như
   tablet; cookie `sora_staff` và `x-sora-device` không đổi.
@@ -639,8 +656,8 @@ Mục tiêu bản dựng lại (giữ nguyên API; đổi client):
 1. Đường ống ảnh + sửa hero/thumbnail web (§8) — thấy ngay, không đụng nghiệp vụ.
 2. Realtime client dùng chung (`@sora/core`), áp cho KDS trước.
 3. Dựng lại KDS (§9.4).
-4. Thiết bị kind `table` + vòng đời phiên theo bàn + màn chờ + khách tự mở bàn + gỡ QR
-   (§9.1). Giao diện T1–T17 iPad đã dựng (22/10/2026).
+4. Thiết bị kind `table` + vòng đời phiên theo bàn + khách tự mở bàn + gỡ QR: **xong**
+   (22/10/2026, §9.1). Còn màn chờ quảng cáo (§9.1b).
 5. Bàn đôi (§9.2).
 6. POS ba khổ (§9.3).
 Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
@@ -742,7 +759,7 @@ vào đơn; app chỉ hiển thị.
    `bg-surface-1`, `border-accent/16`, `border-warn`.
 2. Outbox: lỗi ghi không xử lý được ở POS/KDS/Table; dòng `inflight` kẹt sau reload;
    `enqueue` trả `null` khi đang drain (`packages/core/src/outbox.ts:102,108-111,151-164`).
-3. POS mở bàn từ đặt chỗ thiếu `?code=` (`ReservationDrawer.tsx:109`) → header trống, QR sai.
+3. POS mở bàn từ đặt chỗ thiếu `?code=` (`ReservationDrawer.tsx:109`) → header trống.
 4. Web ngoài lint: 5 chỗ `dangerouslySetInnerHTML` JSON-LD **không escape `<`** từ chữ
    nhập ở Office; ~16 `rgba()` thô; không CSP/security header; không `viewport-fit=cover`
    nên `env(safe-area-inset-*)` vô hiệu; `SITE_URL` mặc định sai tên miền.
@@ -762,15 +779,15 @@ Thấp hơn:
   nhánh → giá chi nhánh → giá online chuỗi → giá tại quán) nhưng đơn web tính theo
   `catalog.dishesByIds` (`o?.price ?? basePrice`, bỏ qua `onlinePrice`). Chỉ lộ khi Office
   khai giá online khác giá tại quán.
-- Dead code: `issueQrToken` (`apps/pos/src/api.ts:667`), `POST /api/table-sessions/:id/qr-token`
-  + `/exchange`, `screens/Holding.tsx` (K4); `pnpm-workspace.yaml`
-  liệt kê `e2e` không tồn tại.
+- Dead code: `screens/Holding.tsx` (K4); `pnpm-workspace.yaml` liệt kê `e2e` không tồn tại.
 - Thiếu favicon ở table/staff/office/web; POS/kitchen có `favicon.svg` chưa link.
 - Nhiều endpoint đọc tin `?branch=` mà không so với `actor.branchId`.
-- Tài liệu lệch: `DEV.md` §QR theo phiên, `LUONG-QR-BAN.md` "chưa hiện thực hoá",
-  `THIET-BI.md` "lưới không cuộn" và `packages/print-bridge`, `README.md` "5 ứng dụng" +
-  token cũ (`danger #C34141`, bo góc 0/4/8/999), `huong-dan-su-dung/03` banner outbox,
-  comment `vite.config.ts` POS/KDS về IndexedDB giữ cache (không có).
+- iPad bàn (như mọi thiết bị ghép) vẫn đọc được `GET /api/auth/staff` (tên nhân viên) và
+  `/api/shifts/open` — route không gắn quyền. iPad chạy Guided Access nên khách không gọi
+  tay được; chặn khi rà quyền thiết bị.
+- Tài liệu lệch: `THIET-BI.md` "lưới không cuộn" và `packages/print-bridge`, `README.md`
+  "5 ứng dụng" + token cũ (`danger #C34141`, bo góc 0/4/8/999), `huong-dan-su-dung/03`
+  banner outbox, comment `vite.config.ts` POS/KDS về IndexedDB giữ cache (không có).
 
 ---
 

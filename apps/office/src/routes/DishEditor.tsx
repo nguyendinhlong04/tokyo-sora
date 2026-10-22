@@ -570,7 +570,7 @@ export function DishEditor({
                 checked={draft.tableOrderable}
                 onChange={(e) => set({ tableOrderable: e.target.checked })}
               />
-              Cho gọi trên Sora Table (khách quét QR tại bàn)
+              Cho gọi trên Sora Table (iPad tại bàn)
             </label>
             <label className="mt-3 flex items-center gap-2.5 text-[length:var(--fs-b2)] text-ink-hi">
               <input

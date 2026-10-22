@@ -84,7 +84,7 @@ Màn liệt kê **món của trạm mình**. Mỗi món có hai nút:
 | **Còn N** | Hộp thoại `{món} còn mấy phần?` — chọn 1…20 → `Còn N phần`, *số phần trừ ngay lúc khách gọi, không đợi nấu xong*; bán hết N phần thì món tự khoá |
 | **Mở lại** (khi món đang khoá) | Món bán lại bình thường |
 
-Hiệu lực **tức thì trên mọi kênh**: menu trên điện thoại khách tại bàn, lưới món
+Hiệu lực **tức thì trên mọi kênh**: thực đơn trên iPad tại bàn, lưới món
 POS và menu đặt online khoá món trong vài giây; khách có món đó trong giỏ sẽ
 thấy thông báo "vừa hết — đã bỏ khỏi giỏ". Mọi lượt báo hết đều ghi nhật ký.
 

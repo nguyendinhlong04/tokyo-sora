@@ -22,8 +22,8 @@ interface Sent {
 /**
  * Cột "Món đang chọn" bên phải thực đơn iPad — T6 giỏ và T7 vừa gửi trong một.
  *
- * Giỏ luôn mở cạnh thực đơn chứ không phải một màn riêng như điện thoại: tổng
- * tiền và nút Gửi bếp lúc nào cũng nằm dưới tay, khách gọi thêm bia không phải
+ * Giỏ luôn mở cạnh thực đơn chứ không phải một màn riêng: tổng tiền và nút
+ * Gửi bếp lúc nào cũng nằm dưới tay, khách gọi thêm bia không phải
  * đi qua màn nào. Gửi xong cột tóm tắt đợt vừa gửi hai giây rồi trở lại giỏ
  * trống — đủ để đọc "đã gửi", không bắt ai bấm "Đóng".
  */
@@ -81,7 +81,7 @@ export function CartColumn({
   const send = useMutation({
     mutationFn: async (items: CartItem[]) => {
       // Thêm món rồi mới gửi bếp — hàng đợi offline gửi tuần tự nên thứ tự này
-      // giữ nguyên cả khi đang mất mạng (y như giỏ của điện thoại)
+      // giữ nguyên cả khi đang mất mạng
       const added = await api.addLines(session.id, cart.toLines(note))
       const fired = await api.send(session.id)
       return { items, queued: added === null || fired === null }

@@ -31,16 +31,34 @@ export type Actor =
        */
       stationId: string | null
     }
-  /** Thiết bị đã ghép nhưng chưa có ai đăng nhập ca — KDS, kiosk, cầu in */
+  /**
+   * Thiết bị đã ghép nhưng chưa có ai đăng nhập ca — KDS, kiosk, cầu in. iPad bàn
+   * cũng đứng ở đây, nhưng CHỈ khi bàn của nó chưa mở: lúc đó nó không có quyền
+   * gì ngoài đọc bàn mình và tự mở bàn (§9.1, xem `TableTerminalController`).
+   */
   | {
       kind: 'device'
       deviceId: number
       branchId: string
       stationId: string | null
       deviceKind: string
+      /** Chỉ iPad bàn có */
+      tableId?: number
     }
-  /** Khách tại bàn (R0) — token QR của phiên bàn */
-  | { kind: 'customer'; tableSessionId: number; branchId: string }
+  /**
+   * Khách tại bàn (R0) — iPad gắn bàn khi bàn đang có phiên.
+   *
+   * iPad của bàn đang mở thành ĐÚNG actor khách của phiên đó chứ không phải một
+   * loại thiết bị mới: mọi chốt chặn khách sẵn có — chỉ đọc đơn bàn mình, đơn mang
+   * kênh `table`, không đọc vé bếp, Realtime chỉ nghe phiên mình — áp nguyên vẹn.
+   */
+  | {
+      kind: 'customer'
+      tableSessionId: number
+      branchId: string
+      deviceId?: number
+      tableId?: number
+    }
   /**
    * Khách web đặt món online — không tài khoản, không thiết bị, không bàn.
    *
@@ -85,16 +103,22 @@ export function actorBranchId(actor: Actor): string | null {
   return actor.kind === 'system' ? null : actor.branchId
 }
 
+/** iPad gắn bàn mà bàn chưa mở — chưa có phiên nào để phục vụ */
+export function isTableDevice(actor: Actor): boolean {
+  return actor.kind === 'device' && actor.deviceKind === 'table'
+}
+
 /**
- * Token bàn chỉ mở đúng bàn của nó.
+ * Khách chỉ mở được đúng bàn của mình.
  *
  * Mã phiên là số chạy nên đoán được: không có chốt này thì khách bàn 12 sửa số
- * trên thanh địa chỉ là đọc được đơn và tạm tính của bàn 11. Nhân viên và thiết
- * bị không bị chặn — họ vốn phải nhìn được cả sàn.
+ * trên thanh địa chỉ là đọc được đơn và tạm tính của bàn 11. iPad của bàn CHƯA mở
+ * thì không mở được phiên nào. Nhân viên và thiết bị khác không bị chặn — họ vốn
+ * phải nhìn được cả sàn.
  */
 export function assertOwnTableSession(actor: Actor, sessionId: number): void {
-  if (actor.kind === 'customer' && actor.tableSessionId !== sessionId) {
-    throw new ForbiddenException('Mã QR này không mở được bàn khác')
+  if ((actor.kind === 'customer' && actor.tableSessionId !== sessionId) || isTableDevice(actor)) {
+    throw new ForbiddenException('iPad này không mở được bàn khác')
   }
 }
 

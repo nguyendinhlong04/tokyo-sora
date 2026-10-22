@@ -83,9 +83,8 @@ flowchart LR
   thêm ô **Chọn người duyệt** + **PIN người duyệt** — *người duyệt phải khác
   người xin*. Đây là thao tác duy nhất không đi qua hàng đợi offline (phải có
   mạng).
-- **Mã QR bàn** (góc trên phiếu order): hiện mã QR cho khách quét để tự gọi món
-  và tự thanh toán trên điện thoại (chương 4). **Mỗi lần mở là cấp mã mới, mã cũ
-  chết ngay** — đừng mở lại khi khách đang dùng.
+- Khách gọi món trên **iPad gắn bàn** (chương 4) thì món hiện ngay trên phiếu order
+  này; bàn trống khách có thể tự mở trên iPad — ô bàn trên sơ đồ chuyển `Có khách`.
 
 ## 2.5 Chuyển · ghép · tách bàn (P9)
 
@@ -114,9 +113,9 @@ Bấm **Tính tiền** ở chân phiếu order. Màn hiện `Tổng đơn` · `�
 - **Tiền mặt:** bấm các nút mệnh giá **+50.000 / +100.000 / +200.000 /
   +500.000** theo tiền khách đưa → **Thu đủ · {số}** → màn hiện thẻ xanh
   **Tiền thối khách**.
-- **Khách chuyển khoản VietQR:** khách tự quét **mã QR bàn** và trả trong app
-  trên điện thoại (chương 4). Tiền về hiện ở màn **đối soát** (P15) — nếu khách
-  đã tự trả một phần, `Đã thu` trên màn tính tiền đã trừ sẵn.
+- **Khách chuyển khoản VietQR:** khách tự trả trên **iPad gắn bàn** (chương 4) — iPad
+  hiện mã VietQR, khách quét bằng app ngân hàng. Tiền về hiện ở màn **đối soát** (P15)
+  — nếu khách đã tự trả một phần, `Đã thu` trên màn tính tiền đã trừ sẵn.
 - **Khuyến mãi & voucher:** khối dưới tổng đơn cho thấy đơn đang được giảm gì —
   khuyến mãi món đã trừ sẵn trong giá món, chương trình hoá đơn đứng một dòng
   (tự áp, không cần làm gì). Khách đưa **mã voucher**: gõ mã → **Kiểm mã** (chỉ
@@ -125,12 +124,12 @@ Bấm **Tính tiền** ở chân phiếu order. Màn hiện `Tổng đơn` · `�
   phải làm **trước khi thu tiền** — bàn đã có lượt trả thì máy chủ không cho đổi
   tổng nữa.
 - Trả đủ xong bàn chuyển `Đã trả · chờ dọn` — **bàn không tự đóng**. Dọn xong
-  bấm **Đóng bàn {mã}** để trả bàn về `Trống` (token QR của khách cũng hết hạn
-  lúc này).
+  bấm **Đóng bàn {mã}** để trả bàn về `Trống` — iPad của bàn tự về màn chào trong
+  vài giây, giỏ của khách vừa rồi bị xoá.
 
 ## 2.7 Yêu cầu từ bàn (P12)
 
-Khách bấm "Gọi nhân viên" trên điện thoại → yêu cầu hiện ở đây (nút **Yêu cầu
+Khách bấm "Gọi nhân viên" trên iPad gắn bàn → yêu cầu hiện ở đây (nút **Yêu cầu
 từ bàn** trên thanh trên cùng). Mỗi thẻ ghi bàn, thời gian chờ, nội dung; khách
 xin tính tiền được gắn `Ưu tiên`, chờ quá 3 phút gắn `Chờ lâu`. Hai nút:
 **Mở bàn** (nhảy vào phiếu order) và **Đã xử lý**.
@@ -229,7 +228,7 @@ Banner đỏ nếu giờ cao điểm mà ngân hàng im hơi quá 15 phút trong
 Để khỏi tìm nút không tồn tại — các mục sau trong thiết kế **chưa dựng** trên POS
 (08/2026):
 
-- Tính tiền: chỉ có **tiền mặt** trên POS (VietQR là khách tự trả qua app bàn);
+- Tính tiền: chỉ có **tiền mặt** trên POS (VietQR là khách tự trả trên iPad bàn);
   chưa có thẻ/ví/ghi nợ công ty, giảm giá tay, ô SĐT tích điểm (voucher thì có —
   §2.6).
 - **In bill và hoá đơn điện tử chưa có trên POS** (HĐĐT quản lý ở Office; in tạm

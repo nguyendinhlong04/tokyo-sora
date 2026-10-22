@@ -51,9 +51,6 @@ const NOTE: Record<string, string> = {
     'Đệm đóng gói đơn mang về: vé vào bếp sớm hơn giờ hẹn ngần này giây.',
   'kitchen.deliveryBufferSeconds': 'Đệm cho đơn giao — dài hơn đóng gói vì còn quãng đường ship.',
 
-  'table.branchNetworks':
-    'Địa chỉ mạng của quán, ngăn bằng dấu phẩy. Khách bắt Wi-Fi quán thì gọi món được ngay; máy ngoài phải xin người mở bàn duyệt. Khai RIÊNG từng chi nhánh — lấy bằng cách mở trình duyệt trên máy đang bắt Wi-Fi quán rồi tra "địa chỉ IP của tôi". Để trống là mọi máy đều phải xin duyệt.',
-
   'auth.pinMaxAttemptsPerMinute': 'Nhập sai PIN quá số lần này trong một phút thì máy bị khoá.',
   'auth.pinLockoutMinutes': 'Khoá bao lâu sau khi vượt ngưỡng nhập sai ở trên.',
   'auth.pairingCodeTtlMinutes': 'Mã ghép thiết bị hết hạn sau ngần này phút kể từ lúc sinh.',

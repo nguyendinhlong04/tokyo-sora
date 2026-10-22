@@ -1,14 +1,17 @@
-import { Body, Controller, Get, Post, Query, Req, Res } from '@nestjs/common'
+import { Body, Controller, ForbiddenException, Get, Post, Query, Req, Res } from '@nestjs/common'
 import type { FastifyReply } from 'fastify'
 import { z } from 'zod'
+import { isTableDevice } from './actor'
 import { Public, STAFF_COOKIE, type RequestWithActor } from './auth.guard'
 import { IdentityService } from './identity.service'
 import { RequirePermission } from './permission.guard'
 
 const PairingCodeBody = z.object({
   branchId: z.string().min(1),
-  kind: z.enum(['pos', 'cashier', 'kds', 'kiosk', 'bridge']),
+  kind: z.enum(['pos', 'cashier', 'kds', 'kiosk', 'bridge', 'table']),
   stationId: z.string().nullish(),
+  /** Bắt buộc với iPad bàn (`table`) — kiểm ở service, nơi biết bàn thuộc chi nhánh nào */
+  tableId: z.number().int().positive().nullish(),
 })
 
 const PairBody = z.object({
@@ -75,6 +78,11 @@ export class IdentityController {
   ) {
     const input = LoginBody.parse(body)
     const actor = req.actor!
+    // iPad bàn đứng giữa phòng ăn cho khách bấm — bàn đang mở hay chưa cũng không
+    // bao giờ là máy vào ca
+    if (isTableDevice(actor) || actor.kind === 'customer') {
+      throw new ForbiddenException('iPad tại bàn không dùng để đăng nhập ca')
+    }
     // Chỉ đăng nhập được từ thiết bị đã ghép — PIN đứng một mình vô dụng
     const deviceId = actor.kind === 'device' ? actor.deviceId : actor.kind === 'staff' ? actor.deviceId : null
     if (deviceId === null) {

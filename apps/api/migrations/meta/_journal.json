@@ -218,6 +218,13 @@
       "when": 1792646860214,
       "tag": "0030_khuyen_mai_ap_dung_chung",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792653636855,
+      "tag": "0031_ipad_ban_go_qr",
+      "breakpoints": true
     }
   ]
 }

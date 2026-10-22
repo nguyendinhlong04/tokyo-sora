@@ -7,8 +7,8 @@ import { DishArt } from './DishArt'
 /**
  * Thẻ món trong lưới ba cột của iPad (T2).
  *
- * Hai đích chạm tách nhau như dòng món trên điện thoại: chạm ảnh/tên mở chi
- * tiết, nút + ở hàng giá thêm thẳng. Tên Việt hai dòng cố định và tên Nhật một
+ * Hai đích chạm tách nhau: chạm ảnh/tên mở chi tiết, nút + ở hàng giá thêm
+ * thẳng. Tên Việt hai dòng cố định và tên Nhật một
  * dòng ngay dưới, để mọi thẻ trong hàng cao bằng nhau và hàng giá thẳng một
  * đường — mắt lướt ngang đọc được giá cả hàng.
  *

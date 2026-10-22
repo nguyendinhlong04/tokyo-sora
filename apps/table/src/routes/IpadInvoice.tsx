@@ -14,7 +14,7 @@ import { Frame } from './IpadPay'
  * T15 Hoá đơn trên iPad — phiếu giấy kraft bên trái, lời cảm ơn và chấm sao
  * bên phải.
  *
- * Như bản điện thoại, KHÔNG in số hoá đơn điện tử, mã tra cứu hay điểm tích luỹ:
+ * KHÔNG in số hoá đơn điện tử, mã tra cứu hay điểm tích luỹ:
  * HĐĐT phải do nhà cung cấp cấp mã mới tra được trên hệ thống thuế, còn điểm cần
  * danh tính khách mà máy ở bàn không có. In ra một mã không tra được gì thì tệ
  * hơn là không in.

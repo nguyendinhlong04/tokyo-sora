@@ -9,11 +9,11 @@ import { StoryDialog } from '../components/StoryDialog'
 import { IconBook, IconPlus, IconWarning } from '../icons'
 import { useMenu } from '../menu'
 import { clock, LABELS, sendRounds, STEPS } from '../order-status'
+import { useOutbox } from '../outbox'
 import { moneyOf, usePromos } from '../promotions'
 import { storyMore, useStories } from '../stories'
 import { useTableSession } from '../table-context'
 import { useIpadCall } from './IpadShell'
-import { useOutbox } from './Shell'
 
 /** Thang than hồng của tiến độ món (§4.1): tro → đồng → than → đã ra */
 const TONE: Record<OrderLineRow['state'], string> = {

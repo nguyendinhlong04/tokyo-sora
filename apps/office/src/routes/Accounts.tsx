@@ -426,7 +426,7 @@ function RolePicker({
     )
   }
 
-  // R0 là khách quét QR, không phải người có tài khoản
+  // R0 là khách gọi món trên iPad tại bàn, không phải người có tài khoản
   const assignable = ROLES.filter((r) => r !== 'R0')
 
   return (

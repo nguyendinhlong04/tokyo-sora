@@ -62,11 +62,11 @@ export function useCart() {
   return value
 }
 
-const STORAGE_KEY = 'sora.table.cart'
+export const CART_KEY = 'sora.table.cart'
 
 function load(): CartItem[] {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
+    const raw = sessionStorage.getItem(CART_KEY)
     return raw ? (JSON.parse(raw) as CartItem[]) : []
   } catch {
     return []
@@ -78,15 +78,15 @@ function load(): CartItem[] {
  *
  * Khách bấm thêm/bớt liên tục và hay đổi ý; gọi API mỗi lần chạm vừa chậm vừa
  * để lại rác trên đơn của bàn. Giữ ở `sessionStorage` để lỡ tay tải lại trang
- * giữa lúc chọn món thì giỏ vẫn còn, nhưng không sống dai hơn tab trình duyệt —
- * người sau ngồi vào bàn không thừa hưởng giỏ của người trước.
+ * giữa lúc chọn món thì giỏ vẫn còn; đổi lượt khách thì `TableProvider` xoá và
+ * dựng lại giỏ — người sau ngồi vào bàn không thừa hưởng giỏ của người trước.
  */
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(load)
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+      sessionStorage.setItem(CART_KEY, JSON.stringify(items))
     } catch {
       // Trình duyệt chặn lưu trữ (chế độ riêng tư): giỏ vẫn chạy trong bộ nhớ
     }

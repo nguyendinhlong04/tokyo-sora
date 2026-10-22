@@ -173,77 +173,48 @@ export interface NewLine {
   modifierOptionIds?: string[]
 }
 
-export type DeviceState = 'waiting' | 'admitted' | 'rejected'
-
-export interface JoinResult {
-  deviceId: number
-  sessionId: number
-  branchId: string
-  state: DeviceState
-  isHost: boolean
-  tableCode: string
-}
-
-export interface PendingList {
-  guestCount: number
-  admittedCount: number
-  waiting: { deviceId: number; since: string }[]
-}
-
 /**
- * Bàn mà máy này vừa quét, để màn chờ hỏi lại đường mạng được.
+ * Bàn của iPad này, hỏi bằng chính token thiết bị (§9.1).
  *
- * `join` cần biết chi nhánh và mã bàn, mà đường `/cho-duyet` thì không mang hai
- * thứ đó. Dùng `sessionStorage` chứ không phải state của router: khách đổi Wi-Fi
- * xong hay mở lại trang, và state của router chết theo lần tải đó.
+ * iPad ghim cứng một bàn từ lúc ghép mã ở Office A4; phiên thì đi theo BÀN — nhân
+ * viên mở bàn ở POS hay khách tự mở ở đây, iPad đều thấy cùng một phiên.
  */
-const BAN_DANG_CHO = 'sora-table-ban-dang-cho'
-
-export function nhoBanDangCho(branchId: string, tableCode: string) {
-  sessionStorage.setItem(BAN_DANG_CHO, JSON.stringify({ branchId, tableCode }))
-}
-
-export function banDangCho(): { branchId: string; tableCode: string } | null {
-  try {
-    const raw = sessionStorage.getItem(BAN_DANG_CHO)
-    return raw ? (JSON.parse(raw) as { branchId: string; tableCode: string }) : null
-  } catch {
-    return null
+export interface TerminalState {
+  branchId: string
+  table: {
+    id: number
+    code: string
+    area: string | null
+    hasGrill: boolean
+    seatMin: number
+    seatMax: number
+    active: boolean
   }
+  /** null = bàn chưa mở */
+  session: TableSession | null
+  /** Bàn có khách đặt trong 90′ tới — iPad không tự mở, chỉ báo giờ, không tên */
+  reservedAt: string | null
 }
 
 export const api = {
+  /** Mã 6 số quản lý sinh ở Office A4 cho đúng một bàn → token dài hạn của iPad */
+  pair: (code: string, name: string) =>
+    apiFetch<{ token: string; deviceId: number }>('/api/auth/pair', {
+      method: 'POST',
+      body: { code, name },
+    }),
+
+  terminal: () => apiFetch<TerminalState>('/api/table-terminal'),
+
   /**
-   * T1: quét mã dán bàn.
-   *
-   * Mã QR chỉ nói "bàn nào" — nó không phải bí mật. Máy chứng minh được đang ở
-   * trong quán thì vào thẳng; không thì nhận `waiting` và phải chờ chủ bàn duyệt.
+   * T1 khách tự mở bàn. Không qua hàng đợi offline: mở bàn mà nằm chờ có mạng thì
+   * khách ngồi trước một thực đơn không gọi được món — mất mạng thì nói thẳng.
    */
-  join: (branchId: string, tableCode: string) =>
-    apiFetch<JoinResult>('/api/table-devices/join', {
+  openTable: (guestCount: number) =>
+    apiFetch<TerminalState & { overCapacity: boolean }>('/api/table-terminal/open', {
       method: 'POST',
-      body: { branchId, tableCode },
+      body: { guestCount },
     }),
-
-  /** Máy đang chờ hỏi lại "tôi được duyệt chưa" */
-  deviceState: () =>
-    apiFetch<{ deviceId: number; state: DeviceState; isHost: boolean; sessionId: number }>(
-      '/api/table-devices/me',
-    ),
-
-  /** Chủ bàn xem ai đang xin vào, kèm bối cảnh số khách */
-  pending: () => apiFetch<PendingList>('/api/table-devices/pending'),
-
-  /** Chủ bàn bấm Đồng ý / Từ chối */
-  decide: (deviceId: number, approve: boolean) =>
-    apiFetch<{ deviceId: number; state: DeviceState }>('/api/table-devices/decide', {
-      method: 'POST',
-      body: { deviceId, approve },
-    }),
-
-  me: () => apiFetch<{ kind: string; tableSessionId?: number; branchId: string }>('/api/auth/me'),
-
-  session: (sessionId: number) => apiFetch<TableSession>(`/api/table-sessions/${sessionId}`),
 
   config: (branchId: string) => apiFetch<ConfigBundle>(`/api/config?branch=${branchId}`),
 

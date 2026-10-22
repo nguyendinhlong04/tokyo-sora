@@ -10,7 +10,7 @@ chốt → sổ sách & báo cáo.
 | Ứng dụng | Tên miền (production) | Cổng dev | Người dùng | Thiết bị |
 |---|---|---|---|---|
 | **Sora Web** | `tokyosora.vn` | `:3001` | Khách online — xem menu, đặt bàn, đặt món mang về/giao hàng | Điện thoại, máy tính của khách |
-| **Sora Table** | `ban.tokyosora.vn/t/<token>` | `:5173` | Khách tại bàn — quét QR gọi món, tự thanh toán | Điện thoại của khách |
+| **Sora Table** | `ban.tokyosora.vn` | `:5173` | Khách tại bàn — tự mở bàn, gọi món, gọi nhân viên, tự thanh toán | iPad gắn cố định ở từng bàn (10,2″, nằm ngang) |
 | **Sora POS** | `pos.tokyosora.vn` | `:5174` | Phục vụ, thu ngân, lễ tân | Tablet 11″ + máy thu ngân 22″ |
 | **Sora Kitchen (KDS)** | `kds.tokyosora.vn` | `:5175` | Đầu bếp từng trạm, người ra món | TV 32–43″ + Android box, treo trong bếp |
 | **Sora Office** | `admin.tokyosora.vn` | `:5176` | Chủ, quản lý chuỗi, kế toán, nhân sự, marketing | Máy tính văn phòng |
@@ -43,7 +43,7 @@ flowchart TD
     EINV["Nhà cung cấp HĐĐT"]
 
     OFFICE -- "phát hành config bundle (một chiều)" --> WEB
-    OFFICE -- " " --> TABLE
+    OFFICE -- "mã ghép iPad bàn" --> TABLE
     OFFICE -- " " --> POS
     OFFICE -- "hồ sơ · lịch · lương" --> STAFF
     OFFICE -- "mã ghép thiết bị" --> KIOSK
@@ -171,7 +171,7 @@ kiểu đăng nhập khác nhau tuỳ bề mặt:
 | Office | **Email + mật khẩu** (không cần thiết bị ghép) | Chủ R10, quản lý chuỗi R11, kế toán R8, nhân sự R13, marketing R9 |
 | Kênh nhân viên | **Link cá nhân** (Office cấp, hiện đúng một lần) **+ PIN của chính mình** | Mọi nhân viên |
 | Kiosk chấm công | Thiết bị ghép sẵn; nhân viên **chạm tên → nhập PIN** | Mọi nhân viên |
-| Sora Table | **Token QR theo phiên bàn** — hết hạn khi đóng bàn | Khách R0 |
+| Sora Table | **iPad ghép sẵn vào một bàn** (mã 6 số ở Office A4) — không đăng nhập; bàn đang mở thì iPad là khách của đúng phiên bàn đó, đóng bàn là mất quyền với đơn cũ | Khách R0 |
 
 Ba điều cần nhớ về quyền:
 

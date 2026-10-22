@@ -18,6 +18,10 @@ import { Field, formatTime } from '../components/report'
  * Ngắt thì cắt cả token thiết bị lẫn phiên nhân viên đang mở trên nó. Nếu chỉ cắt
  * token thiết bị thì cái tablet vừa mất vẫn gọi API bình thường cho tới khi phiên
  * hết hạn — tức là tới 12 tiếng sau, và đó không phải là "ngắt".
+ *
+ * iPad tại bàn (§9.1) chọn bàn ngay lúc sinh mã: mã ghép là thứ duy nhất nói iPad
+ * đứng ở bàn nào, người cầm máy không tự khai được. Một bàn một iPad — chuyển iPad
+ * sang bàn khác là ngắt máy ở đây rồi ghép lại.
  */
 
 const KIND_LABELS: Record<DeviceRow['kind'], string> = {
@@ -26,6 +30,7 @@ const KIND_LABELS: Record<DeviceRow['kind'], string> = {
   kds: 'Màn bếp',
   kiosk: 'Kiosk chấm công',
   bridge: 'Cầu in',
+  table: 'iPad tại bàn',
 }
 
 export function Devices() {
@@ -34,10 +39,14 @@ export function Devices() {
   const queryClient = useQueryClient()
   const [kind, setKind] = useState<DeviceRow['kind']>('pos')
   const [stationId, setStationId] = useState('')
+  const [tableId, setTableId] = useState('')
 
-  // Trạm là của từng chi nhánh — đổi chi nhánh mà giữ trạm cũ thì mã ghép KDS
-  // sinh ra sẽ trỏ vào một trạm không tồn tại ở nơi mới.
-  useEffect(() => setStationId(''), [branchId])
+  // Trạm và bàn là của từng chi nhánh — đổi chi nhánh mà giữ lựa chọn cũ thì mã
+  // ghép sinh ra sẽ trỏ vào một trạm hay một bàn không có ở nơi mới.
+  useEffect(() => {
+    setStationId('')
+    setTableId('')
+  }, [branchId])
 
   const data = useQuery({
     queryKey: ['devices', branchId],
@@ -53,9 +62,11 @@ export function Devices() {
         branchId: branchId!,
         kind,
         stationId: kind === 'kds' ? stationId || null : null,
+        tableId: kind === 'table' && tableId ? Number(tableId) : null,
       }),
     onSuccess: (res) => {
       toast(`Mã ghép ${res.code} — đọc cho người đứng ở máy, sống 10 phút`, 'ok')
+      setTableId('')
       invalidate()
     },
     onError: (err: Error) => toast(err.message, 'danger'),
@@ -79,13 +90,15 @@ export function Devices() {
   const live = devices.filter((d) => d.revokedAt === null)
   const revoked = devices.filter((d) => d.revokedAt !== null)
   const stations = data.data?.stations ?? []
+  const tables = data.data?.tables ?? []
   const pending = data.data?.pendingCodes ?? []
+  const missingTarget = (kind === 'kds' && !stationId) || (kind === 'table' && !tableId)
 
   return (
     <>
       <PageHeader
         title="Thiết bị"
-        subtitle="Máy nào của chi nhánh này đang được phép nói chuyện với hệ thống. Màn bếp ghim cứng một trạm ngay từ lúc ghép."
+        subtitle="Máy nào của chi nhánh này đang được phép nói chuyện với hệ thống. Màn bếp ghim cứng một trạm, iPad tại bàn ghim cứng một bàn ngay từ lúc ghép."
         action={<ConfigBranchPicker />}
       />
 
@@ -125,9 +138,28 @@ export function Devices() {
               </Field>
             ) : null}
 
+            {kind === 'table' ? (
+              <Field label="Gắn vào bàn">
+                <select
+                  value={tableId}
+                  onChange={(e) => setTableId(e.target.value)}
+                  className="h-9 rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
+                >
+                  <option value="">Chọn bàn…</option>
+                  {tables.map((t) => (
+                    <option key={t.id} value={t.id} disabled={t.hasIpad}>
+                      {t.code}
+                      {t.area ? ` · ${t.area}` : ''}
+                      {t.hasIpad ? ' — đã có iPad' : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
+
             <Button
               variant="primary"
-              disabled={makeCode.isPending || (kind === 'kds' && !stationId)}
+              disabled={makeCode.isPending || missingTarget}
               onClick={() => makeCode.mutate()}
             >
               Sinh mã ghép
@@ -150,7 +182,8 @@ export function Devices() {
                   </span>
                   <span className="text-[length:var(--fs-c1)] text-ink-mute">
                     {KIND_LABELS[c.kind as DeviceRow['kind']] ?? c.kind}
-                    {c.stationId ? ` · ${c.stationId}` : ''} · hết hạn {formatTime(c.expiresAt)}
+                    {c.stationId ? ` · ${c.stationId}` : ''}
+                    {c.tableCode ? ` · bàn ${c.tableCode}` : ''} · hết hạn {formatTime(c.expiresAt)}
                   </span>
                 </span>
               ))}
@@ -222,11 +255,15 @@ function DeviceTable({
           },
           {
             key: 'station',
-            header: 'Trạm',
+            header: 'Trạm / bàn',
             width: '150px',
             cell: (row) => (
               <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                {row.stationId ? `${row.stationId} · ${row.stationName ?? ''}` : '—'}
+                {row.stationId
+                  ? `${row.stationId} · ${row.stationName ?? ''}`
+                  : row.tableCode
+                    ? `Bàn ${row.tableCode}`
+                    : '—'}
               </span>
             ),
           },

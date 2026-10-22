@@ -50,9 +50,9 @@ export function App() {
 /**
  * Cửa vào từ link cá nhân: `/nv/<token>`.
  *
- * Cất token rồi RỜI KHỎI địa chỉ này bằng `replace` — cùng lý do màn quét QR của
- * khách làm vậy: URL bị chụp màn hình, dán vào nhóm chat, hiện lại ở gợi ý gõ
- * địa chỉ. Chỗ cất nó là máy của chính người đó.
+ * Cất token rồi RỜI KHỎI địa chỉ này bằng `replace`: URL bị chụp màn hình, dán
+ * vào nhóm chat, hiện lại ở gợi ý gõ địa chỉ. Chỗ cất nó là máy của chính người
+ * đó.
  */
 function LinkEntry() {
   const { token } = useParams()

@@ -132,10 +132,13 @@ export interface RoleAssignments {
 
 export interface DeviceRow {
   id: number
-  kind: 'pos' | 'cashier' | 'kds' | 'kiosk' | 'bridge'
+  kind: 'pos' | 'cashier' | 'kds' | 'kiosk' | 'bridge' | 'table'
   name: string
   stationId: string | null
   stationName: string | null
+  /** Chỉ iPad tại bàn có — máy ghim cứng một bàn từ lúc ghép (§9.1) */
+  tableId: number | null
+  tableCode: string | null
   pairedAt: string
   pairedByName: string | null
   revokedAt: string | null
@@ -147,6 +150,8 @@ export interface PendingCode {
   code: string
   kind: string
   stationId: string | null
+  tableId: number | null
+  tableCode: string | null
   expiresAt: string
 }
 
@@ -2262,10 +2267,17 @@ export const api = {
       devices: DeviceRow[]
       pendingCodes: PendingCode[]
       stations: { id: string; name: string }[]
+      /** Bàn đang dùng để ghim iPad — `hasIpad` thì phải ngắt máy cũ trước */
+      tables: { id: number; code: string; area: string | null; hasIpad: boolean }[]
     }>(`/api/admin/devices?branch=${encodeURIComponent(branchId)}`),
 
   /** Cửa duy nhất sinh mã ghép — dùng chung với luồng K1 của POS */
-  createPairingCode: (input: { branchId: string; kind: string; stationId: string | null }) =>
+  createPairingCode: (input: {
+    branchId: string
+    kind: string
+    stationId: string | null
+    tableId: number | null
+  }) =>
     apiFetch<{ code: string; expiresAt: string }>('/api/auth/pairing-codes', {
       method: 'POST',
       body: input,

@@ -1,93 +1,121 @@
-# 4 · Sora Table — khách quét QR gọi món & tự thanh toán
+# 4 · Sora Table — khách gọi món trên iPad gắn bàn & tự thanh toán
 
-App chạy trên **điện thoại của khách**, không cần cài đặt: khách quét mã QR do
-nhân viên cấp là vào thẳng bàn của mình. Chương này để phục vụ và thu ngân hiểu
-khách đang thấy gì mà hướng dẫn — và biết ranh giới nào là cố ý.
+Mỗi bàn có một **iPad 10,2″ gắn đế, nằm ngang**, ghép sẵn vào đúng bàn đó (lắp đặt:
+[THIET-BI.md](../THIET-BI.md)). Khách không cài gì, không quét gì: ngồi xuống là gọi
+món được. Chương này để phục vụ và thu ngân hiểu khách đang thấy gì mà hướng dẫn — và
+biết ranh giới nào là cố ý.
 
-## 4.1 Vào bàn
+> Luồng cũ "khách quét mã QR bằng điện thoại" **đã bỏ** (22/10/2026). POS không còn
+> nút **Mã QR bàn**.
 
-1. Phục vụ mở bàn trên POS → bấm **Mã QR bàn** (góc trên phiếu order) → đưa
-   khách quét. *Mỗi lần mở hộp thoại là cấp mã mới và mã cũ chết ngay.*
-2. Điện thoại mở `ban.tokyosora.vn/t/<token>` → hiện `Đang mở bàn…` → vào màn
-   chào. Token được đổi lấy cookie phiên rồi **biến mất khỏi thanh địa chỉ** —
-   khách chụp màn hình hay gửi link cho người khác cũng không vào được bàn.
-3. **Bàn đóng là phiên hết hiệu lực ngay.** Mọi màn rơi về *"Chưa vào được bàn
-   nào."* — khách quay lại sau khi bàn đã dọn thì nhờ nhân viên cấp mã mới.
+## 4.1 Mở bàn
 
-Mã cũ/hết hạn: *"Mã trên bàn có thể đã cũ sau khi bàn được dọn. Nhờ nhân viên
-in lại giúp bạn."*
+Hai cách, kết quả như nhau — iPad luôn đi theo **phiên của bàn**:
+
+1. **Khách tự mở trên iPad.** Bàn trống, iPad hiện hộp **Chào mừng quý khách** →
+   khách chọn **Mấy người ăn?** (1–6, hoặc **Khác** để nhập số) → **Bắt đầu gọi món**.
+   Ô bàn trên sơ đồ POS chuyển `Có khách` ngay.
+   - Nhóm **đông hơn sức chứa bàn**: bàn vẫn mở (ghi đúng sức chứa) và POS nhận yêu
+     cầu *"Nhóm N khách — cần ghép thêm bàn cạnh bàn X"* ở **Yêu cầu từ bàn**.
+   - Bàn **có khách đặt trong 90 phút tới**: iPad không mở, chỉ báo *"Bàn này được giữ
+     cho khách đặt lúc HH:MM"* (không bao giờ hiện tên người đặt) và mời gặp nhân
+     viên. Đúng khách đặt thì nhân viên mở bàn ở POS (từ đặt chỗ); khách khác thì xếp
+     bàn khác.
+2. **Nhân viên mở ở POS** (P3) như cũ. iPad thấy bàn đã mở trong vài giây và hỏi lại
+   **Mấy người ăn?** với số nhân viên đã nhập — khách sửa nếu sai (số này đi vào báo
+   cáo bình quân đầu khách).
+
+Hai người cùng mở một lúc (khách chạm đúng lúc nhân viên mở ở POS) không sinh hai bàn —
+iPad vào đúng phiên vừa mở.
 
 ## 4.2 Sơ đồ luồng của khách
 
 ```mermaid
 flowchart TD
-    A["Quét QR bàn"] --> B["Chào: Bàn 12 · số khách"]
-    B --> C["Thực đơn — tìm kiếm, bộ lọc"]
-    C --> D["Giỏ của bàn — ghi chú cho bếp"]
-    D -- "Gửi bếp" --> E["Vé xuống trạm bếp"]
-    E --> F["Đơn của bàn — theo dõi từng món"]
+    A["iPad: bàn trống"] -- "Mấy người ăn? · Bắt đầu" --> C
+    S["POS mở bàn"] --> B["iPad: chốt số khách"] --> C
+    C["Thực đơn — nhóm món · tìm · lọc · giỏ bên phải"]
+    C -- "Gửi bếp" --> E["Vé xuống trạm bếp"]
+    E --> F["Đơn của bàn + tạm tính"]
     F -- "gọi thêm" --> C
-    F --> G["Tạm tính"]
-    G -- "Tự thanh toán" --> H["Chia tiền: trả hết ·<br/>chia đều · chọn món mình trả"]
-    G -- "Gọi thu ngân" --> P["Thu ngân tới thu tiền mặt"]
-    H --> I["VietQR — quét & chuyển khoản"]
-    I --> J["Chờ ngân hàng xác nhận"]
+    F -- "Thanh toán" --> H["Cách trả: trả hết ·<br/>chia đều · chọn món mình trả"]
+    F -- "Gọi thu ngân" --> P["Thu ngân tới thu tiền"]
+    H --> I["VietQR — quét bằng app ngân hàng"]
+    I --> J["Chờ ngân hàng báo về"]
     J -- "webhook báo có" --> K["Hoá đơn + chấm sao"]
     P --> K
+    K --> L["Đã thanh toán đủ — chờ dọn"]
+    L -- "nhân viên đóng bàn ở POS" --> A
 ```
 
 ## 4.3 Gọi món
 
-- **Màn chào (T1):** `Bàn {mã}` + khu vực, dòng nhắc bàn có/không có bếp than
-  ("Bàn không có bếp — bếp nướng sẵn, món ra chậm hơn khoảng 8 phút"), chọn
-  **Mấy người ăn?** rồi **Bắt đầu gọi món**. Số khách gửi thẳng lên máy chủ (đi
-  vào báo cáo bình quân đầu khách) — vượt sức chứa bàn sẽ bị từ chối.
-- **Thực đơn (T2):** thanh nhóm món dính trên; nút **`+`** thêm thẳng vào giỏ;
-  món có tuỳ chọn bắt buộc mang **chấm vàng** — bấm `+` sẽ mở chi tiết để chọn.
-  Món hết gắn thẻ `Tạm hết`, nút khoá (không ẩn). **Bộ lọc** có 5 công tắc:
-  Chay · Không cay · Không hải sản · Dưới 200k · Đang có sẵn.
-- **Chi tiết món (T3):** tuỳ chọn (nhóm `*` là bắt buộc, tự chọn sẵn lựa chọn
-  đầu), ô **Ghi chú cho bếp** (≤300 ký tự), số lượng, **Thêm · {giá}**.
-- **Tìm món (T4):** gõ không dấu vẫn ra ("bo ba chi" → Ba chỉ bò).
-- **Giỏ (T6):** sửa số lượng/xoá từng dòng, ô **Ghi chú chung cho bếp** (gắn
-  vào món chưa có ghi chú riêng) → **Gửi bếp · {tiền}** → màn xác nhận
-  `Đã gửi bếp N món` rồi tự quay về thực đơn.
-- **Đơn của bàn (T8):** nhóm theo **đợt**, mỗi món có thanh trạng thái:
-  `Chờ gửi bếp → Bếp đã nhận → Đang làm → Sắp ra → Đã ra` (món huỷ gạch
-  ngang). Tự cập nhật mỗi 15 giây.
-- **Gọi nhân viên (T9)** — mở được từ mọi màn (nút điện thoại trên cùng): 5 nút
-  **Gọi phục vụ · Thêm than · Đá · nước · Xin tính tiền · Việc khác** → hiện ở
-  màn *Yêu cầu từ bàn* của POS.
+- **Thanh trên:** `TOKYO SORA` · bàn + khu + số khách · **Gọi nhân viên** · **Đơn của
+  bàn** kèm tổng tiền tới giờ.
+- **Thực đơn (T2):** cột trái là các **nhóm món** (kanji + tên + số phần đang chọn),
+  giữa là lưới ba cột thẻ món, phải là cột **Món đang chọn**. Nút **`+`** thêm thẳng vào
+  giỏ (nhãn +1 bay vào cột giỏ); món phải chọn vị/số người ăn có **chấm kem** — bấm `+`
+  là mở chi tiết. Món hết đóng dấu **Đã hết**, xám, không ẩn. Món khuyến mãi có nhãn và
+  giá gốc gạch ngang.
+- **Tìm món (T4) và Bộ lọc (T5)** ở đáy cột nhóm, mở ngay trong cột giữa. Gõ không dấu
+  vẫn ra ("bo ba chi" → Ba chỉ bò). Bộ lọc: Chay · Không cay · Không hải sản · Dưới 200k
+  · Đang có sẵn.
+- **Chi tiết món (T3):** hộp hai cột — trái là món (ảnh, tên, giá, dị ứng), phải là
+  tuỳ chọn (nhóm bắt buộc chọn sẵn lựa chọn đầu), ghi chú cho bếp, số lượng. Món có bài
+  kể có nút **Bí quyết thưởng thức**.
+- **Giỏ (T6–T7):** sửa số lượng từng dòng, ô ghi chú chung cho bếp, **Tạm tính đợt
+  này** → **Gửi bếp**. Gửi xong cột giỏ tóm tắt đợt vừa gửi hai giây rồi trống lại.
+- **Đơn của bàn (T8 + T10):** nhóm theo **lượt gửi bếp**, mỗi món có trạng thái
+  `Bếp đã nhận → Đang làm → Sắp ra → Đã ra` (món huỷ gạch ngang); bên phải là tạm tính
+  (tiền món, khuyến mãi, phí phục vụ, VAT, làm tròn) với hai nút **Thanh toán** và
+  **Gọi thu ngân**.
+- **Gọi nhân viên (T9)** — nút trên thanh trên ở mọi màn: **Gọi phục vụ · Thêm than**
+  (chỉ bàn có bếp) **· Đá · nước · Xin tính tiền · Việc khác** → hiện ở màn *Yêu cầu từ
+  bàn* (P12) của POS.
+- **Để yên 3 phút** (giữa bữa): màn tối lại, chỉ còn tổng đơn và số phần đang chọn chưa
+  gửi; chạm là trở lại đúng chỗ — không bao giờ quay về màn chào giữa bữa.
 
 ## 4.4 Tự thanh toán
 
-- **Tạm tính (T10):** ghi rõ *"chưa phải hoá đơn"*. Hai nút: **Tự thanh toán**
-  / **Gọi thu ngân**. Đã trả một phần thì hiện "Đã trả X · còn Y".
-- **Chia tiền (T11):** ba cách — **Trả hết** · **Chia đều** (chọn mấy người,
-  "Bạn trả một phần; những người còn lại quét mã của họ trên máy mình") ·
-  **Chọn món mình trả** (T12 — món người khác đã nhận trả bị khoá, chống trả
-  trùng).
-- **VietQR (T13):** mã QR + số tài khoản (có nút chép) + số tiền. Nút
-  **Đã chuyển xong** *chỉ đổi màn hình chờ* — không đánh dấu đã trả.
-- **Chờ xác nhận (T14):** "Đang chờ ngân hàng xác nhận…"; quá 45 giây: "Lâu hơn
-  thường lệ. Nhân viên sẽ tới xác nhận giúp bạn." Khách đóng màn được — kết quả
-  vẫn ghi nhận. Khi ngân hàng báo có: `Đã nhận {tiền} — Cảm ơn bạn!`.
-  - Khách chuyển **lệch tiền**: app báo "Nhân viên sẽ tới đối chiếu giúp bạn —
-    chưa cần chuyển thêm" → thu ngân xử lý ở màn đối soát P15 (**Chấp nhận** /
-    **Yêu cầu bù**).
-  - Lượt trả **hết hạn**: "Tạo lại mã mới giúp bạn, tiền chưa bị trừ lượt này."
-- **Hoá đơn (T15):** phiếu đầy đủ món, phí phục vụ, thuế, các lượt trả (tiền
-  mặt/chuyển khoản kèm giờ). Bàn còn nợ thì ghi rõ "đây vẫn là bản tạm tính".
-  Cuối trang là thẻ **"Bữa nay thế nào?"** — khách chạm sao là gửi ngay, nhận
-  xét thêm tuỳ ý → đổ về màn *Phản hồi khách* (B13) trên Office.
+- **Cách trả (T11):** **Trả hết** · **Chia đều** (chọn mấy người; mỗi người lần lượt
+  quét mã phần mình trên chính iPad này) · **Chọn món mình trả** (T12 — món người khác
+  đã nhận trả bị khoá, chống trả trùng). Số tiền lượt này đổi ngay theo lựa chọn.
+- **VietQR (T13):** mã QR + số tài khoản và số tiền (có nút chép). Màn chờ *"Đang chờ
+  ngân hàng báo về…"*, thường dưới một phút; lâu hơn thì *"Lâu hơn thường lệ"* — nhân
+  viên tới xác nhận giúp.
+  - Khách chuyển **lệch tiền**: *"Nhân viên sẽ tới đối chiếu giúp bạn — chưa cần chuyển
+    thêm."* → thu ngân xử lý ở màn đối soát P15 (**Chấp nhận** / **Yêu cầu bù**).
+  - Lượt trả **hết hạn**: *"Tạo lại mã mới giúp bạn, tiền chưa bị trừ lượt này."*
+- **Hoá đơn (T15):** phiếu đủ món (món khuyến mãi in giá gốc + dòng giảm), phí, thuế,
+  các lượt trả. Bàn còn nợ thì ghi rõ *"đây vẫn là bản tạm tính"*. Bên phải là thẻ
+  **chấm sao** — đổ về màn *Phản hồi khách* (B13) trên Office.
+- **Trả đủ:** iPad hiện **Đã thanh toán đủ** — *"Nhân viên sẽ dọn bàn trong ít phút"*,
+  kèm **Xem hoá đơn · Gọi thêm món · Gọi nhân viên**.
 
-## 4.5 Quy tắc an toàn & sự cố
+## 4.5 Đóng bàn và đổi lượt khách
+
+- **Nhân viên đóng bàn ở POS** (sau khi trả đủ, hoặc bàn 0đ) → iPad về hộp **Chào mừng
+  quý khách** trong vài giây, dù đang đứng ở màn nào.
+- Đổi lượt khách là **xoá sạch** dấu vết khách trước trên iPad: món chọn chưa gửi, các
+  lượt trả, từ khoá tìm gần đây. Đơn của bàn trước chỉ còn xem được ở POS.
+- iPad bị **ngắt ở Office → A4** thì về màn **Ghép iPad với bàn** — nhờ quản lý sinh mã
+  mới (chương 6, A4).
+
+## 4.6 Quy tắc an toàn & sự cố
 
 | Tình huống | Hành vi của hệ thống |
 |---|---|
 | Khách bấm "Đã chuyển xong" nhưng chưa chuyển | Không có gì đổi — **chỉ webhook ngân hàng báo có mới ghi nhận tiền** |
 | Bàn trả đủ | Bàn chuyển *Đã trả · chờ dọn*; **nhân viên đóng bàn**, không tự đóng; khách vẫn gọi thêm được (khoản mới cùng phiên) |
-| Mất mạng khi đang gọi món | Giỏ vẫn thao tác được, món **tự gửi khi có mạng** (banner "Mất kết nối — món đã chọn sẽ tự gửi khi có mạng") |
-| Mất mạng khi thanh toán | **Chặn hẳn** (màn 断): *"Thanh toán cần mạng ổn định. Vui lòng gọi thu ngân."* — lượt trả cần tài khoản định danh thật, không xếp hàng được |
-| Bếp báo hết món đang nằm trong giỏ | Hộp thoại *"{món} vừa hết — đã bỏ khỏi giỏ của bạn"* + gợi ý chọn món khác |
+| Mất mạng khi đang gọi món | Giỏ vẫn thao tác được, món **tự gửi khi có mạng** (dải báo "Mất kết nối — bạn vẫn chọn món được, món sẽ tự gửi bếp khi có mạng") |
+| Mất mạng khi thanh toán | **Chặn hẳn**: *"Thanh toán cần mạng ổn định. Vui lòng gọi thu ngân."* — lượt trả cần tài khoản định danh thật, không xếp hàng được |
+| Mất mạng khi mở bàn | Báo *"Mất kết nối — chưa mở được bàn. Vui lòng gọi nhân viên."* — nhân viên mở ở POS |
+| Bếp báo hết món đang nằm trong giỏ | Hộp thoại báo món vừa hết, bỏ khỏi giỏ và gợi ý hai món thay (T16) |
 | Khách gọi nhân viên khi mất mạng | Báo lỗi thẳng (gọi người thì không thể nằm chờ trong hàng đợi) |
+| Khách muốn mở bàn khác hay xem đơn bàn khác | Không làm được — iPad chỉ thấy đúng bàn được ghép |
+
+## 4.7 Chưa có trong bản dựng này
+
+- **Màn chờ quảng cáo** khi bàn trống — hiện bàn trống đứng sẵn ở hộp mở bàn.
+- Chọn ngôn ngữ **VI / EN / JA**.
+- iPad tự cập nhật phần mềm — bản mới chạy khi trang được tải lại (xem THIET-BI.md).

@@ -11,13 +11,11 @@ import { DishLine } from './DishLine'
 /**
  * T3 Chi tiết món trên iPad — hộp thoại hai cột giữa màn.
  *
- * Bản điện thoại là tấm trượt từ đáy cho ngón cái; trên iPad nằm ngang thì hộp
- * giữa màn hợp hơn: cột trái là món (ảnh, tên, giá, dị ứng) đứng yên, cột phải
+ * iPad nằm ngang nên là hộp giữa màn, không phải tấm trượt từ đáy: cột trái là món (ảnh, tên, giá, dị ứng) đứng yên, cột phải
  * là phần phải chọn (vị, thêm, ghi chú) cuộn được, nút thêm ghim đáy cột phải.
  * Khách đọc món bên trái trong lúc tay chọn vị bên phải, không phải cuộn qua lại.
  *
- * Luật chọn giữ đúng như `DishSheet`: nhóm bắt buộc chọn sẵn lựa chọn đầu, nhóm
- * tuỳ chọn để trống — không ai muốn tự dưng bị tính thêm tỏi.
+ * Luật chọn: nhóm bắt buộc chọn sẵn lựa chọn đầu, nhóm tuỳ chọn để trống — không ai muốn tự dưng bị tính thêm tỏi.
  */
 export function DishDialog({
   dish,

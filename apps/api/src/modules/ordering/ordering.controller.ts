@@ -1,7 +1,18 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Req, UseInterceptors } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Req,
+  UseInterceptors,
+} from '@nestjs/common'
 import { z } from 'zod'
 import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
-import { assertOwnTableSession } from '../identity/actor'
+import { assertOwnTableSession, type Actor } from '../identity/actor'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { FloorplanService } from './floorplan.service'
@@ -73,11 +84,16 @@ export class OrderingController {
 
   /** P2 sơ đồ bàn */
   @Get('tables')
-  tables(@Query('branch') branch: string) {
+  tables(@Query('branch') branch: string, @Req() req: RequestWithActor) {
+    // Sơ đồ mang tạm tính của mọi bàn — không phải thứ màn hình giữa bàn ăn được đọc
+    staffOnly(req.actor!, 'iPad tại bàn không xem sơ đồ bàn')
     return this.floorplan.floorplan(branch)
   }
 
-  /** P3 mở bàn */
+  /**
+   * P3 mở bàn. Khách (R0) có `order.create` để gọi món, nhưng không được mở BÀN
+   * BẤT KỲ — iPad chỉ mở đúng bàn mình qua `POST /api/table-terminal/open`.
+   */
   @Post('tables/:id/open')
   @RequirePermission('order.create')
   openTable(
@@ -85,6 +101,7 @@ export class OrderingController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
+    staffOnly(req.actor!, 'Khách không mở bàn ở đây')
     return this.floorplan.openTable(id, OpenTableBody.parse(body), req.actor!)
   }
 
@@ -110,6 +127,8 @@ export class OrderingController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
+    // Khách gọi món vào đơn của CHÍNH bàn mình — mã phiên là số chạy, đoán được
+    assertOwnTableSession(req.actor!, id)
     return this.ordering.addLines(id, AddLinesBody.parse(body).lines, req.actor!)
   }
 
@@ -117,6 +136,7 @@ export class OrderingController {
   @Post('table-sessions/:id/send')
   @RequirePermission('order.create')
   send(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
+    assertOwnTableSession(req.actor!, id)
     return this.ordering.sendToKitchen(id, req.actor!)
   }
 
@@ -128,6 +148,8 @@ export class OrderingController {
     @Param('batchNo', ParseIntPipe) batchNo: number,
     @Req() req: RequestWithActor,
   ) {
+    // Nhịp ra món là việc của nhân viên — khách không nhả đợt hộ bếp
+    staffOnly(req.actor!, 'Khách không nhả đợt món')
     return this.ordering.fireBatch(id, batchNo, req.actor!)
   }
 
@@ -183,6 +205,16 @@ export class OrderingController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
+    // Giỏ của khách nằm trên iPad cho tới lúc gửi bếp; món đã lên đơn thì nhờ
+    // nhân viên huỷ — không để một máy khách huỷ được dòng của bàn khác
+    staffOnly(req.actor!, 'Khách nhờ nhân viên huỷ món đã gửi')
     return this.ordering.voidLine(id, VoidLineBody.parse(body), req.actor!)
+  }
+}
+
+/** Khách tại bàn (iPad) và iPad của bàn chưa mở không làm được việc của nhân viên */
+function staffOnly(actor: Actor, message: string) {
+  if (actor.kind === 'customer' || (actor.kind === 'device' && actor.deviceKind === 'table')) {
+    throw new ForbiddenException(message)
   }
 }

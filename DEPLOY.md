@@ -152,10 +152,6 @@ thấy `/api` cùng origin với trang. Nếu gọi chéo thì buộc phải h�
 `VITE_SUPABASE_ANON_KEY`. `sora-staff` và `sora-kiosk` không nghe Realtime nên không
 cần hai biến đó — CSP của chúng cũng đã chặn `*.supabase.co`.
 
-Riêng `sora-pos` cần thêm `VITE_TABLE_ORIGIN=https://ban.tokyosora.vn` — mã QR dán bàn
-in từ POS phải trỏ sang tên miền của Sora Table. Bỏ trống thì mã trỏ về chính POS và
-khách quét xong không mở được gì.
-
 `sora-office` cần `VITE_STAFF_ORIGIN=https://nv.tokyosora.vn` — link cá nhân cấp ở H1
 phải trỏ sang Kênh nhân viên. Bỏ trống thì link trỏ về chính Office và nhân viên bấm
 vào sẽ rơi vào màn đăng nhập quản trị.

@@ -1,15 +1,22 @@
-import { Money, useToast } from '@sora/ui'
+import { Button, ErrorState, Money, useToast } from '@sora/ui'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router'
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { api, type RequestKind } from '../api'
 import { useCart } from '../cart-context'
-import { KINDS } from '../components/CallStaffSheet'
-import { HostApproval } from '../components/HostApproval'
 import { IconBell, IconOffline, IconReceipt } from '../icons'
+import { useOutbox } from '../outbox'
 import { PromotionsProvider } from '../promotions'
 import { useTable, useTableSession } from '../table-context'
-import { ScanAgain, useOutbox } from './Shell'
+
+/** T9 — việc khách gọi được, nhãn khớp hàng đợi P12 của POS */
+const KINDS: { kind: RequestKind; label: string }[] = [
+  { kind: 'phuc-vu', label: 'Gọi phục vụ' },
+  { kind: 'them-than', label: 'Thêm than' },
+  { kind: 'da-nuoc', label: 'Đá · nước' },
+  { kind: 'tinh-tien', label: 'Xin tính tiền' },
+  { kind: 'khac', label: 'Việc khác' },
+]
 
 interface IpadCall {
   /** Mở bảng "Gọi nhân viên" dưới thanh trên */
@@ -39,19 +46,34 @@ const DIM_AFTER_MS = 3 * 60_000
  * ngón tay khách.
  *
  * Màn chào ở `/` không có thanh trên — nó là hộp thoại mở bữa, đứng một mình.
+ * Bàn chưa mở thì chỉ có màn đó, dù địa chỉ đang là trang nào.
  */
 export function IpadShell() {
-  const { session, ready, ended } = useTable()
+  const { session, ready, error, retry } = useTable()
   const { pathname } = useLocation()
 
   if (!ready) {
     return (
-      <main className="grid h-dvh place-items-center bg-surface-2 font-sans text-ink-mute">
-        Đang mở bàn…
+      <main className="grid h-dvh place-items-center bg-surface-2 px-10 font-sans text-ink-mute">
+        {error ? (
+          <ErrorState
+            message="Chưa nối được máy chủ. Kiểm tra Wi-Fi của iPad rồi thử lại."
+            action={<Button onClick={retry}>Thử lại</Button>}
+          />
+        ) : (
+          'Đang mở bàn…'
+        )}
       </main>
     )
   }
-  if (!session) return <ScanAgain ended={ended} />
+  if (!session) {
+    if (pathname !== '/') return <Navigate to="/" replace />
+    return (
+      <div className="flex h-dvh flex-col overflow-hidden bg-surface-2 font-sans text-[length:var(--fs-b2)] leading-[1.45] text-ink-body">
+        <Outlet />
+      </div>
+    )
+  }
 
   return (
     <PromotionsProvider branchId={session.branchId}>
@@ -63,7 +85,6 @@ export function IpadShell() {
           </div>
         </div>
         {pathname.startsWith('/tra-tien') ? null : <IdleDimmer />}
-        <HostApproval />
       </CallProvider>
     </PromotionsProvider>
   )
@@ -75,8 +96,8 @@ function CallProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
 
   /**
-   * KHÔNG qua hàng đợi offline, giống bản điện thoại: gọi người mà lệnh nằm chờ
-   * có mạng thì khách cứ ngồi đợi một cái chuông không kêu.
+   * KHÔNG qua hàng đợi offline: gọi người mà lệnh nằm chờ có mạng thì khách cứ
+   * ngồi đợi một cái chuông không kêu. Mất mạng thì nói thẳng là chưa gọi được.
    */
   const request = useMutation({
     mutationFn: (input: { kind: RequestKind; note?: string }) =>

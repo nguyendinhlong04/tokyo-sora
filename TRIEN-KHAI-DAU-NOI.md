@@ -250,11 +250,11 @@ Giai đoạn 1 và 2 dùng chung 80% component; làm đúng ngay từ đầu s�
 | Web khách | Next.js SSR để SEO trang W1–W9; luồng /dat-mon là client-side |
 | POS | Web app chạy fullscreen trên máy POS Android/Windows, cache offline bằng IndexedDB |
 | Kitchen | Web app kiosk mode trên Android TV box / mini PC, **không tắt màn**, tự reconnect |
-| Table | Web app mở từ QR dán trên bàn, URL dạng `/ban/<mã bàn>?t=<token phiên>` |
+| Table | Web app trên iPad gắn bàn, ghép như thiết bị (kind `table`, mã 6 số ở Office A4) — luồng QR điện thoại đã bỏ (CLAUDE.md §9.1) |
 | In ấn | Máy in bếp 80mm qua LAN (ESC/POS); hoá đơn khách in từ POS P11 |
 | Thanh toán | VietQR động qua cổng ngân hàng có webhook (không quét tay) |
 
-**Bảo mật tối thiểu:** token phiên bàn hết hạn khi đóng bàn · POS đăng nhập theo ca có PIN ·
+**Bảo mật tối thiểu:** iPad bàn đi theo phiên sống của bàn — đóng bàn là mất quyền với đơn cũ ngay · POS đăng nhập theo ca có PIN ·
 Office phân quyền theo vai trò (màn A2 đã thiết kế sẵn ma trận quyền).
 
 ---

@@ -37,7 +37,7 @@ interface RequestOptions {
  */
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   // Khai `application/json` mà KHÔNG gửi thân là lỗi 400 ở Fastify. Nhiều lệnh
-  // POST không cần thân (đăng xuất, cấp mã QR bàn, đánh dấu đã xử lý) nên header
+  // POST không cần thân (đăng xuất, gửi bếp, đánh dấu đã xử lý) nên header
   // này chỉ đặt khi thật sự có nội dung để gửi.
   const headers: Record<string, string> =
     options.body === undefined ? {} : { 'Content-Type': 'application/json' }

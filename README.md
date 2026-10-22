@@ -8,7 +8,7 @@ Bộ thiết kế gồm **5 ứng dụng** dùng chung một nền dữ liệu, 
 | Ứng dụng | Người dùng | Thiết bị | Số màn |
 |---|---|---|---|
 | **Sora Web** | Khách hàng | Desktop 1440 + Mobile 390 | 48 |
-| **Sora Table** | Khách tại bàn (QR) | Điện thoại của khách | 13 |
+| **Sora Table** | Khách tại bàn | iPad gắn bàn 1080×810 ngang (prototype vẽ cho điện thoại quét QR — đã thay, CLAUDE.md §9.1) | 13 |
 | **Sora POS** | Phục vụ · Thu ngân | Máy POS 1280×800 cảm ứng | 24 |
 | **Sora Kitchen** | Bếp · Expo | Màn hình treo 1920×1080 | 6 |
 | **Sora Office** | Quản lý · Kế toán · HR | Desktop 1440+ | 27 |
@@ -50,7 +50,7 @@ O14 Chờ xác nhận → O7 Thành công & theo dõi đơn.
 
 Mọi màn đều có **bản desktop và bản mobile riêng**, không phải responsive tự co.
 
-### Sora Table — gọi món tại bàn bằng QR
+### Sora Table — gọi món tại bàn (prototype QR điện thoại; bản dựng chạy trên iPad gắn bàn)
 T1 Chào & xác nhận bàn · T2 Thực đơn · T4 Tìm kiếm · T6 Giỏ hàng · T7 Xác nhận gửi ·
 T8 Đơn của bàn · T10 Tạm tính · T11 Chia tiền · T12 Chọn món mình trả · T13 VietQR ·
 T14 Chờ xác nhận · T15 Hoá đơn · T17 Thanh toán bị chặn.

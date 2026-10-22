@@ -3,11 +3,18 @@ import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { isUniqueViolation } from '../../common/pg-error'
 import type { Db } from '../../db/client'
-import { devices, pairingCodes, printers, staff, staffSessions, stations } from '../../db/schema'
+import {
+  areas,
+  devices,
+  pairingCodes,
+  printers,
+  staff,
+  staffSessions,
+  stations,
+  tables,
+} from '../../db/schema'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
-
-export type DeviceKind = 'pos' | 'cashier' | 'kds' | 'kiosk' | 'bridge'
 
 export interface PrinterInput {
   branchId: string
@@ -52,12 +59,18 @@ export class DeviceAdminService {
    */
   async devices(branchId: string) {
     const now = new Date()
-    const [rows, codes, sessions] = await Promise.all([
+    const [rows, codes, sessions, tableRows] = await Promise.all([
       this.db
-        .select({ d: devices, pairedByName: staff.fullName, station: stations.name })
+        .select({
+          d: devices,
+          pairedByName: staff.fullName,
+          station: stations.name,
+          tableCode: tables.code,
+        })
         .from(devices)
         .leftJoin(staff, eq(staff.id, devices.pairedBy))
         .leftJoin(stations, eq(stations.id, devices.stationId))
+        .leftJoin(tables, eq(tables.id, devices.tableId))
         .where(eq(devices.branchId, branchId))
         .orderBy(desc(devices.pairedAt)),
       this.db
@@ -82,15 +95,28 @@ export class DeviceAdminService {
             gt(staffSessions.expiresAt, now),
           ),
         ),
+      // Bàn để chọn khi sinh mã cho iPad bàn (§9.1) — chỉ bàn đang dùng
+      this.db
+        .select({ id: tables.id, code: tables.code, area: areas.name })
+        .from(tables)
+        .leftJoin(areas, eq(areas.id, tables.areaId))
+        .where(and(eq(tables.branchId, branchId), eq(tables.active, true)))
+        .orderBy(asc(tables.code)),
     ])
 
+    const liveIpadTables = new Set(
+      rows.filter(({ d }) => d.tableId !== null && d.revokedAt === null).map(({ d }) => d.tableId),
+    )
+
     return {
-      devices: rows.map(({ d, pairedByName, station }) => ({
+      devices: rows.map(({ d, pairedByName, station, tableCode }) => ({
         id: d.id,
         kind: d.kind,
         name: d.name,
         stationId: d.stationId,
         stationName: station,
+        tableId: d.tableId,
+        tableCode,
         pairedAt: d.pairedAt,
         pairedByName,
         revokedAt: d.revokedAt,
@@ -101,12 +127,16 @@ export class DeviceAdminService {
         code: c.code,
         kind: c.kind,
         stationId: c.stationId,
+        tableId: c.tableId,
+        tableCode: tableRows.find((t) => t.id === c.tableId)?.code ?? null,
         expiresAt: c.expiresAt,
       })),
       stations: await this.db
         .select({ id: stations.id, name: stations.name })
         .from(stations)
         .orderBy(asc(stations.sort)),
+      /** Bàn đã có iPad đang chạy thì không sinh mã được nữa — ngắt máy cũ trước */
+      tables: tableRows.map((t) => ({ ...t, hasIpad: liveIpadTables.has(t.id) })),
     }
   }
 

@@ -63,8 +63,8 @@ export function Pay() {
    * Điều kiện cũ đòi thêm `total > 0`. Hệ quả: bàn mở nhầm, hoặc khách ngồi
    * xuống rồi bỏ đi trước khi gọi món (tổng 0đ), không hiện nút đóng ở đâu cả —
    * mà đây là chỗ DUY NHẤT trong toàn hệ thống gọi được lệnh đóng bàn. Ô bàn
-   * đứng "Có khách" vĩnh viễn, không xếp được khách mới, và mã QR của khách cũ
-   * vẫn sống vì mã chỉ chết khi bàn đóng.
+   * đứng "Có khách" vĩnh viễn, không xếp được khách mới, và iPad của bàn vẫn mở
+   * đơn của khách cũ vì iPad chỉ về màn bàn chưa mở khi bàn đóng.
    *
    * Máy chủ vốn đã cho đóng bàn 0đ — nó chỉ chặn khi CÒN NỢ (floorplan.service
    * `closeSession`). Nên đây là giao diện khớp lại với quy tắc sẵn có, không

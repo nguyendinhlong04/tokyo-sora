@@ -1,23 +1,27 @@
 /**
- * Nghiệm thu GĐ2 (phần backend) — khách tại bàn tự gọi món và tự trả tiền.
+ * Nghiệm thu GĐ2 (phần backend) — khách tại bàn tự gọi món và tự trả tiền trên
+ * iPad gắn bàn (§9.1).
  *
- * Kịch bản exit trong kế hoạch: hai điện thoại cùng bàn chia món không thể trùng ·
- * chỉ webhook ngân hàng mới đổi trạng thái đã trả · đóng bàn thì token cũ chết ·
- * món 86 khoá ngay trên điện thoại.
+ * Kịch bản exit trong kế hoạch: iPad ghép bằng mã 6 số và ghim cứng một bàn ·
+ * khách tự mở bàn, bàn có đặt chỗ thì mời nhân viên · iPad chỉ thấy bàn mình ·
+ * món đã có người nhận không trả trùng được · chỉ webhook ngân hàng mới đổi trạng
+ * thái đã trả · đóng bàn thì iPad về màn bàn chưa mở · món 86 khoá ngay trên iPad.
  */
 import { createHmac } from 'node:crypto'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { IDEMPOTENCY_HEADER } from '@sora/contracts'
+import { and, eq, ne } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
-import { ParamsService } from '../common/params.service'
 import {
   bankEvents,
   devices,
   journalEntries,
-  parameters,
   payments,
+  reservations,
   tableFeedback,
+  tableSessions,
   ticketItems,
 } from '../db/schema'
 import { ConfigBundleService } from '../modules/config-bundle/config-bundle.service'
@@ -33,34 +37,57 @@ let close: () => Promise<void>
 const SEED_DEVICE = 'seed-device-token'
 const BANK_SECRET = 'dev-bank-secret'
 let cashier: string
+let manager: string
+/** Phiên của bàn A4 — khách tự mở trên iPad ở mục 2 */
 let sessionId: number
-/** Bàn bên cạnh — dùng để chứng minh token bàn này không mở được bàn kia */
+/** Bàn 05 bên cạnh — dùng để chứng minh iPad bàn này không mở được bàn kia */
 let otherSession: number
-/** Cookie của "điện thoại" khách — hai máy KHÁC NHAU, không dùng chung token */
-let phoneA: string
-let phoneB: string
-
-/** Địa chỉ giả lập máy đang bắt Wi-Fi của quán; khai vào tham số ở beforeAll */
-const TRONG_QUAN = '203.0.113.10'
-
-/** Mã bàn mà harness dựng sẵn */
-const GRILL_TABLE_CODE = 'A4'
-const SPARE_TABLE_CODE = 'A9'
-
-/** Khách quét mã dán bàn từ một địa chỉ mạng cho trước */
-const joinTable = (ip: string) =>
-  inject({
-    method: 'POST',
-    url: '/api/table-devices/join',
-    headers: { 'x-forwarded-for': ip },
-    payload: { branchId: fx.branchId, tableCode: GRILL_TABLE_CODE },
-  })
-
-const cookieOf = (res: { cookies: { name: string; value: string }[] }) =>
-  res.cookies.map((c) => `${c.name}=${c.value}`).join('; ')
+/** iPad bàn A4 — ghép đúng đường người lắp máy đi ở mục 1 */
+let ipadA4: string
+let ipadA4Id: number
+/** iPad của bàn 05 và A9: ghép thẳng vào CSDL, đường ghép đã kiểm ở mục 1 */
+const IPAD_05 = 'ipad-ban-05-token'
+const IPAD_A9 = 'ipad-ban-a9-token'
 
 const inject = (opts: Parameters<NestFastifyApplication['inject']>[0]) => app.inject(opts)
 const staffAuth = () => ({ authorization: `Bearer ${cashier}`, [DEVICE_HEADER]: SEED_DEVICE })
+const asManager = () => ({ authorization: `Bearer ${manager}`, [DEVICE_HEADER]: SEED_DEVICE })
+/** iPad gọi API như ngoài đời: chỉ mang token thiết bị — không cookie, không đăng nhập */
+const ipad = (token = ipadA4) => ({ [DEVICE_HEADER]: token })
+
+const login = async (staffId: number) =>
+  (
+    await inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { [DEVICE_HEADER]: SEED_DEVICE },
+      payload: { branchId: fx.branchId, staffId, pin: fx.pins[staffId] },
+    })
+  ).json<{ token: string }>().token
+
+const pairingCode = (tableId?: number) =>
+  inject({
+    method: 'POST',
+    url: '/api/auth/pairing-codes',
+    headers: asManager(),
+    payload: { branchId: fx.branchId, kind: 'table', tableId },
+  })
+
+/** Khách chạm "Bắt đầu gọi món" rồi chọn số người */
+const selfOpen = (token: string, guestCount: number) =>
+  inject({
+    method: 'POST',
+    url: '/api/table-terminal/open',
+    headers: ipad(token),
+    payload: { guestCount },
+  })
+
+interface TerminalState {
+  table: { id: number; code: string; hasGrill: boolean; seatMax: number }
+  session: { id: number; status: string; guestCount: number } | null
+  reservedAt: string | null
+  overCapacity?: boolean
+}
 
 /** Giả lập ngân hàng gọi webhook — ký đúng như hàng thật */
 function bankWebhook(payload: { bankRef: string; vaNumber: string; amount: number }) {
@@ -84,21 +111,31 @@ beforeAll(async () => {
   fx = boot.fixtures
   close = boot.close
 
-  await db.insert(devices).values({
-    branchId: fx.branchId,
-    kind: 'cashier',
-    name: 'Máy thu ngân gốc',
-    tokenHash: hashToken(SEED_DEVICE),
-  })
+  await db.insert(devices).values([
+    {
+      branchId: fx.branchId,
+      kind: 'cashier',
+      name: 'Máy thu ngân gốc',
+      tokenHash: hashToken(SEED_DEVICE),
+    },
+    {
+      branchId: fx.branchId,
+      kind: 'table',
+      name: 'iPad bàn 05',
+      tableId: fx.plainTableId,
+      tokenHash: hashToken(IPAD_05),
+    },
+    {
+      branchId: fx.branchId,
+      kind: 'table',
+      name: 'iPad bàn A9',
+      tableId: fx.spareTableId,
+      tokenHash: hashToken(IPAD_A9),
+    },
+  ])
 
-  cashier = (
-    await inject({
-      method: 'POST',
-      url: '/api/auth/login',
-      headers: { [DEVICE_HEADER]: SEED_DEVICE },
-      payload: { branchId: fx.branchId, staffId: fx.cashierId, pin: fx.pins[fx.cashierId] },
-    })
-  ).json<{ token: string }>().token
+  cashier = await login(fx.cashierId)
+  manager = await login(fx.managerId)
 
   await inject({
     method: 'POST',
@@ -106,29 +143,6 @@ beforeAll(async () => {
     headers: staffAuth(),
     payload: { branchId: fx.branchId, openingCash: 0 },
   })
-
-  sessionId = (
-    await inject({
-      method: 'POST',
-      url: `/api/tables/${fx.grillTableId}/open`,
-      headers: staffAuth(),
-      payload: { guestCount: 4 },
-    })
-  ).json<{ id: number }>().id
-
-  /**
-   * Khai đường mạng của quán, rồi NẠP LẠI tham số.
-   *
-   * ParamsService giữ cache trong tiến trình và chỉ nạp lại khi có sự kiện đổi
-   * tham số — ghi thẳng vào CSDL sau khi app đã chạy thì nó không thấy, và mọi
-   * máy sẽ rơi vào hàng chờ duyệt. Sai kiểu này rất khó lần vì không có lỗi nào.
-   */
-  await db.insert(parameters).values({
-    key: 'table.branchNetworks',
-    branchId: fx.branchId,
-    value: TRONG_QUAN,
-  })
-  await app.get(ParamsService).reload()
 }, 120_000)
 
 afterAll(async () => {
@@ -137,122 +151,131 @@ afterAll(async () => {
 
 // ---------------------------------------------------------------------------
 
-describe('1. Quét mã QR dán bàn (T1)', () => {
-  it('máy đang ở trong quán vào thẳng, thành chủ bàn', async () => {
-    const res = await joinTable(TRONG_QUAN)
-    expect(res.statusCode).toBe(201)
-    const body = res.json<{ state: string; isHost: boolean; sessionId: number }>()
-    expect(body.state).toBe('admitted')
-    expect(body.isHost).toBe(true)
-    expect(body.sessionId).toBe(sessionId)
+describe('1. Ghép iPad vào bàn (A4)', () => {
+  it('quản lý sinh mã cho bàn A4, iPad nhập mã thì nhận token', async () => {
+    const code = await pairingCode(fx.grillTableId)
+    expect(code.statusCode, code.payload).toBe(201)
 
-    const cookie = String(res.headers['set-cookie'])
-    expect(cookie).toContain('HttpOnly')
-    expect(cookie).toContain('SameSite=Strict')
-    phoneA = cookieOf(res)
-  })
-
-  it('CSDL chỉ giữ bản băm của máy, không giữ token', async () => {
-    const rows = await db.query.tableDevices.findMany({
-      where: (d, { eq }) => eq(d.tableSessionId, sessionId),
-    })
-    expect(rows).toHaveLength(1)
-    expect(rows[0]!.tokenHash).toHaveLength(64) // SHA-256 dạng hex
-    expect(phoneA).not.toContain(rows[0]!.tokenHash)
-  })
-
-  it('điện thoại thứ hai cùng bàn cũng vào được, nhưng không là chủ bàn', async () => {
-    const res = await joinTable(TRONG_QUAN)
-    const body = res.json<{ state: string; isHost: boolean }>()
-    expect(body.state).toBe('admitted')
-    expect(body.isHost).toBe(false)
-    phoneB = cookieOf(res)
-  })
-
-  /**
-   * Đây là lớp bảo vệ chính của luồng mới: mã QR dán bàn ai chụp cũng được, nên
-   * thứ chặn người ở nhà là việc họ KHÔNG đi ra internet qua đường mạng của quán.
-   */
-  it('máy ở ngoài quán chỉ được xếp hàng chờ duyệt', async () => {
-    const res = await joinTable('198.51.100.7')
-    const body = res.json<{ state: string; isHost: boolean }>()
-    expect(body.state).toBe('waiting')
-    expect(body.isHost).toBe(false)
-  })
-
-  /** Quét lại mã bàn từ một địa chỉ khác, mang theo cookie của máy cũ */
-  const quetLai = (ip: string, cookie: string) =>
-    inject({
+    const paired = await inject({
       method: 'POST',
-      url: '/api/table-devices/join',
-      headers: { 'x-forwarded-for': ip, cookie },
-      payload: { branchId: fx.branchId, tableCode: GRILL_TABLE_CODE },
+      url: '/api/auth/pair',
+      payload: { code: code.json<{ code: string }>().code, name: 'iPad bàn A4' },
     })
-
-  /**
-   * Lối thoát mà chính màn chờ mời khách đi: "kết nối Wi-Fi của quán rồi quét
-   * lại mã". Nhánh trả về sớm cho máy đã biết từng bỏ qua bước hỏi đường mạng,
-   * nên khách quét lần đầu bằng 4G phải chờ duyệt tới hết bữa dù có đổi mạng.
-   */
-  it('máy đang chờ bắt Wi-Fi quán rồi quét lại thì vào thẳng', async () => {
-    const ngoai = await joinTable('198.51.100.8')
-    const truoc = ngoai.json<{ state: string; deviceId: number }>()
-    expect(truoc.state).toBe('waiting')
-
-    const sau = (await quetLai(TRONG_QUAN, cookieOf(ngoai))).json<{
-      state: string
-      deviceId: number
-    }>()
-    expect(sau.state).toBe('admitted')
-    // Vẫn là máy cũ — không đẻ thêm một máy nữa vào bàn
-    expect(sau.deviceId).toBe(truoc.deviceId)
+    expect(paired.statusCode, paired.payload).toBe(201)
+    const body = paired.json<{ token: string; deviceId: number }>()
+    ipadA4 = body.token
+    ipadA4Id = body.deviceId
   })
 
-  /**
-   * Chiều ngược lại phải đứng yên: điện thoại rơi Wi-Fi giữa bữa rồi quét lại
-   * mã là chuyện thường, đẩy người đang ăn ra ngoài mới là hỏng.
-   */
-  it('rời Wi-Fi quán KHÔNG đẩy máy đã vào bàn ra ngoài', async () => {
-    const body = (await quetLai('198.51.100.9', phoneA)).json<{
-      state: string
-      isHost: boolean
-    }>()
-    expect(body.state).toBe('admitted')
-    expect(body.isHost).toBe(true)
+  it('CSDL chỉ giữ bản băm token, và iPad ghim đúng bàn của mã ghép', async () => {
+    const [row] = await db.select().from(devices).where(eq(devices.id, ipadA4Id))
+    expect(row!.kind).toBe('table')
+    expect(row!.tableId).toBe(fx.grillTableId)
+    expect(row!.tokenHash).toHaveLength(64) // SHA-256 dạng hex
+    expect(ipadA4).not.toContain(row!.tokenHash)
   })
 
-  /** Từ chối vẫn dứt điểm cho cả bữa — Wi-Fi quán không phải cửa sau */
-  it('máy đã bị từ chối thì bắt Wi-Fi quán cũng không vào được', async () => {
-    const ngoai = await joinTable('198.51.100.10')
-    const deviceId = ngoai.json<{ deviceId: number }>().deviceId
+  it('mã cho iPad tại bàn phải chọn bàn', async () => {
+    expect((await pairingCode()).statusCode).toBe(400)
+  })
 
-    const tuChoi = await inject({
+  it('bàn không thuộc chi nhánh thì không sinh mã', async () => {
+    expect((await pairingCode(999_999)).statusCode).toBe(400)
+  })
+
+  /** Hai iPad một bàn là hai giỏ cho một phiên — khách bấm máy này, món hiện máy kia */
+  it('bàn đã có iPad đang chạy thì không sinh thêm mã', async () => {
+    expect((await pairingCode(fx.grillTableId)).statusCode).toBe(409)
+  })
+
+  it('iPad không đăng nhập ca được — PIN nhân viên không mở quyền trên máy của khách', async () => {
+    const res = await inject({
       method: 'POST',
-      url: '/api/table-devices/decide',
-      headers: { cookie: phoneA },
-      payload: { deviceId, approve: false },
+      url: '/api/auth/login',
+      headers: ipad(),
+      payload: { branchId: fx.branchId, staffId: fx.cashierId, pin: fx.pins[fx.cashierId] },
     })
-    expect(tuChoi.statusCode).toBe(201)
+    expect(res.statusCode).toBe(403)
+  })
+})
 
-    const res = await quetLai(TRONG_QUAN, cookieOf(ngoai))
+// ---------------------------------------------------------------------------
+
+describe('2. Bàn chưa mở — khách tự mở trên iPad (T1)', () => {
+  it('iPad đọc được bàn mình ngay cả khi bàn chưa mở', async () => {
+    const res = await inject({ method: 'GET', url: '/api/table-terminal', headers: ipad() })
+    expect(res.statusCode, res.payload).toBe(200)
+    const body = res.json<TerminalState>()
+    expect(body.table.code).toBe('A4')
+    expect(body.table.hasGrill).toBe(true)
+    expect(body.session).toBeNull()
+  })
+
+  it('iPad của bàn chưa mở không đọc được gì khác', async () => {
+    const reads = [
+      ['/api/table-sessions/1', 403],
+      ['/api/tables?branch=' + fx.branchId, 403],
+      ['/api/table-requests?branch=' + fx.branchId, 403],
+      ['/api/tickets?station=ST-02', 400],
+      ['/api/expo', 400],
+    ] as const
+    for (const [url, status] of reads) {
+      const res = await inject({ method: 'GET', url, headers: ipad() })
+      expect(res.statusCode, `GET ${url}`).toBe(status)
+    }
+  })
+
+  it('cửa của iPad chỉ dành cho iPad — máy thu ngân không gọi được', async () => {
+    const res = await inject({ method: 'GET', url: '/api/table-terminal', headers: staffAuth() })
     expect(res.statusCode).toBe(403)
   })
 
-  it('quét mã của bàn chưa mở thì không mở ra gì cả', async () => {
+  it('khách tự mở bàn — POS thấy bàn có khách ngay', async () => {
+    const res = await selfOpen(ipadA4, 4)
+    expect(res.statusCode, res.payload).toBe(201)
+    const body = res.json<TerminalState>()
+    expect(body.session?.status).toBe('open')
+    expect(body.session?.guestCount).toBe(4)
+    expect(body.overCapacity).toBe(false)
+    sessionId = body.session!.id
+
+    const floor = await inject({
+      method: 'GET',
+      url: `/api/tables?branch=${fx.branchId}`,
+      headers: staffAuth(),
+    })
+    const a4 = floor.json<{ id: number; session: { id: number } | null }[]>()
+    expect(a4.find((t) => t.id === fx.grillTableId)?.session?.id).toBe(sessionId)
+  })
+
+  /** Khách chạm hai lần, hoặc nhân viên vừa mở ở POS đúng lúc khách chạm */
+  it('mở lại bàn đang mở không đẻ phiên thứ hai, cũng không báo lỗi', async () => {
+    const res = await selfOpen(ipadA4, 4)
+    expect(res.statusCode).toBe(201)
+    expect(res.json<TerminalState>().session?.id).toBe(sessionId)
+
+    const live = await db
+      .select({ id: tableSessions.id })
+      .from(tableSessions)
+      .where(and(eq(tableSessions.tableId, fx.grillTableId), ne(tableSessions.status, 'closed')))
+    expect(live).toHaveLength(1)
+  })
+
+  it('iPad không mở được bàn khác qua cửa của nhân viên', async () => {
     const res = await inject({
       method: 'POST',
-      url: '/api/table-devices/join',
-      headers: { 'x-forwarded-for': TRONG_QUAN },
-      payload: { branchId: fx.branchId, tableCode: 'KHONG-CO-BAN-NAY' },
+      url: `/api/tables/${fx.spareTableId}/open`,
+      headers: ipad(),
+      payload: { guestCount: 2 },
     })
-    expect(res.statusCode).toBe(404)
+    expect(res.statusCode).toBe(403)
   })
 
   it('khách chốt lại số khách của bàn mình', async () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/guests`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { guestCount: 3 },
     })
     expect(res.statusCode).toBe(201)
@@ -262,7 +285,7 @@ describe('1. Quét mã QR dán bàn (T1)', () => {
     await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/guests`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { guestCount: 4 },
     })
   })
@@ -271,17 +294,17 @@ describe('1. Quét mã QR dán bàn (T1)', () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/guests`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { guestCount: 40 },
     })
     expect(res.statusCode).toBe(409)
   })
 
-  it('điện thoại đọc được mình đang ngồi bàn nào — T1 mới chào bàn được', async () => {
+  it('iPad đọc được mình đang ở bàn nào — T1 mới chào bàn được', async () => {
     const res = await inject({
       method: 'GET',
       url: `/api/table-sessions/${sessionId}`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
     })
     expect(res.statusCode).toBe(200)
     const body = res.json<{
@@ -289,19 +312,79 @@ describe('1. Quét mã QR dán bàn (T1)', () => {
       table: { code: string; hasGrill: boolean }
     }>()
     expect(body.guestCount).toBe(4)
-    expect(body.table.code).toBeTruthy()
+    expect(body.table.code).toBe('A4')
     expect(body.table.hasGrill).toBe(true)
   })
 })
 
 // ---------------------------------------------------------------------------
 
-describe('2. Khách tự gọi món (T2 · T6 · T7)', () => {
+describe('2b. Đặt chỗ và sức chứa khi khách tự mở (bàn 05)', () => {
+  let reservationId: number
+
+  beforeAll(async () => {
+    const slotAt = new Date(Date.now() + 30 * 60_000)
+    const [row] = await db
+      .insert(reservations)
+      .values({
+        displayCode: 'DB-IPAD-001',
+        branchId: fx.branchId,
+        seatKind: 'standard',
+        guestCount: 2,
+        slotAt,
+        endAt: new Date(slotAt.getTime() + 105 * 60_000),
+        status: 'confirmed',
+        customerName: 'Chị Vy',
+        customerPhone: '0977 613 209',
+        tableId: fx.plainTableId,
+        source: 'phone',
+        businessDate: businessDateOf(slotAt, 'Asia/Ho_Chi_Minh'),
+      })
+      .returning({ id: reservations.id })
+    reservationId = row!.id
+  })
+
+  /** Màn hình đặt giữa phòng ăn — ai đi ngang cũng đọc được, nên không có tên khách */
+  it('bàn có đặt chỗ trong 90′ thì iPad không mở, chỉ báo giờ — không lộ tên người đặt', async () => {
+    const res = await selfOpen(IPAD_05, 2)
+    expect(res.statusCode).toBe(409)
+    expect(res.json<{ code: string }>().code).toBe('table_reserved')
+    expect(res.json<{ reservedAt: string | null }>().reservedAt).not.toBeNull()
+    expect(res.payload).not.toContain('Chị Vy')
+    expect(res.payload).not.toContain('0977')
+
+    const state = await inject({
+      method: 'GET',
+      url: '/api/table-terminal',
+      headers: ipad(IPAD_05),
+    })
+    expect(state.json<TerminalState>().reservedAt).not.toBeNull()
+    expect(state.payload).not.toContain('Chị Vy')
+  })
+
+  it('đông hơn sức chứa vẫn mở với đúng sức chứa và báo iPad gọi nhân viên', async () => {
+    await db
+      .update(reservations)
+      .set({ status: 'cancelled' })
+      .where(eq(reservations.id, reservationId))
+
+    const res = await selfOpen(IPAD_05, 7)
+    expect(res.statusCode, res.payload).toBe(201)
+    const body = res.json<TerminalState>()
+    expect(body.overCapacity).toBe(true)
+    expect(body.session?.guestCount).toBe(4)
+    otherSession = body.session!.id
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('3. Khách tự gọi món (T2 · T6 · T7)', () => {
   it('khách thêm món vào đơn của bàn mình', async () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/lines`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: {
         lines: [
           { dishId: 'thanbo', qty: 2 },
@@ -315,37 +398,57 @@ describe('2. Khách tự gọi món (T2 · T6 · T7)', () => {
     expect(res.json<{ money: { sub: number } }>().money.sub).toBe(1_175_000)
   })
 
-  it('khách KHÔNG gọi món hộ bàn khác được', async () => {
-    otherSession = (
-      await inject({
-        method: 'POST',
-        url: `/api/tables/${fx.plainTableId}/open`,
-        headers: staffAuth(),
-        payload: { guestCount: 2 },
-      })
-    ).json<{ id: number }>().id
-
+  it('khách KHÔNG gọi nhân viên hộ bàn khác được', async () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${otherSession}/requests`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { kind: 'phuc-vu' },
     })
     expect(res.statusCode).toBe(400)
   })
 
+  it('khách KHÔNG gọi món hay gửi bếp hộ bàn khác được', async () => {
+    const lines = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${otherSession}/lines`,
+      headers: ipad(),
+      payload: { lines: [{ dishId: 'miso', qty: 1 }] },
+    })
+    expect(lines.statusCode).toBe(403)
+
+    const send = await inject({
+      method: 'POST',
+      url: `/api/table-sessions/${otherSession}/send`,
+      headers: ipad(),
+    })
+    expect(send.statusCode).toBe(403)
+  })
+
   /**
-   * Mã phiên là số chạy nên đoán được. Không có chốt này thì sửa số trên thanh
-   * địa chỉ là đọc được đơn và tạm tính của bàn bên cạnh.
+   * Mã phiên là số chạy nên đoán được. Không có chốt này thì sửa số trong lệnh gọi
+   * là đọc được đơn và tạm tính của bàn bên cạnh.
    */
   it('khách KHÔNG đọc được đơn, tạm tính hay thông tin của bàn khác', async () => {
     for (const path of ['', '/order', '/bill']) {
       const res = await inject({
         method: 'GET',
         url: `/api/table-sessions/${otherSession}${path}`,
-        headers: { cookie: phoneA },
+        headers: ipad(),
       })
       expect(res.statusCode, `GET ${path || '/'}`).toBe(403)
+    }
+  })
+
+  it('bàn đang mở cũng không đọc được sơ đồ, hàng đợi hay Expo của cả sàn', async () => {
+    const reads = [
+      ['/api/tables?branch=' + fx.branchId, 403],
+      ['/api/table-requests?branch=' + fx.branchId, 403],
+      ['/api/expo', 400],
+    ] as const
+    for (const [url, status] of reads) {
+      const res = await inject({ method: 'GET', url, headers: ipad() })
+      expect(res.statusCode, `GET ${url}`).toBe(status)
     }
   })
 
@@ -362,7 +465,7 @@ describe('2. Khách tự gọi món (T2 · T6 · T7)', () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/send`,
-      headers: staffAuth(),
+      headers: ipad(),
     })
     expect(res.statusCode).toBe(201)
     expect(res.json<{ tickets: number }>().tickets).toBeGreaterThan(0)
@@ -374,24 +477,48 @@ describe('2. Khách tự gọi món (T2 · T6 · T7)', () => {
     const first = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/lines`,
-      headers: { cookie: phoneA, [IDEMPOTENCY_HEADER]: key },
+      headers: { ...ipad(), [IDEMPOTENCY_HEADER]: key },
       payload,
     })
     const replay = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/lines`,
-      headers: { cookie: phoneA, [IDEMPOTENCY_HEADER]: key },
+      headers: { ...ipad(), [IDEMPOTENCY_HEADER]: key },
       payload,
     })
     expect(replay.json<{ money: { sub: number } }>().money.sub).toBe(
       first.json<{ money: { sub: number } }>().money.sub,
     )
   })
+
+  it('việc của nhân viên — nhả đợt, huỷ món đã lên đơn — iPad không làm được', async () => {
+    const order = await inject({
+      method: 'GET',
+      url: `/api/table-sessions/${sessionId}/order`,
+      headers: ipad(),
+    })
+    const { order: o, lines } = order.json<{ order: { id: number }; lines: { id: number }[] }>()
+
+    const fire = await inject({
+      method: 'POST',
+      url: `/api/orders/${o.id}/batches/2/fire`,
+      headers: ipad(),
+    })
+    expect(fire.statusCode).toBe(403)
+
+    const voided = await inject({
+      method: 'POST',
+      url: `/api/order-lines/${lines[0]!.id}/void`,
+      headers: ipad(),
+      payload: { reason: 'Khách đổi ý' },
+    })
+    expect(voided.statusCode).toBe(403)
+  })
 })
 
 // ---------------------------------------------------------------------------
 
-describe('2b. Thực đơn trên điện thoại (T2 · T3 · T5)', () => {
+describe('3b. Thực đơn trên iPad (T2 · T3 · T5)', () => {
   beforeAll(async () => {
     // Ngoài đời Office bấm "Lưu & phát hành"; ở đây gọi thẳng service vì thu ngân
     // không có quyền sửa giá — và quyền đó không phải thứ mục này đang kiểm.
@@ -402,7 +529,7 @@ describe('2b. Thực đơn trên điện thoại (T2 · T3 · T5)', () => {
     const res = await inject({
       method: 'GET',
       url: `/api/config?branch=${fx.branchId}`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
     })
     expect(res.statusCode).toBe(200)
     const bundle = res.json<{
@@ -419,14 +546,14 @@ describe('2b. Thực đơn trên điện thoại (T2 · T3 · T5)', () => {
     const before = await inject({
       method: 'GET',
       url: `/api/table-sessions/${sessionId}/order`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
     })
     const subBefore = before.json<{ order: { moneySub: number } }>().order.moneySub
 
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/lines`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { lines: [{ dishId: 'thanbo', qty: 1, modifierOptionIds: ['yaki-them-toi'] }] },
     })
     expect(res.statusCode).toBe(201)
@@ -438,7 +565,7 @@ describe('2b. Thực đơn trên điện thoại (T2 · T3 · T5)', () => {
     await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/lines`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: {
         lines: [
           { dishId: 'thanbo', qty: 1, modifierOptionIds: ['yaki-them-rau'], note: 'cắt dày' },
@@ -459,12 +586,12 @@ describe('2b. Thực đơn trên điện thoại (T2 · T3 · T5)', () => {
 
 // ---------------------------------------------------------------------------
 
-describe('3. Gọi nhân viên (T9 → P12)', () => {
+describe('4. Gọi nhân viên (T9 → P12)', () => {
   it('khách bấm gọi, yêu cầu hiện trên hàng đợi của POS', async () => {
     await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/requests`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { kind: 'them-than' },
     })
     const res = await inject({
@@ -480,7 +607,7 @@ describe('3. Gọi nhân viên (T9 → P12)', () => {
     await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/requests`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { kind: 'tinh-tien' },
     })
     const res = await inject({
@@ -516,14 +643,18 @@ describe('3. Gọi nhân viên (T9 → P12)', () => {
 
 // ---------------------------------------------------------------------------
 
-describe('4. Chia tiền — hai điện thoại không thể trả trùng (T11 · T12)', () => {
+/**
+ * Một iPad cho cả bàn: người trả trước và người trả sau bấm trên cùng một máy, cách
+ * nhau vài phút. Thứ phải chặn là người sau nhận lại món người trước ĐÃ tạo mã trả.
+ */
+describe('5. Chia tiền — món đã có người nhận không trả trùng được (T11 · T12)', () => {
   let lineIds: number[]
 
   beforeAll(async () => {
     const detail = await inject({
       method: 'GET',
       url: `/api/table-sessions/${sessionId}/order`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
     })
     lineIds = detail
       .json<{ lines: { id: number; priceTotal: number; parentLineId: number | null }[] }>()
@@ -535,7 +666,7 @@ describe('4. Chia tiền — hai điện thoại không thể trả trùng (T11 
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/split/preview`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { parts: 3 },
     })
     const body = res.json<{ amounts: number[]; outstanding: number }>()
@@ -544,11 +675,11 @@ describe('4. Chia tiền — hai điện thoại không thể trả trùng (T11 
     expect(Math.max(...body.amounts) - Math.min(...body.amounts)).toBeLessThanOrEqual(1)
   })
 
-  it('điện thoại A nhận vài món → tạo lượt trả kèm VietQR', async () => {
+  it('người thứ nhất nhận vài món → tạo lượt trả kèm VietQR', async () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/split/claim`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { orderLineIds: lineIds.slice(0, 2) },
     })
     expect(res.statusCode).toBe(201)
@@ -558,22 +689,22 @@ describe('4. Chia tiền — hai điện thoại không thể trả trùng (T11 
     expect(body.qrString.startsWith('000201')).toBe(true)
   })
 
-  it('điện thoại B nhận đúng món A đã nhận → BỊ CHẶN', async () => {
+  it('người sau nhận lại đúng món đã có người nhận → BỊ CHẶN', async () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/split/claim`,
-      headers: { cookie: phoneB },
+      headers: ipad(),
       payload: { orderLineIds: [lineIds[0]!] },
     })
     expect(res.statusCode).toBe(409)
     expect(res.json<{ code: string }>().code).toBe('line_already_claimed')
   })
 
-  it('tạm tính báo món nào đã có người nhận — máy kia khoá trước khi bấm, không đợi lỗi', async () => {
+  it('tạm tính báo món nào đã có người nhận — iPad khoá món đó trước khi bấm, không đợi lỗi', async () => {
     const res = await inject({
       method: 'GET',
       url: `/api/table-sessions/${sessionId}/bill`,
-      headers: { cookie: phoneB },
+      headers: ipad(),
     })
     const claimed = res
       .json<{ claimedLines: { orderLineId: number }[] }>()
@@ -581,11 +712,11 @@ describe('4. Chia tiền — hai điện thoại không thể trả trùng (T11 
     expect(claimed).toEqual(expect.arrayContaining(lineIds.slice(0, 2)))
   })
 
-  it('điện thoại B nhận món KHÁC thì được', async () => {
+  it('nhận món KHÁC thì được', async () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/split/claim`,
-      headers: { cookie: phoneB },
+      headers: ipad(),
       payload: { orderLineIds: lineIds.slice(2, 3) },
     })
     expect(res.statusCode).toBe(201)
@@ -602,7 +733,7 @@ describe('4. Chia tiền — hai điện thoại không thể trả trùng (T11 
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/split/preview`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { parts: 2 },
     })
 
@@ -617,13 +748,12 @@ describe('4. Chia tiền — hai điện thoại không thể trả trùng (T11 
 
 // ---------------------------------------------------------------------------
 
-describe('5. Chỉ ngân hàng mới đổi trạng thái đã trả (T13 · T14 · §20)', () => {
+describe('6. Chỉ ngân hàng mới đổi trạng thái đã trả (T13 · T14 · §20)', () => {
   let paymentId: number
   let vaNumber: string
   let amount: number
-  /** Bàn riêng: bàn ở mục 4 đã bị các lượt nhận món giữ hết tiền */
+  /** Bàn riêng: bàn ở mục 5 đã bị các lượt nhận món giữ hết tiền */
   let qrSession: number
-  let qrCookie: string
 
   beforeAll(async () => {
     const opened = await inject({
@@ -635,27 +765,17 @@ describe('5. Chỉ ngân hàng mới đổi trạng thái đã trả (T13 · T14
     expect(opened.statusCode, opened.payload).toBe(201)
     qrSession = opened.json<{ id: number }>().id
 
-    const joined = await inject({
-      method: 'POST',
-      url: '/api/table-devices/join',
-      headers: { 'x-forwarded-for': TRONG_QUAN },
-      payload: { branchId: fx.branchId, tableCode: SPARE_TABLE_CODE },
-    })
-    expect(joined.statusCode, joined.payload).toBe(201)
-    expect(joined.json<{ state: string }>().state).toBe('admitted')
-    qrCookie = cookieOf(joined)
-
     await inject({
       method: 'POST',
       url: `/api/table-sessions/${qrSession}/lines`,
-      headers: { cookie: qrCookie },
+      headers: ipad(IPAD_A9),
       payload: { lines: [{ dishId: 'thanbo', qty: 1 }] },
     })
 
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${qrSession}/pay/vietqr`,
-      headers: { cookie: qrCookie },
+      headers: ipad(IPAD_A9),
       payload: { amount: 50_000 },
     })
     expect(res.statusCode, res.payload).toBe(201)
@@ -666,7 +786,11 @@ describe('5. Chỉ ngân hàng mới đổi trạng thái đã trả (T13 · T14
   })
 
   it('lượt trả mới sinh ra ở trạng thái chờ, chưa phải đã trả', async () => {
-    const res = await inject({ method: 'GET', url: `/api/payments/${paymentId}/status`, headers: { cookie: qrCookie } })
+    const res = await inject({
+      method: 'GET',
+      url: `/api/payments/${paymentId}/status`,
+      headers: ipad(IPAD_A9),
+    })
     expect(res.json<{ state: string }>().state).toBe('pending')
   })
 
@@ -695,7 +819,11 @@ describe('5. Chỉ ngân hàng mới đổi trạng thái đã trả (T13 · T14
     expect(res.statusCode).toBe(201)
     expect(res.json<{ matched: boolean }>().matched).toBe(true)
 
-    const status = await inject({ method: 'GET', url: `/api/payments/${paymentId}/status`, headers: { cookie: qrCookie } })
+    const status = await inject({
+      method: 'GET',
+      url: `/api/payments/${paymentId}/status`,
+      headers: ipad(IPAD_A9),
+    })
     expect(status.json<{ state: string; paidAt: string }>().state).toBe('paid')
 
     const entries = await db.select().from(journalEntries)
@@ -727,7 +855,7 @@ describe('5. Chỉ ngân hàng mới đổi trạng thái đã trả (T13 · T14
     const created = await inject({
       method: 'POST',
       url: `/api/table-sessions/${qrSession}/pay/vietqr`,
-      headers: { cookie: qrCookie },
+      headers: ipad(IPAD_A9),
       payload: { amount: 30_000 },
     })
     const p = created.json<{ id: number; vaNumber: string }>()
@@ -749,7 +877,7 @@ describe('5. Chỉ ngân hàng mới đổi trạng thái đã trả (T13 · T14
 
 // ---------------------------------------------------------------------------
 
-describe('6. Món hết khoá ngay trên điện thoại khách (K5 → T2)', () => {
+describe('7. Món hết khoá ngay trên iPad (K5 → T2)', () => {
   it('thu ngân KHÔNG được báo hết món — đó là việc của bếp (§4.2)', async () => {
     const res = await inject({
       method: 'POST',
@@ -781,18 +909,18 @@ describe('6. Món hết khoá ngay trên điện thoại khách (K5 → T2)', ()
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/lines`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { lines: [{ dishId: 'kemtra', qty: 1 }] },
     })
     expect(res.statusCode).toBe(409)
     expect(res.json<{ code: string }>().code).toBe('dish_sold_out')
   })
 
-  it('khách đọc được danh sách món hết để tô xám ngay trên máy mình', async () => {
+  it('khách đọc được danh sách món hết để tô xám ngay trên iPad', async () => {
     const res = await inject({
       method: 'GET',
       url: `/api/availability?branch=${fx.branchId}`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
     })
     expect(res.statusCode).toBe(200)
     expect(res.json<{ dishId: string }[]>().some((a) => a.dishId === 'kemtra')).toBe(true)
@@ -801,12 +929,12 @@ describe('6. Món hết khoá ngay trên điện thoại khách (K5 → T2)', ()
 
 // ---------------------------------------------------------------------------
 
-describe('6b. Chấm sao sau bữa ăn (T15 → B13)', () => {
+describe('7b. Chấm sao sau bữa ăn (T15 → B13)', () => {
   it('khách chấm sao kèm nhận xét', async () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/feedback`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { stars: 4, comment: 'Thăn bò ngon, chờ hơi lâu' },
     })
     expect(res.statusCode).toBe(201)
@@ -817,14 +945,14 @@ describe('6b. Chấm sao sau bữa ăn (T15 → B13)', () => {
     await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/feedback`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { stars: 5, comment: 'Nghĩ lại thì rất đáng' },
     })
 
     const res = await inject({
       method: 'GET',
       url: `/api/table-sessions/${sessionId}/feedback`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
     })
     expect(res.json<{ stars: number; comment: string }>()).toEqual({
       stars: 5,
@@ -839,7 +967,7 @@ describe('6b. Chấm sao sau bữa ăn (T15 → B13)', () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${sessionId}/feedback`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { stars: 9 },
     })
     expect(res.statusCode).toBe(400)
@@ -849,7 +977,7 @@ describe('6b. Chấm sao sau bữa ăn (T15 → B13)', () => {
     const res = await inject({
       method: 'POST',
       url: `/api/table-sessions/${otherSession}/feedback`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
       payload: { stars: 1 },
     })
     expect(res.statusCode).toBe(403)
@@ -858,7 +986,7 @@ describe('6b. Chấm sao sau bữa ăn (T15 → B13)', () => {
 
 // ---------------------------------------------------------------------------
 
-describe('7. Đóng bàn thì token QR chết theo (§8)', () => {
+describe('8. Đóng bàn thì iPad về màn bàn chưa mở (§9.1)', () => {
   it('trả nốt phần còn lại rồi đóng bàn', async () => {
     const bill = await inject({
       method: 'GET',
@@ -883,17 +1011,47 @@ describe('7. Đóng bàn thì token QR chết theo (§8)', () => {
     expect(res.statusCode).toBe(201)
   })
 
-  it('token cũ không dùng lại được — khách bàn trước không đọc được đơn bàn sau', async () => {
+  it('iPad thấy bàn đã về trạng thái chưa mở', async () => {
+    const res = await inject({ method: 'GET', url: '/api/table-terminal', headers: ipad() })
+    expect(res.json<TerminalState>().session).toBeNull()
+  })
+
+  it('khách bàn trước không còn đọc được đơn của mình trên iPad', async () => {
     const res = await inject({
       method: 'GET',
       url: `/api/table-sessions/${sessionId}/order`,
-      headers: { cookie: phoneA },
+      headers: ipad(),
     })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('khách sau tự mở bàn là phiên MỚI — không thấy đơn của khách trước', async () => {
+    const res = await selfOpen(ipadA4, 2)
+    expect(res.statusCode, res.payload).toBe(201)
+    const next = res.json<TerminalState>().session!
+    expect(next.id).not.toBe(sessionId)
+
+    const old = await inject({
+      method: 'GET',
+      url: `/api/table-sessions/${sessionId}/order`,
+      headers: ipad(),
+    })
+    expect(old.statusCode).toBe(403)
+  })
+
+  it('ngắt iPad ở A4 thì máy đó hết đường vào ngay', async () => {
+    const revoked = await inject({
+      method: 'DELETE',
+      url: `/api/admin/devices/${ipadA4Id}`,
+      headers: asManager(),
+    })
+    expect(revoked.statusCode, revoked.payload).toBe(200)
+
+    const res = await inject({ method: 'GET', url: '/api/table-terminal', headers: ipad() })
     expect(res.statusCode).toBe(401)
   })
 
-  it('quét lại mã dán bàn cũng không vào được nữa — bàn đã đóng', async () => {
-    const res = await joinTable(TRONG_QUAN)
-    expect(res.statusCode).toBe(404)
+  it('ngắt máy cũ rồi thì ghép được iPad mới cho bàn đó', async () => {
+    expect((await pairingCode(fx.grillTableId)).statusCode).toBe(201)
   })
 })

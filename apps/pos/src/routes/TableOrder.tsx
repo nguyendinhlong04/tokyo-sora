@@ -5,7 +5,6 @@ import {
   MenuItemCard,
   Modal,
   Money,
-  QrCode,
   SectionLabel,
   useToast,
 } from '@sora/ui'
@@ -62,7 +61,6 @@ export function TableOrder() {
   const [category, setCategory] = useState<string | null>('quick')
   const [pad, setPad] = useState<PadLine[]>([])
   const [voiding, setVoiding] = useState<OrderLineRow | null>(null)
-  const [showQr, setShowQr] = useState(false)
   const [modifierFor, setModifierFor] = useState<ConfigDish | null>(null)
 
   const id = Number(sessionId)
@@ -314,7 +312,6 @@ export function TableOrder() {
             ) : null}
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={() => setShowQr(true)}>Mã QR bàn</Button>
             <Button variant="ghost" onClick={() => void navigate('/floor')}>
               Sơ đồ
             </Button>
@@ -497,13 +494,6 @@ export function TableOrder() {
         />
       ) : null}
 
-      <TableQrDialog
-        branchId={branchId!}
-        tableCode={tableCode}
-        open={showQr}
-        onClose={() => setShowQr(false)}
-      />
-
       <VoidDialog
         line={voiding}
         onClose={() => setVoiding(null)}
@@ -639,49 +629,6 @@ function ModifierDialog({
             </div>
           </div>
         ))}
-      </div>
-    </Modal>
-  )
-}
-
-/**
- * Mã QR của bàn — in một lần rồi DÁN CỐ ĐỊNH, không đổi giữa các bữa.
- *
- * Mã chỉ mang một thông tin: "đây là bàn nào". Nó KHÔNG phải bí mật, ai chụp
- * cũng được. Việc một máy có gọi món được hay không do máy chủ quyết qua ba lớp
- * của LUONG-QR-BAN.md — quan trọng nhất là bàn phải đang mở và máy phải chứng
- * minh được đang ở trong quán.
- *
- * Hộp này vì thế chỉ còn để in hoặc chìa cho khách quét, không cấp phát gì cả.
- *
- * Sora Table nằm ở tên miền khác POS nên địa chỉ lấy từ `VITE_TABLE_ORIGIN`; máy
- * dev không đặt biến này thì lấy chính gốc của POS.
- */
-function TableQrDialog({
-  branchId,
-  tableCode,
-  open,
-  onClose,
-}: {
-  branchId: string
-  tableCode: string
-  open: boolean
-  onClose: () => void
-}) {
-  const origin = import.meta.env.VITE_TABLE_ORIGIN ?? window.location.origin
-  const url = `${origin}/t/${branchId}/${tableCode}`
-
-  return (
-    <Modal
-      open={open}
-      title={`Mã QR bàn ${tableCode}`}
-      onClose={onClose}
-      footer={<Button onClick={onClose}>Đóng</Button>}
-    >
-      <div className="flex flex-col items-center gap-4">
-        <div className="rounded-md bg-[var(--sora-washi-100)] p-4">
-          <QrCode value={url} size={240} label={`Mã QR vào bàn ${tableCode}`} />
-        </div>
       </div>
     </Modal>
   )

@@ -373,96 +373,66 @@ describe('Chia bill — chống trả trùng (T12)', () => {
 })
 
 /**
- * Máy khách trong một bàn (LUONG-QR-BAN.md).
+ * iPad gắn bàn (§9.1).
  *
- * Mã QR dán bàn ai chụp cũng được, nên toàn bộ sức nặng dồn vào việc phân biệt
- * từng điện thoại. Hai bất biến dưới đây giữ cho vai chủ bàn không nhập nhằng —
- * nếu chúng chỉ nằm trong code thì một đường ghi sót là mất sạch.
+ * iPad là danh tính của BÀN: nó đọc và ghi đơn của phiên đang sống ở bàn mình.
+ * Hai iPad trên một bàn là hai giỏ tranh nhau một đơn, một iPad không bàn là máy
+ * khách không biết mình phục vụ ai — cả hai chặn ở CSDL chứ không ở kỷ luật code.
  */
-describe('Máy khách trong bàn', () => {
-  let sessionId = 0
+describe('iPad gắn bàn', () => {
+  let tableId = 0
 
   beforeAll(async () => {
-    // Dùng lại lượt ăn của các test trên: mỗi bàn chỉ được có một lượt chưa đóng,
-    // nên mở thêm một lượt nữa sẽ đụng đúng bất biến đó.
-    const existing = await db.query<{ id: number }>(
-      `SELECT id FROM table_sessions WHERE status <> 'closed' LIMIT 1`,
-    )
-    if (existing.rows.length > 0) {
-      sessionId = existing.rows[0]!.id
-    } else {
-      const { rows } = await db.query<{ id: number }>(`
-        INSERT INTO table_sessions (branch_id, table_id, business_date)
-          SELECT 'cg', id, '2026-08-01' FROM tables LIMIT 1
-          RETURNING id
-      `)
-      sessionId = rows[0]!.id
-    }
+    const { rows } = await db.query<{ id: number }>(`SELECT id FROM tables WHERE code = 'A4'`)
+    tableId = rows[0]!.id
     await db.exec(`
-      INSERT INTO table_devices (table_session_id, token_hash, state, is_host, admitted_via, admitted_at)
-        VALUES (${sessionId}, 'hash-chu-ban', 'admitted', true, 'wifi', now());
+      INSERT INTO devices (branch_id, kind, name, table_id, token_hash)
+        VALUES ('cg', 'table', 'iPad A4', ${tableId}, 'hash-ipad-a4')
     `)
   })
 
-  it('một lượt ăn chỉ có đúng một chủ bàn', async () => {
+  it('iPad bàn phải có bàn; máy khác không được mang bàn', async () => {
     await expect(
-      db.exec(`
-        INSERT INTO table_devices (table_session_id, token_hash, state, is_host, admitted_via, admitted_at)
-          VALUES (${sessionId}, 'hash-chu-ban-2', 'admitted', true, 'wifi', now())
-      `),
-    ).rejects.toThrow(/table_devices_one_host/)
-  })
-
-  it('máy đang chờ không được cầm quyền chủ bàn', async () => {
+      db.exec(`INSERT INTO devices (branch_id, kind, name, token_hash)
+                 VALUES ('cg', 'table', 'iPad lạc', 'hash-ipad-lac')`),
+    ).rejects.toThrow(/devices_table_check/)
     await expect(
-      db.exec(`
-        INSERT INTO table_devices (table_session_id, token_hash, state, is_host)
-          VALUES (${sessionId}, 'hash-cho-doi', 'waiting', true)
-      `),
-    ).rejects.toThrow(/table_devices_host_admitted/)
+      db.exec(`INSERT INTO devices (branch_id, kind, name, table_id, token_hash)
+                 VALUES ('cg', 'kds', 'Màn bếp', ${tableId}, 'hash-kds-ban')`),
+    ).rejects.toThrow(/devices_table_check/)
   })
 
-  it('nhiều máy cùng chờ duyệt ở một bàn là bình thường', async () => {
-    await db.exec(`
-      INSERT INTO table_devices (table_session_id, token_hash, state)
-        VALUES (${sessionId}, 'hash-cho-1', 'waiting'),
-               (${sessionId}, 'hash-cho-2', 'waiting')
-    `)
-    const { rows } = await db.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM table_devices
-        WHERE table_session_id = ${sessionId} AND state = 'waiting'`,
+  it('mỗi bàn đúng một iPad đang chạy — ngắt máy cũ rồi mới ghép máy mới', async () => {
+    await expect(
+      db.exec(`INSERT INTO devices (branch_id, kind, name, table_id, token_hash)
+                 VALUES ('cg', 'table', 'iPad A4 thứ hai', ${tableId}, 'hash-ipad-a4-2')`),
+    ).rejects.toThrow(/devices_one_live_table/)
+
+    await db.exec(`UPDATE devices SET revoked_at = now() WHERE token_hash = 'hash-ipad-a4'`)
+    await db.exec(`INSERT INTO devices (branch_id, kind, name, table_id, token_hash)
+                     VALUES ('cg', 'table', 'iPad A4 thay thế', ${tableId}, 'hash-ipad-a4-3')`)
+  })
+
+  it('mã ghép iPad phải chỉ ra bàn, và chỉ trỏ được tới bàn có thật', async () => {
+    await expect(
+      db.exec(`INSERT INTO pairing_codes (code, branch_id, kind, expires_at)
+                 VALUES ('100001', 'cg', 'table', now() + interval '10 minutes')`),
+    ).rejects.toThrow(/pairing_codes_table_check/)
+    await expect(
+      db.exec(`INSERT INTO pairing_codes (code, branch_id, kind, table_id, expires_at)
+                 VALUES ('100002', 'cg', 'table', 999999, now() + interval '10 minutes')`),
+    ).rejects.toThrow(/pairing_codes_table_id_tables_id_fk/)
+  })
+
+  it('luồng QR điện thoại đã gỡ — không còn bảng máy khách, không còn tham số Wi-Fi', async () => {
+    const tablesLeft = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM information_schema.tables WHERE table_name = 'table_devices'`,
     )
-    expect(rows[0]!.n).toBe(2)
-  })
-})
-
-/**
- * Tham số địa chỉ mạng của quán (migration 9006).
- *
- * Màn A6 chỉ hiện những tham số đã có dòng trong CSDL. Thiếu dòng này thì người
- * vận hành không có chỗ nào khai địa chỉ Wi-Fi của quán, và lớp 2 vĩnh viễn coi
- * như không ai đang ngồi trong quán — hỏng âm thầm, không báo lỗi gì.
- */
-describe('Tham số gọi món tại bàn', () => {
-  it('migration đã nạp sẵn dòng table.branchNetworks ở cấp chuỗi', async () => {
-    const { rows } = await db.query<{ value: string; unit: string | null }>(
-      `SELECT value::text AS value, unit FROM parameters
-        WHERE key = 'table.branchNetworks' AND branch_id IS NULL`,
-    )
-    expect(rows).toHaveLength(1)
-    // Để trống: chưa khai thì không ai được coi là ở trong quán
-    expect(rows[0]!.value).toBe('""')
-  })
-
-  it('khai đè được theo từng chi nhánh', async () => {
-    await db.exec(`
-      INSERT INTO parameters (key, branch_id, value)
-        VALUES ('table.branchNetworks', 'cg', '"203.0.113.10, 203.0.113.11"'::jsonb)
-    `)
-    const { rows } = await db.query<{ n: number }>(
+    expect(tablesLeft.rows[0]!.n).toBe(0)
+    const params = await db.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM parameters WHERE key = 'table.branchNetworks'`,
     )
-    expect(rows[0]!.n).toBe(2)
+    expect(params.rows[0]!.n).toBe(0)
   })
 })
 

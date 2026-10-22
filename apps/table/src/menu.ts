@@ -218,8 +218,8 @@ export function countActive(filters: Filters): number {
 }
 
 /**
- * Bỏ dấu để "bo ba chi" tìm ra "Bò ba chỉ" — gõ có dấu trên điện thoại giữa bữa
- * ăn là việc không ai muốn làm.
+ * Bỏ dấu để "bo ba chi" tìm ra "Bò ba chỉ" — gõ có dấu trên iPad giữa bữa ăn là
+ * việc không ai muốn làm.
  */
 export function fold(text: string): string {
   return text

@@ -74,6 +74,37 @@ mép thì vé hàng dưới biến mất mà không ai biết — nên bước n
 
 ---
 
+## iPad tại bàn — iPad thế hệ 7 (10,2″) gắn đế, nằm ngang
+
+Mỗi bàn một iPad, ghim cứng vào **đúng một bàn** ngay lúc ghép. Khách gọi món, gọi
+nhân viên, xem đơn và tự trả tiền trên máy này; bàn trống thì khách tự mở bàn ngay
+trên iPad (chọn số người → "Bắt đầu gọi món").
+
+1. Office → **Quản trị → A4 Thiết bị** → loại **iPad tại bàn** → chọn **bàn** → Sinh mã
+   ghép. Bàn đã có iPad đang chạy thì không chọn được: một bàn một iPad — ngắt máy cũ
+   trước.
+2. Trên iPad mở Safari, vào `https://ban.tokyo-sora.vn`, nhập mã 6 số. Màn chào phải
+   hiện **đúng số bàn**; sai bàn là sinh nhầm mã — ngắt máy ở A4 rồi làm lại bước 1.
+3. Cài đặt iPad:
+   - Màn hình & Độ sáng → Tự động khoá: **Không bao giờ** (máy cắm sạc ở đế; app chưa
+     giữ màn sáng bằng Wake Lock).
+   - Trợ năng → **Truy cập được hướng dẫn** (Guided Access): bật, đặt mã. Mở trang
+     gọi món, bấm ba lần nút Home để khoá vào đó; khoanh vùng **thanh địa chỉ** của Safari
+     để khách không chạm được, và tắt **Chuyển động** để giữ hướng ngang — trang web
+     không tự khoá hướng xoay được. Có MDM thì dùng Single App Mode.
+4. Gắn đế, cắm sạc, iPad **nằm ngang**.
+
+Giới hạn cần biết: iPad thế hệ 7 dừng ở iPadOS 18 và không ẩn được thanh trạng thái.
+App chưa có manifest cài ra màn hình chính (biểu tượng mở vẫn kèm thanh Safari — vì vậy
+mới phải khoanh vùng thanh địa chỉ ở bước 3).
+
+Chuyển iPad sang bàn khác = ngắt máy ở A4 rồi ghép lại bằng mã của bàn mới. Máy bị
+ngắt tự quay về màn ghép, ghi "đã bị ngắt ở Office". Bàn có khách đặt trong 90 phút tới
+thì iPad không cho tự mở, chỉ báo giờ đặt (không bao giờ hiện tên người đặt) và mời gặp
+nhân viên — nhân viên mở bàn ở POS là iPad sẵn sàng gọi món.
+
+---
+
 ## Kiosk chấm công — tablet 10″ gắn cố định
 
 Máy này đứng ở lối vào khu nhân viên, cắm điện liên tục, **không cầm đi đâu**: chi
@@ -105,7 +136,7 @@ máy gắn cứng chi nhánh, và đối chiếu chéo với phiên đăng nhậ
 
 ## Sau khi cài xong: bài kiểm 5 phút
 
-Chạy đủ năm bước này trước khi bàn giao cho quán:
+Chạy đủ sáu bước này trước khi bàn giao cho quán:
 
 1. **Ghép máy** — mã dùng lần hai phải bị từ chối.
 2. **Đăng nhập ca** bằng PIN trên máy POS; PIN đúng nhưng gõ ở máy chưa ghép phải
@@ -115,6 +146,9 @@ Chạy đủ năm bước này trước khi bàn giao cho quán:
    **không được nhân đôi**. Thanh trên cùng phải báo "Mất mạng" trong lúc đó.
 5. **Tắt nguồn màn bếp rồi bật lại khi chưa có mạng** — màn phải tự lên và hiện
    được giao diện (chưa có vé mới là đúng, vì vé đến từ máy chủ).
+6. **iPad tại bàn** — ở bàn trống chạm "Bắt đầu gọi món" phải mở được bàn và POS thấy
+   "Có khách" ngay; gọi một món, rồi đóng bàn ở POS: iPad về màn đầu trong vài giây,
+   món chưa gửi của khách trước không còn trong giỏ.
 
 Bước 4 và 5 là hai bước hay bị bỏ qua nhất và cũng là hai bước quan trọng nhất —
 chúng chứng minh quán vẫn chạy được khi mạng chập chờn.
@@ -130,6 +164,8 @@ Không phải cài lại gì. Khi có bản mới:
   phiếu order đang dựng.
 - **Màn bếp**: tự cập nhật khi hàng vé rỗng. Màn treo tường không có ai bấm nút,
   nhưng tải lại giữa lúc đang có vé thì đầu bếp mất chỗ đang nhìn.
+- **iPad tại bàn**: chưa tự cập nhật — bản mới chạy khi trang được tải lại. Tải lại lúc
+  bàn trống (thoát Guided Access → kéo trang xuống), không bao giờ giữa bữa.
 
 ## Máy in bill
 

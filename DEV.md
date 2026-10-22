@@ -110,6 +110,7 @@ Mở app rồi dán vào Console của trình duyệt:
 localStorage.setItem('sora.device.token', 'dev-device-token')   // POS
 localStorage.setItem('sora.device.token', 'dev-kds-st-02')      // Màn quầy sống
 localStorage.setItem('sora.device.token', 'dev-kds-st-06')      // Màn bếp nướng
+localStorage.setItem('sora.device.token', 'dev-table-token')    // iPad bàn đầu tiên (:5173)
 location.reload()
 ```
 
@@ -119,22 +120,22 @@ location.reload()
 > Hệ thống xử lý đúng trong cả hai trường hợp: quyền là hợp của vai trò người đăng
 > nhập và vai trò của thiết bị họ đang đứng.
 >
-> Với Sora Table thì va chạm này gắt hơn: cookie bàn (`sora_table`) và cookie nhân
-> viên (`sora_staff`) cùng nằm trên `localhost`, mà thứ tự ưu tiên là **nhân viên
-> trước, bàn sau**. Đang đăng nhập POS thì mở app bàn sẽ thấy "Chưa vào được bàn
-> nào"; ngược lại, đang có cookie bàn thì POS không đăng nhập được ("Thiếu thiết bị
-> đã ghép"). Cách làm việc: **mở Sora Table ở cửa sổ ẩn danh hoặc trình duyệt khác**
-> với POS. Ngoài đời `pos.tokyosora.vn` và `ban.tokyosora.vn` là hai tên miền nên
-> không bao giờ gặp.
+> Sora Table không dính va chạm này: token iPad bàn luôn thắng cookie nhân viên
+> (iPad không bao giờ vào ca), nên mở chung trình duyệt với POS/Office được. Chỗ duy
+> nhất còn lộ: iPad bị ngắt mà trình duyệt còn cookie nhân viên thì API trả 403 thay
+> vì 401 — app vẫn hiểu là "đã bị ngắt" và về màn ghép.
 
-## Chạy thử vòng khách tự phục vụ (GĐ2)
+## Chạy thử vòng khách tự phục vụ trên iPad (GĐ2 · §9.1)
 
-1. Mở bàn ở POS (P2 → chạm bàn trống), vào màn đơn bàn.
-2. Bấm **Mã QR bàn** — POS cấp token mới và hiện mã QR. Quét bằng điện thoại cùng
-   mạng LAN, hoặc chép địa chỉ `/t/<token>` rồi mở ở cửa sổ ẩn danh trỏ vào
-   `http://localhost:5173`.
-3. Khách gọi món trên điện thoại → vé xuống màn bếp; bấm **Gọi nhân viên** → yêu cầu
-   hiện ở màn **Yêu cầu từ bàn** (P12) của POS.
+1. Mở `http://localhost:5173` ở khổ **1080×810** (iPad ngang). Dán `dev-table-token` như
+   trên là iPad của bàn đầu tiên. Muốn thử đường ghép thật: xoá token, vào Office →
+   **Quản trị → Thiết bị**, loại **iPad tại bàn**, chọn bàn → **Sinh mã ghép**, rồi nhập mã
+   ở màn "Ghép iPad với bàn".
+2. Bàn trống: chọn số người → **Bắt đầu gọi món** là khách tự mở bàn, POS thấy bàn "Có
+   khách". Bàn đã mở ở POS thì iPad hỏi lại số khách. Chọn đông hơn sức chứa → bàn mở
+   đúng sức chứa và POS nhận yêu cầu "Nhóm N khách — cần ghép thêm bàn".
+3. Khách gọi món trên iPad → vé xuống màn bếp; bấm **Gọi nhân viên** → yêu cầu hiện ở
+   màn **Yêu cầu từ bàn** (P12) của POS.
 4. Tự thanh toán tới màn VietQR rồi giả lập ngân hàng báo có:
 
 ```bash
@@ -144,9 +145,9 @@ node -e "const {createHmac}=require('crypto');const raw=JSON.stringify({bankRef:
 Chỉ webhook này mới đổi trạng thái sang **đã trả** — nút "Đã chuyển xong" của khách
 chỉ đổi màn hình chờ.
 
-Mã QR in từ POS trỏ về `VITE_TABLE_ORIGIN`; máy dev không đặt biến này thì mã trỏ về
-chính POS (`:5174`), nên khi thử bằng điện thoại thật hãy đặt
-`VITE_TABLE_ORIGIN=http://<IP máy dev>:5173`.
+Đóng bàn ở POS → iPad về màn đầu sau vài giây (hỏi lại bàn 2 s khi chờ dọn, 10 s khi
+đang mở) và giỏ của khách trước bị xoá. Ngắt iPad ở Office → iPad về màn ghép. Trang để
+ở tab nền thì trình duyệt ngưng hỏi lại — chuyển về tab đó là chạy tiếp.
 
 ## Tài khoản dev
 

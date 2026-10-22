@@ -24,9 +24,9 @@ import {
 } from '../menu'
 import { sendRounds } from '../order-status'
 import { usePromos } from '../promotions'
+import { loadRecent, RECENT_KEY, RECENT_MAX } from '../recent-searches'
 import { storyMore, useStories } from '../stories'
 import { useTableSession } from '../table-context'
-import { loadRecent, RECENT_KEY, RECENT_MAX } from './Search'
 
 interface Section {
   key: string
@@ -37,8 +37,7 @@ interface Section {
 /**
  * T2 Thực đơn trên iPad gắn bàn — cột nhóm · lưới ba cột · cột giỏ (§9.1).
  *
- * Mỗi lần chỉ hiện MỘT nhóm chứ không cuộn cả thực đơn dài như điện thoại: trên
- * màn ngang, cột nhóm bên trái đã là mục lục luôn mở, chạm là tới. Nhóm dài
+ * Mỗi lần chỉ hiện MỘT nhóm chứ không cuộn cả thực đơn dài: trên màn ngang, cột nhóm bên trái đã là mục lục luôn mở, chạm là tới. Nhóm dài
  * (Nướng) chia tiếp thành chặng bò · heo · hải sản · rau ở dải thẻ phía trên.
  * Tìm món (T4) mở ngay trong cột giữa, cột nhóm và giỏ vẫn đứng yên hai bên.
  */
@@ -177,7 +176,7 @@ export function IpadMenu() {
     setFlash({ dishId, at: Date.now() })
   }
 
-  /** Món phải chọn vị / số người ăn thì + là MỞ chi tiết — y như điện thoại */
+  /** Món phải chọn vị / số người ăn thì + là MỞ chi tiết */
   const addOrOpen = (dish: Dish, from: HTMLElement | null) => {
     if (menu.soldOut.has(dish.id)) return
     if (needsChoice(menu.groupsOf(dish))) {

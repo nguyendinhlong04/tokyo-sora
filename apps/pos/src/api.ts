@@ -708,12 +708,6 @@ export const api = {
       method: 'POST',
     }),
 
-  /** P3 in mã QR dán bàn cho khách quét — token cũ chết ngay khi cấp mã mới */
-  issueQrToken: (sessionId: number) =>
-    apiFetch<{ token: string; url: string }>(`/api/table-sessions/${sessionId}/qr-token`, {
-      method: 'POST',
-    }),
-
   closeSession: (sessionId: number, tableCode: string) =>
     enqueue<{ changed: boolean }>({
       method: 'POST',
