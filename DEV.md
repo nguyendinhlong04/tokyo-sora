@@ -24,7 +24,7 @@ Mật khẩu nằm ở `~/.tokyo-sora-dev/superpw.txt` (superuser `postgres`) v�
 ```bash
 pnpm install
 pnpm --filter @sora/api db:migrate
-pnpm --filter @sora/api db:seed            # dữ liệu nền — không có tài khoản nào
+pnpm --filter @sora/api db:seed            # dữ liệu nền cho CSDL trống — không có tài khoản nào
 pnpm --filter @sora/api db:dev-bootstrap   # tài khoản dev, thiết bị dev, phát hành bundle
 ```
 
@@ -101,9 +101,18 @@ pnpm -r build
 
 ```bash
 pnpm extract-seed
+pnpm --filter @sora/api db:seed --ghi-de
+pnpm --filter @sora/api db:dev-bootstrap   # phát hành lại bundle để app thấy
 ```
 
-Đọc `designs/*.dc.html`, xuất JSON đã chuẩn hoá vào `scripts/extract-seed/out/`.
+`extract-seed` đọc `designs/*.dc.html`, xuất JSON đã chuẩn hoá vào `scripts/extract-seed/out/`.
+
+`db:seed` không cờ chỉ nạp CSDL **trống**: CSDL đã có dữ liệu nền thì nó dừng, không ghi
+gì — để lệnh ở DEPLOY.md chạy lại nhầm lên Supabase không trả thực đơn thật về prototype.
+`--ghi-de` nạp đè như bản cũ: chi nhánh, trạm, nhóm, món, set, bài kể, tuỳ chọn, bàn, vùng
+giao, nhà cung cấp đã sửa ở Office **trên máy này** trở về theo prototype, thẻ công thức
+của món mẫu bị xoá rồi chèn lại. Cờ chỉ nhận CSDL trên chính máy này (localhost, 127.x,
+::1, socket); gõ `db:seed -- --ghi-de` cũng được.
 
 ## Mở POS và màn bếp lên dùng ngay
 

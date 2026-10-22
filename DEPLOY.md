@@ -53,9 +53,18 @@ DATABASE_URL="<direct-url>" pnpm --filter @sora/api db:seed
 ```
 
 `db:seed` chỉ nạp dữ liệu nền — chi nhánh, trạm bếp, thực đơn mẫu, sơ đồ bàn, tham số —
-và **không tạo tài khoản, mật khẩu hay PIN nào**. Chạy một lần cho CSDL mới: lệnh ghi đè
-bằng bản mẫu, nên chạy lại là trả tên món, giá niêm yết và sơ đồ bàn đã sửa ở Office về
-như prototype.
+và **không tạo tài khoản, mật khẩu hay PIN nào**. Lệnh chỉ nạp **CSDL trống**: CSDL đã có
+chi nhánh, trạm, nhóm món, món, nhóm tuỳ chọn, khu vực, bàn, vùng giao hay nhà cung cấp
+thì nó dừng trước khi ghi, in ra bảng nào đã có bao nhiêu dòng và thoát mã 1. Chạy lại
+nhầm vì thế không trả tên món, giá niêm yết hay sơ đồ bàn đã sửa ở Office về như
+prototype. Cả lượt nạp nằm trong một transaction: hỏng giữa chừng thì CSDL vẫn trống, sửa
+lỗi rồi chạy lại. Cờ `--ghi-de` (nạp đè) chỉ dành cho máy dev — `DATABASE_URL` trỏ ra
+ngoài máy đang chạy là bị từ chối trước khi kết nối.
+
+Cũng vì vậy, dữ liệu nền thêm vào seed **sau** lần nạp đầu — khoá tham số mới, khoản mục
+chi mới — không tới được CSDL này qua `db:seed`. Bản phát hành cần chúng phải kèm
+migration riêng (mẫu: `migrations/9006_table_branch_networks.sql`), chạy bằng
+`db:migrate` ở trên.
 
 Migration in ra `NOTICE` cho hai guard có thể bị Supabase chặn:
 

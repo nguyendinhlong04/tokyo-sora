@@ -90,7 +90,7 @@ pnpm --filter @sora/api test src/modules/ordering/domain/order-state.test.ts -t 
 
 pnpm --filter @sora/api db:generate      # drizzle-kit → migrations/00NN_<tên>.sql
 pnpm --filter @sora/api db:migrate       # runner riêng, chạy mọi *.sql theo tên file
-pnpm --filter @sora/api db:seed          # dữ liệu nền, upsert (đè thực đơn mẫu); KHÔNG tạo tài khoản
+pnpm --filter @sora/api db:seed          # dữ liệu nền, chỉ CSDL trống; --ghi-de: nạp đè ở máy dev; KHÔNG tạo tài khoản
 pnpm --filter @sora/api db:dev-bootstrap # chỉ CSDL ở máy này: tài khoản dev + thiết bị dev + bundle, in token
 pnpm --filter @sora/api db:create-admin  # R10 đầu tiên ở production — hỏi mật khẩu, chỉ tạo mới
 pnpm --filter @sora/pos build && pnpm --filter @sora/pos preview   # thử service worker :4174 (kitchen :4175, table :4173)
@@ -347,7 +347,9 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   `9002_realtime_broadcast`, `9003_realtime_rls`, `9004_stock_moves_guard`, …). Runner
   riêng `src/db/migrate.ts` chạy mọi file một lần theo tên, ghi `_sora_migrations`.
   **Không có down**; file đã chạy thì sửa không có tác dụng → luôn thêm file mới.
-  Vercel build **không** chạy migration — chạy tay trước khi deploy API.
+  Vercel build **không** chạy migration — chạy tay trước khi deploy API. Dữ liệu nền
+  mới cho CSDL đang chạy (khoá tham số A6…) cũng đi bằng migration `9xxx` (mẫu `9006`):
+  `db:seed` từ chối CSDL đã có dữ liệu.
 - Không dùng Drizzle `.prepare()` (pooler transaction của Supabase).
 - Không viết truy vấn con tương quan trong `sql` ở **phần select** của truy vấn **không
   join**: khi đó Drizzle bỏ tên bảng, `${orders.id}` thành `"id"` trần và Postgres gắn nó

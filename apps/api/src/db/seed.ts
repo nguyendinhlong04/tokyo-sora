@@ -1,8 +1,18 @@
 /**
- * Nạp dữ liệu nền từ prototype vào CSDL:  pnpm --filter @sora/api db:seed
+ * Nạp dữ liệu nền từ prototype vào CSDL MỚI:  pnpm --filter @sora/api db:seed
+ * (lệnh nằm ở seed-cli.ts). Nguồn là các file JSON do `pnpm extract-seed` sinh ra
+ * từ designs/*.dc.html.
  *
- * Idempotent — chạy lại không nhân bản, chỉ cập nhật. Nguồn là các file JSON do
- * `pnpm extract-seed` sinh ra từ designs/*.dc.html.
+ * Phần lớn lệnh ghi dưới đây là UPSERT theo khoá của prototype, nên chạy lên CSDL
+ * đang dùng là lặng lẽ trả tên món, giá niêm yết, sơ đồ bàn, thẻ công thức… đã sửa
+ * ở Office về như prototype. Vì vậy CSDL đã có dữ liệu nền thì `seed` dừng trước
+ * khi ghi; nạp đè chỉ dành cho máy dev (`--ghi-de`, xem `parseSeedArgs`). Cả lượt
+ * nằm trong một transaction: lượt đầu hỏng giữa chừng không để lại nửa thực đơn
+ * khiến lượt sau bị từ chối.
+ *
+ * Hệ quả: dòng thêm vào đây SAU lần nạp đầu (khoá tham số, khoản mục…) không bao
+ * giờ tới được CSDL đang chạy qua lệnh này — cần ở đó thì thêm bằng migration, như
+ * `9006_table_branch_networks.sql`.
  *
  * KHÔNG tạo tài khoản, mật khẩu hay PIN nào: lệnh này chạy cả lên production
  * (DEPLOY.md), mà bản cũ nạp tài khoản Office mẫu bằng UPSERT — mỗi lượt chạy đặt
@@ -10,12 +20,12 @@
  * `dev-accounts.ts` (db:dev-bootstrap); tài khoản quản trị đầu tiên ở production
  * tạo bằng db:create-admin.
  */
-import 'dotenv/config'
 import { and, eq } from 'drizzle-orm'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { Pool } from 'pg'
-import { createDb, type Db } from './client'
+import type { Tx } from '../common/tx'
+import type { Db } from './client'
+import { assertLocalDatabase } from './dev-accounts'
 import { RECIPE_DOCS } from './seed-recipe-docs'
 import { PREP_SECONDS_BY_STATION, routingForSeedDish } from './seed-routing'
 import { DISH_STORIES } from './seed-stories'
@@ -23,8 +33,8 @@ import * as s from './schema'
 
 const SEED_DIR = join(__dirname, '..', '..', '..', '..', 'scripts', 'extract-seed', 'out')
 
-const readJson = async <T>(name: string): Promise<T> =>
-  JSON.parse(await readFile(join(SEED_DIR, name), 'utf8')) as T
+const readJson = async <T>(dir: string, name: string): Promise<T> =>
+  JSON.parse(await readFile(join(dir, name), 'utf8')) as T
 
 /** Trạm bếp — tên và thuộc tính hiển thị lấy từ prototype KDS (bản hi-fi cuối) */
 const STATIONS = [
@@ -36,7 +46,10 @@ const STATIONS = [
   { id: 'ST-06', name: 'Bếp nướng', kanji: '焼', color: '#D9721F', ticketPrefix: 'A', columns: 4, sort: 6 },
 ]
 
-/** Tham số khởi điểm cho Trung tâm tham số A6 (§29.1) */
+/**
+ * Tham số khởi điểm cho Trung tâm tham số A6 (§29.1). Khoá thêm vào đây chỉ tới CSDL
+ * nạp sau đó — CSDL đang chạy cần thêm migration (xem đầu file).
+ */
 const PARAMETERS: {
   key: string
   value: unknown
@@ -437,7 +450,7 @@ const AREA_NAMES: Record<string, string> = {
 const PRIVATE_ZONES = new Set(['private', 'rieng'])
 
 /** Dựng khu vực + bàn của một chi nhánh, gọi lại được nhiều lần; trả về số bàn */
-async function seedFloorplan(db: Db, branchId: string, rows: SeedTable[]): Promise<number> {
+async function seedFloorplan(db: Tx, branchId: string, rows: SeedTable[]): Promise<number> {
   const areaIdByZone = new Map<string, number>()
   for (const zone of new Set(rows.map((t) => t.z))) {
     const name = AREA_NAMES[zone] ?? zone
@@ -507,9 +520,83 @@ function layoutFromDescription(branch: SeedBranch): SeedTable[] {
   return rows
 }
 
-async function seed(db: Db) {
+/**
+ * Bảng seed ghi đè mà Office sửa được (A3 · A10 · M1 · O10 · S3…). Dù chỉ một dòng ở
+ * bảng nào là CSDL đã nạp rồi hoặc đang được dùng. Bảng con (chặng set, bài kể, thẻ
+ * công thức, tuỳ chọn) không cần đếm: Office chỉ tạo chúng từ món hay nhóm cha đã có.
+ */
+const OWNED_TABLES = [
+  ['chi nhánh', s.branches],
+  ['trạm bếp', s.stations],
+  ['nhóm thực đơn', s.categories],
+  ['món', s.dishes],
+  ['nhóm tuỳ chọn', s.modifierGroups],
+  ['khu vực', s.areas],
+  ['bàn', s.tables],
+  ['vùng giao', s.deliveryZones],
+  ['nhà cung cấp', s.suppliers],
+] as const
+
+/** CSDL đã có dữ liệu nền — kết quả dự kiến của một lượt chạy lại, không phải sự cố */
+export class SeedRefused extends Error {}
+
+/**
+ * Nạp dữ liệu nền trong MỘT transaction — hỏng giữa chừng thì không còn dòng nào.
+ *
+ * Không có `overwrite` thì đếm OWNED_TABLES trước, có dòng là dừng (`SeedRefused`).
+ * `dir` chỉ để test truyền bộ JSON nhỏ — thư mục `out/` bị gitignore, CI không có.
+ */
+export async function seed(db: Db, { overwrite = false, dir = SEED_DIR } = {}) {
+  return db.transaction(async (tx) => {
+    if (!overwrite) {
+      const found: string[] = []
+      for (const [label, table] of OWNED_TABLES) {
+        const count = await tx.$count(table)
+        if (count > 0) found.push(`${count} ${label}`)
+      }
+      if (found.length > 0) {
+        throw new SeedRefused(
+          `CSDL đã có dữ liệu nền (${found.join(', ')}) — không ghi gì. db:seed chỉ nạp ` +
+            'CSDL mới: chạy lại sẽ trả thực đơn, giá niêm yết và sơ đồ bàn đã sửa ở Office ' +
+            'về như prototype. Máy dev muốn nạp lại sau `pnpm extract-seed`: thêm --ghi-de ' +
+            '(chỉ nhận CSDL trên máy này).',
+        )
+      }
+    }
+    return writeSeed(tx, dir)
+  })
+}
+
+/**
+ * Đọc tham số dòng lệnh của db:seed.
+ *
+ * `--ghi-de` chỉ nhận CSDL trên chính máy này: trỏ DATABASE_URL vào Supabase thì có
+ * cờ cũng bị từ chối, vì nạp đè là trả thực đơn thật về prototype. `--` đứng riêng là
+ * của pnpm (`db:seed -- --ghi-de`), bỏ qua.
+ */
+export function parseSeedArgs(
+  argv: string[],
+  databaseUrl: string | undefined,
+): { overwrite: boolean } {
+  const args = argv.filter((a) => a !== '--')
+  const unknown = args.filter((a) => a !== '--ghi-de')
+  if (unknown.length > 0) {
+    throw new Error(`db:seed không hiểu tham số ${unknown.join(' ')} — chỉ có --ghi-de`)
+  }
+  const overwrite = args.includes('--ghi-de')
+  if (overwrite) {
+    assertLocalDatabase(
+      databaseUrl,
+      'db:seed --ghi-de',
+      'Nạp đè là trả thực đơn, giá niêm yết và sơ đồ bàn đã sửa ở Office về như prototype.',
+    )
+  }
+  return { overwrite }
+}
+
+async function writeSeed(db: Tx, dir: string) {
   // ---- Chi nhánh ----
-  const branchRows = await readJson<SeedBranch[]>('branches.json')
+  const branchRows = await readJson<SeedBranch[]>(dir, 'branches.json')
   for (const b of branchRows) {
     await db
       .insert(s.branches)
@@ -532,7 +619,7 @@ async function seed(db: Db) {
   }
 
   // ---- Nhóm thực đơn ----
-  const cats = await readJson<[string, string, string][]>('categories.json')
+  const cats = await readJson<[string, string, string][]>(dir, 'categories.json')
   await Promise.all(
     cats.map((c, i) => {
       const row = { id: c[0], nameVi: c[1], kanji: c[2], sort: i }
@@ -541,7 +628,7 @@ async function seed(db: Db) {
   )
 
   // ---- Món ----
-  const { dishes } = await readJson<{ dishes: SeedDishRow[] }>('dishes.json')
+  const { dishes } = await readJson<{ dishes: SeedDishRow[] }>(dir, 'dishes.json')
   const unroutable: string[] = []
   for (const d of dishes) {
     const isSet = d.group === 'set'
@@ -598,7 +685,10 @@ async function seed(db: Db) {
   // ---- Chặng của set ----
   // Prototype mô tả set theo CHẶNG (Mở bữa · Bò trên than · Chốt bữa…) và "set nấu
   // theo nhịp, mang từng chặng" — nên mỗi chặng lệch một đợt ra món.
-  const setData = await readJson<{ setDetails: Record<string, SeedSetDetail> | null }>('sets.json')
+  const setData = await readJson<{ setDetails: Record<string, SeedSetDetail> | null }>(
+    dir,
+    'sets.json',
+  )
   const knownDishIds = new Set(dishes.map((d) => d.id))
   const skippedSetItems: string[] = []
 
@@ -694,7 +784,7 @@ async function seed(db: Db) {
   }
 
   // ---- Nhóm tuỳ chọn (modifier) ----
-  const mods = await readJson<Record<string, SeedModifierGroup[]>>('modifiers.json')
+  const mods = await readJson<Record<string, SeedModifierGroup[]>>(dir, 'modifiers.json')
   for (const [scope, groups] of Object.entries(mods)) {
     for (const [gi, g] of groups.entries()) {
       const gid = `${scope}-${g.gid}`
@@ -724,7 +814,7 @@ async function seed(db: Db) {
 
   // ---- Khu vực & bàn ----
   const branchId = branchRows[0]!.id
-  const tableRows = await readJson<{ tables: SeedTable[] }>('tables.json')
+  const tableRows = await readJson<{ tables: SeedTable[] }>(dir, 'tables.json')
   // Chi nhánh đầu có sơ đồ thật; hai chi nhánh còn lại suy từ dòng mô tả ở A10
   let tableCount = await seedFloorplan(db, branchId, tableRows.tables)
   for (const b of branchRows.slice(1)) {
@@ -854,19 +944,3 @@ async function seed(db: Db) {
     setItemsChuaCoTrongDanhMuc: skippedSetItems,
   }
 }
-
-async function main() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-  try {
-    const summary = await seed(createDb(pool))
-    console.log('Đã nạp:', JSON.stringify(summary))
-    console.log(`Thời gian chuẩn theo trạm: ${JSON.stringify(PREP_SECONDS_BY_STATION)}`)
-  } finally {
-    await pool.end()
-  }
-}
-
-main().catch((err) => {
-  console.error(err)
-  process.exitCode = 1
-})

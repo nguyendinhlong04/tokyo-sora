@@ -1,6 +1,7 @@
 /**
  * Tài khoản mẫu của máy dev: năm tài khoản Office (email + mật khẩu) và năm nhân
- * viên quán của prototype POS (PIN). Chỉ `db:dev-bootstrap` dùng file này.
+ * viên quán của prototype POS (PIN). Chỉ `db:dev-bootstrap` dùng các tài khoản này;
+ * `db:seed --ghi-de` mượn `assertLocalDatabase`.
  *
  * Chúng từng nằm trong `seed.ts` — mà `db:seed` chạy cả lên production theo
  * DEPLOY.md, nạp bằng UPSERT: mỗi lượt seed đặt lại mật khẩu chủ quán CHU01 về một
@@ -104,8 +105,14 @@ export async function seedDevAccounts(db: Db, branchId: string) {
  * NODE_ENV để trống. Thứ phải xét là nơi kết nối TỚI — hỏi chính `pg` (đã tính `?host=` lẫn
  * PGHOST) thay vì tự đọc URL, để không lệch với chỗ Pool sẽ nối thật. Đường hầm SSH
  * trỏ localhost về CSDL thật thì không chặn được.
+ *
+ * Rào này canh cả `db:seed --ghi-de` (seed.ts) — `command` và `reason` chỉ đổi lời báo.
  */
-export function assertLocalDatabase(connectionString: string | undefined): void {
+export function assertLocalDatabase(
+  connectionString: string | undefined,
+  command = 'dev-bootstrap',
+  reason = 'Mật khẩu, PIN và token thiết bị dev công khai trong repo.',
+): void {
   const host = new Client({ connectionString }).host.toLowerCase()
   const local =
     host.startsWith('/') || // socket Unix — chỉ có trên chính máy này
@@ -115,7 +122,7 @@ export function assertLocalDatabase(connectionString: string | undefined): void 
     /^127(\.\d{1,3}){3}$/.test(host)
   if (!local) {
     throw new Error(
-      `dev-bootstrap chỉ chạy trên CSDL ở máy này (localhost, 127.x, ::1, socket) — DATABASE_URL đang trỏ tới ${host}. Mật khẩu, PIN và token thiết bị dev công khai trong repo.`,
+      `${command} chỉ chạy trên CSDL ở máy này (localhost, 127.x, ::1, socket) — DATABASE_URL đang trỏ tới ${host}. ${reason}`,
     )
   }
 }
