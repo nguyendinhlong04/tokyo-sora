@@ -18,6 +18,9 @@ export interface EinvoiceIssueInput {
   /**
    * Cố định cho một hoá đơn qua mọi lượt thử. Lượt trước chết giữa chừng mà lượt
    * sau gửi lại thì nhà cung cấp nhận ra là một — không thành hai hoá đơn thật.
+   *
+   * Lượt trước bị nhà cung cấp TỪ CHỐI thì lượt sau có thể mang nội dung đã sửa
+   * (người mua) với cùng khoá — adapter thật phải kiểm nhà cung cấp chấp nhận việc đó.
    */
   requestKey: string
   formNo: string

@@ -5,11 +5,14 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   UseInterceptors,
 } from '@nestjs/common'
+import { InvoiceBuyerSchema } from '@sora/contracts'
 import { z } from 'zod'
 import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import { Public } from '../identity/auth.guard'
 import type { Actor } from '../identity/actor'
 import { SplitPaymentService } from '../payments/split-payment.service'
@@ -34,11 +37,16 @@ const CreateBody = z.object({
     address: z.string().max(300).nullish(),
     ward: z.string().max(120).nullish(),
     note: z.string().max(300).nullish(),
+    /** O5 "Xuất hoá đơn công ty" — không bắt buộc */
+    invoiceBuyer: InvoiceBuyerSchema.nullish(),
   }),
   lines: z.array(LineBody).min(1).max(50),
   slotMode: z.enum(['asap', 'scheduled']),
   slotAt: z.string().nullish(),
 })
+
+/** null = "Bán cho người tiêu dùng" */
+const BuyerBody = z.object({ buyer: InvoiceBuyerSchema.nullable() })
 
 /** Khách web: không tài khoản, không thiết bị — chỉ biết họ đang đặt ở chi nhánh nào */
 const guestOf = (branchId: string): Actor => ({ kind: 'guest', branchId })
@@ -56,6 +64,7 @@ export class OnlineController {
   constructor(
     private readonly online: OnlineService,
     private readonly payments: SplitPaymentService,
+    private readonly einvoice: EinvoiceService,
   ) {}
 
   /** O1: chi nhánh đang bán online */
@@ -124,5 +133,17 @@ export class OnlineController {
   @Get('track/:token')
   track(@Param('token') token: string) {
     return this.online.track(token)
+  }
+
+  /**
+   * O7: khách bổ sung hay sửa thông tin xuất hoá đơn sau khi đặt — được tới lúc
+   * hoá đơn phát hành. Cũng mở bằng mã theo dõi, như lượt trả tiền.
+   */
+  @Public()
+  @Put('track/:token/invoice-buyer')
+  async setInvoiceBuyer(@Param('token') token: string, @Body() body: unknown) {
+    const { buyer } = BuyerBody.parse(body)
+    const order = await this.online.orderIdOfTrackToken(token)
+    return this.einvoice.setBuyerForOrder(order.id, buyer, guestOf(order.branchId))
   }
 }

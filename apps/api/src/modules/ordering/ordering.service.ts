@@ -1109,6 +1109,16 @@ export class OrderingService {
             })
           : null
 
+      // Người mua khai ở bàn nguồn đi theo món sang bàn đích — trừ khi bàn đích đã khai riêng
+      if (sourceOrder?.invoiceBuyer) {
+        await tx
+          .update(orders)
+          .set({ invoiceBuyer: sourceOrder.invoiceBuyer })
+          .where(
+            and(eq(orders.tableSessionId, targetSessionId), sql`${orders.invoiceBuyer} IS NULL`),
+          )
+      }
+
       const now = new Date()
       await tx
         .update(tableSessions)

@@ -1,8 +1,24 @@
-import { Controller, Get, Param, ParseIntPipe, Post, Req } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  Req,
+  UseInterceptors,
+} from '@nestjs/common'
+import { InvoiceBuyerSchema } from '@sora/contracts'
+import { z } from 'zod'
+import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
 import { assertOwnTableSession } from '../identity/actor'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { EinvoiceService } from './einvoice.service'
+
+/** null = "Bán cho người tiêu dùng" */
+const BuyerBody = z.object({ buyer: InvoiceBuyerSchema.nullable() })
 
 /**
  * Hoá đơn điện tử nhìn từ quầy và từ bàn. Sổ hoá đơn của kế toán (F3) nằm ở
@@ -20,6 +36,22 @@ export class EinvoiceController {
   sessionInvoice(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithActor) {
     assertOwnTableSession(req.actor!, id)
     return this.einvoice.statusForSession(id)
+  }
+
+  /**
+   * Khai thông tin xuất hoá đơn của bàn — POS P10 và iPad T10/T11. Cùng quyền với
+   * gọi món: ai gọi món được cho bàn thì khai được người mua cho bàn đó.
+   */
+  @Put('table-sessions/:id/invoice-buyer')
+  @RequirePermission('order.create')
+  @UseInterceptors(IdempotencyInterceptor)
+  setBuyer(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    assertOwnTableSession(req.actor!, id)
+    return this.einvoice.setBuyerForSession(id, BuyerBody.parse(body).buyer, req.actor!)
   }
 
   @Get('orders/:id/invoice')

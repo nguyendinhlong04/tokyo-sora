@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { formatVnd, rooms, VAT_RATE_PARAMS } from '@sora/contracts'
+import { formatVnd, rooms, VAT_RATE_PARAMS, type InvoiceBuyer } from '@sora/contracts'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { businessDateOf, minuteOfDayIn, startOfBusinessDay } from '../../common/business-date'
 import { DB } from '../../common/db.module'
@@ -30,6 +30,8 @@ import { isOnSale, scheduleOf } from '../catalog/domain/sale-window'
 import type { Actor } from '../identity/actor'
 import { hashToken, newToken } from '../identity/tokens'
 import { CustomersService } from '../crm/customers.service'
+import { buyerFrom } from '../einvoice/domain/buyer'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import { prepayDueOf } from '../ordering/domain/prepay'
 import { OrderingService, type AddLineInput } from '../ordering/ordering.service'
 import { DispatchService } from './dispatch.service'
@@ -46,6 +48,8 @@ export interface OnlineCustomer {
   note?: string | null
   /** Mã đơn bên GrabFood/ShopeeFood/Be — thứ nhân viên đối chiếu khi shipper tới */
   externalCode?: string | null
+  /** Xuất hoá đơn cho công ty / cá nhân — ghi vào `orders.invoice_buyer`, không vào `customer` */
+  invoiceBuyer?: InvoiceBuyer | null
 }
 
 export interface CreateOnlineOrderInput {
@@ -67,6 +71,7 @@ export class OnlineService {
     private readonly ordering: OrderingService,
     private readonly customers: CustomersService,
     private readonly dispatch: DispatchService,
+    private readonly einvoice: EinvoiceService,
   ) {}
 
   // ------------------------------------------------------ O1 chọn chi nhánh
@@ -188,6 +193,8 @@ export class OnlineService {
        * khớp số tiền mã QR đòi. Phí phục vụ chỉ thu ăn tại chỗ nên không có ở đây.
        */
       pricing: await this.pricingOf(branchId),
+      // Chi nhánh chưa bật hoá đơn điện tử thì O5 không hỏi thông tin xuất hoá đơn
+      einvoiceEnabled: await this.einvoice.enabledFor(branchId),
     }
   }
 
@@ -402,6 +409,7 @@ export class OnlineService {
             zone: zoneName,
             etaMinutes,
           },
+          invoiceBuyer: buyerFrom(input.customer.invoiceBuyer, actor.kind === 'staff'),
           slotMode: input.slotMode,
           slotAt,
           moneyShip: ship,
@@ -601,6 +609,8 @@ export class OnlineService {
         /** Phần khách trả trước — đơn giao thì phí ship không nằm trong đây */
         prepay: prepayDueOf(order),
         paid: Number(received?.paid ?? 0),
+        /** Một dòng VAT cho mỗi thuế suất — món ăn 8%, bia rượu 10% */
+        vatBreakdown: order.vatBreakdown,
       },
       lines: lines.map((l) => ({
         nameSnapshot: l.nameSnapshot,
@@ -610,6 +620,8 @@ export class OnlineService {
       })),
       // Đơn đã huỷ phải nói vì sao — khách không phải gọi điện hỏi
       cancelReason: order.cancelReason,
+      // Hỏi cũng là đẩy phát hành: webhook VietQR chỉ xếp hàng (xem `EinvoiceService`)
+      invoice: await this.einvoice.statusForOrder(order.id),
     }
   }
 

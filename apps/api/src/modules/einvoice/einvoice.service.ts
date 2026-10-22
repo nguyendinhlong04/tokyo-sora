@@ -38,6 +38,7 @@ import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
 import { vatRatesOf } from '../ordering/vat-rates'
+import { buyerFrom } from './domain/buyer'
 import { buildInvoiceDocument, type DocumentResult } from './domain/document'
 import { assertInvoiceSerial, formatInvoiceNo, retryDelayMs, serialForDate } from './domain/serial'
 import {
@@ -61,6 +62,9 @@ const EXTERNAL_CHANNELS = new Set(['grab', 'shopee', 'be'])
 
 /** Một lượt giữ hoá đơn dài hơn timeout gọi nhà cung cấp, để Vercel cắt hàm giữa chừng cũng nhả ra */
 const TIMEOUT_MS = Number(process.env.EINVOICE_TIMEOUT_MS ?? 8_000)
+
+/** Lượt gửi không có câu trả lời (`call`) — không biết nhà cung cấp đã nhận hay chưa */
+const UNANSWERED = new Set(['provider_timeout', 'provider_unreachable'])
 
 type Prepared =
   { ok: true; input: EinvoiceIssueInput } | { ok: false; code: string; message: string }
@@ -235,6 +239,78 @@ export class EinvoiceService {
     const input = prepared.input
     const result = await this.call(input)
     return this.db.transaction((tx) => this.record(tx, claimed, input, result, actor))
+  }
+
+  // ============================================================ Người mua
+
+  /**
+   * Người mua khách yêu cầu ghi trên hoá đơn — POS và iPad cùng gửi vào đây.
+   *
+   * Sửa được tới lúc hoá đơn phát hành; sau đó đổi người mua là lập hoá đơn thay
+   * thế (`replace`), việc của thu ngân có quản lý ca duyệt. null = "Bán cho người
+   * tiêu dùng".
+   */
+  async setBuyerForSession(
+    sessionId: number,
+    buyer: InvoiceBuyer | null,
+    actor: Actor,
+  ): Promise<InvoiceStatus> {
+    const [session] = await this.db
+      .select({ status: tableSessions.status })
+      .from(tableSessions)
+      .where(eq(tableSessions.id, sessionId))
+    if (!session) throw new NotFoundException('Không có phiên bàn này')
+    if (session.status === 'closed') {
+      throw new ConflictException({ code: 'session_closed', message: 'Bàn đã đóng' })
+    }
+    const [order] = await this.db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(eq(orders.tableSessionId, sessionId))
+    if (!order) {
+      throw new ConflictException({
+        code: 'no_order',
+        message: 'Bàn chưa gọi món — gọi món rồi mới khai thông tin xuất hoá đơn',
+      })
+    }
+    await this.setBuyer(order.id, buyer, actor)
+    return this.statusForSession(sessionId)
+  }
+
+  /** Đơn online: khách bổ sung người mua bằng mã theo dõi, trước khi hoá đơn phát hành */
+  async setBuyerForOrder(orderId: number, buyer: InvoiceBuyer | null, actor: Actor) {
+    await this.setBuyer(orderId, buyer, actor)
+    return this.statusForOrder(orderId)
+  }
+
+  private async setBuyer(orderId: number, buyer: InvoiceBuyer | null, actor: Actor) {
+    const clean = buyerFrom(buyer, actor.kind === 'staff')
+
+    await this.db.transaction(async (tx) => {
+      // Khoá đơn: lượt dựng nội dung hoá đơn (`prepare`) đọc đơn FOR SHARE nên
+      // hoặc nó thấy người mua mới, hoặc lượt này thấy hoá đơn đang gửi mà dừng
+      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update')
+      if (!order) throw new NotFoundException('Không có đơn này')
+      if (order.status === 'cancelled') {
+        throw new ConflictException({ code: 'order_cancelled', message: 'Đơn đã huỷ' })
+      }
+      const [live] = await tx
+        .select()
+        .from(invoices)
+        .where(and(eq(invoices.orderId, orderId), inArray(invoices.state, LIVE)))
+      const locked = live ? lockOf(live) : null
+      if (locked) throw new ConflictException({ ...locked, invoiceId: live!.id })
+
+      await tx.update(orders).set({ invoiceBuyer: clean }).where(eq(orders.id, orderId))
+      // Không ghi số định danh hay email vào nhật ký — chỉ ghi loại người mua
+      await this.audit.write(tx, {
+        actor,
+        action: 'einvoice.buyer.set',
+        entity: 'order',
+        entityId: String(orderId),
+        payload: { kind: clean?.kind ?? 'consumer' },
+      })
+    })
   }
 
   // ========================================================= Thay thế & huỷ
@@ -433,7 +509,7 @@ export class EinvoiceService {
     }
     return {
       enabled: await this.enabledFor(order.branchId),
-      editable: open && live?.state !== 'issued',
+      editable: open && (live === null || lockOf(live) === null),
       buyer: order.invoiceBuyer ?? null,
       invoice: live ? this.view(live) : null,
     }
@@ -624,7 +700,8 @@ export class EinvoiceService {
    * thì dừng ở đây mà chưa tốn số nào — một số đã cấp là phải phát hành.
    */
   private async prepare(tx: Tx, row: InvoiceRow): Promise<Prepared> {
-    const [order] = await tx.select().from(orders).where(eq(orders.id, row.orderId))
+    // FOR SHARE: người mua đang được sửa (`setBuyer` giữ FOR UPDATE) thì đợi bản mới
+    const [order] = await tx.select().from(orders).where(eq(orders.id, row.orderId)).for('share')
     const [branch] = await tx.select().from(branches).where(eq(branches.id, row.branchId))
     const config = await this.configOf(row.branchId)
     if (!config.ok) return config
@@ -929,6 +1006,33 @@ export class EinvoiceService {
         },
       })
   }
+}
+
+/**
+ * Nội dung hoá đơn (người mua) còn sửa được không — null = được.
+ *
+ * Khoá khi đã phát hành, khi đang gửi, và khi đã gửi mà không có câu trả lời (hết
+ * giờ, mất mạng): nhà cung cấp có thể đã nhận bản cũ, gửi lại cùng `request_key`
+ * với nội dung khác là tờ trên cơ quan thuế lệch với tờ của quán. Nhà cung cấp đã
+ * trả lời "không nhận" thì sửa được — chưa có tờ nào.
+ */
+function lockOf(row: InvoiceRow): { code: string; message: string } | null {
+  if (row.state === 'issued') {
+    return {
+      code: 'invoice_issued',
+      message: 'Hoá đơn đã phát hành — đổi người mua phải lập hoá đơn thay thế',
+    }
+  }
+  if (row.leaseUntil && row.leaseUntil > new Date()) {
+    return { code: 'invoice_issuing', message: 'Hoá đơn đang phát hành — đợi vài giây rồi xem lại' }
+  }
+  if (row.invoiceNo !== null && UNANSWERED.has(row.lastErrorCode ?? '')) {
+    return {
+      code: 'invoice_unconfirmed',
+      message: 'Hoá đơn đã gửi nhưng chưa có kết quả — đợi phát hành xong rồi lập hoá đơn thay thế',
+    }
+  }
+  return null
 }
 
 /** `order_lines.modifiers` = [{optionId, name, priceDelta}] đóng băng lúc gọi */
