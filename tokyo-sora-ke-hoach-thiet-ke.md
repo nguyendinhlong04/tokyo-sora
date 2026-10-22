@@ -189,12 +189,19 @@ Ma trận chỉ nói vai trò nào được đụng tới việc đó. Được 
 | Xem, xác nhận báo cáo của cấp dưới | – | ✓ | ✓ | ✓ | ✓ | – | ✓ | – | ✓ | ✓ |
 | Xử lý sự cố, giao việc khắc phục, đóng sự cố thường | – | ✓ | – | ✓ | – | – | ✓ | – | ✓ | ✓ |
 | Đóng sự cố nghiêm trọng | – | – | – | – | – | – | ✓ | – | – | ✓ |
+| Bộ KPI theo chức danh | – | – | – | – | – | – | – | – | ✓ | ✓ |
+| Mở kỳ KPI, đặt chỉ tiêu, bắt đầu đánh giá | – | – | – | – | – | – | ✓ | – | ✓ | ✓ |
+| Đánh giá KPI cấp dưới, tính lại số | – | ✓ | ✓ | ✓ | ✓ | – | ✓ | – | ✓ | ✓ |
+| Ghi phiếu kiểm tra (vệ sinh ATTP, khách bí mật) | – | ✓ | – | ✓ | – | ✓ | ✓ | – | ✓ | ✓ |
+| Chốt kỳ KPI | – | – | – | – | – | – | – | – | ✓ | ✓ |
 
 R1–R4 không mở Office: chức danh và cấp trên của họ hiện ở Kênh nhân viên. Không ai tự gán chức danh cho chính mình.
 
 **Việc**: giao tay luôn giao cho một NGƯỜI trong phạm vi (mỗi người nhận một việc riêng); việc định kỳ (SOP mở/đóng ca, vệ sinh ATTP) giao cho một CHỨC DANH — ai giữ ghế và đứng ca **đã công bố** đúng ngày thì thấy, checklist dùng chung, mỗi mục ghi người tích. Nộp → nghiệm thu đạt hoặc trả lại kèm lý do; còn mục chưa tích thì phải ghi lý do mới nộp được. Không ai tự giao việc cho mình hay tự nghiệm thu việc mình nộp; việc đã quá hạn không dời hạn được. Nhân viên tuyến đầu nhận, tích, nộp trên Kênh nhân viên; trưởng ca được chỉ định làm ghế nghiệm thu thì nghiệm thu ngay trên điện thoại — ngoại lệ có chủ ý, không đụng tiền. Phạm vi giao việc: R10 · R11 toàn chuỗi; R13 KHÔNG giao việc vận hành hộ quản lý chi nhánh.
 
 **Báo cáo công việc**: mẫu theo chi nhánh (trường, lịch nộp mỗi ca / ngày / tuần / tháng, ghế nộp, người xác nhận); suất phải nộp tính từ mẫu + lịch đã công bố, quá hạn mà chưa nộp là "còn thiếu". Số tự điền (doanh thu, đơn huỷ, vé trễ, két, điểm khách chấm, checklist SOP…) tính đúng định nghĩa của B2/B5 và **đóng băng lúc nộp**; sai thì viết bổ sung. Báo cáo có tiền chỉ nộp ở Office; báo cáo ca bếp nộp được trên Kênh nhân viên. **Sự cố**: ai cũng báo (Kênh nhân viên), mã `SC-yyMM-NNNN`; TNLĐ, ATTP, cháy nổ mức nghiêm trọng trở lên phải khai báo ra ngoài (hệ thống nhắc và lưu mốc); chỉ đóng khi có nguyên nhân gốc, biện pháp và việc khắc phục đã xong; sự cố nghiêm trọng do R11/R10 đóng và người báo không tự đóng. Không chấm KPI bằng số sự cố.
+
+**KPI**: danh mục chỉ số nằm trong code (số tự động lấy từ dữ liệu thật, đúng định nghĩa báo cáo; số nhập tay do quản lý chấm 1–5; điểm kiểm tra vệ sinh/khách bí mật từ phiếu có bằng chứng); bộ KPI theo chức danh 3–6 chỉ số, trọng số đúng 100%. Kỳ theo chi nhánh (tháng, tuỳ chọn quý): mở kỳ dựng phiếu, người đánh giá là cấp trên trực tiếp lúc mở kỳ; **luật chấm và mức thưởng đóng băng lúc công bố kỳ** (Điều 104). Tự đánh giá chỉ để đối chiếu; quản lý chấm phần nhập tay, được loại chỉ số có dữ liệu sai kèm lý do; R13/R10 chốt (người chốt không là người được chấm). Không đủ dữ liệu là "không có dữ liệu", không phải 0; độ phủ dưới 70% không xếp loại. Hạng A ≥ 105 · B ≥ 95 · C ≥ 80 · D. Thưởng gợi ý theo hạng (người lương giờ nhân hệ số giờ công) chỉ R8/R13/R10 thấy; H7 điền sẵn, R13 sửa được kèm ghi chú, **không tự cộng**. KPI không phạt, không khấu trừ (Điều 127); không chấm cá nhân bằng doanh thu, upsell hay số sự cố.
 
 **Văn bản** đi theo luồng ký: nháp → trình (chọn người ký) → người ký **nhập PIN của chính mình** → ban hành, có số hiệu `TB|QD|QYD-yyMM-NNNN` → thu hồi kèm lý do. Từ lúc trình, nội dung bị khoá ở tầng CSDL; người ký trả lại thì về nháp. Người ký chỉ ký được văn bản mà mọi người nhận nằm trong phạm vi của mình. Quyết định **bổ nhiệm / điều chuyển / miễn nhiệm** đổi sơ đồ ngay lúc ký và **không thu hồi được** — sai thì ban hành quyết định khác; người có tên trong quyết định không ký chính quyết định đó. Danh sách người nhận chụp lại lúc ký (không gồm người soạn và người ký); quy định còn hiệu lực tự đến tay người mới vào làm.
 

@@ -431,6 +431,28 @@ export const ACTIONS = {
     grants: { R11: A, R10: A },
     note: 'Người đóng phải khác người báo',
   },
+  'kpi.configure': {
+    label: 'Bộ KPI theo chức danh',
+    grants: { R13: A, R10: A },
+  },
+  'kpi.cycle-manage': {
+    label: 'Mở kỳ KPI, đặt chỉ tiêu, bắt đầu đánh giá',
+    grants: { R11: A, R13: A, R10: A },
+  },
+  'kpi.review-team': {
+    label: 'Đánh giá KPI cấp dưới, tính lại số',
+    grants: { R5: A, R6: A, R7: A, R8: A, R11: A, R13: A, R10: A },
+    note: 'Chấm ai do sơ đồ quyết: người đánh giá là cấp trên trực tiếp lúc mở kỳ. Không thấy số thưởng nếu không có payroll.view-others',
+  },
+  'kpi.observe': {
+    label: 'Ghi phiếu kiểm tra (vệ sinh ATTP, khách bí mật)',
+    grants: { R5: A, R7: A, R9: A, R11: A, R13: A, R10: A },
+  },
+  'kpi.close': {
+    label: 'Chốt kỳ KPI',
+    grants: { R13: A, R10: A },
+    note: 'Người chốt không được là người được chấm trong kỳ đó',
+  },
 } as const satisfies Record<string, ActionDef>
 
 export type ActionKey = keyof typeof ACTIONS

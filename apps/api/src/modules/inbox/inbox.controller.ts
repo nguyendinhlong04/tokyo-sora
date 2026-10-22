@@ -10,6 +10,7 @@ import { RequirePermission } from '../identity/permission.guard'
 import { DocumentsService } from '../org/documents.service'
 import { OrgService, requireStaff } from '../org/org.service'
 import { TasksService } from '../org/tasks.service'
+import { PerformanceService } from '../performance/performance.service'
 import { IncidentsService } from '../work-reports/incidents.service'
 import { WorkReportsService } from '../work-reports/work-reports.service'
 
@@ -32,6 +33,7 @@ export class InboxController {
     private readonly tasks: TasksService,
     private readonly reports: WorkReportsService,
     private readonly incidents: IncidentsService,
+    private readonly kpi: PerformanceService,
   ) {}
 
   @Get('inbox')
@@ -43,6 +45,7 @@ export class InboxController {
       documents: await this.docs.counts(me.staffId),
       tasks: await this.tasks.counts(me.staffId),
       reports: await this.reports.counts(me),
+      kpi: await this.kpi.counts(me),
     }
     if (checkPermission('incident.manage', actorRoles(me)) !== 'deny') {
       counts.incidents = await this.incidents.counts(me)

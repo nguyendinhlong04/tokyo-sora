@@ -1,3 +1,4 @@
+import type { KpiMetricCode } from './kpi.js'
 import type { OrgUnitKind } from './org.js'
 import type { Role } from './permissions.js'
 import type { ReportField } from './work-reports.js'
@@ -690,6 +691,151 @@ export const STANDARD_REPORT_TEMPLATES: StandardReportTemplate[] = [
       { key: 'thiet-bi', label: 'Thiết bị cần sửa', type: 'doan' },
       { key: 've-sinh', label: 'Bếp đã vệ sinh theo checklist', type: 'co-khong', required: true },
       { key: 'nhan-xet', label: 'Ghi chú', type: 'doan' },
+    ],
+  },
+]
+
+// ------------------------------------------------------------------ Bộ KPI mẫu
+
+/**
+ * Bộ KPI theo chức danh (3–6 chỉ số, trọng số cộng đúng 100). Ghế trong chi nhánh
+ * gọi theo tên bộ phận (hoặc tổ) + chức danh; ghế văn phòng (`chuoi`) theo tên
+ * phòng. Đây là điểm xuất phát — R13 và chủ duyệt trước khi mở kỳ đầu tiên.
+ */
+export interface StandardKpiSet {
+  seats: { unit: string | null; title: string; scope: 'chi-nhanh' | 'chuoi' }[]
+  items: { metric: KpiMetricCode; weight: number }[]
+}
+
+const COOK_TEAMS = [
+  'Tổ khai vị lạnh',
+  'Tổ quầy sống',
+  'Tổ chiên xào hấp',
+  'Tổ lẩu cơm mì',
+  'Tổ đồ uống',
+  'Tổ bếp nướng',
+]
+
+export const STANDARD_KPI_SETS: StandardKpiSet[] = [
+  {
+    seats: [{ unit: null, title: 'Quản lý chi nhánh', scope: 'chi-nhanh' }],
+    items: [
+      { metric: 'cn.doanh-thu-thuan', weight: 30 },
+      { metric: 'cn.doanh-thu-gio-cong', weight: 15 },
+      { metric: 'bep.food-cost', weight: 15 },
+      { metric: 'kh.diem-hai-long', weight: 15 },
+      { metric: 'nt.ve-sinh', weight: 15 },
+      { metric: 'tc.bao-cao-dung-han', weight: 10 },
+    ],
+  },
+  {
+    seats: [{ unit: 'Sảnh', title: 'Quản lý ca', scope: 'chi-nhanh' }],
+    items: [
+      { metric: 'san.phan-hoi-ban', weight: 20 },
+      { metric: 'kh.diem-hai-long', weight: 20 },
+      { metric: 'tc.bao-cao-dung-han', weight: 20 },
+      { metric: 'tc.checklist', weight: 15 },
+      { metric: 'nt.khach-bi-mat', weight: 10 },
+      { metric: 'nt.thai-do', weight: 15 },
+    ],
+  },
+  {
+    seats: [{ unit: 'Bếp', title: 'Bếp trưởng', scope: 'chi-nhanh' }],
+    items: [
+      { metric: 'bep.food-cost', weight: 25 },
+      { metric: 'bep.ti-le-tre', weight: 20 },
+      { metric: 'bep.hao-hut', weight: 15 },
+      { metric: 'nt.ve-sinh', weight: 20 },
+      { metric: 'tc.bao-cao-dung-han', weight: 10 },
+      { metric: 'tc.su-co-dung-han', weight: 10 },
+    ],
+  },
+  {
+    seats: [
+      { unit: 'Bếp', title: 'Bếp phó', scope: 'chi-nhanh' },
+      { unit: 'Bếp', title: 'Phụ bếp và rửa', scope: 'chi-nhanh' },
+      ...COOK_TEAMS.map((unit) => ({ unit, title: 'Đầu bếp', scope: 'chi-nhanh' as const })),
+    ],
+    items: [
+      { metric: 'bep.ti-le-tre', weight: 30 },
+      { metric: 'nt.ve-sinh', weight: 15 },
+      { metric: 'tc.checklist', weight: 20 },
+      { metric: 'cc.dung-gio', weight: 15 },
+      { metric: 'nt.tay-nghe', weight: 20 },
+    ],
+  },
+  {
+    seats: [{ unit: 'Sảnh', title: 'Phục vụ', scope: 'chi-nhanh' }],
+    items: [
+      { metric: 'san.phan-hoi-ban', weight: 20 },
+      { metric: 'kh.diem-hai-long', weight: 15 },
+      { metric: 'tc.checklist', weight: 20 },
+      { metric: 'cc.dung-gio', weight: 15 },
+      { metric: 'nt.thai-do', weight: 20 },
+      { metric: 'nt.khach-bi-mat', weight: 10 },
+    ],
+  },
+  {
+    seats: [{ unit: 'Sảnh', title: 'Thu ngân', scope: 'chi-nhanh' }],
+    items: [
+      { metric: 'tn.ket-khop', weight: 35 },
+      { metric: 'tn.qr-treo', weight: 15 },
+      { metric: 'cc.dung-gio', weight: 15 },
+      { metric: 'nt.thai-do', weight: 20 },
+      { metric: 'tc.checklist', weight: 15 },
+    ],
+  },
+  {
+    seats: [{ unit: 'Sảnh', title: 'Lễ tân', scope: 'chi-nhanh' }],
+    items: [
+      { metric: 'lt.nhac-hen', weight: 30 },
+      { metric: 'kh.no-show', weight: 20 },
+      { metric: 'tc.checklist', weight: 15 },
+      { metric: 'cc.dung-gio', weight: 15 },
+      { metric: 'nt.thai-do', weight: 20 },
+    ],
+  },
+  {
+    seats: [{ unit: 'Kho', title: 'Thủ kho', scope: 'chi-nhanh' }],
+    items: [
+      { metric: 'kho.lech-kiem-ke', weight: 30 },
+      { metric: 'kho.so-lan-kiem-ke', weight: 20 },
+      { metric: 'kho.xuat-huy', weight: 20 },
+      { metric: 'tc.viec-dung-han', weight: 15 },
+      { metric: 'cc.dung-gio', weight: 15 },
+    ],
+  },
+  {
+    seats: [
+      { unit: 'Phòng Kế toán', title: 'Kế toán trưởng', scope: 'chuoi' },
+      { unit: 'Phòng Kế toán', title: 'Kế toán viên', scope: 'chuoi' },
+    ],
+    items: [
+      { metric: 'kt.khoa-so', weight: 30 },
+      { metric: 'kt.duyet-phieu-chi', weight: 30 },
+      { metric: 'tc.viec-dung-han', weight: 25 },
+      { metric: 'cc.dung-gio', weight: 15 },
+    ],
+  },
+  {
+    seats: [
+      { unit: 'Phòng Marketing', title: 'Trưởng phòng marketing', scope: 'chuoi' },
+      { unit: 'Phòng Marketing', title: 'Chuyên viên marketing', scope: 'chuoi' },
+    ],
+    items: [
+      { metric: 'kh.khach-moi', weight: 25 },
+      { metric: 'kh.doanh-thu-web', weight: 25 },
+      { metric: 'kh.khieu-nai-dung-han', weight: 25 },
+      { metric: 'tc.viec-dung-han', weight: 25 },
+    ],
+  },
+  {
+    seats: [{ unit: 'Sảnh', title: 'Điều phối online', scope: 'chi-nhanh' }],
+    items: [
+      { metric: 'ol.xac-nhan', weight: 30 },
+      { metric: 'ol.dung-gio', weight: 30 },
+      { metric: 'tc.checklist', weight: 20 },
+      { metric: 'cc.dung-gio', weight: 20 },
     ],
   },
 ]

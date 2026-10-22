@@ -20,6 +20,7 @@ import { ReportsModule } from './modules/reports/reports.module'
 import { ReservationsModule } from './modules/reservations/reservations.module'
 import { SiteModule } from './modules/site/site.module'
 import { WorkReportsModule } from './modules/work-reports/work-reports.module'
+import { PerformanceModule } from './modules/performance/performance.module'
 
 @Controller()
 class HealthController {
@@ -48,6 +49,7 @@ class HealthController {
     HrModule,
     OrgModule,
     WorkReportsModule,
+    PerformanceModule,
     InboxModule,
     AccountingModule,
     CrmModule,

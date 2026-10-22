@@ -881,3 +881,84 @@ describe('Báo cáo công việc và sự cố — đã nộp là hồ sơ', () 
     await expect(db.exec(`DELETE FROM incidents`)).rejects.toThrow(/không xoá được/)
   })
 })
+
+describe('KPI — luật chấm đóng băng khi mở kỳ, phiếu đóng băng khi chốt', () => {
+  const hoa = `(SELECT id FROM staff WHERE code = 'NV01')`
+  const minh = `(SELECT id FROM staff WHERE code = 'NV09')`
+
+  it('kỳ đã mở không đổi luật chấm; kỳ chỉ đi tới', async () => {
+    await db.exec(`
+      INSERT INTO kpi_cycles (branch_id, kind, period_start, period_end, created_by)
+        VALUES ('cg', 'thang', '2026-09-01', '2026-09-30', ${hoa})
+    `)
+    await expect(
+      db.exec(`UPDATE kpi_cycles SET state = 'open' WHERE period_start = '2026-09-01'`),
+    ).rejects.toThrow(/kpi_cycles_order_check/)
+    await db.exec(`
+      UPDATE kpi_cycles SET state = 'open', rules = '{"gradeA":105}', opened_by = ${hoa},
+                            opened_at = now()
+       WHERE period_start = '2026-09-01'
+    `)
+    await expect(
+      db.exec(`UPDATE kpi_cycles SET rules = '{"gradeA":90}' WHERE period_start = '2026-09-01'`),
+    ).rejects.toThrow(/luật chấm/)
+    await expect(
+      db.exec(`UPDATE kpi_cycles SET state = 'draft' WHERE period_start = '2026-09-01'`),
+    ).rejects.toThrow(/không lùi/)
+  })
+
+  it('không tự chấm KPI của mình; chốt kỳ xong phiếu chỉ nhận ý kiến một lần', async () => {
+    await db.exec(`
+      INSERT INTO employees (staff_id, branch_id, position, pay_kind, hourly_rate_vnd, started_on)
+        VALUES (${minh}, 'cg', 'Phục vụ', 'hourly', 25000, '2026-01-05')
+        ON CONFLICT DO NOTHING
+    `)
+    const cycle = `(SELECT id FROM kpi_cycles WHERE period_start = '2026-09-01')`
+    const employee = `(SELECT id FROM employees WHERE staff_id = ${minh} LIMIT 1)`
+    await expect(
+      db.exec(`
+        INSERT INTO kpi_reviews (cycle_id, staff_id, employee_id, reviewer_id)
+          VALUES (${cycle}, ${minh}, ${employee}, ${minh})
+      `),
+    ).rejects.toThrow(/kpi_reviews_not_self/)
+    await db.exec(`
+      INSERT INTO kpi_reviews (cycle_id, staff_id, employee_id, reviewer_id, score_milli, grade)
+        VALUES (${cycle}, ${minh}, ${employee}, ${hoa}, 101000, 'B')
+    `)
+    await db.exec(`
+      UPDATE kpi_cycles SET state = 'review', review_started_by = ${hoa}, review_started_at = now()
+       WHERE id = ${cycle};
+      UPDATE kpi_cycles SET state = 'closed', closed_by = ${hoa}, closed_at = now()
+       WHERE id = ${cycle};
+    `)
+    await expect(
+      db.exec(`UPDATE kpi_reviews SET grade = 'A' WHERE cycle_id = ${cycle}`),
+    ).rejects.toThrow(/đã chốt/)
+    await db.exec(
+      `UPDATE kpi_reviews SET employee_ack_at = now(), employee_feedback = 'Đồng ý' WHERE cycle_id = ${cycle}`,
+    )
+    await expect(
+      db.exec(`UPDATE kpi_reviews SET employee_feedback = 'Đổi ý' WHERE cycle_id = ${cycle}`),
+    ).rejects.toThrow(/một lần/)
+  })
+
+  it('phiếu kiểm tra cần bằng chứng https; huỷ một lần, không sửa điểm, không xoá', async () => {
+    await expect(
+      db.exec(`
+        INSERT INTO kpi_observations (branch_id, kind, observed_on, score_milli, evidence_url, observer_id)
+          VALUES ('cg', 've-sinh', '2026-10-20', 92000, 'http://anh.example/1.jpg', ${hoa})
+      `),
+    ).rejects.toThrow(/kpi_observations_evidence_check/)
+    await db.exec(`
+      INSERT INTO kpi_observations (branch_id, kind, observed_on, score_milli, evidence_url, observer_id)
+        VALUES ('cg', 've-sinh', '2026-10-20', 92000, 'https://anh.example/1.jpg', ${hoa})
+    `)
+    await expect(db.exec(`UPDATE kpi_observations SET score_milli = 99000`)).rejects.toThrow(
+      /không sửa điểm/,
+    )
+    await db.exec(
+      `UPDATE kpi_observations SET voided_at = now(), voided_by = ${hoa}, void_reason = 'Chấm nhầm chi nhánh'`,
+    )
+    await expect(db.exec(`DELETE FROM kpi_observations`)).rejects.toThrow(/không xoá được/)
+  })
+})

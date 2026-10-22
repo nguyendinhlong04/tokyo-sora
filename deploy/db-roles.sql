@@ -48,6 +48,8 @@ REVOKE DELETE ON org_document_receipts FROM sora_app;
 REVOKE DELETE ON tasks, task_check_items FROM sora_app;
 -- Bổ sung báo cáo chỉ thêm; sự cố không xoá — báo nhầm thì đóng kèm ghi chú (9011)
 REVOKE DELETE ON work_report_addenda, incidents FROM sora_app;
+-- Phiếu kiểm tra (KPI) huỷ kèm lý do, không xoá (9012)
+REVOKE DELETE ON kpi_observations FROM sora_app;
 
 -- outbox_events: được đánh dấu đã phát và dọn retention, nội dung bất biến do
 -- trigger sora_outbox_guard canh.

@@ -266,6 +266,8 @@ export interface InboxCounts {
   reports: { due: number; overdue: number; toReview: number }
   /** Chỉ có với người xử lý sự cố (`incident.manage`) */
   incidents?: { open: number; severeOpen: number }
+  /** Phiếu KPI chờ tôi tự đánh giá · phiếu cấp dưới chờ tôi chấm */
+  kpi: { selfDue: number; toReview: number }
 }
 
 export interface MyOrgProfile {

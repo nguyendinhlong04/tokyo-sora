@@ -126,6 +126,11 @@ const ORG_ROWS: [ActionKey, string][] = [
   ['workreport.review', '....xxxx.x.xx'],
   ['incident.manage', '....x.x..x.xx'],
   ['incident.close-severe', '.........x..x'],
+  ['kpi.configure', '...........xx'],
+  ['kpi.cycle-manage', '.........x.xx'],
+  ['kpi.review-team', '....xxxx.x.xx'],
+  ['kpi.observe', '....x.x.xx.xx'],
+  ['kpi.close', '...........xx'],
 ]
 
 const SYMBOL: Record<string, Permission> = { '.': 'deny', x: 'allow', a: 'approve' }
@@ -355,6 +360,7 @@ describe('Bất biến của mô hình quyền', () => {
       'org.view',
       'doc.compose',
       'task.assign',
+      'kpi.observe',
     ])
     // Không một đồng nào, không một dòng tồn kho nào đi qua tay marketing
     expect(isPermitted('bill.discount-upto-10', ['R9'])).toBe(false)

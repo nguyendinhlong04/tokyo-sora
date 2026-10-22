@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest'
 import {
   STANDARD_BRANCH_HEAD,
   STANDARD_BRANCH_UNITS,
+  STANDARD_CHAIN_UNITS,
+  STANDARD_KPI_SETS,
   STANDARD_REPORT_TEMPLATES,
   STANDARD_SOPS,
   type StandardSeat,
 } from './org-standards.js'
 import { TASK_CHECKLIST_MAX, TASK_MONTH_DAY_MAX } from './tasks.js'
+import { KPI_METRICS } from './kpi.js'
 import { REPORT_AUTO_FIELDS } from './work-reports.js'
+import type { StandardUnit } from './org-standards.js'
 
 const key = (seat: StandardSeat) => `${seat.unit ?? ''}/${seat.title}`
 
@@ -79,6 +83,45 @@ describe('Mẫu báo cáo chuẩn', () => {
         t.fields.some((f) => f.type === 'tien'),
         t.code,
       ).toBe(false)
+    }
+  })
+})
+
+describe('Bộ KPI mẫu', () => {
+  /** Mọi cặp (đơn vị, chức danh) ở mọi tầng của mẫu chi nhánh và mẫu chuỗi */
+  const all = (units: StandardUnit[]): string[] =>
+    units.flatMap((u) => [
+      ...u.positions.map((p) => `${u.name}/${p.title}`),
+      ...all(u.children ?? []),
+    ])
+  const known = new Set([
+    ...all(STANDARD_BRANCH_UNITS),
+    ...all(STANDARD_CHAIN_UNITS),
+    `/${STANDARD_BRANCH_HEAD.title}`,
+  ])
+
+  it('trọng số mỗi bộ cộng đúng 100, 3–6 chỉ số, không trùng chỉ số', () => {
+    for (const set of STANDARD_KPI_SETS) {
+      const name = set.seats.map((s) => s.title).join(', ')
+      expect(
+        set.items.reduce((sum, i) => sum + i.weight, 0),
+        name,
+      ).toBe(100)
+      expect(set.items.length, name).toBeGreaterThanOrEqual(3)
+      expect(set.items.length, name).toBeLessThanOrEqual(6)
+      expect(new Set(set.items.map((i) => i.metric)).size, name).toBe(set.items.length)
+      for (const i of set.items)
+        expect(KPI_METRICS[i.metric], `${name} → ${i.metric}`).toBeDefined()
+    }
+  })
+
+  it('ghế của bộ KPI có thật trong mẫu cơ cấu', () => {
+    for (const set of STANDARD_KPI_SETS) {
+      for (const seat of set.seats) {
+        expect(known.has(`${seat.unit ?? ''}/${seat.title}`), `${seat.unit}/${seat.title}`).toBe(
+          true,
+        )
+      }
     }
   })
 })
