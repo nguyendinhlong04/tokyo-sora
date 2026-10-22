@@ -5,7 +5,7 @@ import { api, type EinvoiceConfig } from '../api'
 import { ConfigBranchPicker, useConfigBranch } from '../components/config-branch'
 import { PageHeader } from '../components/PageHeader'
 import { TextInput as Input } from '../components/form'
-import { Field } from '../components/report'
+import { Field, formatDay } from '../components/report'
 
 /**
  * A9 — Hoá đơn điện tử.
@@ -24,6 +24,8 @@ import { Field } from '../components/report'
 
 interface Draft {
   taxCode: string
+  sellerName: string
+  sellerAddress: string
   provider: string
   certificateSerial: string
   certificateExpiry: string
@@ -89,10 +91,14 @@ export function EInvoice() {
 
   const chainDirty =
     draft.taxCode !== current.chain.taxCode ||
+    draft.sellerName !== current.chain.sellerName ||
+    draft.sellerAddress !== current.chain.sellerAddress ||
     draft.provider !== current.chain.provider ||
     draft.certificateSerial !== current.chain.certificateSerial ||
     draft.certificateExpiry !== current.chain.certificateExpiry
   const branchDirty = draft.serial !== current.branch.serial
+  /** Máy chủ chưa đấu nối nhà cung cấp thì bật là bật một thứ không chạy — API cũng chặn */
+  const cannotEnable = !current.branch.enabled && current.runtime.provider === 'off'
 
   return (
     <>
@@ -128,7 +134,21 @@ export function EInvoice() {
                 mono
               />
             </Field>
-            <Field label="Nhà cung cấp hoá đơn">
+            <Field label="Tên người bán">
+              <Input
+                value={draft.sellerName}
+                onChange={(v) => set('sellerName', v)}
+                placeholder="Đúng như giấy đăng ký doanh nghiệp"
+              />
+            </Field>
+            <Field label="Địa chỉ trụ sở" className="lg:col-span-2">
+              <Input
+                value={draft.sellerAddress}
+                onChange={(v) => set('sellerAddress', v)}
+                placeholder="Đúng như giấy đăng ký doanh nghiệp — in trên mọi hoá đơn, kèm địa chỉ chi nhánh"
+              />
+            </Field>
+            <Field label="Nhà cung cấp theo hợp đồng">
               <Input
                 value={draft.provider}
                 onChange={(v) => set('provider', v)}
@@ -152,6 +172,18 @@ export function EInvoice() {
             </Field>
           </div>
 
+          <p
+            className={`mt-4 text-[length:var(--fs-c1)] leading-relaxed ${
+              current.runtime.provider === 'off' ? 'text-warn' : 'text-ink-mute'
+            }`}
+          >
+            {current.runtime.provider === 'off'
+              ? 'Máy chủ chưa đấu nối nhà cung cấp hoá đơn điện tử — chưa bật được. Đấu nối là việc của người triển khai (biến môi trường EINVOICE_PROVIDER), không khai ở đây.'
+              : current.runtime.live
+                ? `Máy chủ đang đấu nối nhà cung cấp: ${current.runtime.provider}.`
+                : 'Máy chủ đang chạy bản giả lập — chưa ký hợp đồng. Hoá đơn in “HOÁ ĐƠN THỬ”, không có giá trị với cơ quan thuế.'}
+          </p>
+
           {daysLeft !== null ? (
             <p
               className={`mt-4 text-[length:var(--fs-c1)] leading-relaxed ${
@@ -174,6 +206,8 @@ export function EInvoice() {
                 onClick={() =>
                   save.mutate({
                     taxCode: draft.taxCode,
+                    sellerName: draft.sellerName,
+                    sellerAddress: draft.sellerAddress,
                     provider: draft.provider,
                     certificateSerial: draft.certificateSerial,
                     certificateExpiry: draft.certificateExpiry,
@@ -197,7 +231,10 @@ export function EInvoice() {
           </p>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <Field label="Ký hiệu hoá đơn">
+            <Field
+              label="Ký hiệu hoá đơn"
+              hint="Năm trong ký hiệu tự theo ngày lập: C26MAA thành C27MAA từ 01/01/2027, số đếm lại từ 1 — không phải khai lại."
+            >
               <Input
                 value={draft.serial}
                 onChange={(v) => set('serial', v.toUpperCase().slice(0, 6))}
@@ -205,16 +242,27 @@ export function EInvoice() {
                 mono
               />
             </Field>
-            <Field label="Trạng thái">
+            <Field
+              label="Trạng thái"
+              hint={
+                current.branch.enabledFrom
+                  ? `Bật từ ${formatDay(current.branch.enabledFrom)} — bill trả trước ngày này không đòi hoá đơn ở F3, F6.`
+                  : undefined
+              }
+            >
               <button
                 type="button"
-                disabled={save.isPending}
+                disabled={save.isPending || cannotEnable}
                 onClick={() => save.mutate({ enabled: !current.branch.enabled })}
-                className={`h-9 rounded-sm border px-4 text-[length:var(--fs-b2)] ${
+                className={`h-9 rounded-sm border px-4 text-[length:var(--fs-b2)] disabled:cursor-not-allowed ${
                   current.branch.enabled ? 'border-ok text-ok' : 'border-line-3 text-ink-mute'
                 }`}
               >
-                {current.branch.enabled ? 'Đang phát hành hoá đơn' : 'Chưa bật — bấm để bật'}
+                {current.branch.enabled
+                  ? 'Đang phát hành hoá đơn'
+                  : cannotEnable
+                    ? 'Chưa bật được — máy chủ chưa đấu nối'
+                    : 'Chưa bật — bấm để bật'}
               </button>
             </Field>
           </div>
@@ -234,10 +282,10 @@ export function EInvoice() {
         </section>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-          Bật khi chưa có mã số thuế hoặc chưa có ký hiệu thì hệ thống từ chối — thà không bật được
-          còn hơn bật rồi mỗi bill đều rơi vào hàng đợi lỗi. Bản dựng này chưa đấu nối nhà cung cấp
-          thật: lượt gọi ra cơ quan thuế nhận mã ngay tại chỗ, còn toàn bộ luồng phát hành, hàng đợi
-          lỗi và huỷ / thay thế ở F3 thì đã thật.
+          Bật khi chưa đủ mã số thuế, tên và địa chỉ người bán, ký hiệu — hoặc máy chủ chưa đấu nối
+          nhà cung cấp — thì hệ thống từ chối: thà không bật được còn hơn bật rồi mỗi bill đều rơi
+          vào hàng đợi lỗi. Bật rồi thì mỗi bill trả đủ tự lập một hoá đơn; sổ phát hành, hàng chờ
+          và hoá đơn thay thế ở F3.
         </p>
       </div>
     </>

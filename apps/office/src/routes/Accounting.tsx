@@ -1,14 +1,21 @@
-import { formatVnd } from '@sora/contracts'
+import {
+  CONSUMER_BUYER_LABEL,
+  INVOICE_STATES,
+  formatVnd,
+  invoiceNumberLabel,
+  type InvoiceState,
+} from '@sora/contracts'
 import { Button, ErrorState, useToast } from '@sora/ui'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { api, type InvoiceRow, type InvoiceState } from '../api'
+import { api, type InvoiceBookFilters } from '../api'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Money, formatDay, formatPercent, formatTime } from '../components/report'
-import { Toggle } from '../components/form'
+import { Field, SearchField, Select } from '../components/form'
 import { useSession } from '../session-context'
+import { INVOICE_STATE_LABELS, InvoiceDrawer } from './InvoiceDetail'
 
 /**
  * Kế toán — F2 nhật ký · F3 hoá đơn · F4 thuế · F5 công nợ · F6 khoá sổ.
@@ -216,26 +223,40 @@ export function RevenueJournal() {
 
 // ---------------------------------------------------------------- F3
 
-const INVOICE_STATES: Record<InvoiceState, { label: string; tone: string }> = {
-  pending: { label: 'Chờ phát hành', tone: 'text-warn' },
-  issued: { label: 'Đã phát hành', tone: 'text-ok' },
-  failed: { label: 'Lỗi phát hành', tone: 'text-danger' },
-  voided: { label: 'Đã huỷ', tone: 'text-ink-mute' },
-  replaced: { label: 'Đã thay thế', tone: 'text-ink-mute' },
-}
+const STATE_OPTIONS = INVOICE_STATES.map((state) => ({
+  value: state,
+  label: INVOICE_STATE_LABELS[state].label,
+}))
+
+const BUYER_OPTIONS: { value: NonNullable<InvoiceBookFilters['buyer']>; label: string }[] = [
+  { value: 'consumer', label: 'Người tiêu dùng' },
+  { value: 'company', label: 'Công ty' },
+  { value: 'person', label: 'Cá nhân' },
+]
 
 export function InvoiceBook() {
-  const { branchId, can } = useSession()
+  const { branchId } = useSession()
   const toast = useToast()
   const queryClient = useQueryClient()
   const range = useMonthRange()
-  const mayVoid = can('einvoice.void-replace-adjust')
-  const [voiding, setVoiding] = useState<InvoiceRow | null>(null)
+  const [state, setState] = useState<InvoiceState | ''>('')
+  const [buyer, setBuyer] = useState<NonNullable<InvoiceBookFilters['buyer']> | ''>('')
+  const [search, setSearch] = useState('')
+  const [q, setQ] = useState('')
+  const [openId, setOpenId] = useState<number | null>(null)
 
+  // Gõ tìm không bắn một lượt đọc sổ cho mỗi phím
+  useEffect(() => {
+    const timer = setTimeout(() => setQ(search.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const filters: InvoiceBookFilters = { state: state || undefined, buyer: buyer || undefined, q }
   const book = useQuery({
-    queryKey: ['invoices', branchId, range.from, range.to],
-    queryFn: () => api.invoiceBook(branchId!, range.from, range.to),
+    queryKey: ['invoices', branchId, range.from, range.to, filters],
+    queryFn: () => api.invoiceBook(branchId!, range.from, range.to, filters),
     enabled: Boolean(branchId),
+    placeholderData: keepPreviousData,
   })
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['invoices'] })
@@ -243,10 +264,25 @@ export function InvoiceBook() {
 
   const issue = useMutation({
     mutationFn: (orderId: number) => api.issueInvoice(orderId),
-    onSuccess: (row) =>
-      row.state === 'issued'
-        ? (toast(`Đã phát hành ${row.serial}-${row.invoiceNo}`, 'ok'), refresh())
-        : (toast(`Phát hành thất bại: ${row.lastError}`, 'danger'), refresh()),
+    onSuccess: (view) => {
+      refresh()
+      if (view.state === 'issued') toast(`Đã phát hành ${invoiceNumberLabel(view)}`, 'ok')
+      else toast(`Chưa phát hành được: ${view.lastError ?? 'không rõ lỗi'}`, 'danger')
+    },
+    onError: fail,
+  })
+
+  const retry = useMutation({
+    mutationFn: () => api.retryInvoices(branchId!),
+    onSuccess: (result) => {
+      refresh()
+      toast(
+        result.failed === 0
+          ? `Đã phát hành lại ${result.issued} hoá đơn`
+          : `Đã phát hành lại ${result.issued}, còn ${result.remaining} chưa lên được`,
+        result.failed === 0 ? 'ok' : 'warn',
+      )
+    },
     onError: fail,
   })
 
@@ -258,7 +294,7 @@ export function InvoiceBook() {
         title="Sổ hoá đơn điện tử"
         subtitle={
           data?.serial
-            ? `Ký hiệu ${data.serial}. Một đơn một hoá đơn — phát hành hai lần là sai phạm thuế.`
+            ? `Ký hiệu ${data.serial} — năm trong ký hiệu tự theo ngày lập. Mỗi bill một hoá đơn; sai thì lập hoá đơn thay thế, không huỷ.`
             : 'Chi nhánh chưa khai ký hiệu hoá đơn — chưa phát hành được.'
         }
         action={<RangePicker {...range} />}
@@ -273,17 +309,74 @@ export function InvoiceBook() {
           <>
             {!data.serial ? (
               <p className="rounded-md border border-danger-line bg-surface-1 px-5 py-3.5 text-[length:var(--fs-c1)] leading-relaxed text-ink-body">
-                Chưa khai ký hiệu hoá đơn cho chi nhánh này. Đặt tham số{' '}
-                <span className="font-mono text-ink-hi">einvoice.serial</span> ở{' '}
-                <Link to="/tham-so" className="text-accent-ink">
-                  A6 · Trung tâm tham số
-                </Link>{' '}
-                — 6 ký tự và bắt buộc có chữ M.
+                Chưa khai ký hiệu hoá đơn cho chi nhánh này — khai ở{' '}
+                <Link to="/hoa-don-dien-tu" className="text-accent-ink">
+                  A9 · Hoá đơn điện tử
+                </Link>
+                : 6 ký tự, bắt buộc có chữ M.
               </p>
             ) : null}
 
-            {voiding ? (
-              <VoidForm invoice={voiding} onClose={() => setVoiding(null)} onDone={refresh} />
+            {data.queue.length > 0 ? (
+              <section className="mt-4 rounded-md border border-warn bg-surface-1 p-5">
+                <div className="flex items-start gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+                      Chưa lên cơ quan thuế — {data.queue.length}
+                    </p>
+                    <p className="mt-1.5 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                      Máy chủ tự gửi lại mỗi lần quầy hỏi hàng chờ; bấm để gửi ngay, tối đa 20 tờ
+                      một lượt.
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    disabled={retry.isPending}
+                    onClick={() => retry.mutate()}
+                  >
+                    {retry.isPending
+                      ? 'Đang gửi lại…'
+                      : `Phát hành lại ${Math.min(data.queue.length, 20)} hoá đơn`}
+                  </Button>
+                </div>
+                <ul className="mt-3 flex flex-col">
+                  {data.queue.slice(0, 5).map((row) => (
+                    <li key={row.id}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenId(row.id)}
+                        className="flex w-full items-baseline gap-3 border-b border-line-1 py-2 text-left text-[length:var(--fs-c1)] hover:bg-surface-2"
+                      >
+                        <span className="w-28 font-mono text-ink-body">{row.orderCode}</span>
+                        <span className="min-w-0 flex-1 truncate text-ink-mute">
+                          {row.error ?? 'Chờ lượt gửi đầu tiên'}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {data.needsAction.length > 0 ? (
+              <section className="mt-4 rounded-md border border-danger-line bg-surface-1 p-5">
+                <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+                  Hoá đơn đã lên thuế mà đơn đã huỷ — {data.needsAction.length}
+                </p>
+                <p className="mt-1.5 max-w-[760px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                  Tờ hoá đơn vẫn còn hiệu lực trong khi doanh thu đã huỷ. Kế toán quyết cách xử lý —
+                  lập hoá đơn thay thế hoặc điều chỉnh với cơ quan thuế.
+                </p>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {data.needsAction.map((row) => (
+                    <li key={row.id}>
+                      <Button size="sm" onClick={() => setOpenId(row.id)}>
+                        {row.serial} · {row.invoiceNo ?? '—'} · {row.orderCode}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ) : null}
 
             {data.missing.length > 0 ? (
@@ -299,8 +392,12 @@ export function InvoiceBook() {
                     >
                       <span className="w-24 text-ink-mute">{formatDay(row.businessDate)}</span>
                       <span className="font-mono text-ink-body">{row.displayCode}</span>
+                      <span className="text-ink-mute">
+                        {CHANNEL_LABELS[row.channel] ?? row.channel}
+                      </span>
                       <Money amount={row.moneyTotal} className="ml-auto text-ink-hi" />
                       <Button
+                        size="sm"
                         onClick={() => issue.mutate(row.orderId)}
                         disabled={!data.serial || issue.isPending}
                       >
@@ -316,7 +413,42 @@ export function InvoiceBook() {
               <DataTable
                 rows={data.rows}
                 rowKey={(row) => row.id}
-                empty="Khoảng này chưa phát hành hoá đơn nào."
+                loading={book.isFetching && book.isPlaceholderData}
+                resetKey={JSON.stringify(filters)}
+                onRowClick={(row) => setOpenId(row.id)}
+                empty={
+                  state || buyer || q
+                    ? 'Không có hoá đơn nào khớp bộ lọc.'
+                    : 'Khoảng này chưa có hoá đơn nào.'
+                }
+                toolbar={
+                  <div className="flex flex-wrap items-end gap-4">
+                    <Field label="Trạng thái">
+                      <Select
+                        value={state}
+                        onChange={setState}
+                        options={STATE_OPTIONS}
+                        placeholder="Tất cả"
+                        width={180}
+                      />
+                    </Field>
+                    <Field label="Người mua">
+                      <Select
+                        value={buyer}
+                        onChange={setBuyer}
+                        options={BUYER_OPTIONS}
+                        placeholder="Tất cả"
+                        width={180}
+                      />
+                    </Field>
+                    <SearchField
+                      value={search}
+                      onChange={setSearch}
+                      placeholder="MST, tên người mua, số hoá đơn, mã đơn"
+                      width={320}
+                    />
+                  </div>
+                }
                 columns={[
                   {
                     key: 'day',
@@ -324,28 +456,28 @@ export function InvoiceBook() {
                     width: '110px',
                     cell: (row) => (
                       <span className="text-[length:var(--fs-c1)] text-ink-mute">
-                        {formatDay(row.businessDate)}
+                        {formatDay(row.invoiceDate ?? row.businessDate)}
                       </span>
                     ),
                   },
                   {
                     key: 'no',
                     header: 'Số hoá đơn',
-                    width: '160px',
+                    width: '180px',
                     cell: (row) => (
                       <span
                         className={`font-mono text-[length:var(--fs-b2)] text-ink-hi ${
                           row.state === 'voided' || row.state === 'replaced' ? 'opacity-60' : ''
                         }`}
                       >
-                        {row.invoiceNo ? `${row.serial}-${row.invoiceNo}` : '—'}
+                        {row.invoiceNo ? invoiceNumberLabel(row) : '—'}
                       </span>
                     ),
                   },
                   {
                     key: 'order',
                     header: 'Đơn',
-                    width: '140px',
+                    width: '130px',
                     cell: (row) => (
                       <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
                         {row.orderCode}
@@ -353,17 +485,21 @@ export function InvoiceBook() {
                     ),
                   },
                   {
-                    key: 'taxCode',
-                    header: 'Mã cơ quan thuế',
-                    width: 'minmax(180px, 1fr)',
+                    key: 'buyer',
+                    header: 'Người mua',
+                    width: 'minmax(220px, 1fr)',
                     cell: (row) => (
                       <span className="min-w-0">
-                        <span className="block truncate font-mono text-[length:var(--fs-c1)] text-ink-mute">
-                          {row.taxCode ?? row.lastError ?? '—'}
+                        <span
+                          className={`block truncate text-[length:var(--fs-c1)] ${
+                            row.buyerName ? 'text-ink-hi' : 'text-ink-mute'
+                          }`}
+                        >
+                          {row.buyerName ?? CONSUMER_BUYER_LABEL}
                         </span>
-                        {row.voidReason ? (
-                          <span className="mt-0.5 block truncate text-[length:var(--fs-c1)] text-warn">
-                            {row.voidReason}
+                        {row.buyerTaxCode ? (
+                          <span className="mt-0.5 block font-mono text-[length:var(--fs-c2)] text-ink-mute">
+                            MST {row.buyerTaxCode}
                           </span>
                         ) : null}
                       </span>
@@ -372,15 +508,25 @@ export function InvoiceBook() {
                   {
                     key: 'state',
                     header: 'Trạng thái',
-                    width: '150px',
+                    width: 'minmax(170px, 0.8fr)',
                     cell: (row) => (
-                      <span
-                        className={`text-[length:var(--fs-c1)] ${INVOICE_STATES[row.state].tone}`}
-                      >
-                        {INVOICE_STATES[row.state].label}
+                      <span className="min-w-0 text-[length:var(--fs-c1)]">
+                        <span className={STATE_TONES[row.state]}>
+                          {INVOICE_STATE_LABELS[row.state].label}
+                        </span>
+                        {row.state === 'failed' && row.lastError ? (
+                          <span className="mt-0.5 block truncate text-[length:var(--fs-c2)] text-ink-mute">
+                            {row.lastError}
+                          </span>
+                        ) : null}
                         {row.replacesId ? (
-                          <span className="block text-[length:var(--fs-c2)] text-ink-mute">
-                            thay cho #{row.replacesId}
+                          <span className="mt-0.5 block text-[length:var(--fs-c2)] text-ink-mute">
+                            thay cho tờ #{row.replacesId}
+                          </span>
+                        ) : null}
+                        {row.voidReason ? (
+                          <span className="mt-0.5 block truncate text-[length:var(--fs-c2)] text-ink-mute">
+                            {row.voidReason}
                           </span>
                         ) : null}
                       </span>
@@ -389,24 +535,27 @@ export function InvoiceBook() {
                   {
                     key: 'amount',
                     header: 'Tổng tiền',
-                    width: '150px',
+                    width: '140px',
                     align: 'right',
                     cell: (row) => <Money amount={row.amountTotal} className="text-ink-body" />,
                   },
                   {
                     key: 'actions',
                     header: '',
-                    width: '140px',
+                    width: '120px',
                     cell: (row) => (
-                      <span className="flex justify-end gap-1.5">
+                      <span className="flex justify-end">
                         {row.state === 'pending' || row.state === 'failed' ? (
-                          <Button onClick={() => issue.mutate(row.orderId)} size="sm">
+                          <Button
+                            size="sm"
+                            disabled={issue.isPending}
+                            onClick={(e) => {
+                              // Cả dòng đã bắt onClick để mở ngăn chi tiết
+                              e.stopPropagation()
+                              issue.mutate(row.orderId)
+                            }}
+                          >
                             Phát hành
-                          </Button>
-                        ) : null}
-                        {row.state === 'issued' && mayVoid ? (
-                          <Button onClick={() => setVoiding(row)} size="sm" variant="danger">
-                            Huỷ
                           </Button>
                         ) : null}
                       </span>
@@ -417,85 +566,37 @@ export function InvoiceBook() {
             </div>
 
             <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-              CHƯA đấu nối nhà cung cấp hoá đơn điện tử: toàn bộ luồng cấp số, hàng đợi lỗi và
-              huỷ/thay thế có duyệt đều thật, chỉ lượt gọi ra cơ quan thuế là giả lập. Hoá đơn đã
-              huỷ giữ nguyên số đã cấp — số đã lên thuế thì tồn tại vĩnh viễn.
+              Bấm một dòng để xem nội dung tờ hoá đơn, các tờ cùng đơn và lập hoá đơn thay thế. Tờ
+              đã phát hành không sửa, không huỷ — tờ cũ giữ số, tờ thay thế lấy số kế tiếp. Huỷ chỉ
+              còn cho tờ chưa lên cơ quan thuế và chưa cấp số.
             </p>
           </>
         )}
       </div>
+
+      {openId !== null ? (
+        <InvoiceDrawer invoiceId={openId} onClose={() => setOpenId(null)} onChanged={refresh} />
+      ) : null}
     </>
   )
 }
 
-function VoidForm({
-  invoice,
-  onClose,
-  onDone,
-}: {
-  invoice: InvoiceRow
-  onClose: () => void
-  onDone: () => void
-}) {
-  const toast = useToast()
-  const [reason, setReason] = useState('')
-  const [replace, setReplace] = useState(true)
+/** Màu chữ trạng thái trong bảng — tông của Badge, viết tay vì ô bảng không đặt Badge */
+const STATE_TONES: Record<InvoiceState, string> = {
+  pending: 'text-warn',
+  issued: 'text-ok',
+  failed: 'text-danger',
+  voided: 'text-ink-mute',
+  replaced: 'text-ink-mute',
+}
 
-  const submit = useMutation({
-    mutationFn: () => api.voidInvoice(invoice.id, { reason, replace }),
-    onSuccess: (result) => {
-      toast(
-        result.replacement ? 'Đã thay thế — bản mới đang chờ phát hành' : 'Đã huỷ hoá đơn',
-        'ok',
-      )
-      onDone()
-      onClose()
-    },
-    onError: (err: Error) =>
-      toast(
-        err.message.includes('duyệt bằng PIN')
-          ? 'Vai trò của bạn cần người khác duyệt thao tác này — luồng duyệt bằng PIN chưa có trên Office'
-          : err.message,
-        'danger',
-      ),
-  })
-
-  return (
-    <section className="mt-4 rounded-md border border-danger-line bg-surface-1 p-5">
-      <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
-        Huỷ hoá đơn {invoice.serial}-{invoice.invoiceNo}
-      </p>
-      <div className="mt-4 flex flex-wrap items-end gap-4">
-        <label className="block min-w-[320px] flex-1">
-          <span className="mb-1.5 block text-[length:var(--fs-c1)] text-ink-mute">
-            Lý do (bắt buộc)
-          </span>
-          <input
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Sai tên người mua"
-            className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
-          />
-        </label>
-        <Toggle onChange={() => setReplace(!replace)} on={replace}>
-          {replace ? 'Huỷ và phát hành thay thế' : 'Chỉ huỷ'}
-        </Toggle>
-        <div className="ml-auto flex gap-2">
-          <Button onClick={onClose}>Bỏ</Button>
-          <Button
-            variant="danger"
-            disabled={!reason.trim() || submit.isPending}
-            onClick={() => submit.mutate()}
-          >
-            Xác nhận
-          </Button>
-        </div>
-      </div>
-      <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-        Bản gốc không mất và giữ nguyên số đã cấp; thao tác này sinh bản ghi duyệt trong sổ.
-      </p>
-    </section>
-  )
+const CHANNEL_LABELS: Record<string, string> = {
+  pos: 'Tại quầy',
+  table: 'Tại bàn',
+  web: 'Web',
+  grab: 'Grab',
+  shopee: 'ShopeeFood',
+  be: 'Be',
 }
 
 // ---------------------------------------------------------------- F4
@@ -547,31 +648,68 @@ export function TaxReport() {
                   Khoảng này chưa có doanh thu.
                 </p>
               ) : (
-                <table className="mt-4 w-full">
-                  <thead>
-                    <tr className="border-b border-line-1 text-left text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-                      <th className="pb-2">Thuế suất</th>
-                      <th className="pb-2 text-right">Doanh thu trước thuế</th>
-                      <th className="pb-2 text-right">Thuế</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.buckets.map((bucket) => (
-                      <tr
-                        key={bucket.rate}
-                        className="border-b border-line-1 text-[length:var(--fs-b2)] text-ink-body last:border-b-0"
-                      >
-                        <td className="py-2 font-mono">
-                          {formatPercent(bucket.rate).replace('+', '')}
-                        </td>
-                        <td className="py-2 text-right font-mono">{formatVnd(bucket.netVnd)}</td>
-                        <td className="py-2 text-right font-mono text-ink-hi">
-                          {formatVnd(bucket.vatVnd)}
-                        </td>
+                <>
+                  {/* Một dòng mỗi thuế suất — món ăn 8%, bia rượu 10%. Số theo hoá đơn đã
+                      phát hành (ngày lập); bill đã trả chưa có hoá đơn tách cột riêng để
+                      thấy ngay phần tờ khai còn hụt chứng từ. */}
+                  <table className="mt-4 w-full">
+                    <thead>
+                      <tr className="border-b border-line-1 text-left text-[length:var(--fs-c2)] font-semibold tracking-[0.1em] text-ink-mute uppercase">
+                        <th className="pb-2">Thuế suất</th>
+                        <th className="pb-2 text-right">Theo hoá đơn · trước thuế</th>
+                        <th className="pb-2 text-right">Thuế</th>
+                        <th className="pb-2 text-right">Chưa có hoá đơn · trước thuế</th>
+                        <th className="pb-2 text-right">Thuế</th>
+                        <th className="pb-2 text-right">Cộng thuế</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {data.buckets.map((bucket) => {
+                        const invoiced = data.invoicedBuckets.find((b) => b.rate === bucket.rate)
+                        const pending = data.uninvoicedBuckets.find((b) => b.rate === bucket.rate)
+                        return (
+                          <tr
+                            key={bucket.rate}
+                            className="border-b border-line-1 text-[length:var(--fs-b2)] text-ink-body last:border-b-0"
+                          >
+                            <td className="py-2 font-mono">
+                              {formatPercent(bucket.rate).replace('+', '')}
+                            </td>
+                            <td className="py-2 text-right font-mono">
+                              {formatVnd(invoiced?.netVnd ?? 0)}
+                            </td>
+                            <td className="py-2 text-right font-mono">
+                              {formatVnd(invoiced?.vatVnd ?? 0)}
+                            </td>
+                            <td
+                              className={`py-2 text-right font-mono ${pending?.netVnd ? 'text-warn' : 'text-ink-mute'}`}
+                            >
+                              {formatVnd(pending?.netVnd ?? 0)}
+                            </td>
+                            <td
+                              className={`py-2 text-right font-mono ${pending?.vatVnd ? 'text-warn' : 'text-ink-mute'}`}
+                            >
+                              {formatVnd(pending?.vatVnd ?? 0)}
+                            </td>
+                            <td className="py-2 text-right font-mono text-ink-hi">
+                              {formatVnd(bucket.vatVnd)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  {data.uninvoicedBuckets.some((b) => b.netVnd !== 0) ? (
+                    <p className="mt-3 text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
+                      Bill đã trả mà chưa có hoá đơn vẫn tính vào VAT đầu ra (theo ngày kinh doanh)
+                      — phát hành bù ở{' '}
+                      <Link to="/hoa-don" className="text-accent-ink">
+                        sổ hoá đơn F3
+                      </Link>{' '}
+                      trước khi nộp tờ khai.
+                    </p>
+                  ) : null}
+                </>
               )}
             </section>
 

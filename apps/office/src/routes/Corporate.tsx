@@ -38,7 +38,6 @@ const blank = (): CorporateInput => ({
   paymentTermDays: 30,
   reconcileDay: 1,
   blockAfterOverdueDays: null,
-  einvoiceMode: null,
   active: true,
 })
 
@@ -167,9 +166,16 @@ export function Corporate() {
                 cell: (company) => (
                   <span className="min-w-0 text-[length:var(--fs-c1)]">
                     {company.blockedReason ? (
-                      <span className="text-danger">{company.blockedReason}</span>
-                    ) : (
+                      <span className="block text-danger">{company.blockedReason}</span>
+                    ) : company.address ? (
                       <Badge tone="neutral">Quầy ghi nợ được</Badge>
+                    ) : null}
+                    {company.address ? null : (
+                      // Hoá đơn cho công ty bắt buộc có địa chỉ — chi nhánh đã bật hoá đơn
+                      // điện tử thì máy chủ từ chối ghi nợ (`corporate_profile_incomplete`)
+                      <span className="mt-1 block text-warn">
+                        Thiếu địa chỉ — chi nhánh đã bật hoá đơn điện tử thì quầy chưa ghi nợ được
+                      </span>
                     )}
                   </span>
                 ),
@@ -216,7 +222,6 @@ function toInput(row: CorporateRow): CorporateInput {
     paymentTermDays: row.paymentTermDays,
     reconcileDay: row.reconcileDay,
     blockAfterOverdueDays: row.blockAfterOverdueDays,
-    einvoiceMode: row.einvoiceMode,
     active: row.active,
   }
 }
@@ -273,9 +278,8 @@ function Statement({ company }: { company: CorporateRow }) {
           <DateInput value={range.to} onChange={(to) => setRange({ ...range, to })} />
         </Field>
         <p className="ml-auto max-w-[420px] text-right text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-          Chốt kỳ ngày {company.reconcileDay} hằng tháng · hoá đơn điện tử chế độ{' '}
-          {company.einvoiceModeEffective === 'aggregate' ? 'gộp cuối kỳ' : 'từng bill'} · chặn ghi
-          nợ khi quá hạn {company.blockAfterOverdueDaysEffective} ngày
+          Chốt kỳ ngày {company.reconcileDay} hằng tháng · mỗi bill ghi nợ một hoá đơn điện tử đứng
+          tên công ty · chặn ghi nợ khi quá hạn {company.blockAfterOverdueDaysEffective} ngày
         </p>
       </div>
 
@@ -490,8 +494,12 @@ function CorporateForm({
   const set = <K extends keyof CorporateInput>(key: K, value: CorporateInput[K]) =>
     onChange({ ...draft, [key]: value })
 
+  // Địa chỉ bắt buộc: mỗi bill ghi nợ là một hoá đơn đứng tên công ty (NĐ 254/2026)
   const ready =
-    draft.code.trim() !== '' && draft.name.trim() !== '' && /^\d{10}(-\d{3})?$/.test(draft.taxCode)
+    draft.code.trim() !== '' &&
+    draft.name.trim() !== '' &&
+    /^\d{10}(-\d{3})?$/.test(draft.taxCode) &&
+    (draft.address ?? '').trim() !== ''
 
   return (
     <section className="rounded-md border border-accent bg-surface-1 p-5">
@@ -566,24 +574,12 @@ function CorporateForm({
             mono
           />
         </Field>
-        <Field label="Xuất hoá đơn điện tử">
-          <select
-            value={draft.einvoiceMode ?? ''}
-            onChange={(e) =>
-              set(
-                'einvoiceMode',
-                e.target.value === '' ? null : (e.target.value as 'per-bill' | 'aggregate'),
-              )
-            }
-            className="h-9 w-full rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
-          >
-            <option value="">Theo tham số chung</option>
-            <option value="per-bill">Từng bill</option>
-            <option value="aggregate">Gộp cuối kỳ</option>
-          </select>
-        </Field>
-        <Field label="Địa chỉ">
-          <Input value={draft.address ?? ''} onChange={(v) => set('address', v || null)} />
+        <Field label="Địa chỉ trên hoá đơn" className="lg:col-span-2">
+          <Input
+            value={draft.address ?? ''}
+            onChange={(v) => set('address', v || null)}
+            placeholder="Đúng như giấy đăng ký kinh doanh"
+          />
         </Field>
       </div>
 
@@ -592,8 +588,9 @@ function CorporateForm({
           {draft.active ? 'Đang hợp tác' : 'Ngừng hợp tác'}
         </Toggle>
         <p className="max-w-[520px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-          Để trống hai ô "theo tham số chung" nghĩa là dùng số của cả chuỗi ở A6 — sửa một chỗ, mọi
-          công ty chưa khai riêng đều đổi theo.
+          Để trống ô "theo tham số chung" nghĩa là dùng số của cả chuỗi ở A6 — sửa một chỗ, mọi công
+          ty chưa khai riêng đều đổi theo. Địa chỉ bắt buộc: mỗi bill ghi nợ là một hoá đơn đứng tên
+          công ty.
         </p>
         <div className="ml-auto flex gap-2">
           <Button onClick={onCancel}>Bỏ</Button>

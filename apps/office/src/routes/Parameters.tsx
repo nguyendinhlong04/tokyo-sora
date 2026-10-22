@@ -35,7 +35,10 @@ const GROUP_LABEL: Record<string, string> = {
  * BỘ giờ chứ không chỉ phần vượt — và đó đúng là chỗ người ta sửa nhầm.
  */
 const NOTE: Record<string, string> = {
-  'sales.vatRate': 'Đổi số này là đổi tiền trên mọi hoá đơn — kiểm với kế toán trước.',
+  'sales.vatRate':
+    'Thuế suất của món ăn và đồ uống không cồn — 0,08 (8%) tới 31/12/2026 theo NĐ 174/2025. Đổi số này là đổi tiền trên mọi bill và hoá đơn — kiểm với kế toán trước.',
+  'sales.vatRateAlcohol':
+    'Thuế suất của bia, rượu (nhóm thuế "Bia, rượu" ở M2) — 0,1 (10%), không được giảm vì chịu thuế tiêu thụ đặc biệt. Giá đang chưa gồm thuế: bật số này là cộng thuế vào mọi bill.',
   'sales.serviceFeeRate':
     'Phí phục vụ, CHỈ cộng vào bill ăn tại chỗ. Mang về và giao hàng không thu.',
   'sales.roundingUnit':
@@ -113,12 +116,19 @@ const NOTE: Record<string, string> = {
   'stock.expiryWarnDays': 'Còn ngần này ngày nữa là tới hạn thì S9 báo động.',
 
   'einvoice.taxCode': 'Mã số thuế của CHUỖI — một mã dùng chung cho cả ba chi nhánh.',
-  'einvoice.provider': 'Nhà cung cấp dịch vụ hoá đơn điện tử đã ký hợp đồng.',
+  'einvoice.sellerName':
+    'Tên người bán đúng như giấy đăng ký doanh nghiệp — in trên mọi hoá đơn. Khai ở A9.',
+  'einvoice.sellerAddress':
+    'Địa chỉ trụ sở đúng như giấy đăng ký doanh nghiệp — hoá đơn in kèm địa chỉ chi nhánh. Khai ở A9.',
+  'einvoice.provider':
+    'Tên nhà cung cấp đã ký hợp đồng — để ghi nhớ. Máy chủ đấu nối nhà cung cấp nào là do biến môi trường EINVOICE_PROVIDER.',
   'einvoice.certificateSerial': 'Serial chứng thư số đang dùng để ký hoá đơn.',
   'einvoice.certificateExpiry':
     'Chứng thư hết hạn là mọi hoá đơn rơi vào hàng đợi lỗi F3 — theo dõi ngày này.',
   'einvoice.enabled':
-    'Chỉ bật khi bốn ô trên đã khai đủ. Bật sớm là mỗi bill rơi vào hàng đợi lỗi.',
+    'Bật ở A9 — chỉ bật được khi đủ mã số thuế, tên và địa chỉ người bán, ký hiệu, và máy chủ đã đấu nối nhà cung cấp.',
+  'einvoice.enabledFrom':
+    'Ngày bật hoá đơn lần đầu, tự ghi ở A9. F3 và F6 chỉ đòi hoá đơn cho bill từ ngày này — sửa tay là đổi phạm vi đòi hoá đơn.',
   'einvoice.serial':
     'Ký hiệu hoá đơn RIÊNG từng địa điểm kinh doanh — không chi nhánh nào dùng chung.',
 
@@ -135,8 +145,6 @@ const NOTE: Record<string, string> = {
   'corporate.defaultCreditLimitVnd':
     'Hạn mức nợ gán cho khách doanh nghiệp mới — từng khách sửa riêng được.',
   'corporate.blockAfterOverdueDays': 'Quá hạn ngần này ngày thì khoá, không cho ghi nợ thêm.',
-  'corporate.einvoiceMode':
-    'per-bill là xuất hoá đơn từng bill; aggregate là gộp một hoá đơn cuối kỳ.',
 
   'feedback.complaintStars':
     'Từ mấy sao trở XUỐNG thì một lượt đánh giá thành khiếu nại phải có người xử lý.',

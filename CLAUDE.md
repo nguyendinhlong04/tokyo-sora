@@ -688,7 +688,7 @@ Mục tiêu bản dựng lại (giữ nguyên API; đổi client):
 Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
 Chen ngay sau giao diện iPad, theo yêu cầu 22/10/2026: **khuyến mãi áp dụng chung** (§9.6) —
 xong cùng ngày: API, B11, iPad, web và ô voucher ở POS. Rồi **hoá đơn điện tử** (§9.7): API,
-POS, iPad bàn và web xong 22/10/2026 trên nhánh `hoa-don-dien-tu`, Office theo sau.
+POS, iPad bàn, web và Office xong 22/10/2026 trên nhánh `hoa-don-dien-tu`.
 
 ### 9.6 Khuyến mãi áp dụng chung (chốt và làm 22/10/2026)
 Một bộ chấm cho mọi kênh: `packages/contracts/src/promotions.ts` (test `promotions.test.ts`),
@@ -829,13 +829,22 @@ chỉ ghi khi khách yêu cầu, không thì "Bán cho người tiêu dùng". Mo
   theo dõi VAT từng thuế suất. Trang theo dõi có khối hoá đơn (`don/[token]/InvoiceBlock.tsx`):
   bổ sung, sửa, bỏ người mua khi `editable`; đã phát hành thì ký hiệu · số, mã tra cứu, nút
   tra cứu (chỉ địa chỉ `https`; bản giả lập không có nút).
+- **Office:** F3 (`routes/Accounting.tsx` + ngăn `routes/InvoiceDetail.tsx`) lọc trạng thái /
+  người mua / tìm, khối hàng chờ có "Phát hành lại n hoá đơn" (`invoices/retry`), khối đơn
+  huỷ mà hoá đơn còn hiệu lực, bill thiếu hoá đơn; ngăn chi tiết đọc `snapshot`, chuỗi thay
+  thế, lập hoá đơn thay thế (form người mua dùng chung, tra MST cửa nhân viên), huỷ tờ chưa
+  cấp số. F4 mỗi thuế suất một dòng, tách theo hoá đơn / chưa có hoá đơn. A9 thêm tên, địa
+  chỉ người bán, dòng `runtime` của máy chủ, ngày bật; không cho bật khi máy chủ `off`. B15
+  bỏ chế độ hoá đơn, địa chỉ bắt buộc. M2 "Nhóm thuế" là ô chọn `VAT_CODES`. A6 có ghi chú
+  `sales.vatRateAlcohol`, `einvoice.sellerName/sellerAddress/enabledFrom`.
 - **Nhà cung cấp:** `einvoice-provider.ts`, `EINVOICE_PROVIDER` (`mock` ở dev và test · `off`
   mặc định ở production — A9 không cho bật). Bản giả lập trả `test: true` → bill và màn
   khách in "HOÁ ĐƠN THỬ". Chưa ký hợp đồng: adapter thật thêm ở file này, thông tin đăng
   nhập để trong env, không trong `parameters`.
 - **Chưa làm / biết trước:**
-  - Giao diện còn lại: Office F3/B15/A9/M2/A6/F4 — một PR. Office B15 còn ô chọn chế độ
-    hoá đơn (vô tác dụng).
+  - Office chưa có ô duyệt PIN — người có quyền △ (thu ngân) gặp `requires_approval` ở F3
+    thì được chỉ sang POS P11. Bundle Office một chunk 289 KB gzip (trước PR này 283 KB),
+    vượt ngân sách 250 KB từ trước — cần tách theo route.
   - Hoá đơn điều chỉnh, hoàn tiền sau khi xuất, thông báo sai sót 04/SS; người mua nước ngoài
     (hộ chiếu); một bill nhiều người mua (tách ở P9 trước khi trả).
   - Chờ kế toán xác nhận: phí giao có chịu VAT không; làm tròn 1.000đ sinh phần thu ngoài hoá

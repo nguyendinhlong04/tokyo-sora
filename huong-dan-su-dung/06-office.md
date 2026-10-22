@@ -72,7 +72,10 @@ riêng lát "theo cách trả tiền" cộng cả hai vì để đối soát v�
   tiêu 12 tháng trượt). Chỉ chủ sửa được; không có nút cộng điểm ở đây.
 - **B15 · Khách doanh nghiệp** — hồ sơ MST, hạn mức nợ, điều khoản NET; bảng kê
   tuổi nợ 4 khoang; **Gạch nợ** khi tiền về. Quá hạn quá N ngày → **POS tự chặn
-  ghi nợ mới**, cột "Quầy" nói rõ hồ sơ nào đang bị chặn.
+  ghi nợ mới**, cột "Quầy" nói rõ hồ sơ nào đang bị chặn. Mỗi bill ghi nợ là một
+  hoá đơn điện tử đứng tên công ty, lập ngay lúc ghi nợ (không còn "gộp cuối
+  kỳ") — nên **Địa chỉ trên hoá đơn** là bắt buộc; hồ sơ thiếu địa chỉ hiện cảnh
+  báo và quầy chưa ghi nợ được ở chi nhánh đã bật hoá đơn.
 
 ## 6.4 Nhân sự (H1–H7)
 
@@ -174,13 +177,28 @@ flowchart TD
 - **F2 · Nhật ký doanh thu** — sổ bất biến (trigger CSDL chặn sửa): bán, thu,
   giảm giá, tặng, huỷ, hoàn — kèm người thao tác, người duyệt, lý do. Sửa sai
   là bút toán ngược, không sửa dòng cũ.
-- **F3 · Sổ hoá đơn điện tử** — khối "Bill đã trả mà chưa có hoá đơn" với nút
-  **Phát hành** từng dòng; trạng thái Chờ/Đã phát hành/Lỗi/Đã huỷ/Đã thay thế;
-  huỷ bắt buộc lý do, chọn "Huỷ và phát hành thay thế" hay "Chỉ huỷ". **Một đơn
-  một hoá đơn**; hoá đơn huỷ giữ nguyên số đã cấp. Chưa khai ký hiệu ở A9 thì
-  không phát hành được.
+- **F3 · Sổ hoá đơn điện tử** — mỗi bill trả đủ tự lập một hoá đơn; sổ để soát
+  và xử lý chỗ lệch:
+  - Lọc theo **Trạng thái** (Chờ phát hành · Đã phát hành · Chưa lên được · Đã
+    huỷ · Đã thay thế), **Người mua** (người tiêu dùng · công ty · cá nhân), ô
+    tìm theo MST, tên người mua, số hoá đơn, mã đơn.
+  - Khối **"Chưa lên cơ quan thuế"** (cả chi nhánh, không theo ngày) kèm nút
+    **Phát hành lại n hoá đơn** (tối đa 20 tờ một lượt). Máy chủ cũng tự gửi lại
+    mỗi lần trạm thu ngân hỏi hàng chờ.
+  - Khối **"Hoá đơn đã lên thuế mà đơn đã huỷ"** — tờ vẫn còn hiệu lực, kế toán
+    quyết thay thế hay điều chỉnh. Khối **"Bill đã trả mà chưa có hoá đơn"** (tính
+    từ ngày bật ở A9) với nút **Phát hành** — đơn Grab/Shopee/Be không tự lập,
+    phát hành tay ở đây.
+  - Bấm một dòng mở **ngăn chi tiết**: người bán, người mua, từng món kèm thuế
+    suất, VAT từng mức, hình thức trả, mã cơ quan thuế, mã tra cứu, các tờ cùng
+    đơn. Tờ đã phát hành **không sửa, không huỷ** — sai thì **Lập hoá đơn thay
+    thế** (lý do + người mua mới; tờ cũ giữ số, tờ mới lấy số kế tiếp). Chỉ tờ
+    chưa lên thuế và **chưa cấp số** mới **Huỷ tờ chưa cấp số** được.
+  - Chưa khai ký hiệu thì đầu sổ báo và dẫn về A9.
 - **F4 · Báo cáo thuế** — VAT đầu ra − VAT đầu vào = VAT phải nộp; TNCN đã khấu
-  trừ; khối đối chiếu hoá đơn vs doanh thu — lệch là đỏ kèm giải thích.
+  trừ; bảng **mỗi thuế suất một dòng** (món ăn 8%, bia rượu 10%): phần theo hoá
+  đơn đã phát hành và phần bill đã trả chưa có hoá đơn tách cột; khối đối chiếu
+  hoá đơn vs doanh thu — lệch là đỏ kèm giải thích.
 - **F5 · Công nợ** — phải trả NCC và phải thu khách doanh nghiệp (cùng nguồn
   với B15).
 - **F6 · Khoá sổ kỳ** — màn có hệ quả lớn nhất Office: liệt kê **việc còn dở**
@@ -264,7 +282,7 @@ gia vị… **Bỏ trống là hợp lệ ở mọi ô** — trang web tự lùi
 | **A6 · Trung tâm tham số** | Một sổ cho mọi ngưỡng/hệ số của hệ thống, nhóm theo mảng, mỗi dòng có chú thích hệ quả + lịch sử ai đổi. Hai nút lưu: **"Lưu cho chuỗi"** / **"Chỉ chi nhánh này"** (+ **Bỏ ghi đè**). Hiệu lực ngay, không cần triển khai lại |
 | **A7 · Nhật ký thao tác** | Sổ bất biến mọi hành động nhạy cảm; lọc theo ngày/hành động/người; 50 dòng/trang |
 | **A8 · Nội dung website** | Ba tab **Tin tức**, **Tuyển dụng** và **W1 · Ảnh & video hero**; bài giữ nháp được. Mỗi khung hero có hai cờ riêng: **Chiếu trên trang chủ** và **Chiếu trên iPad tại bàn** (màn chờ quảng cáo khi bàn trống — trang chủ đổi trong một phút, iPad trong mười phút; video nên dưới 3 MB). Giá món sửa ở M1, địa chỉ/giờ mở sửa ở A10 — không ở đây |
-| **A9 · Hoá đơn điện tử** | Phần chuỗi: MST, nhà cung cấp HĐĐT, chứng thư số (đếm ngày hết hạn); phần chi nhánh: **ký hiệu 6 ký tự có chữ M** + công tắc bật phát hành. Khai ở đây, phát hành ở F3 |
+| **A9 · Hoá đơn điện tử** | Phần chuỗi: MST, **tên và địa chỉ người bán** đúng giấy đăng ký doanh nghiệp, nhà cung cấp theo hợp đồng, chứng thư số (đếm ngày hết hạn); dòng trạng thái đấu nối của máy chủ (chưa đấu nối · bản giả lập "HOÁ ĐƠN THỬ" · nhà cung cấp thật). Phần chi nhánh: **ký hiệu 6 ký tự có chữ M** (năm trong ký hiệu tự đổi theo ngày lập) + công tắc bật phát hành; bật lần đầu ghi ngày bắt đầu đòi hoá đơn. Thiếu thông tin hoặc máy chủ chưa đấu nối thì không bật được. Khai ở đây, phát hành ở F3 |
 | **A10 · Chi nhánh** | Tên, SĐT, địa chỉ, email, **giờ mở cửa** — sửa một chỗ đổ ra website, chân hoá đơn, và là **nguồn dựng lưới giờ đặt bàn** (gõ sai giờ mở là chi nhánh ngừng nhận đặt) |
 
 ## 6.11 Giới hạn của bản dựng hiện tại (08/2026)
@@ -275,9 +293,10 @@ gia vị… **Bỏ trống là hợp lệ ở mọi ô** — trang web tự lùi
   (`db:dev-bootstrap` trên máy dev). Các màn cần phát hành lại sau khi sửa: A3
   sơ đồ bàn, A5 máy in, M1/M10/M11 phần cờ kênh.
 - **Luồng duyệt bằng PIN trên Office mới có ở B11 (bật khuyến mãi).** Các chỗ
-  khác vượt hạn mức (phiếu chi của quản lý ca, điều chỉnh tồn của thủ kho, huỷ
-  hoá đơn) hiện báo *"cần người duyệt, mà luồng duyệt bằng PIN chưa có trên
-  Office"* — tạm thời để người có quyền cao hơn tự thao tác.
+  khác vượt hạn mức (phiếu chi của quản lý ca, điều chỉnh tồn của thủ kho) hiện
+  báo *"cần người duyệt, mà luồng duyệt bằng PIN chưa có trên Office"* — tạm
+  thời để người có quyền cao hơn tự thao tác. Hoá đơn thay thế thì R7 · R8 · R10
+  làm thẳng ở F3; thu ngân làm ở POS P11 với PIN quản lý ca.
 - **B10** chưa có đặt lịch email, xuất PDF, so sánh liên chi nhánh (đã có CSV).
 - **C3** chưa tự sinh phiếu hằng tháng — phải bấm nút **Sinh phiếu tháng N**.
 - Ngân hàng và nhà cung cấp HĐĐT đang chạy **bản giả lập** — màn hình và thao

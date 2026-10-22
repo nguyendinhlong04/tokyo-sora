@@ -1,4 +1,4 @@
-import { formatVnd } from '@sora/contracts'
+import { VAT_CODES, VAT_CODE_LABELS, formatVnd, type VatCode } from '@sora/contracts'
 import { ApiError } from '@sora/core'
 import { Button, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -367,12 +367,20 @@ export function DishEditor({
                   className={inputClass}
                 />
               </Field>
-              <Field label="Mã thuế">
-                <input
+              {/* Thuế suất không nằm ở món mà ở A6 (`sales.vatRate`, `sales.vatRateAlcohol`):
+                  món ăn đang giảm còn 8%, bia rượu giữ 10% — kế toán đổi một con số */}
+              <Field label="Nhóm thuế">
+                <select
                   value={draft.vatCode}
-                  onChange={(e) => set({ vatCode: e.target.value })}
+                  onChange={(e) => set({ vatCode: e.target.value as VatCode })}
                   className={inputClass}
-                />
+                >
+                  {VAT_CODES.map((code) => (
+                    <option key={code} value={code}>
+                      {VAT_CODE_LABELS[code]}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </div>
 
