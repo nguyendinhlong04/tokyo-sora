@@ -232,6 +232,31 @@ describe('O11 — menu online', () => {
     expect(after.dishes.some((d: { id: string }) => d.id === 'thanbo')).toBe(true)
   })
 
+  /**
+   * Bundle của chi nhánh đã áp ghi đè giá, trạng thái và trạm — cờ bán online cũng
+   * phải là cờ của chi nhánh. Trước đây bundle chép nguyên cờ cấp chuỗi.
+   */
+  it('bundle cấu hình của chi nhánh mang đúng cờ bán online mà thực đơn đang dùng', async () => {
+    const published = await inject({
+      method: 'POST',
+      url: `/api/office/config/publish?branch=${fx.branchId}`,
+      headers: asOwner(),
+    })
+    expect(published.statusCode, published.payload).toBe(201)
+
+    const bundle = await inject({
+      method: 'GET',
+      url: `/api/config?branch=${fx.branchId}`,
+      headers: asOwner(),
+    })
+    expect(bundle.statusCode, bundle.payload).toBe(200)
+    const flagOf = (id: string) =>
+      bundle.json().dishes.find((d: { id: string }) => d.id === id).onlineVisible
+    // Hai mục trên: sò điệp chuỗi bật mà chi nhánh tắt, thăn bò chuỗi tắt mà chi nhánh bật
+    expect(flagOf('sodiep')).toBe(false)
+    expect(flagOf('thanbo')).toBe(true)
+  })
+
   it('trần đơn mỗi khung sửa được và khung giờ đổi theo', async () => {
     const res = await inject({
       method: 'PUT',

@@ -217,7 +217,7 @@ Ba trạng thái "không bán" dễ nhầm:
 |---|---|---|
 | **86 / báo hết** | Màn bếp K5 (hoặc B1 hiển thị) | Hết **trong ca**, tự hết hạn cuối ngày, khoá mọi kênh ngay |
 | **Tắt ở chi nhánh này** | M1, khối giá | Chi nhánh đó ngừng bán tới khi bật lại |
-| **Đang tắt (online)** | O11 Menu online | Chỉ tắt kênh mang về/giao — tại quán vẫn bán |
+| **Đang tắt (online)** | O11 Menu online | Chỉ tắt trên web đặt món (mang về/giao) — tại quán vẫn bán, đơn Grab/Shopee/Be nhập tay (O12) không bị chặn |
 
 **Trang giới thiệu món trên web** (khối trong drawer M1): soạn nội dung trang
 `/thuc-don/{mã}` — chương, lời dẫn, vị trí phần thịt, hương vị, độ cắt, gợi ý
@@ -249,7 +249,10 @@ gia vị… **Bỏ trống là hợp lệ ở mọi ô** — trang web tự lùi
 - **O11 · Menu online** — trần đơn mỗi khung 15 phút, thời gian bếp cần trước;
   công tắc bán online + **giá online** từng món (trống = giá tại quán). Giá online
   là giá khách web thấy và trả; đơn tại quán và đơn kênh ngoài nhập tay (O12) vẫn
-  tính giá tại quán.
+  tính giá tại quán. Công tắc bán online cũng chỉ áp cho web: web ẩn món nào thì
+  khách không đặt được món đó, kể cả từ giỏ cũ. Muốn ngừng bán trên GrabFood /
+  ShopeeFood / Be thì tắt trong ứng dụng của sàn — đơn sàn đã nhận vẫn nhập được
+  ở O12.
 - **R3 · Cấu hình nhận đặt** — chế độ xác nhận **tự động / duyệt tay**; 11 tham
   số thời lượng & giữ chỗ (giữ chỗ mềm 10′, giữ bàn 15′, thời lượng bữa…); trần
   suất và **tiền cọc theo kiểu chỗ**; **chặn ngày** (không huỷ suất đã nhận —

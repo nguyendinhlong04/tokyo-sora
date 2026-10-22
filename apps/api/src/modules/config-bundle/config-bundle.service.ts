@@ -23,6 +23,7 @@ import {
   tables,
 } from '../../db/schema'
 import { activePrintersOf } from '../admin/device-admin.service'
+import { onlineVisibleOf } from '../catalog/domain/online-visible'
 import type { Actor } from '../identity/actor'
 
 /**
@@ -134,7 +135,8 @@ export class ConfigBundleService {
             secondaryLabel: d.secondaryLabel,
             prepSeconds: d.prepSeconds,
           },
-          onlineVisible: d.onlineVisible,
+          // Cờ của chi nhánh như thực đơn online, không phải cờ chuỗi
+          onlineVisible: onlineVisibleOf(d, o),
           tableOrderable: d.tableOrderable,
           sort: d.sort,
         }

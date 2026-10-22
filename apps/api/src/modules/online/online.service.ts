@@ -26,6 +26,7 @@ import {
   orders,
   payments,
 } from '../../db/schema'
+import { onlineVisibleOf } from '../catalog/domain/online-visible'
 import { priceOf } from '../catalog/domain/price'
 import { isOnSale, scheduleOf } from '../catalog/domain/sale-window'
 import type { Actor } from '../identity/actor'
@@ -136,8 +137,8 @@ export class OnlineService {
         const override = overrideByDish.get(d.id)
         if (override?.active === false) return false
         if (!isOnSale(scheduleOf(d), today, minuteNow)) return false
-        // Cờ của chi nhánh (O11) đè lên cờ cấp chuỗi, cả bật lẫn tắt
-        return override?.onlineVisible ?? d.onlineVisible
+        // Cùng một hàm với cửa nhận đơn web: hiện món nào thì khách đặt được món đó
+        return onlineVisibleOf(d, override)
       })
       .map((d) => ({
         id: d.id,
@@ -317,7 +318,20 @@ export class OnlineService {
     const dayStart = startOfBusinessDay(businessDate, branch.timezone)
     const options = await this.slotOptions(input.branchId, input.type)
 
-    await this.assertOnlineSellable(input.lines.map((l) => l.dishId))
+    /**
+     * Cờ "bán online" (O11) là thực đơn của WEB, nên chỉ đơn web phải qua nó.
+     *
+     * Đơn GrabFood/ShopeeFood/Be nhân viên nhập theo đơn sàn đã nhận: món nằm trên
+     * thực đơn của sàn, khách đã trả bên sàn, shipper đang tới. Chặn ở đây không
+     * huỷ được đơn nào, chỉ đẩy nó ra giấy — cùng lẽ với vùng giao, giờ nhận đơn
+     * và trần khung bên dưới. Hết món (86) và lịch bán vẫn chặn mọi kênh.
+     */
+    if ((input.channel ?? 'web') === 'web') {
+      await this.assertOnlineSellable(
+        input.branchId,
+        input.lines.map((l) => l.dishId),
+      )
+    }
 
     // Phí giao chốt TRƯỚC khi tạo đơn: đơn giao mà không biết phí thì không có
     // con số nào để khách xác nhận.
@@ -496,18 +510,30 @@ export class OnlineService {
   }
 
   /**
-   * Món phải được bật "bán online" mới nhận đơn.
+   * Món phải đang bán online ở CHI NHÁNH NÀY mới nhận đơn web.
    *
    * Danh mục có 78 món nhưng chỉ ~40 món bán online (§23.1): món dễ nguội, món
-   * phải nướng tại bàn thì mang về là hỏng trải nghiệm.
+   * phải nướng tại bàn thì mang về là hỏng trải nghiệm. Đọc cả ghi đè chi nhánh
+   * (O11) bằng đúng hàm của thực đơn O2 — chỉ đọc cờ chuỗi thì món chi nhánh bật
+   * riêng bị từ chối, còn món chi nhánh đã tắt vẫn lọt qua từ giỏ cũ.
    */
-  private async assertOnlineSellable(dishIds: string[]) {
+  private async assertOnlineSellable(branchId: string, dishIds: string[]) {
     const rows = await this.db
-      .select({ id: dishes.id, nameVi: dishes.nameVi, onlineVisible: dishes.onlineVisible })
+      .select({
+        nameVi: dishes.nameVi,
+        dish: { onlineVisible: dishes.onlineVisible },
+        branch: { onlineVisible: dishBranchOverrides.onlineVisible },
+      })
       .from(dishes)
+      // Điều kiện chi nhánh nằm TRONG join: đặt ở WHERE thì món không có ghi đè rơi
+      // khỏi kết quả, và món chuỗi đang tắt lọt qua cửa này
+      .leftJoin(
+        dishBranchOverrides,
+        and(eq(dishBranchOverrides.dishId, dishes.id), eq(dishBranchOverrides.branchId, branchId)),
+      )
       .where(inArray(dishes.id, [...new Set(dishIds)]))
 
-    const offline = rows.filter((r) => !r.onlineVisible)
+    const offline = rows.filter((r) => !onlineVisibleOf(r.dish, r.branch))
     if (offline.length > 0) {
       throw new BadRequestException({
         code: 'not_online_sellable',

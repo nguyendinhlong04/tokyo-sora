@@ -329,6 +329,9 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   khuyến mãi món **đóng băng** vào dòng đơn lúc tạo (§9.6). Giá theo kênh chỉ có một chỗ:
   `priceOf` (`catalog/domain/price.ts`) — đơn web theo giá online O11, mọi kênh khác (kể cả
   Grab/ShopeeFood/Be nhập tay) theo giá tại quán; thực đơn O2, Office và dòng đơn cùng gọi nó.
+  Cờ "bán online" cũng một chỗ: `onlineVisibleOf` (`catalog/domain/online-visible.ts`) — cờ
+  chi nhánh O11 đè cờ chuỗi cả bật lẫn tắt; thực đơn O2, cửa nhận đơn web, Office và bundle
+  cùng gọi. Cờ chỉ chặn đơn **web** — đơn kênh ngoài nhập tay theo thực đơn của sàn.
 - `business_date` theo múi giờ chi nhánh (`businessDateOf`); mã hiển thị `ON-yyMM-NNNN`
   / `DB-yyMM-NNNN` (`nextDisplayCode`), khách đọc mã này, không đọc id.
 - **Sổ bất biến** (append-only, trigger `sora_append_only` + revoke quyền role `sora_app`
@@ -836,6 +839,9 @@ Thấp hơn:
 - Ba cách format tiền (`formatVnd`, `<Money>` Intl, `toLocaleString`+'₫' ở POS) → chuẩn
   về `formatVnd` + `font-mono tabular-nums`.
 - POS `soldOut` bỏ qua `limited` còn 0 (`TableOrder.tsx:292`), table thì xử lý.
+- Món đã tắt (`active=false` cấp chuỗi, hoặc "Tắt ở chi nhánh này") vẫn gọi được qua API ở
+  mọi kênh: thực đơn O2 và bundle ẩn món, nhưng `addOneLine`/`dishesByIds` không kiểm
+  `active` — giỏ cũ hay lệnh gọi thẳng vẫn tạo dòng đơn (thử 22/10/2026: web và tại bàn 201).
 - Dead code: `screens/Holding.tsx` (K4); `pnpm-workspace.yaml` liệt kê `e2e` không tồn tại.
 - Thiếu favicon ở table/staff/office/web; POS/kitchen có `favicon.svg` chưa link.
 - Nhiều endpoint đọc tin `?branch=` mà không so với `actor.branchId`.

@@ -23,6 +23,7 @@ import {
   type DishStoryCondiment,
   type DishStoryCut,
 } from '../../db/schema'
+import { onlineVisibleOf } from '../catalog/domain/online-visible'
 import { priceOf } from '../catalog/domain/price'
 import { describeSchedule, scheduleOf } from '../catalog/domain/sale-window'
 import { setCostRange } from '../catalog/domain/set-cost'
@@ -187,8 +188,8 @@ export class CatalogAdminService {
         /** Giá và trạng thái mà chi nhánh này thật sự bán */
         effectivePrice: override?.price ?? d.basePrice,
         effectiveActive: override?.active ?? d.active,
-        /** Cùng thứ tự ưu tiên với thực đơn online mà khách nhìn thấy */
-        effectiveOnlineVisible: override?.onlineVisible ?? d.onlineVisible,
+        /** Cùng hàm với thực đơn O2 và cửa nhận đơn web: Office thấy bật là khách đặt được */
+        effectiveOnlineVisible: onlineVisibleOf(d, override),
         // Cùng hàm với thực đơn O2 và đơn web: giá khách thấy cũng là giá khách trả
         effectiveOnlinePrice: priceOf(d, override, 'web'),
       }
@@ -860,7 +861,7 @@ export class CatalogAdminService {
         nameVi: set.nameVi,
         active: override?.active ?? set.active,
         priceVnd: price,
-        onlineVisible: override?.onlineVisible ?? set.onlineVisible,
+        onlineVisible: onlineVisibleOf(set, override),
         tableOrderable: set.tableOrderable,
         branchOverride: override ? { price: override.price, active: override.active } : null,
         courses: range.courses,

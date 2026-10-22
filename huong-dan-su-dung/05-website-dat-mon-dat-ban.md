@@ -58,6 +58,8 @@ Những chặn khách sẽ gặp (đều là hành vi đúng):
   vỡ công suất bếp giờ cao điểm.
 - Món `Tạm hết` không đặt được; món "ngon nhất trong 30 phút" có dòng nhắc chọn
   khung giờ gần.
+- **"Món chỉ phục vụ tại quán: …"**: món chi nhánh vừa tắt bán online (O11) mà
+  còn nằm trong giỏ cũ — bỏ món đó khỏi giỏ rồi đặt lại.
 
 Khuyến mãi (soạn ở Office **B11**, chạy chung với iPad tại bàn và quầy): món đang
 được giảm hiện giá giảm màu cam, giá gốc gạch ngang và nhãn chương trình ("Giờ

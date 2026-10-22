@@ -898,3 +898,94 @@ describe('8. Giá kênh online — thực đơn và đơn web cùng một giá (
     expect(order.moneySub).toBe(2 * price)
   })
 })
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Thực đơn online hiện món nào thì đơn web đặt được đúng món đó.
+ *
+ * Cờ "bán online" của chi nhánh (O11) đè cờ cấp chuỗi cả hai chiều. Trước đây O2
+ * đọc ghi đè còn cửa nhận đơn chỉ đọc cờ chuỗi: món chi nhánh bật riêng thì web
+ * hiện mà đặt bị từ chối, món chi nhánh tắt thì web ẩn mà giỏ cũ trong trình
+ * duyệt hay một lệnh gọi thẳng API vẫn đặt được.
+ */
+describe('9. Cờ bán online của chi nhánh — thực đơn và cửa nhận đơn cùng một kết luận (O2 · O6 · O11 · O12)', () => {
+  /** Cờ cấp chuỗi và ghi đè của chi nhánh; `null` = chi nhánh theo cấp chuỗi */
+  async function setOnlineFlags(dishId: string, chain: boolean, branch: boolean | null) {
+    await db.update(dishes).set({ onlineVisible: chain }).where(eq(dishes.id, dishId))
+    await db
+      .insert(dishBranchOverrides)
+      .values({ dishId, branchId: fx.branchId, onlineVisible: branch })
+      .onConflictDoUpdate({
+        target: [dishBranchOverrides.dishId, dishBranchOverrides.branchId],
+        set: { onlineVisible: branch },
+      })
+  }
+
+  /** Thực đơn web có món này không, và đặt đúng món đó thì máy chủ trả gì */
+  async function menuAndOrder(dishId: string) {
+    const menu = await inject({ method: 'GET', url: `/api/online/menu?branch=${fx.branchId}` })
+    return {
+      onMenu: menu.json<{ dishes: { id: string }[] }>().dishes.some((d) => d.id === dishId),
+      order: await placeTakeaway([{ dishId, qty: 1 }]),
+    }
+  }
+
+  afterAll(async () => {
+    for (const dishId of ['sodiep', 'miso', 'kemtra']) await setOnlineFlags(dishId, true, null)
+  })
+
+  it('chi nhánh bật riêng món mà chuỗi đang tắt: thực đơn hiện, đơn web nhận', async () => {
+    await setOnlineFlags('sodiep', false, true)
+    const { onMenu, order } = await menuAndOrder('sodiep')
+    expect(onMenu).toBe(true)
+    expect(order.statusCode, order.payload).toBe(201)
+  })
+
+  it('chi nhánh tắt món mà chuỗi đang bật: thực đơn ẩn, đơn web bị từ chối kèm tên món', async () => {
+    await setOnlineFlags('miso', true, false)
+    const { onMenu, order } = await menuAndOrder('miso')
+    expect(onMenu).toBe(false)
+    expect(order.statusCode).toBe(400)
+    expect(order.json<{ code: string; message: string }>()).toMatchObject({
+      code: 'not_online_sellable',
+      message: expect.stringContaining('Canh miso'),
+    })
+  })
+
+  /**
+   * Nhân viên nhập đơn Grab theo đơn sàn ĐÃ nhận: món nằm trên thực đơn của sàn,
+   * khách trả tiền bên sàn, shipper đang tới. Cờ O11 là thực đơn của web — chặn ở
+   * đây không huỷ được đơn nào, chỉ đẩy nó ra giấy, như giờ nhận đơn ở mục 6.
+   */
+  it('đơn kênh ngoài nhập tay không bị cờ bán online chặn, ở cấp chi nhánh lẫn cấp chuỗi', async () => {
+    await setOnlineFlags('miso', true, false)
+    await setOnlineFlags('kemtra', false, null)
+    const lines = [
+      { dishId: 'miso', qty: 1 },
+      { dishId: 'kemtra', qty: 2 },
+    ]
+
+    const grab = await inject({
+      method: 'POST',
+      url: '/api/orders/external',
+      headers: staffAuth(),
+      payload: {
+        branchId: fx.branchId,
+        channel: 'grab',
+        type: 'delivery',
+        externalCode: 'GR-9001',
+        customer: {},
+        lines,
+      },
+    })
+    expect(grab.statusCode, grab.payload).toBe(201)
+
+    // Cùng hai món đó, khách web thì bị từ chối — và được nói tên cả hai
+    const web = await placeTakeaway(lines)
+    expect(web.statusCode).toBe(400)
+    const message = web.json<{ message: string }>().message
+    expect(message).toContain('Canh miso')
+    expect(message).toContain('Kem trà xanh')
+  })
+})
