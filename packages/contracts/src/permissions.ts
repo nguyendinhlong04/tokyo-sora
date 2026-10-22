@@ -407,6 +407,11 @@ export const ACTIONS = {
     grants: { R11: A, R10: A },
     note: 'Người đại diện chuỗi. Nhân sự (R13) soạn và trình quyết định nhân sự, không tự ký',
   },
+  'task.assign': {
+    label: 'Giao việc, nghiệm thu, việc định kỳ & SOP (trong phạm vi)',
+    grants: { R5: A, R6: A, R7: A, R8: A, R9: A, R11: A, R12: A, R13: A, R10: A },
+    note: 'Giao cho ai do sơ đồ quyết: người trong cây con mình làm trưởng. Nhận việc, tích checklist, nộp việc thì mọi người làm qua khoá "của mình"',
+  },
 } as const satisfies Record<string, ActionDef>
 
 export type ActionKey = keyof typeof ACTIONS

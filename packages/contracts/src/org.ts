@@ -259,6 +259,9 @@ export interface SignerOption {
  */
 export interface InboxCounts {
   documents: { unread: number; toAck: number; toSign: number }
+  tasks: { open: number; overdue: number; toReview: number }
+  /** Chỉ có với người xử lý khiếu nại (`feedback.respond`) */
+  feedback?: { assigned: number; overdue: number }
 }
 
 export interface MyOrgProfile {

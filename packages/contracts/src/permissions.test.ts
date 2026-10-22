@@ -121,6 +121,7 @@ const ORG_ROWS: [ActionKey, string][] = [
   ['doc.compose', '....xxxxxxxxx'],
   ['doc.sign-notice', '......x..x.xx'],
   ['doc.sign-decision', '.........x..x'],
+  ['task.assign', '....xxxxxxxxx'],
 ]
 
 const SYMBOL: Record<string, Permission> = { '.': 'deny', x: 'allow', a: 'approve' }
@@ -189,6 +190,13 @@ describe('Ma trận khớp 1:1 với bảng §4.2c — Tổ chức & điều hà
     // Nhân sự soạn và trình quyết định bổ nhiệm, nhưng không tự ký
     expect(can('doc.compose', ['R13'])).toBe(true)
     expect(isPermitted('doc.sign-decision', ['R13'])).toBe(false)
+  })
+
+  it('nhân viên tuyến đầu không giao việc cho ai — nhận việc và nộp việc qua khoá "của tôi"', () => {
+    for (const role of ['R1', 'R2', 'R3', 'R4'] as Role[]) {
+      expect(isPermitted('task.assign', [role]), role).toBe(false)
+    }
+    expect(can('task.assign', ['R7'])).toBe(true)
   })
 
   it('marketing và điều phối có cửa "của tôi" — nhận việc, đọc văn bản như mọi người', () => {
@@ -342,6 +350,7 @@ describe('Bất biến của mô hình quyền', () => {
       'customer.view-book',
       'org.view',
       'doc.compose',
+      'task.assign',
     ])
     // Không một đồng nào, không một dòng tồn kho nào đi qua tay marketing
     expect(isPermitted('bill.discount-upto-10', ['R9'])).toBe(false)

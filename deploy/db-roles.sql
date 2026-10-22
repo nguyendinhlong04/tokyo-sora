@@ -44,6 +44,8 @@ FROM sora_app;
 REVOKE DELETE ON position_assignments FROM sora_app;
 -- Biên nhận văn bản (đã đọc / đã xác nhận) là bằng chứng phổ biến quy định
 REVOKE DELETE ON org_document_receipts FROM sora_app;
+-- Việc không giao nữa thì HUỶ kèm lý do; việc đã đóng là hồ sơ của KPI (trigger 9009)
+REVOKE DELETE ON tasks, task_check_items FROM sora_app;
 
 -- outbox_events: được đánh dấu đã phát và dọn retention, nội dung bất biến do
 -- trigger sora_outbox_guard canh.

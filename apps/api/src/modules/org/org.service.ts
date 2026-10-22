@@ -56,7 +56,7 @@ import {
  * Sơ đồ tổ chức dùng một múi giờ: mọi chi nhánh hiện ở Việt Nam, và "hôm nay ai
  * giữ chức gì" phải là MỘT câu trả lời cho cả chuỗi chứ không đổi theo chi nhánh.
  */
-const ORG_TZ = 'Asia/Ho_Chi_Minh'
+export const ORG_TZ = 'Asia/Ho_Chi_Minh'
 export const todayVN = () => businessDateOf(new Date(), ORG_TZ)
 
 export interface UnitInput {

@@ -184,8 +184,11 @@ Ma trận chỉ nói vai trò nào được đụng tới việc đó. Được 
 | Soạn văn bản nội bộ (thông báo, quyết định, quy định) | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Ký ban hành thông báo | – | – | – | ✓ | – | – | ✓ | – | ✓ | ✓ |
 | Ký ban hành quyết định, quy định | – | – | – | – | – | – | ✓ | – | – | ✓ |
+| Giao việc, nghiệm thu, việc định kỳ & SOP (trong phạm vi) | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 R1–R4 không mở Office: chức danh và cấp trên của họ hiện ở Kênh nhân viên. Không ai tự gán chức danh cho chính mình.
+
+**Việc**: giao tay luôn giao cho một NGƯỜI trong phạm vi (mỗi người nhận một việc riêng); việc định kỳ (SOP mở/đóng ca, vệ sinh ATTP) giao cho một CHỨC DANH — ai giữ ghế và đứng ca **đã công bố** đúng ngày thì thấy, checklist dùng chung, mỗi mục ghi người tích. Nộp → nghiệm thu đạt hoặc trả lại kèm lý do; còn mục chưa tích thì phải ghi lý do mới nộp được. Không ai tự giao việc cho mình hay tự nghiệm thu việc mình nộp; việc đã quá hạn không dời hạn được. Nhân viên tuyến đầu nhận, tích, nộp trên Kênh nhân viên; trưởng ca được chỉ định làm ghế nghiệm thu thì nghiệm thu ngay trên điện thoại — ngoại lệ có chủ ý, không đụng tiền. Phạm vi giao việc: R10 · R11 toàn chuỗi; R13 KHÔNG giao việc vận hành hộ quản lý chi nhánh.
 
 **Văn bản** đi theo luồng ký: nháp → trình (chọn người ký) → người ký **nhập PIN của chính mình** → ban hành, có số hiệu `TB|QD|QYD-yyMM-NNNN` → thu hồi kèm lý do. Từ lúc trình, nội dung bị khoá ở tầng CSDL; người ký trả lại thì về nháp. Người ký chỉ ký được văn bản mà mọi người nhận nằm trong phạm vi của mình. Quyết định **bổ nhiệm / điều chuyển / miễn nhiệm** đổi sơ đồ ngay lúc ký và **không thu hồi được** — sai thì ban hành quyết định khác; người có tên trong quyết định không ký chính quyết định đó. Danh sách người nhận chụp lại lúc ký (không gồm người soạn và người ký); quy định còn hiệu lực tự đến tay người mới vào làm.
 

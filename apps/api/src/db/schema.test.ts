@@ -685,3 +685,90 @@ describe('Văn bản — đóng băng từ lúc trình ký, biên nhận ghi m�
     await expect(db.exec(`DELETE FROM org_document_receipts`)).rejects.toThrow(/không xoá được/)
   })
 })
+
+describe('Việc — không tự nghiệm thu, việc đã đóng là hồ sơ, checklist chốt khi nộp', () => {
+  const hoa = `(SELECT id FROM staff WHERE code = 'NV01')`
+  const minh = `(SELECT id FROM staff WHERE code = 'NV09')`
+  const task = (title: string) => `(SELECT id FROM tasks WHERE title = '${title}')`
+
+  it('không giao cho chính người làm nghiệm thu', async () => {
+    await expect(
+      db.exec(`
+        INSERT INTO tasks (title, assignee_staff_id, reviewer_staff_id, due_at)
+          VALUES ('Tự nghiệm thu', ${minh}, ${minh}, now() + interval '1 day')
+      `),
+    ).rejects.toThrow(/tasks_review_not_self/)
+  })
+
+  it('mỗi mẫu một việc mỗi ngày — sinh lại là trùng khoá, không ra việc thứ hai', async () => {
+    const position = `(SELECT id FROM positions ORDER BY id LIMIT 1)`
+    await db.exec(`
+      INSERT INTO task_templates (title, checklist, assignee_position_id, recurrence, due_minute,
+                                  starts_on, created_by)
+        VALUES ('Kiểm kho', '{"Đếm","Ghi sổ"}', ${position}, 'hang-ngay', 660, '2026-10-01', ${hoa})
+    `)
+    const insert = `
+      INSERT INTO tasks (title, assignee_position_id, due_at, template_id, occurrence_date)
+        SELECT 'Kiểm kho', ${position}, now(), id, '2026-10-22' FROM task_templates
+         WHERE title = 'Kiểm kho'`
+    await db.exec(insert)
+    await expect(db.exec(insert)).rejects.toThrow(/tasks_one_per_occurrence/)
+    await expect(
+      db.exec(`
+        INSERT INTO task_templates (title, assignee_position_id, recurrence, starts_on, created_by)
+          VALUES ('Theo ca thiếu ca', ${position}, 'theo-ca', '2026-10-01', ${hoa})
+      `),
+    ).rejects.toThrow(/task_templates_shape_check/)
+  })
+
+  it('checklist tích được khi đang làm; nộp xong thì chốt, việc xong thì không sửa, không xoá', async () => {
+    await db.exec(`
+      INSERT INTO tasks (title, assignee_staff_id, reviewer_staff_id, due_at, created_by)
+        VALUES ('Lau quạt hút', ${minh}, ${hoa}, now() + interval '1 day', ${hoa});
+      INSERT INTO task_check_items (task_id, idx, label)
+        VALUES (${task('Lau quạt hút')}, 0, 'Tháo lưới lọc');
+    `)
+    await db.exec(`
+      UPDATE task_check_items SET checked_by = ${minh}, checked_at = now()
+       WHERE task_id = ${task('Lau quạt hút')}
+    `)
+    await db.exec(`
+      UPDATE tasks SET state = 'submitted', submitted_by = ${minh}, submitted_at = now()
+       WHERE title = 'Lau quạt hút'
+    `)
+    await expect(
+      db.exec(`UPDATE task_check_items SET checked_by = NULL, checked_at = NULL`),
+    ).rejects.toThrow(/checklist đã chốt/)
+    // Người nộp không tự bấm "Đạt"
+    await expect(
+      db.exec(`
+        UPDATE tasks SET state = 'done', reviewed_by = ${minh}, reviewed_at = now(),
+                         done_by = ${minh}, done_at = now()
+         WHERE title = 'Lau quạt hút'
+      `),
+    ).rejects.toThrow(/tasks_review_not_self/)
+    await db.exec(`
+      UPDATE tasks SET state = 'done', reviewed_by = ${hoa}, reviewed_at = now(),
+                       done_by = ${minh}, done_at = now()
+       WHERE title = 'Lau quạt hút'
+    `)
+    await expect(
+      db.exec(`UPDATE tasks SET due_at = now() + interval '7 days' WHERE title = 'Lau quạt hút'`),
+    ).rejects.toThrow(/đã đóng/)
+    await expect(db.exec(`DELETE FROM tasks WHERE title = 'Lau quạt hút'`)).rejects.toThrow(
+      /không xoá được/,
+    )
+  })
+
+  it('huỷ phải ghi người huỷ và lý do', async () => {
+    await db.exec(`
+      INSERT INTO tasks (title, assignee_staff_id, due_at, created_by)
+        VALUES ('Dán nhãn kệ', ${minh}, now() + interval '1 day', ${hoa})
+    `)
+    await expect(
+      db.exec(
+        `UPDATE tasks SET state = 'cancelled', cancelled_at = now() WHERE title = 'Dán nhãn kệ'`,
+      ),
+    ).rejects.toThrow(/tasks_cancel_check/)
+  })
+})

@@ -418,3 +418,169 @@ export const STANDARD_BRANCH_UNITS: StandardUnit[] = [
     ],
   },
 ]
+
+// ------------------------------------------------------------------ SOP theo ca
+
+/** Chức danh trong chi nhánh: `unit` = tên bộ phận (Sảnh, Bếp, Kho), null = chính chi nhánh */
+export interface StandardSeat {
+  unit: string | null
+  title: string
+}
+
+/**
+ * Một quy trình chuẩn (SOP) thành việc định kỳ của chi nhánh.
+ *
+ * `shift`: gắn vào ca mở cửa (ca bắt đầu sớm nhất) hay ca đóng cửa (kết thúc muộn
+ * nhất) trong các ca mẫu H2 của chi nhánh — mở ca hạn 45 phút sau giờ vào ca, đóng
+ * ca hạn đúng giờ kết ca. Chi nhánh chưa có ca mẫu thì thành việc hằng ngày, hạn
+ * `dueMinute`; tạo ca mẫu xong sửa lại mẫu việc để gắn theo ca.
+ */
+export interface StandardSop {
+  title: string
+  assignee: StandardSeat
+  reviewer: StandardSeat | null
+  recurrence: 'theo-ca' | 'hang-ngay' | 'hang-tuan' | 'hang-thang'
+  shift?: 'mo-cua' | 'dong-cua'
+  /** Phút kể từ 00:00 — hạn khi không theo ca */
+  dueMinute: number
+  weekday?: number
+  monthDay?: number
+  priority: 'thuong' | 'gap'
+  checklist: string[]
+}
+
+/** Mở ca theo ca mẫu: hạn sau giờ vào ca chừng này phút */
+export const SOP_OPENING_GRACE_MINUTES = 45
+
+const FLOOR_LEAD: StandardSeat = { unit: 'Sảnh', title: 'Quản lý ca' }
+const HEAD_CHEF: StandardSeat = { unit: 'Bếp', title: 'Bếp trưởng' }
+
+export const STANDARD_SOPS: StandardSop[] = [
+  {
+    title: 'Mở ca – Sảnh',
+    assignee: { unit: 'Sảnh', title: 'Phục vụ' },
+    reviewer: FLOOR_LEAD,
+    recurrence: 'theo-ca',
+    shift: 'mo-cua',
+    dueMinute: 10 * 60 + 30,
+    priority: 'gap',
+    checklist: [
+      'Bật đèn, điều hoà, nhạc nền theo giờ mở cửa',
+      'Lau bàn ghế; kiểm tra vỉ nướng, kẹp gắp từng bàn',
+      'Bổ sung khăn giấy, nước chấm, đũa muỗng ở trạm phục vụ',
+      'Máy POS, máy in, Wi-Fi hoạt động',
+      'Bình chữa cháy đúng chỗ, lối thoát hiểm thông thoáng',
+      'Đồng phục, bảng tên, vệ sinh cá nhân đạt chuẩn',
+    ],
+  },
+  {
+    title: 'Mở ca – Bếp',
+    assignee: { unit: 'Bếp', title: 'Bếp phó' },
+    reviewer: HEAD_CHEF,
+    recurrence: 'theo-ca',
+    shift: 'mo-cua',
+    dueMinute: 10 * 60,
+    priority: 'gap',
+    checklist: [
+      'Tủ mát, tủ đông chạy bình thường, cửa đóng kín',
+      'Gas, bếp, hút khói hoạt động; than đủ cho ca',
+      'Hàng sơ chế ca trước có nhãn ngày, còn hạn',
+      'Sơ chế đủ định mức mở cửa cho từng trạm',
+      'Màn bếp các trạm đã bật',
+      'Tạp dề, mũ, găng tay; rửa tay đúng quy trình',
+    ],
+  },
+  {
+    title: 'Đóng ca – Sảnh',
+    assignee: { unit: 'Sảnh', title: 'Phục vụ' },
+    reviewer: FLOOR_LEAD,
+    recurrence: 'theo-ca',
+    shift: 'dong-cua',
+    dueMinute: 23 * 60 + 30,
+    priority: 'thuong',
+    checklist: [
+      'Dọn, lau sạch bàn ghế; vỉ nướng đem ngâm rửa',
+      'Than tàn đổ vào thùng kim loại có nắp, tưới tắt hẳn',
+      'Tắt điều hoà, đèn, nhạc; đóng cửa sổ',
+      'Không còn khách; đồ khách bỏ quên ghi sổ',
+      'Tắt máy POS, cắm sạc máy tính bảng',
+    ],
+  },
+  {
+    title: 'Đóng ca – Bếp (gas, điện, nước, khoá)',
+    assignee: { unit: 'Bếp', title: 'Bếp phó' },
+    reviewer: HEAD_CHEF,
+    recurrence: 'theo-ca',
+    shift: 'dong-cua',
+    dueMinute: 23 * 60 + 30,
+    priority: 'gap',
+    checklist: [
+      'Khoá van gas tổng và van từng bếp',
+      'Tắt bếp, lò, hút khói; ngắt điện thiết bị không chạy qua đêm',
+      'Khoá vòi nước, không rò rỉ',
+      'Nguyên liệu thừa bọc kín, dán nhãn ngày, cất tủ',
+      'Đổ rác đã phân loại; khoá cửa kho và cửa sau',
+    ],
+  },
+  {
+    title: 'Vệ sinh an toàn thực phẩm cuối ngày',
+    assignee: { unit: 'Bếp', title: 'Phụ bếp và rửa' },
+    reviewer: HEAD_CHEF,
+    recurrence: 'theo-ca',
+    shift: 'dong-cua',
+    dueMinute: 23 * 60 + 30,
+    priority: 'thuong',
+    checklist: [
+      'Rửa, khử trùng thớt và dao theo màu sống/chín',
+      'Cọ bề mặt sơ chế, bồn rửa, sàn bếp',
+      'Vệ sinh lưới lọc hút khói, máng mỡ',
+      'Lưu mẫu thức ăn đúng quy định, ghi sổ lưu mẫu',
+      'Kiểm tra bẫy côn trùng, chuột',
+    ],
+  },
+  {
+    title: 'Kiểm tra hạn dùng và nhãn nguyên liệu',
+    assignee: { unit: 'Kho', title: 'Thủ kho' },
+    reviewer: HEAD_CHEF,
+    recurrence: 'hang-ngay',
+    dueMinute: 11 * 60,
+    priority: 'thuong',
+    checklist: [
+      'Rà hạn dùng trong kho và tủ; nhập trước xuất trước',
+      'Nguyên liệu đã mở có nhãn ngày mở',
+      'Hàng sắp hết hạn báo bếp trưởng dùng trước',
+      'Hàng hết hạn, hỏng lập phiếu xuất huỷ',
+    ],
+  },
+  {
+    title: 'Tổng vệ sinh bếp',
+    assignee: { unit: 'Bếp', title: 'Bếp phó' },
+    reviewer: HEAD_CHEF,
+    recurrence: 'hang-tuan',
+    weekday: 1,
+    dueMinute: 16 * 60,
+    priority: 'thuong',
+    checklist: [
+      'Lau trần, tường, quạt hút khu bếp',
+      'Vệ sinh bên trong tủ mát, tủ đông',
+      'Cọ cống rãnh, bẫy mỡ',
+      'Vệ sinh kho khô, sắp lại kệ',
+    ],
+  },
+  {
+    title: 'Kiểm tra phòng cháy chữa cháy và tủ sơ cứu',
+    assignee: FLOOR_LEAD,
+    reviewer: { unit: null, title: 'Quản lý chi nhánh' },
+    recurrence: 'hang-thang',
+    monthDay: 1,
+    dueMinute: 16 * 60,
+    priority: 'gap',
+    checklist: [
+      'Bình chữa cháy còn áp, còn hạn kiểm định, đúng vị trí',
+      'Đèn thoát hiểm, chuông báo cháy hoạt động',
+      'Lối thoát hiểm không bị chắn',
+      'Tủ sơ cứu đủ thuốc, băng gạc còn hạn',
+      'Số điện thoại khẩn cấp dán đúng chỗ',
+    ],
+  },
+]

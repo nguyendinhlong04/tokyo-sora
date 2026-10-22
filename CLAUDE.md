@@ -269,7 +269,9 @@ chuyển/ghép/tách, thiết bị bàn, yêu cầu từ bàn) · catalog · kit
 reservations · site · admin · inventory · expenses · hr · accounting · crm · reports ·
 org (sơ đồ tổ chức — `OrgService.snapshot()` + hàm thuần `domain/org.ts` trả lời "ai quản
 ai" cho mọi module: `scopeOf`, `inScope`, `managersOf`; văn bản nội bộ `DocumentsService`:
-trình → ký bằng PIN người ký → ban hành, quyết định nhân sự áp vào sơ đồ cùng transaction) ·
+trình → ký bằng PIN người ký → ban hành, quyết định nhân sự áp vào sơ đồ cùng transaction;
+giao việc + SOP theo ca `TasksService` — việc định kỳ **sinh lười** lúc có người đọc, không
+cron) ·
 inbox (`GET /api/me/inbox` — chỉ **đếm** việc cần xử lý của người đang đăng nhập; module
 riêng để các module nghiệp vụ không import lẫn nhau).
 
@@ -304,7 +306,7 @@ thoại bàn** cookie `sora_table` (`table_devices.state='admitted'`, phiên ch�
 | kds | kiosk | bridge`); (4) 401 trừ `@Public`. Route khách chạm được **phải** gọi
 `assertOwnTableSession(actor, sessionId)`.
 
-Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 63 action
+Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 64 action
 `domain.verb`, mỗi ô `allow | approve | deny`. `PermissionGuard` chỉ chặn `deny`; ô
 `approve` (△) thì service phải `ApprovalService.authorize(tx, …)` với body
 `approval: {approverStaffId, approverPin, reason}` — người duyệt phải khác người làm
@@ -337,10 +339,14 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   `pending → draft | issued` và `issued → revoked`, nội dung khoá từ lúc trình, không xoá
   văn bản đã trình. `org_document_receipts` = ai nhận, mốc đọc/xác nhận ghi **đúng một lần**,
   không xoá. Số hiệu cấp lúc ký qua `org_document_counters` (UPSERT…RETURNING).
+- **Việc** `tasks` (trigger `9009`): việc `done`/`cancelled` là hồ sơ — không sửa, không xoá
+  (KPI "việc đúng hạn" đếm trên đó); checklist chỉ tích khi việc `open`. Việc định kỳ sinh
+  bằng `INSERT … ON CONFLICT DO NOTHING` trên `tasks_one_per_occurrence` (mẫu, ngày). Không ai
+  tự nghiệm thu: CHECK `tasks_review_not_self`.
 - **Migration:** `db:generate` sinh `migrations/00NN_*.sql`; SQL viết tay đánh số từ
   `9000_` để luôn chạy sau cùng (`9000_guards`, `9001_kitchen_money_guard`,
   `9002_realtime_broadcast`, `9003_realtime_rls`, `9004_stock_moves_guard`, …,
-  `9007_org_guards`, `9008_document_guards`). Runner
+  `9007_org_guards`, `9008_document_guards`, `9009_task_guards`). Runner
   riêng `src/db/migrate.ts` chạy mọi file một lần theo tên, ghi `_sora_migrations`.
   **Không có down**; file đã chạy thì sửa không có tác dụng → luôn thêm file mới.
   Vercel build **không** chạy migration — chạy tay trước khi deploy API.
@@ -394,8 +400,10 @@ không thì chủ bàn duyệt) → cookie `sora_table`. Luồng này **sắp th
   `GET /api/realtime/events?after=<seq>` — quy tắc client "**refetch rồi mới stream**".
 - **Nghe: chưa app nào.** Không có `supabase-js`, không gọi `/api/realtime/*`. Tất cả
   đang **polling** TanStack Query: KDS 5 s · POS 10–30 s · Table 1–20 s · Web 10 s ·
-  hộp việc `/api/me/inbox` (chuông Office, huy hiệu Kênh NV) 60 s. Comment trong `apps/kitchen/src/App.tsx`, `apps/pos/src/App.tsx`, `Floorplan.tsx` nói
-  realtime là đường chính — **sai**, đừng tin.
+  hộp việc `/api/me/inbox` (chuông Office, huy hiệu Kênh NV) 60 s — lần hỏi này cũng là
+  điểm sinh việc định kỳ và đồng bộ nhãn chức danh H1. Comment trong
+  `apps/kitchen/src/App.tsx`, `apps/pos/src/App.tsx`, `Floorplan.tsx` nói realtime là đường
+  chính — **sai**, đừng tin.
 - **Ghi offline:** `enqueue` của `@sora/core` (Dexie `sora-outbox`, FIFO, header
   `idempotency-key`); server `IdempotencyInterceptor` so hash body (khác → 409
   `idempotency_key_reused`). Chỉ đơn và trạng thái; **không** cache kết quả đọc.
