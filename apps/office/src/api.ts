@@ -1,4 +1,21 @@
-import type { AssignmentKind, OrgAssignmentRow, OrgChart, OrgUnitKind, Role } from '@sora/contracts'
+import type {
+  AssignmentKind,
+  DecisionType,
+  DocAttachment,
+  DocKind,
+  DocTarget,
+  DocumentDetail,
+  DocumentRow,
+  InboxCounts,
+  MyDocument,
+  MyDocumentDetail,
+  OrgAssignmentRow,
+  OrgChart,
+  OrgUnitKind,
+  PersonnelChange,
+  Role,
+  SignerOption,
+} from '@sora/contracts'
 import { apiFetch } from '@sora/core'
 
 export interface OfficeStaff {
@@ -3203,6 +3220,81 @@ export const api = {
       method: 'POST',
       body: { target },
     }),
+
+  // ---- N4 Văn bản & thông báo · hộp "Việc cần xử lý"
+
+  inbox: () => apiFetch<InboxCounts>('/api/me/inbox'),
+
+  documents: (filter: { state?: string; kind?: string; q?: string } = {}) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(filter)) if (value) params.set(key, value)
+    const query = params.toString()
+    return apiFetch<DocumentRow[]>(`/api/org/documents${query ? `?${query}` : ''}`)
+  },
+
+  document: (id: number) => apiFetch<DocumentDetail>(`/api/org/documents/${id}`),
+
+  createDocument: (input: DocumentInput) =>
+    apiFetch<{ id: number }>('/api/org/documents', { method: 'POST', body: input }),
+
+  updateDocument: (id: number, input: DocumentInput) =>
+    apiFetch<{ id: number }>(`/api/org/documents/${id}`, { method: 'PUT', body: input }),
+
+  deleteDocument: (id: number) =>
+    apiFetch<{ id: number }>(`/api/org/documents/${id}`, { method: 'DELETE' }),
+
+  submitDocument: (id: number, signerId: number) =>
+    apiFetch<{ id: number }>(`/api/org/documents/${id}/submit`, {
+      method: 'POST',
+      body: { signerId },
+    }),
+
+  returnDocument: (id: number, note: string) =>
+    apiFetch<{ id: number }>(`/api/org/documents/${id}/return`, { method: 'POST', body: { note } }),
+
+  signDocument: (id: number, pin: string) =>
+    apiFetch<{ id: number; number: string; recipients: number }>(`/api/org/documents/${id}/sign`, {
+      method: 'POST',
+      body: { pin },
+    }),
+
+  revokeDocument: (id: number, reason: string) =>
+    apiFetch<{ id: number }>(`/api/org/documents/${id}/revoke`, {
+      method: 'POST',
+      body: { reason },
+    }),
+
+  documentSigners: (kind: DocKind) =>
+    apiFetch<SignerOption[]>(`/api/org/documents/signers?kind=${kind}`),
+
+  documentAudience: (targets: DocTarget[]) =>
+    apiFetch<{ count: number }>('/api/org/documents/audience-preview', {
+      method: 'POST',
+      body: { targets },
+    }),
+
+  myDocuments: () => apiFetch<MyDocument[]>('/api/org/me/documents'),
+
+  myDocument: (id: number) => apiFetch<MyDocumentDetail>(`/api/org/me/documents/${id}`),
+
+  markDocument: (id: number, ack: boolean) =>
+    apiFetch<{ readAt: string | null; ackedAt: string | null }>(
+      `/api/org/me/documents/${id}/receipt`,
+      { method: 'POST', body: { ack } },
+    ),
+}
+
+export interface DocumentInput {
+  kind: DocKind
+  decisionType: DecisionType | null
+  title: string
+  body: string
+  attachments: DocAttachment[]
+  targets: DocTarget[]
+  changes: PersonnelChange[] | null
+  requiresAck: boolean
+  effectiveFrom: string
+  effectiveTo: string | null
 }
 
 export interface OrgUnitInput {

@@ -13,6 +13,9 @@ nhân sự (R13), marketing (R9), bếp trưởng (R5), thủ kho (R6).
   chứa trang đang xem tự mở). Ô **"Lọc menu…"** gõ là trải phẳng kết quả — gõ
   "kho" hay "S5" đều ra. Menu chỉ hiện màn mà vai trò của bạn dùng được.
 - Route mặc định là **M1 · Món và set**.
+- **Chuông "Việc cần xử lý"** cạnh logo: số trên chuông là tổng việc đang chờ bạn
+  (văn bản chưa đọc, cần xác nhận, chờ bạn ký). Bấm để xem từng nhóm và đi thẳng tới
+  màn xử lý. Số tự cập nhật mỗi phút — chưa có thông báo đẩy.
 
 **Ba cách nói "chi nhánh nào"** — nhầm lẫn phổ biến nhất khi mới dùng:
 
@@ -104,7 +107,7 @@ flowchart LR
   kiểm, chủ duyệt và phát. Quản lý ca thấy *công* nhưng không bao giờ thấy
   *lương*.
 
-## 6.4b Tổ chức & điều hành (N2 · N3)
+## 6.4b Tổ chức & điều hành (N2 · N3 · N4)
 
 Sơ đồ tổ chức là trục của giao việc, văn bản, báo cáo và KPI: **cấp trên trực
 tiếp** của một người là người ngồi ghế **trưởng** của đơn vị gần nhất phía trên.
@@ -113,6 +116,7 @@ tiếp** của một người là người ngồi ghế **trưởng** của đơ
 |---|---|
 | **N2 · Sơ đồ tổ chức** | Cây đơn vị (công ty → khối/phòng → chi nhánh → bộ phận → tổ). Mỗi thẻ đơn vị liệt kê chức danh: người đang giữ, **thực có/định biên**, thanh than hồng (càng nóng càng thiếu người — đỏ là ghế trưởng trống). Bố cục **Dọc/Ngang**, thu phóng, **tìm người** (mở nhánh và đưa thẻ ra giữa), lọc chi nhánh, **In sơ đồ** (A3 ngang) |
 | **N3 · Chức danh & định biên** | Cùng dữ liệu dạng bảng: lọc "chỉ ghế còn trống", cột vai trò gợi ý báo người giữ ghế chưa có quyền ở A1 |
+| **N4 · Văn bản & thông báo** | Sổ thông báo, quyết định, quy định nội bộ. Tab **Gửi tôi · Chờ tôi ký · Tôi soạn · Tất cả**. Soạn, trình ký, ký bằng PIN, thu hồi; theo dõi ai đã đọc/xác nhận |
 
 **Bắt đầu nhanh — dựng theo mẫu chuẩn:** nút **Dựng khung chuỗi theo mẫu** tạo Ban
 điều hành, Khối văn phòng (Kế toán, Nhân sự, Marketing), Khối vận hành; dải
@@ -136,6 +140,47 @@ trước khi dùng làm căn cứ tuyển dụng.
   lương nào ở đây); chỉ R10 · R11 · R13 **sửa** được và thấy danh sách "chưa xếp vào
   sơ đồ". Phạm vi theo cây áp cho **thao tác** — giao việc, ký văn bản, chấm KPI —
   không áp cho việc xem. R1–R4 không mở Office.
+
+**Văn bản (N4) — soạn, trình, ký:**
+
+1. **Văn bản mới** → chọn loại: **Thông báo**, **Quyết định** (bổ nhiệm, điều
+   chuyển, miễn nhiệm, khen thưởng, kỷ luật, khác) hoặc **Quy định**. Nội dung là
+   chữ thường; tài liệu dài (PDF, ảnh) thì dán **đường dẫn https** ở mục Đính kèm.
+2. **Nơi nhận** ghép từ nhiều quy tắc: toàn chuỗi, chi nhánh, đơn vị (có hoặc không
+   gồm đơn vị con), chức danh, vai trò, từng người. Ô bên cạnh ước tính số người
+   nhận. Bật **Yêu cầu xác nhận đã đọc** cho nội quy, quy định ATTP — người nhận
+   phải bấm "Tôi đã đọc và hiểu".
+3. **Lưu nháp** bao nhiêu lần cũng được. Xong thì chọn **Trình người ký** → **Trình
+   ký**. Từ lúc trình, nội dung và nơi nhận **khoá lại** — người ký ký đúng thứ đã
+   đọc. Người ký **Trả lại người soạn** kèm lý do thì văn bản về nháp để sửa.
+4. Người ký bấm **Ký ban hành** và nhập **PIN của chính mình**. Văn bản nhận số
+   hiệu (`TB-…` thông báo · `QD-…` quyết định · `QYD-…` quy định) và tới tay người
+   nhận ngay trên Kênh nhân viên. Bạn tự có quyền ký thì nút **Ký ban hành** hiện
+   ngay ở màn soạn, không cần trình.
+5. Đã ban hành thì **không sửa**. Sai thì **Thu hồi văn bản…** kèm lý do (văn bản
+   rời hộp thư người nhận, sổ vẫn giữ) hoặc ban hành văn bản khác. **Chép link Kênh
+   nhân viên** để dán vào nhóm Zalo của quán.
+
+| Ai ký được | Thông báo | Quyết định, quy định |
+|---|---|---|
+| Quản lý ca (R7) | ✓ trong chi nhánh của mình | – |
+| Quản lý chuỗi (R11) · Chủ (R10) | ✓ | ✓ |
+| Quản lý nhân sự (R13) | ✓ | – |
+
+- **Quyết định bổ nhiệm / điều chuyển / miễn nhiệm** có thêm bảng _Thay đổi nhân
+  sự_ (ai, ghế nào, chính hay kiêm nhiệm). Ký xong là sơ đồ N2 và chức danh ở H1
+  **đổi ngay** theo ngày hiệu lực; người có tên trong quyết định tự nhận được quyết
+  định. Loại này **không thu hồi được** — sai thì ban hành quyết định khác. Người có
+  tên trong quyết định không ký được chính quyết định đó.
+- **PIN là chữ ký:** nhập sai nhiều lần liên tiếp thì bị khoá vài phút, như ở máy
+  POS. Chưa có PIN thì không có tên trong danh sách người ký.
+- **Người nhận chốt lúc ký**, không gồm người soạn và người ký. Riêng **quy định**
+  còn hiệu lực thì người vào làm sau vẫn nhận và phải xác nhận.
+- Bên phải màn chi tiết: **Đã đọc x/y · đã xác nhận x/y** và tên người chưa đọc
+  (chỉ người soạn, người ký, R10 · R11 · R13 thấy tên).
+- **Kỷ luật:** hệ thống chỉ lưu và phổ biến quyết định. Trình tự xử lý kỷ luật
+  (họp, biên bản, có mặt người lao động) làm theo luật, ngoài hệ thống. Không dùng
+  văn bản để phạt tiền hay trừ lương.
 
 ## 6.5 Chi phí & tài sản (C1–C5)
 

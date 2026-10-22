@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router'
 import { ConfigBranchProvider } from './components/config-branch'
+import { InboxBell } from './components/InboxBell'
 import { PublishConfig } from './components/publish-config'
 import { ReportBranchProvider } from './components/report'
 import { Debts, InvoiceBook, PeriodClose, RevenueJournal, TaxReport } from './routes/Accounting'
@@ -65,6 +66,10 @@ import { SessionProvider, useSession } from './session-context'
  */
 const OrgChart = lazy(() => import('./routes/OrgChart').then((m) => ({ default: m.OrgChart })))
 const Positions = lazy(() => import('./routes/Positions').then((m) => ({ default: m.Positions })))
+const Documents = lazy(() => import('./routes/Documents').then((m) => ({ default: m.Documents })))
+const DocumentPage = lazy(() =>
+  import('./routes/DocumentPage').then((m) => ({ default: m.DocumentPage })),
+)
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5_000, refetchOnWindowFocus: true } },
@@ -132,6 +137,7 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
     items: [
       { to: '/so-do-to-chuc', label: 'N2 · Sơ đồ tổ chức', need: 'org.view' },
       { to: '/chuc-danh', label: 'N3 · Chức danh & định biên', need: 'org.view' },
+      { to: '/van-ban', label: 'N4 · Văn bản & thông báo', need: 'doc.compose' },
     ],
   },
   {
@@ -271,6 +277,9 @@ export function App() {
                 <Route path="/ky-luong" element={<Payroll />} />
                 <Route path="/so-do-to-chuc" element={<OrgChart />} />
                 <Route path="/chuc-danh" element={<Positions />} />
+                <Route path="/van-ban" element={<Documents />} />
+                <Route path="/van-ban/moi" element={<DocumentPage />} />
+                <Route path="/van-ban/:id" element={<DocumentPage />} />
                 <Route path="/chi-phi-tong-quan" element={<ExpenseOverview />} />
                 <Route path="/chi-phi" element={<Expenses />} />
                 <Route path="/dinh-ky" element={<RecurringExpenses />} />
@@ -358,13 +367,14 @@ function Shell() {
   return (
     <div className="flex h-dvh overflow-hidden bg-canvas font-sans text-ink-body print:h-auto print:overflow-visible">
       <aside className="flex w-64 flex-none flex-col border-r border-line-1 bg-surface-1 print:hidden">
-        <div className="flex-none border-b border-line-1 px-5 py-4">
+        <div className="flex flex-none items-center justify-between gap-2 border-b border-line-1 px-5 py-4">
           <div className="flex items-baseline gap-2">
             <span className="font-jp text-[length:var(--fs-b2)] text-accent">東京空</span>
             <span className="text-[length:var(--fs-c1)] font-semibold tracking-[0.16em] text-ink-hi">
               TOKYO SORA
             </span>
           </div>
+          <InboxBell />
         </div>
 
         <div className="flex-none border-b border-line-1 px-5 py-3.5">

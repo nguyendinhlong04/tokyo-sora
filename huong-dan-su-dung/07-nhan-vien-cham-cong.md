@@ -1,8 +1,8 @@
 # 7 · Kênh nhân viên & kiosk chấm công
 
 Hai bề mặt dành cho **mọi nhân viên** (phục vụ, bếp, thu ngân…): xem lịch —
-công — phiếu lương của chính mình trên điện thoại, và chấm công vào/ra ca tại
-quán. Chúng là hai app tách biệt vì hai vùng tin cậy khác nhau: điện thoại cá
+công — phiếu lương — thông báo của chính mình trên điện thoại, và chấm công
+vào/ra ca tại quán. Chúng là hai app tách biệt vì hai vùng tin cậy khác nhau: điện thoại cá
 nhân mang đi khắp nơi, kiosk gắn cứng ở chi nhánh.
 
 ## 7.1 Kênh nhân viên (`nv.tokyosora.vn`)
@@ -30,7 +30,11 @@ qua Zalo.
 Nếu thấy *"Link không còn hiệu lực. Xin quản lý cấp lại."* — có link mới được
 cấp, xin lại là xong.
 
-### Hai màn duy nhất
+### Thanh tab ở đáy màn
+
+Ba tab trong tầm ngón cái: **Lịch** (mở đầu) · **Thông báo** · **Lương**. Chấm số
+trên tab Thông báo là số văn bản chưa đọc — tự cập nhật mỗi phút khi app đang mở;
+chưa có thông báo đẩy, nên quán vẫn dán link văn bản vào nhóm Zalo.
 
 **Lịch & công (H8):**
 
@@ -54,6 +58,18 @@ cấp, xin lại là xong.
 tạm ứng) → **Thực lãnh**. Phiếu chỉ hiện **sau khi kỳ lương được duyệt**. Màn
 hoàn toàn chỉ đọc — *"Thấy số chưa đúng thì nhắn quản lý nhân sự — kỳ đã chốt
 không sửa ngược, sai sẽ được cộng/trừ ở kỳ sau."*
+
+**Thông báo (N13):** thông báo, quyết định, quy định đã ký ban hành gửi tới bạn.
+
+- Văn bản **Cần bạn xác nhận** (nội quy, quy định ATTP…) nằm trên cùng, gắn nhãn
+  _Cần xác nhận_. Chưa đọc thì tiêu đề in đậm, có chấm vàng.
+- Mở văn bản là đã ghi **đã đọc**. Văn bản cần xác nhận có nút **Tôi đã đọc và
+  hiểu** dính đáy màn — bấm một lần, hiện _"Đã xác nhận {ngày}"_. Đó là bằng chứng
+  quán đã phổ biến cho bạn, không bấm lại hay huỷ được.
+- Tài liệu đính kèm mở bằng link (tab mới). Văn bản bị thu hồi tự biến khỏi danh
+  sách.
+- Quyết định bổ nhiệm/điều chuyển về chính bạn cũng tới đây; chức danh ở đầu màn
+  đổi theo ngày hiệu lực.
 
 ### Ranh giới phạm vi `self` (cố ý)
 

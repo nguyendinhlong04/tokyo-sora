@@ -48,7 +48,7 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
 | `apps/pos` | `@sora/pos` | Sora POS (PWA) | Phục vụ, thu ngân · tablet 11″ ngang + máy thu ngân 22″ → **sắp tới thêm iPad & điện thoại** | `:5174` | `pos.tokyo-sora.vn` |
 | `apps/kitchen` | `@sora/kitchen` | Sora Kitchen / KDS (PWA) | Bếp từng trạm, ra món · TV 32–43″ 1920×1080, Android box | `:5175` | `kds.tokyo-sora.vn` |
 | `apps/office` | `@sora/office` | Sora Office | Chủ, quản lý, kế toán, HR, marketing · desktop 1440+, **nền sáng** | `:5176` | `admin.tokyo-sora.vn` |
-| `apps/staff` | `@sora/staff` | Kênh nhân viên (H8 lịch/công · H9 phiếu lương) — **không phải app gọi món** | `:5178` | `nv.tokyo-sora.vn` |
+| `apps/staff` | `@sora/staff` | Kênh nhân viên (H8 lịch/công · H9 phiếu lương · N13 thông báo) — **không phải app gọi món** | `:5178` | `nv.tokyo-sora.vn` |
 | `apps/kiosk` | `@sora/kiosk` | Kiosk chấm công (H10) · tablet 10″ gắn cố định | `:5179` | `chamcong.tokyo-sora.vn` |
 
 Tên miền thật có gạch nối (`tokyo-sora.vn`). Nhiều tài liệu và `SITE_URL` mặc định
@@ -62,8 +62,9 @@ còn ghi `tokyosora.vn` — đó là chỗ lệch, không phải tên miền th�
   typecheck/build API và app. Import nội bộ trong gói bắt buộc có đuôi `.js`.
 - `core` — runtime trình duyệt cho các SPA: `apiFetch` (gắn `x-sora-device`,
   `idempotency-key`), `session` (localStorage `sora.device.token`), **outbox** Dexie/IndexedDB
-  gửi lại khi có mạng, `ember` (thang than hồng), `server-clock`. API không dùng gói này.
-- `ui` — 17 thành phần dùng chung + `useToast` (§4.6). Ship TS thô, không build.
+  gửi lại khi có mạng, `ember` (thang than hồng), `server-clock`, `safeHref` (chỉ cho link
+  `https:` do người dùng dán ra thẻ `<a>`). API không dùng gói này.
+- `ui` — 18 thành phần dùng chung + `useToast` (§4.6). Ship TS thô, không build.
 - `tokens` — `tokens.css` là **nguồn duy nhất** của màu, cỡ chữ, bo góc, chuyển động;
   `fonts.css` + `fonts/*.woff2` self-host, sinh bằng `scripts/fetch-fonts` (không sửa tay).
 - `config` — `tsconfig.base.json` (strict, `noUncheckedIndexedAccess`, bundler resolution).
@@ -215,7 +216,8 @@ mất mạng = dải báo + hàng đợi cục bộ, màn thanh toán bị chặ
 `EmptyState` · `ErrorState` · `Skeleton` · `Badge` · `Money` · `TableTile` (P2) ·
 `OrderTicket` (K2) · `MenuItemCard` (P4 — cố ý **không ảnh**) · `OutboxBanner` ·
 `QrCode` (entry riêng `@sora/ui/QrCode` để web không kéo Dexie) · `EmberBar` (thanh than
-hồng: độ dài = tỉ lệ, màu = độ "nóng"; nơi gọi luôn in chữ đi kèm).
+hồng: độ dài = tỉ lệ, màu = độ "nóng"; nơi gọi luôn in chữ đi kèm) · `CountBadge` (chấm
+đếm của chuông Office và thanh tab Kênh NV; màu trung tính, chỉ đỏ khi `urgent`).
 
 Quy tắc: mọi `<button>` có `type="button"`; variant là `Record<Union,string>` UPPER_CASE;
 không responsive prefix trong gói; app Vite **phải** có `@source '../../../packages/ui/src'`
@@ -391,8 +393,8 @@ không thì chủ bàn duyệt) → cookie `sora_table`. Luồng này **sắp th
   `availability.changed`, `config.published`, `reservation.created`. Bắt kịp:
   `GET /api/realtime/events?after=<seq>` — quy tắc client "**refetch rồi mới stream**".
 - **Nghe: chưa app nào.** Không có `supabase-js`, không gọi `/api/realtime/*`. Tất cả
-  đang **polling** TanStack Query: KDS 5 s · POS 10–30 s · Table 1–20 s · Web 10 s.
-  Comment trong `apps/kitchen/src/App.tsx`, `apps/pos/src/App.tsx`, `Floorplan.tsx` nói
+  đang **polling** TanStack Query: KDS 5 s · POS 10–30 s · Table 1–20 s · Web 10 s ·
+  hộp việc `/api/me/inbox` (chuông Office, huy hiệu Kênh NV) 60 s. Comment trong `apps/kitchen/src/App.tsx`, `apps/pos/src/App.tsx`, `Floorplan.tsx` nói
   realtime là đường chính — **sai**, đừng tin.
 - **Ghi offline:** `enqueue` của `@sora/core` (Dexie `sora-outbox`, FIFO, header
   `idempotency-key`); server `IdempotencyInterceptor` so hash body (khác → 409

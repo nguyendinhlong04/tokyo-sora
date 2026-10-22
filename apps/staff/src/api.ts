@@ -1,3 +1,4 @@
+import type { InboxCounts, MyDocument, MyDocumentDetail } from '@sora/contracts'
 import { apiFetch } from '@sora/core'
 
 /**
@@ -175,4 +176,18 @@ export const api = {
   }) => apiFetch<{ id: number; state: string }>('/api/hr/leaves', { method: 'POST', body: input }),
 
   payslips: () => apiFetch<Payslip[]>('/api/hr/payroll/my-payslips'),
+
+  // ---- N13 Thông báo · hộp "Việc cần xử lý" — kiểu lấy từ @sora/contracts
+
+  inbox: () => apiFetch<InboxCounts>('/api/me/inbox'),
+
+  notices: () => apiFetch<MyDocument[]>('/api/org/me/documents'),
+
+  notice: (id: number) => apiFetch<MyDocumentDetail>(`/api/org/me/documents/${id}`),
+
+  markNotice: (id: number, ack: boolean) =>
+    apiFetch<{ readAt: string | null; ackedAt: string | null }>(
+      `/api/org/me/documents/${id}/receipt`,
+      { method: 'POST', body: { ack } },
+    ),
 }
