@@ -257,6 +257,52 @@ describe('A1 — Tài khoản', () => {
     await db.update(staffSessions).set({ revokedAt: null }).where(eq(staffSessions.staffId, ownerId))
   })
 
+  /**
+   * Thân PATCH chỉ mang trường cần đổi. zod 4 vẫn điền mặc định cho trường vắng
+   * mặt trong `.partial()` (`active` = true), nên trước đây sửa tên một tài khoản
+   * đã khoá là mở khoá lại nó — người đã nghỉ đăng nhập POS lại được bằng PIN cũ.
+   */
+  it('sửa tên tài khoản đã khoá không mở khoá lại nó', async () => {
+    const created = await inject({
+      method: 'POST',
+      url: '/api/admin/accounts',
+      headers: asOwner(),
+      payload: {
+        code: 'PV93',
+        fullName: 'Người đã nghỉ',
+        pin: '8642',
+        roles: [{ roleCode: 'R1', branchId: fx.branchId }],
+      },
+    })
+    expect(created.statusCode, created.payload).toBe(201)
+    const id = created.json().id as number
+
+    const lock = await inject({
+      method: 'PATCH',
+      url: `/api/admin/accounts/${id}`,
+      headers: asOwner(),
+      payload: { active: false },
+    })
+    expect(lock.statusCode, lock.payload).toBe(200)
+
+    const rename = await inject({
+      method: 'PATCH',
+      url: `/api/admin/accounts/${id}`,
+      headers: asOwner(),
+      payload: { fullName: 'Người đã nghỉ việc' },
+    })
+    expect(rename.statusCode, rename.payload).toBe(200)
+    expect(rename.json()).toMatchObject({ fullName: 'Người đã nghỉ việc', active: false })
+
+    const login = await inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { [DEVICE_HEADER]: SEED_DEVICE },
+      payload: { branchId: fx.branchId, staffId: id, pin: '8642' },
+    })
+    expect(login.statusCode).not.toBe(201)
+  })
+
   it('marketing không mở được màn tài khoản', async () => {
     const res = await inject({ method: 'GET', url: '/api/admin/accounts', headers: asMarketing() })
     expect(res.statusCode).toBe(403)
@@ -504,6 +550,40 @@ describe('A5 — Máy in', () => {
     const names = bundle.json().printers.map((p: { name: string }) => p.name)
     expect(names).not.toContain('Quầy thu ngân')
   })
+
+  /**
+   * Thân PATCH chỉ mang trường cần đổi. zod 4 vẫn điền mặc định cho trường vắng
+   * mặt trong `.partial()`, nên trước đây đổi địa chỉ một máy in đã tắt là bật lại
+   * nó, đưa cổng về 9100 và số liên về 1.
+   */
+  it('đổi địa chỉ máy in không bật lại nó, không đổi cổng hay số liên', async () => {
+    const created = await inject({
+      method: 'POST',
+      url: '/api/admin/printers',
+      headers: asOwner(),
+      payload: {
+        branchId: fx.branchId,
+        name: 'Quầy bar',
+        kind: 'bill',
+        stationId: null,
+        host: '10.0.0.23',
+        port: 9101,
+        template: 'k80-bill',
+        copies: 2,
+        active: false,
+      },
+    })
+    expect(created.statusCode, created.payload).toBe(201)
+
+    const res = await inject({
+      method: 'PATCH',
+      url: `/api/admin/printers/${created.json().id}`,
+      headers: asOwner(),
+      payload: { host: '10.0.0.24' },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.json()).toMatchObject({ host: '10.0.0.24', port: 9101, copies: 2, active: false })
+  })
 })
 
 describe('A9 — Hoá đơn điện tử', () => {
@@ -627,6 +707,25 @@ describe('A8 — CMS website', () => {
     expect(res.json()[0].title).toContain('than hoa Bình Định')
   })
 
+  /**
+   * Thân PATCH chỉ mang trường cần đổi. zod 4 vẫn điền mặc định cho trường vắng
+   * mặt trong `.partial()` (`published` = false), nên trước đây sửa tiêu đề một
+   * bài đang hiện là gỡ bài khỏi website.
+   */
+  it('sửa tiêu đề bài đang hiện không gỡ bài khỏi website', async () => {
+    const res = await inject({
+      method: 'PATCH',
+      url: `/api/admin/cms/posts/${postId}`,
+      headers: asMarketing(),
+      payload: { title: 'Chúng tôi đổi sang than hoa Bình Định sau ba tháng thử' },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    const site = await inject({ method: 'GET', url: '/api/site/posts' })
+    expect(site.json().map((p: { title: string }) => p.title)).toEqual([
+      'Chúng tôi đổi sang than hoa Bình Định sau ba tháng thử',
+    ])
+  })
+
   it('bài hẹn ngày tương lai thì chưa lọt ra web', async () => {
     const future = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10)
     const created = await inject({
@@ -658,6 +757,65 @@ describe('A8 — CMS website', () => {
 
     const res = await inject({ method: 'GET', url: '/api/site/jobs' })
     expect(res.json()[0]).toMatchObject({ title: 'Phục vụ bàn', branchName: null, slots: 6 })
+  })
+
+  /**
+   * Nút Bật/Tắt ở A8 chỉ gửi đúng một trường. zod 4 vẫn điền giá trị mặc định
+   * cho mọi trường vắng mặt trong `.partial()`, nên trước đây một cú bấm tắt tin
+   * đã lặng lẽ đưa số vị trí về 1.
+   */
+  it('tắt rồi bật lại tin tuyển dụng không đổi số vị trí', async () => {
+    const [job] = (
+      await inject({ method: 'GET', url: '/api/admin/cms/jobs', headers: asMarketing() })
+    ).json<{ id: number }[]>()
+    for (const published of [false, true]) {
+      await inject({
+        method: 'PATCH',
+        url: `/api/admin/cms/jobs/${job!.id}`,
+        headers: asMarketing(),
+        payload: { published },
+      })
+    }
+    const res = await inject({ method: 'GET', url: '/api/site/jobs' })
+    expect(res.json()[0]).toMatchObject({ title: 'Phục vụ bàn', slots: 6 })
+  })
+
+  /** Cùng nút Bật/Tắt: trước đây bật một khung hero là đưa thứ tự về 0, tâm ảnh về giữa */
+  it('bật khung hero lên trang chủ không làm mất thứ tự hay tâm ảnh', async () => {
+    const created = await inject({
+      method: 'POST',
+      url: '/api/admin/cms/hero',
+      headers: asMarketing(),
+      payload: {
+        imageUrl: 'https://storage.googleapis.com/tokyo-sora/hero/gio-vang.jpg',
+        caption: 'Giờ vàng bia tươi',
+        sort: 7,
+        mobileFocusX: 30,
+        published: false,
+      },
+    })
+    expect(created.statusCode, created.payload).toBe(201)
+    const frameId = created.json<{ id: number }>().id
+
+    const res = await inject({
+      method: 'PATCH',
+      url: `/api/admin/cms/hero/${frameId}`,
+      headers: asMarketing(),
+      payload: { published: true },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    const frames = await inject({
+      method: 'GET',
+      url: '/api/admin/cms/hero',
+      headers: asMarketing(),
+    })
+    expect(frames.json<{ id: number }[]>().find((h) => h.id === frameId)).toMatchObject({
+      sort: 7,
+      mobileFocusX: 30,
+      published: true,
+    })
+    const web = await inject({ method: 'GET', url: '/api/site/hero' })
+    expect(web.json<{ id: number }[]>().map((h) => h.id)).toContain(frameId)
   })
 
   it('marketing ĐỌC được thực đơn nhưng không sửa được giá, và không chạm vào chi nhánh', async () => {

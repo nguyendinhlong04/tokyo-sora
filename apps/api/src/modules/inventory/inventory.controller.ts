@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common'
 import { z } from 'zod'
+import { parsePatch } from '../../common/patch'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { InventoryService } from './inventory.service'
@@ -176,7 +177,7 @@ export class InventoryController {
   @Patch('ingredients/:id')
   @RequirePermission('recipe.edit')
   updateIngredient(@Param('id') id: string, @Body() body: unknown, @Req() req: RequestWithActor) {
-    const { approval, ...patch } = IngredientBody.partial().parse(body)
+    const { approval, ...patch } = parsePatch(IngredientBody, body)
     return this.inventory.updateIngredient(id, patch, req.actor!, approval)
   }
 

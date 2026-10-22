@@ -18,7 +18,15 @@ import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
-import { devices, dishes, setGroupItems, setGroups, staff, staffRoles } from '../db/schema'
+import {
+  devices,
+  dishes,
+  ingredients,
+  setGroupItems,
+  setGroups,
+  staff,
+  staffRoles,
+} from '../db/schema'
 import { ALL_DAYS, dayBitOf } from '../modules/catalog/domain/sale-window'
 import { DEVICE_HEADER } from '../modules/identity/auth.guard'
 import { hashToken } from '../modules/identity/tokens'
@@ -233,6 +241,36 @@ describe('M8 — Bán thành phẩm', () => {
     })
     expect(res.statusCode).toBe(409)
   })
+
+  /**
+   * Thân PATCH chỉ mang trường cần đổi. zod 4 vẫn điền mặc định cho trường vắng
+   * mặt trong `.partial()`, nên trước đây đổi tên một bán thành phẩm bị đọc thành
+   * "bỏ cờ bán thành phẩm" và bị chặn vì còn công thức mẻ; nguyên liệu thường thì
+   * lặng lẽ mất nhóm, định mức tồn, cờ theo lô và thứ tự.
+   */
+  it('đổi tên bán thành phẩm không đụng tới cờ, nhóm, định mức hay thứ tự', async () => {
+    await db
+      .update(ingredients)
+      .set({ groupName: 'Nước sốt', minLevelBase: 1_500, lotRequired: true, sort: 4 })
+      .where(eq(ingredients.id, 'sot-nen'))
+
+    const res = await inject({
+      method: 'PATCH',
+      url: '/api/inventory/ingredients/sot-nen',
+      headers: asOwner(),
+      payload: { name: 'Sốt nền tare' },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.json()).toMatchObject({
+      name: 'Sốt nền tare',
+      isSemiFinished: true,
+      prepYieldBase: 2_000,
+      groupName: 'Nước sốt',
+      minLevelBase: 1_500,
+      lotRequired: true,
+      sort: 4,
+    })
+  })
 })
 
 // =========================================================== M9
@@ -434,6 +472,38 @@ describe('M10 — Cây danh mục', () => {
     expect(ids).not.toContain('nuong')
     expect(ids).toContain('bo-nuong')
   })
+
+  /**
+   * Thân PATCH chỉ mang trường cần đổi. zod 4 vẫn điền mặc định cho trường vắng
+   * mặt trong `.partial()`, nên trước đây đổi tên một nhóm là xoá tên tiếng Anh,
+   * tiếng Nhật, kanji, ảnh và bật lại kênh đã tắt.
+   */
+  it('đổi tên nhóm không xoá tên dịch, kanji, ảnh và không bật lại kênh đã tắt', async () => {
+    const kept = {
+      nameEn: 'Drinks',
+      nameJa: '飲み物',
+      kanji: '酒',
+      imageUrl: '/anh/nhom/do-uong.jpg',
+      onlineVisible: false,
+      tableVisible: false,
+    }
+    const created = await inject({
+      method: 'POST',
+      url: '/api/admin/categories',
+      headers: asOwner(),
+      payload: category({ id: 'do-uong', nameVi: 'Đồ uống', ...kept }),
+    })
+    expect(created.statusCode, created.payload).toBe(201)
+
+    const res = await inject({
+      method: 'PATCH',
+      url: '/api/admin/categories/do-uong',
+      headers: asOwner(),
+      payload: { nameVi: 'Đồ uống & rượu' },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.json()).toMatchObject({ nameVi: 'Đồ uống & rượu', ...kept })
+  })
 })
 
 // =========================================================== M11
@@ -539,6 +609,37 @@ describe('M11 — Set & Combo', () => {
       payload: { saleStartMinute: 14 * 60, saleEndMinute: 11 * 60 },
     })
     expect(backwards.statusCode).toBe(400)
+  })
+
+  /**
+   * Hộp "Lịch bán" của M11 chỉ gửi năm trường lịch. zod 4 vẫn điền mặc định cho
+   * trường vắng mặt trong `.partial()`, nên trước đây mỗi lần lưu lịch là ảnh và
+   * giá online của set về null — set mất ảnh trên web, iPad và bán online bằng
+   * giá tại quán.
+   */
+  it('lưu lịch bán của set không xoá ảnh và giá online của set', async () => {
+    await db
+      .update(dishes)
+      .set({ imageUrl: '/anh/set-sora.png', onlinePrice: 1_350_000 })
+      .where(eq(dishes.id, 'setsora'))
+
+    const res = await inject({
+      method: 'PATCH',
+      url: '/api/admin/dishes/setsora',
+      headers: asOwner(),
+      // Đúng thân `ScheduleDialog` gửi (apps/office/src/routes/Sets.tsx)
+      payload: {
+        saleFrom: null,
+        saleTo: null,
+        saleDays: ALL_DAYS,
+        saleStartMinute: null,
+        saleEndMinute: null,
+      },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+
+    const [row] = await db.select().from(dishes).where(eq(dishes.id, 'setsora'))
+    expect(row).toMatchObject({ imageUrl: '/anh/set-sora.png', onlinePrice: 1_350_000 })
   })
 
   it('ngoài lịch bán thì thực đơn online ẩn món và POS bị từ chối lúc bấm', async () => {

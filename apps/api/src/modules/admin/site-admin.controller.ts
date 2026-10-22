@@ -10,6 +10,7 @@ import {
   Req,
 } from '@nestjs/common'
 import { z } from 'zod'
+import { parsePatch } from '../../common/patch'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { SiteAdminService } from './site-admin.service'
@@ -75,7 +76,7 @@ export class SiteAdminController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    return this.cms.updatePost(id, PostBody.partial().parse(body), req.actor!)
+    return this.cms.updatePost(id, parsePatch(PostBody, body), req.actor!)
   }
 
   @Delete('posts/:id')
@@ -103,7 +104,7 @@ export class SiteAdminController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    return this.cms.updateJob(id, JobBody.partial().parse(body), req.actor!)
+    return this.cms.updateJob(id, parsePatch(JobBody, body), req.actor!)
   }
 
   @Delete('jobs/:id')
@@ -131,7 +132,7 @@ export class SiteAdminController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    return this.cms.updateHeroImage(id, HeroBody.partial().parse(body), req.actor!)
+    return this.cms.updateHeroImage(id, parsePatch(HeroBody, body), req.actor!)
   }
 
   @Delete('hero/:id')

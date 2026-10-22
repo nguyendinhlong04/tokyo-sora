@@ -381,3 +381,64 @@ describe('N2 — phạm vi theo cây và cấp trên trực tiếp', () => {
     expect(res.json<{ code: string }>().code).toBe('staff_only')
   })
 })
+
+/**
+ * Thân sửa chức danh chỉ mang trường cần đổi. zod 4 vẫn điền mặc định cho trường
+ * vắng mặt trong `.partial()`, nên trước đây một thân một trường đưa định biên về 1,
+ * thứ tự về 0, vai trò gợi ý về null, ba phần mô tả công việc về rỗng và hạ ghế trưởng
+ * xuống ghế thường. Tab "Mô tả công việc" (N2 · N3) không gửi `sort`: mỗi lần lưu là
+ * chức danh đổi chỗ trong đơn vị.
+ */
+describe('N2 · N3 — sửa chức danh', () => {
+  it('đổi tên chức danh không đổi định biên, thứ tự, vai trò gợi ý hay mô tả công việc', async () => {
+    const kept = {
+      isHead: false,
+      headcount: 3,
+      suggestedRole: 'R1',
+      duties: ['Đón khách ở cửa'],
+      authorities: ['Xếp bàn theo sơ đồ'],
+      requirements: ['Nói được tiếng Anh'],
+      sort: 9,
+    }
+    const created = await inject({
+      method: 'POST',
+      url: '/api/org/positions',
+      headers: bearer(hrManager),
+      payload: { unitId: unitNamed(await chart(owner), 'Sảnh')!.id, title: 'Đón khách', ...kept },
+    })
+    expect(created.statusCode, created.payload).toBe(201)
+
+    const res = await inject({
+      method: 'PUT',
+      url: `/api/org/positions/${created.json<{ id: number }>().id}`,
+      headers: bearer(hrManager),
+      payload: { title: 'Đón khách & xếp bàn' },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(positionIn(await chart(owner), 'Sảnh', 'Đón khách & xếp bàn')).toMatchObject(kept)
+  })
+
+  it('sửa mô tả của ghế trưởng không làm cấp dưới mất cấp trên trực tiếp', async () => {
+    const c = await chart(owner)
+    const cgUnit = c.units.find((u) => u.branchId === fx.branchId)!.name
+    const { holders: _holders, ...lead } = positionIn(c, cgUnit, 'Quản lý chi nhánh')!
+    const requirements = [...lead.requirements, 'Từng quản lý quán trên 80 chỗ']
+
+    const res = await inject({
+      method: 'PUT',
+      url: `/api/org/positions/${lead.id}`,
+      headers: bearer(hrManager),
+      payload: { requirements },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(positionIn(await chart(owner), cgUnit, 'Quản lý chi nhánh')).toMatchObject({
+      ...lead,
+      isHead: true,
+      requirements,
+    })
+
+    const me = await inject({ method: 'GET', url: '/api/org/me', headers: bearer(shiftLead) })
+    const body = me.json<{ managers: { staffId: number }[] }>()
+    expect(body.managers.map((m) => m.staffId)).toEqual([branchLeadId])
+  })
+})

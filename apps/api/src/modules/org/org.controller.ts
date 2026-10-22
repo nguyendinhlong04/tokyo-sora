@@ -13,6 +13,7 @@ import {
 import { ASSIGNMENT_KINDS, ROLES } from '@sora/contracts'
 import { z } from 'zod'
 import { IdempotencyInterceptor } from '../../common/idempotency.interceptor'
+import { parsePatch } from '../../common/patch'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { OrgService } from './org.service'
@@ -57,7 +58,11 @@ const PositionFields = {
 
 const PositionBody = z.object({ unitId: Id, ...PositionFields })
 
-const PositionPatch = z.object(PositionFields).partial().extend({ active: z.boolean().optional() })
+/**
+ * Sửa một phần, đi qua `parsePatch`: tab "Mô tả công việc" (N2 · N3) không gửi `sort`, và
+ * thân một trường mà điền mặc định là hạ ghế trưởng, xoá vai trò gợi ý và mô tả công việc.
+ */
+const PositionPatch = z.object({ ...PositionFields, active: z.boolean().optional() })
 
 const AssignBody = z.object({
   staffIds: z.array(Id).min(1).max(50),
@@ -131,7 +136,7 @@ export class OrgController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    return this.org.updatePosition(id, PositionPatch.parse(body), req.actor!)
+    return this.org.updatePosition(id, parsePatch(PositionPatch, body), req.actor!)
   }
 
   @Post('assignments')

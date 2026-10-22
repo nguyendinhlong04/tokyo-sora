@@ -12,6 +12,7 @@ import {
   Req,
 } from '@nestjs/common'
 import { z } from 'zod'
+import { parsePatch } from '../../common/patch'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { DeviceAdminService } from './device-admin.service'
@@ -79,7 +80,7 @@ export class DeviceAdminController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    return this.hardware.updatePrinter(id, PrinterBody.partial().parse(body), req.actor!)
+    return this.hardware.updatePrinter(id, parsePatch(PrinterBody, body), req.actor!)
   }
 
   @Delete('printers/:id')

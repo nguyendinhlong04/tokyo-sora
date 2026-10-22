@@ -282,6 +282,10 @@ inbox (`GET /api/me/inbox` — chỉ **đếm** việc cần xử lý của ngư
 riêng để các module nghiệp vụ không import lẫn nhau).
 
 **Controller mỏng:** zod schema ở đầu file; `@Body() body: unknown` → `Schema.parse(body)`;
+thân sửa một phần (PATCH, và PUT chức danh N2 · N3) qua `parsePatch(Schema, body)`
+(`common/patch.ts`) — `.partial()` của zod 4 vẫn điền `.default()` cho trường vắng mặt và
+ghi đè dữ liệu (§11); `parsePatch` chỉ gỡ `.default()` đứng ngoài cùng, nên viết
+`.nullable().default(x)`, không viết `.default(x).nullable()`/`.optional()` (vẫn bị điền);
 query qua `z.coerce`; `ParseIntPipe` cho id; truyền `req.actor!` vào service. Decorator:
 `@RequirePermission('<domain.verb>')`, `@Public()`, `@UseInterceptors(IdempotencyInterceptor)`
 cho mọi route ghi mà client có thể gửi lại. Không DTO class, không class-validator.
@@ -751,6 +755,15 @@ Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
    Còn lệch, chưa sửa: `inventory.e2e` "F7: đủ cả giá vốn lẫn nhân sự" lấy hôm nay theo UTC
    còn F7 neo giờ VN → đỏ nếu chạy 00:00–07:00; `HrService` xét "tuần đã qua" bằng ngày UTC
    (`todayIso`).
+9. **Thân sửa một phần ghi đè trường không gửi — đã sửa 22/10/2026.** zod 4 `.partial()` vẫn
+   điền `.default()` cho trường vắng mặt. Mọi cửa có `.default()` (A8 bài/tin tuyển/hero, M1
+   món/set, M10, A3, A5, A1, nguyên liệu kho, chức danh N2 · N3) đi qua `parsePatch` (§5.2),
+   mỗi cửa một e2e "thân một trường không đổi trường khác". Còn chờ chủ dự án kiểm dữ liệu đã
+   ghi bằng code cũ: hộp "Lịch bán" M11 (`Sets.tsx`) đưa ảnh và giá online của set về null —
+   tra `audit_log` `dish.updated` có `saleDays` và `imageUrl` mà không có `nameVi`; nút Bật/Tắt
+   A8 đưa số vị trí tuyển về 1, tâm ảnh hero về 50/50, thứ tự về 0; tab "Mô tả công việc" (N2 ·
+   N3) không gửi `sort` nên chức danh nào đã lưu ở đó có `sort` = 0 và đổi chỗ trong đơn vị
+   (`org.position.updated`; Office chưa có chỗ sửa thứ tự chức danh).
 
 Thấp hơn:
 - `var(--sora-accent)` không tồn tại (`apps/office/src/routes/Cms.tsx:1035`).

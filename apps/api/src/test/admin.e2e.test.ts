@@ -383,6 +383,25 @@ describe('A3 — Sơ đồ bàn', () => {
     const after = await availability(6, 'private')
     expect(after.capacity).toBe(0)
   })
+
+  /**
+   * Thân PATCH chỉ mang trường cần đổi. zod 4 vẫn điền mặc định cho trường vắng
+   * mặt trong `.partial()` (`active` = true), nên trước đây sửa một bàn đã ngừng
+   * dùng là bật lại nó lên sơ đồ và vào phép đếm sức chứa.
+   */
+  it('sửa bàn đã ngừng dùng không bật lại nó', async () => {
+    const res = await inject({
+      method: 'PATCH',
+      url: `/api/admin/tables/${tableId}`,
+      headers: asOwner(),
+      payload: { seatMin: 2 },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.json()).toMatchObject({ seatMin: 2, seatMax: 8, active: false })
+
+    const after = await availability(6, 'private')
+    expect(after.capacity).toBe(0)
+  })
 })
 
 describe('Tham số vẫn đọc được sau khi Office sửa', () => {
