@@ -6,6 +6,7 @@ import type { Dish } from '../api'
 import { IconClose, IconPlus } from '../icons'
 import type { SetExtra } from '../menu'
 import type { Stories } from '../stories'
+import { DISH_IMAGES } from './DishArt'
 import { DishLine } from './DishLine'
 
 /** Chữ Nhật đầu dòng hương vị — cùng bộ chữ trang món trên web dùng */
@@ -98,11 +99,10 @@ export function StoryDialog({
             className="relative grid h-[270px] place-items-center border-y border-accent/16 bg-[radial-gradient(120%_100%_at_50%_30%,var(--sora-line-1)_0%,var(--sora-surface-4)_70%)]"
           >
             {dish.imageUrl ? (
-              // Ô 329×268, ảnh 263×214 — tấm 640 cho màn mật độ 2×, qua bộ tối ưu (§8.1)
               <OptimizedImage
                 src={dish.imageUrl}
-                widths={[384, 640]}
-                sizes="263px"
+                widths={DISH_IMAGES.story.widths}
+                sizes={`${DISH_IMAGES.story.px}px`}
                 alt=""
                 eager
                 width={400}

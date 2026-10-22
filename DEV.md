@@ -70,6 +70,7 @@ pnpm dev:lab      # UI-lab:5177 — trang đối chiếu design token
 ```bash
 pnpm --filter @sora/pos build && pnpm --filter @sora/pos preview       # :4174
 pnpm --filter @sora/kitchen build && pnpm --filter @sora/kitchen preview  # :4175
+pnpm --filter @sora/table build && pnpm --filter @sora/table preview      # :4173 — iPad tại bàn
 ```
 
 Trên Windows phải **tắt server preview trước khi build lại**, nếu không Vite không
@@ -77,6 +78,14 @@ xoá được thư mục `dist` đang bị khoá file (`EPERM`).
 
 Service worker chỉ nắm quyền từ lần điều hướng SAU khi cài, nên muốn thử offline
 thì: mở trang → tải lại một lần → tắt server → tải lại lần nữa.
+
+Sora Table nhận trang ngay lần cài đầu (`clientsClaim`), và khi đang ở màn chờ thì tải
+sẵn ảnh thực đơn vào bộ đệm `sora-anh` (DevTools → Application → Cache storage). Thử bản
+mới khỏi chờ 10 phút: sửa code, build lại, rồi gõ ở Console
+`(await navigator.serviceWorker.getRegistration()).update()` — đang ở màn chờ thì trang tự
+tải lại, đang mở bàn thì bản mới nằm chờ tới lúc đóng bàn. Trình duyệt nhúng của Claude
+không đăng ký được service worker trên `vite preview`: thử bằng Chrome hoặc Chromium
+headless.
 
 ## Kiểm tra
 

@@ -25,6 +25,28 @@ export function optimizedSrc(src: string, width: OptimizerWidth): string {
 }
 
 /**
+ * Tấm `srcset` sẽ chọn cho ô `cssPx` điểm CSS ở màn này: tấm nhỏ nhất đủ nét, không
+ * có thì tấm lớn nhất. Để tải sẵn đúng tấm trang sẽ đòi, không tải thừa tấm khác.
+ */
+export function pickWidth(widths: OptimizerWidth[], cssPx: number): OptimizerWidth {
+  const need = cssPx * (globalThis.devicePixelRatio || 1)
+  const sorted = [...widths].sort((a, b) => a - b)
+  return sorted.find((w) => w >= need) ?? sorted[sorted.length - 1]!
+}
+
+/**
+ * Xoá một ảnh khỏi mọi bộ đệm của service worker.
+ *
+ * Ảnh của bộ tối ưu về dạng "opaque" (khác gốc, không CORS): service worker không
+ * đọc được mã lỗi nên có thể đang giữ đúng một tấm hỏng. Giải mã hỏng thì xoá, lần
+ * sau hỏi lại mạng.
+ */
+export async function forgetCachedImage(url: string): Promise<void> {
+  if (!('caches' in globalThis)) return
+  for (const name of await caches.keys()) await (await caches.open(name)).delete(url)
+}
+
+/**
  * `<img>` qua bộ tối ưu. Bộ tối ưu từ chối (kho lạ, hết hạn mức đổi cỡ của tháng,
  * quá giờ) thì hiện ảnh gốc: Office nhận URL tự do, một ảnh lạ không được làm vỡ ô.
  *
@@ -68,7 +90,8 @@ export function OptimizedImage({
       loading={eager ? 'eager' : 'lazy'}
       fetchPriority={eager ? 'high' : undefined}
       decoding="async"
-      onError={() => {
+      onError={(e) => {
+        void forgetCachedImage(e.currentTarget.currentSrc).catch(() => undefined)
         if (!direct) setFailed(src)
       }}
       className={className}

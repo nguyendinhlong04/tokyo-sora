@@ -4,7 +4,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { IconArrowRight } from '../icons'
+import { useWarmMenuImages } from '../image-cache'
 import { clock } from '../order-status'
+import { useApplyUpdateWhenIdle } from '../pwa'
 import { useTable } from '../table-context'
 
 /** Mỗi khung ảnh đứng bảy giây (§9.1b: 6–8 s) — đủ đọc xong dòng chữ lớn rồi mới đổi */
@@ -46,6 +48,9 @@ const BRAND: Slide = {
  *
  * Chỉ dựng ảnh của khung trước, đang chiếu và kế tiếp: A10 3 GB giải mã cả bộ nền
  * 1920 điểm ảnh một lúc là đuối. Video chỉ dựng cho khung đang chiếu.
+ *
+ * Bàn trống cũng là lúc duy nhất máy được làm việc nặng: áp bản phần mềm mới (§9.1)
+ * và tải sẵn ảnh thực đơn vào bộ đệm (§8 quy tắc 5).
  */
 export function IpadIdle({ onWake }: { onWake: () => void }) {
   const { terminal } = useTable()
@@ -55,7 +60,8 @@ export function IpadIdle({ onWake }: { onWake: () => void }) {
   const [videoLen, setVideoLen] = useState<{ id: string; ms: number } | null>(null)
   /** Phim hỏng thì khung đó chiếu ảnh như khung tĩnh, không đứng màn đen */
   const [brokenVideos, setBrokenVideos] = useState<ReadonlySet<string>>(() => new Set())
-  useReloadOnNewVersion()
+  useApplyUpdateWhenIdle(REFRESH_MS)
+  useWarmMenuImages(terminal?.branchId)
 
   const total = slides.length
   // Bộ khung có thể ngắn lại sau một lần hỏi lại — không để chỉ số trỏ ra ngoài
@@ -264,50 +270,4 @@ function fromFrame(frame: SiteHeroFrame): Slide {
     imageUrl: frame.imageUrl,
     videoUrl: frame.videoUrl,
   }
-}
-
-/** Bản đã tải lại cho — máy chủ có trả một trang lạ thì cũng không tải lại vòng tròn */
-const RELOADED_KEY = 'sora.table.reloaded-for'
-
-/**
- * Bản phần mềm mới chỉ nạp ở màn chờ (§9.1) — không bao giờ giữa bữa.
- *
- * Sora Table chưa có service worker, nên bản mới chỉ chạy khi trang tải lại, mà
- * iPad đứng trong Guided Access cả ngày thì không ai tải lại cho. Màn chờ là lúc
- * duy nhất tải lại không làm mất gì của ai: so script của trang đang chạy với
- * `index.html` mới nhất trên máy chủ, khác là tải lại.
- */
-function useReloadOnNewVersion() {
-  useEffect(() => {
-    const running = buildOf(document)
-    const check = async () => {
-      try {
-        const res = await fetch('/', { cache: 'no-store' })
-        if (!res.ok) return
-        const html = await res.text()
-        const latest = buildOf(new DOMParser().parseFromString(html, 'text/html'))
-        if (!latest || latest === running) return
-        if (sessionStorage.getItem(RELOADED_KEY) === latest) return
-        sessionStorage.setItem(RELOADED_KEY, latest)
-        window.location.reload()
-      } catch {
-        // Mất mạng hay trình duyệt chặn lưu trữ: lần hỏi sau
-      }
-    }
-    void check()
-    const timer = setInterval(() => void check(), REFRESH_MS)
-    return () => clearInterval(timer)
-  }, [])
-}
-
-/**
- * Dấu vân tay của một bản build: đường dẫn script module và stylesheet — tên có băm
- * nội dung, nên bản chỉ đổi CSS cũng ra dấu khác.
- */
-function buildOf(doc: Document): string {
-  return [...doc.querySelectorAll('script[type="module"][src], link[rel="stylesheet"][href]')]
-    .map((el) => el.getAttribute('src') ?? el.getAttribute('href') ?? '')
-    .map((path) => new URL(path, window.location.href).pathname)
-    .sort()
-    .join(' ')
 }

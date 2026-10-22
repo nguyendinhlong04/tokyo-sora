@@ -92,7 +92,7 @@ pnpm --filter @sora/api db:generate      # drizzle-kit → migrations/00NN_<tên
 pnpm --filter @sora/api db:migrate       # runner riêng, chạy mọi *.sql theo tên file
 pnpm --filter @sora/api db:seed          # upsert idempotent; reset mật khẩu Office mẫu
 pnpm --filter @sora/api db:dev-bootstrap # tạo thiết bị dev + phát hành bundle, in token
-pnpm --filter @sora/pos build && pnpm --filter @sora/pos preview   # thử service worker :4174 (kitchen :4175)
+pnpm --filter @sora/pos build && pnpm --filter @sora/pos preview   # thử service worker :4174 (kitchen :4175, table :4173)
 ```
 
 - API cần `apps/api/.env` (xem `.env.example`): `DATABASE_URL` (role `sora_app`),
@@ -399,10 +399,19 @@ migration `0031` xoá bảng `table_devices` và cột `qr_token_hash`.
   `QueryClient` phải đặt `mutations.networkMode: 'always'`: mặc định `'online'` của
   TanStack **hoãn** lệnh ghi khi trình duyệt báo mất mạng — `mutationFn` không chạy, lệnh
   không vào outbox, reload lúc đó là mất. Đã đặt ở table (22/10/2026); POS và KDS chưa.
-- **PWA:** chỉ `pos` và `kitchen` (`vite-plugin-pwa`, `registerType:'prompt'`, fullscreen
-  landscape; precache js/css/html/woff2/png/svg; `/api` không cache trừ KDS `NetworkFirst`
-  `/api/recipes`). POS cập nhật khi thu ngân bấm; KDS tự cập nhật khi hàng vé rỗng.
-  Kiosk **cố ý** không có service worker. Service worker chỉ chạy ở bản build.
+- **PWA:** `pos`, `kitchen` và `table` (`vite-plugin-pwa`, `registerType:'prompt'`; precache
+  js/css/html/woff2/png/svg; `/api` không cache trừ KDS `NetworkFirst` `/api/recipes`). POS
+  cập nhật khi thu ngân bấm; KDS tự cập nhật khi hàng vé rỗng; table chỉ áp bản mới ở màn
+  chờ (`src/pwa.ts`: hỏi `registration.update()` mỗi 10 phút, tự tải lại ở
+  `controllerchange` — workbox-window không tải lại trang mà lúc đăng ký chưa có service
+  worker điều khiển, đúng iPad vừa lắp).
+  Table còn có bộ đệm `sora-anh` (`CacheFirst`, 31 ngày) cho ảnh qua bộ tối ưu của web, tải
+  sẵn ảnh thực đơn ở màn chờ (`image-cache.ts`); ảnh khác gốc là phản hồi opaque nên tấm
+  nào giải mã hỏng thì trang tự xoá (`forgetCachedImage`). Service worker lấy ảnh bằng
+  `fetch`, nên CSP `connect-src` của table (không chỉ `img-src`) phải có kho ảnh
+  `https://tokyo-sora.vn`. Kiosk **cố ý** không có service worker. Service worker chỉ chạy
+  ở bản build; trình duyệt nhúng của Claude không đăng ký được service worker trên
+  `vite preview` — kiểm bằng Chromium headless.
 
 ### 5.7 Biến môi trường (tên, không giá trị)
 API: `DATABASE_URL`, `DATABASE_MIGRATION_URL`, `TEST_DATABASE_URL`, `SUPABASE_JWT_SECRET`,
@@ -576,14 +585,16 @@ chọn im lặng.
   web) · giá khuyến mãi (§9.6) · tự về màn đầu khi đóng bàn · màn chờ quảng cáo (§9.1b) ·
   tự nạp bản mới ở màn chờ · ảnh món qua bộ tối ưu của web (`@sora/ui/image`): thẻ lưới
   tấm 256 (ô 140 — ≤ 2× theo §8), chi tiết món và "Bí quyết" tấm 640; 10 ảnh món đo được
-  65 MB gốc → 63 KB. **Chưa:** VI/EN/JA, manifest standalone + Wake Lock, service worker
-  (precache ảnh thực đơn của bundle — §8 quy tắc 5), Realtime thay polling.
-- **Offline:** giỏ và lệnh gửi qua outbox như hiện tại; màn chờ vẫn hiển thị khi mất mạng
-  (ảnh đã tải nằm trong bộ đệm trình duyệt — chưa có service worker nên bật máy lúc mất
-  mạng thì app không lên); thanh toán bị chặn kèm "Vui lòng gọi thu ngân".
+  65 MB gốc → 63 KB · service worker: vỏ app chạy được khi mất mạng, ảnh thực đơn của bundle
+  tải sẵn ở màn chờ (§8 quy tắc 5). **Chưa:** VI/EN/JA, manifest standalone + Wake Lock,
+  Realtime thay polling.
+- **Offline:** giỏ và lệnh gửi qua outbox như hiện tại; mất mạng giữa bữa thì thực đơn và
+  màn chờ vẫn chạy, ảnh lấy từ bộ đệm `sora-anh`; bật máy lúc mất mạng thì vỏ app lên, báo
+  "Chưa nối được máy chủ" và tự nối lại (`/api` không cache); thanh toán bị chặn kèm "Vui
+  lòng gọi thu ngân".
 - **Cập nhật phần mềm:** chỉ tự reload khi đang ở **màn chờ** (không bao giờ giữa bữa) —
-  đã làm: mỗi lần vào màn chờ và mỗi 10 phút, so script/CSS của trang với `index.html` mới
-  nhất trên máy chủ, khác là tải lại; nhớ bản vừa tải lại để không tải vòng tròn.
+  service worker tải bản mới ở nền, màn chờ hỏi `registration.update()` lúc vào và mỗi 10
+  phút rồi mới áp (`src/pwa.ts`).
 
 #### 9.1b Màn chờ quảng cáo (bàn chưa mở) — làm xong 22/10/2026
 - Nội dung từ Office **A8** (dùng lại `site_hero_images`: ảnh + video) với cờ **riêng**
@@ -601,7 +612,9 @@ chọn im lặng.
   giỏ/đơn) — chỉ giảm sáng (dimmer) và hiện tổng tạm tính; chạm là trở lại.
 - Ảnh qua bộ tối ưu của web (`@sora/ui/image`, 1080/1920 WebP — một nền đo 152 KB thay cho
   PNG vài MB); CSP của table có `img-src https://tokyo-sora.vn` và `media-src` cho kho video.
-  Video ≤ 3 MB/clip (A8 nhắc, không ép). **Chưa precache** — cần service worker.
+  Video ≤ 3 MB/clip (A8 nhắc, không ép). Ảnh khung chiếu rồi nằm trong bộ đệm `sora-anh`;
+  video không cache (khác gốc, iPad cần phản hồi theo đoạn) — mất mạng thì khung video
+  chiếu ảnh của khung đó.
 
 ### 9.2 Bàn đôi
 - Sơ đồ bàn (Office A3) khai **cặp bàn**: `tables.pair_id` (hoặc bảng `table_pairs`),

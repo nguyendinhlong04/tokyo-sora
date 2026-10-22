@@ -115,7 +115,8 @@ flowchart TD
 |---|---|
 | Khách bấm "Đã chuyển xong" nhưng chưa chuyển | Không có gì đổi — **chỉ webhook ngân hàng báo có mới ghi nhận tiền** |
 | Bàn trả đủ | Bàn chuyển *Đã trả · chờ dọn*; **nhân viên đóng bàn**, không tự đóng; khách vẫn gọi thêm được (khoản mới cùng phiên) |
-| Mất mạng khi đang gọi món | Giỏ vẫn thao tác được, món **tự gửi khi có mạng** (dải báo "Mất kết nối — bạn vẫn chọn món được, món sẽ tự gửi bếp khi có mạng") |
+| Mất mạng khi đang gọi món | Giỏ vẫn thao tác được, ảnh món vẫn hiện (iPad tải sẵn lúc bàn trống), món **tự gửi khi có mạng** (dải báo "Mất kết nối — bạn vẫn chọn món được, món sẽ tự gửi bếp khi có mạng") |
+| Bật iPad lúc mất mạng | App vẫn lên, báo *"Chưa nối được máy chủ. Kiểm tra Wi-Fi của iPad rồi thử lại."* và tự nối lại khi có mạng |
 | Mất mạng khi thanh toán | **Chặn hẳn**: *"Thanh toán cần mạng ổn định. Vui lòng gọi thu ngân."* — lượt trả cần tài khoản định danh thật, không xếp hàng được |
 | Mất mạng khi mở bàn | Báo *"Mất kết nối — chưa mở được bàn. Vui lòng gọi nhân viên."* — nhân viên mở ở POS |
 | Bếp báo hết món đang nằm trong giỏ | Hộp thoại báo món vừa hết, bỏ khỏi giỏ và gợi ý hai món thay (T16) |
@@ -125,5 +126,3 @@ flowchart TD
 ## 4.7 Chưa có trong bản dựng này
 
 - Chọn ngôn ngữ **VI / EN / JA**.
-- Chạy khi bật máy lúc mất mạng (chưa có service worker): mất mạng giữa chừng thì màn chờ vẫn
-  chiếu ảnh đã tải, nhưng bật lại iPad khi chưa có mạng thì app không lên.

@@ -99,6 +99,12 @@ Giới hạn cần biết: iPad thế hệ 7 dừng ở iPadOS 18 và không ẩ
 App chưa có manifest cài ra màn hình chính (biểu tượng mở vẫn kèm thanh Safari — vì vậy
 mới phải khoanh vùng thanh địa chỉ ở bước 3).
 
+**Lần đầu mở app phải có mạng.** iPad lưu vỏ app vào máy ngay khi mở trang, rồi tải sẵn
+ảnh thực đơn trong lúc chiếu màn chờ (bàn trống; Office phát hành ảnh mới thì lượt chờ
+sau tải tiếp). Từ đó mất mạng giữa bữa thì thực đơn và ảnh món vẫn hiện, món tự gửi bếp
+khi có mạng lại; bật iPad lúc mất mạng thì app vẫn lên, báo "Chưa nối được máy chủ" và tự
+nối lại. Video quảng cáo không lưu sẵn — mất mạng thì khung video chiếu ảnh của khung đó.
+
 Chuyển iPad sang bàn khác = ngắt máy ở A4 rồi ghép lại bằng mã của bàn mới. Máy bị
 ngắt tự quay về màn ghép, ghi "đã bị ngắt ở Office". Bàn có khách đặt trong 90 phút tới
 thì iPad không cho tự mở, chỉ báo giờ đặt (không bao giờ hiện tên người đặt) và mời gặp
@@ -147,10 +153,11 @@ Chạy đủ sáu bước này trước khi bàn giao cho quán:
    **không được nhân đôi**. Thanh trên cùng phải báo "Mất mạng" trong lúc đó.
 5. **Tắt nguồn màn bếp rồi bật lại khi chưa có mạng** — màn phải tự lên và hiện
    được giao diện (chưa có vé mới là đúng, vì vé đến từ máy chủ).
-6. **iPad tại bàn** — bàn trống phải đang chiếu màn chờ quảng cáo; chạm vào, chọn số người,
-   "Bắt đầu gọi món" phải mở được bàn và POS thấy "Có khách" ngay; gọi một món, rồi đóng
-   bàn ở POS: iPad về màn chờ trong vài giây, món chưa gửi của khách trước không còn trong
-   giỏ.
+6. **iPad tại bàn** — bàn trống phải đang chiếu màn chờ quảng cáo; để vậy vài phút cho iPad
+   tải sẵn ảnh thực đơn. Chạm vào, chọn số người, "Bắt đầu gọi món" phải mở được bàn và POS
+   thấy "Có khách" ngay; **tắt Wi-Fi của iPad**, mở vài nhóm món — ảnh phải hiện đủ — rồi
+   bật lại; gọi một món, rồi đóng bàn ở POS: iPad về màn chờ trong vài giây, món chưa gửi
+   của khách trước không còn trong giỏ.
 
 Bước 4 và 5 là hai bước hay bị bỏ qua nhất và cũng là hai bước quan trọng nhất —
 chúng chứng minh quán vẫn chạy được khi mạng chập chờn.
