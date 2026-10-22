@@ -597,6 +597,7 @@ export class HrService {
         period.branchId,
         { from: period.periodStart, to: period.periodEnd },
         rates,
+        tx,
       )
 
       await tx.delete(payrollLines).where(eq(payrollLines.periodId, periodId))
@@ -610,6 +611,7 @@ export class HrService {
         period.branchId,
         period.periodStart,
         period.periodEnd,
+        tx,
       )
 
       const rows = people.map(({ employee, fullName }) => {

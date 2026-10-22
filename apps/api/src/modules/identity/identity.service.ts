@@ -12,6 +12,7 @@ import { and, eq, gt, isNotNull, isNull, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
 import { isUniqueViolation } from '../../common/pg-error'
+import type { DbOrTx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
   devices,
@@ -298,8 +299,8 @@ export class IdentityService {
   }
 
   /** Vai trò ở một chi nhánh = vai trò gán riêng chi nhánh + vai trò toàn chuỗi */
-  async rolesOf(staffId: number, branchId: string): Promise<Role[]> {
-    const rows = await this.db
+  async rolesOf(staffId: number, branchId: string, db: DbOrTx = this.db): Promise<Role[]> {
+    const rows = await db
       .select({ roleCode: staffRoles.roleCode })
       .from(staffRoles)
       .where(
@@ -487,16 +488,27 @@ export class IdentityService {
     }
   }
 
-  /** Xác minh PIN của NGƯỜI DUYỆT trong luồng △ — không tạo phiên */
-  async verifyPinOnly(staffId: number, pin: string, branchId: string): Promise<Role[] | null> {
-    const [person] = await this.db
+  /**
+   * Xác minh PIN của NGƯỜI DUYỆT trong luồng △ — không tạo phiên.
+   *
+   * Luồng duyệt gọi hàm này TỪ TRONG transaction (`ApprovalService.authorize`) nên
+   * phải truyền `tx`: trên Vercel pool chỉ có một kết nối và transaction đang giữ
+   * nó — đọc bằng `this.db` là chờ chính mình tới khi hết hạn kết nối rồi 500.
+   */
+  async verifyPinOnly(
+    staffId: number,
+    pin: string,
+    branchId: string,
+    db: DbOrTx = this.db,
+  ): Promise<Role[] | null> {
+    const [person] = await db
       .select()
       .from(staff)
       .where(and(eq(staff.id, staffId), eq(staff.active, true)))
     if (!person?.pinHash) return null
     const ok = await argonVerify(person.pinHash, pin).catch(() => false)
     if (!ok) return null
-    return this.rolesOf(person.id, branchId)
+    return this.rolesOf(person.id, branchId, db)
   }
 
   // -------------------------------------------------------- Giải mã token

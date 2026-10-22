@@ -21,6 +21,7 @@ import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
+import { ParamsService } from '../common/params.service'
 import {
   corporateCharges,
   corporateCustomers,
@@ -183,6 +184,8 @@ beforeAll(async () => {
     { key: 'feedback.complaintStars', value: 3, unit: 'sao' },
     { key: 'feedback.responseHours', value: 24, unit: 'giờ' },
   ])
+  // ParamsService nạp cache lúc khởi động — chèn thẳng bảng thì phải nạp lại
+  await app.get(ParamsService).reload()
 
   owner = await officeLogin('chu@tokyosora.vn')
   marketer = await officeLogin('thao@tokyosora.vn')

@@ -11,7 +11,7 @@ import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
 import { PeriodLockService } from '../../common/period-lock.service'
 import { isUniqueViolation } from '../../common/pg-error'
-import type { Tx } from '../../common/tx'
+import type { DbOrTx, Tx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
   assets,
@@ -512,7 +512,7 @@ export class ExpensesService {
         throw new ConflictException('Không ai tự duyệt phiếu chi của mình')
       }
       // Duyệt là lúc phiếu thành chi phí, nên nó cũng phải nằm trong kỳ còn mở
-      await this.locks.assertOpen(voucher.branchId, [voucher.paidOn], 'duyệt phiếu chi')
+      await this.locks.assertOpen(voucher.branchId, [voucher.paidOn], 'duyệt phiếu chi', tx)
 
       const [approved] = await tx
         .update(expenseVouchers)
@@ -560,9 +560,13 @@ export class ExpensesService {
     )
   }
 
-  /** Tạm ứng chưa khấu trừ của một người — H7 đọc để trừ vào thực lãnh */
-  async openAdvances(branchId: string, from: string, to: string) {
-    const rows = await this.db
+  /**
+   * Tạm ứng chưa khấu trừ của một người — H7 đọc để trừ vào thực lãnh.
+   *
+   * H7 gọi từ trong transaction tính nháp nên truyền `tx` — xem `IdentityService.verifyPinOnly`.
+   */
+  async openAdvances(branchId: string, from: string, to: string, db: DbOrTx = this.db) {
+    const rows = await db
       .select({
         employeeId: expenseVouchers.advanceEmployeeId,
         total: sql<number>`coalesce(sum(${expenseVouchers.amountVnd}), 0)::float8`,

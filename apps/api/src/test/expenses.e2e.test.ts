@@ -13,6 +13,7 @@ import { hash } from '@node-rs/argon2'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
+import { ParamsService } from '../common/params.service'
 import { expenseCategories, parameters, staff, staffRoles } from '../db/schema'
 import { bootTestApp, type Fixtures } from './harness'
 
@@ -106,6 +107,8 @@ beforeAll(async () => {
     { key: 'expense.ownerApprovalVnd', branchId: null, value: 20_000_000, unit: 'đồng' },
     { key: 'expense.assetThresholdVnd', branchId: null, value: 5_000_000, unit: 'đồng' },
   ])
+  // ParamsService nạp cache lúc khởi động — chèn thẳng bảng thì phải nạp lại
+  await app.get(ParamsService).reload()
 
   // Cây khoản mục tối thiểu (seed thật có đủ; harness thì không)
   await db.insert(expenseCategories).values([

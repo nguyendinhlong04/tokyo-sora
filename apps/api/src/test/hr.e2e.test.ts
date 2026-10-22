@@ -12,6 +12,7 @@ import { hash } from '@node-rs/argon2'
 import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db } from '../db/client'
+import { ParamsService } from '../common/params.service'
 import { parameters, staff, staffRoles, timeEntries } from '../db/schema'
 import { bootTestApp, type Fixtures } from './harness'
 
@@ -102,6 +103,8 @@ beforeAll(async () => {
     { key: 'payroll.insuranceEmployeeRate', branchId: null, value: 0.105, unit: 'tỉ lệ' },
     { key: 'payroll.pitWithholdRate', branchId: null, value: 0, unit: 'tỉ lệ' },
   ])
+  // ParamsService nạp cache lúc khởi động — chèn thẳng bảng thì phải nạp lại
+  await app.get(ParamsService).reload()
 
   owner = await officeLogin('chu@tokyosora.vn')
   hrManager = await officeLogin('ns@tokyosora.vn')

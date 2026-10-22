@@ -917,7 +917,8 @@ export class CatalogAdminService {
    */
   private async announceCategories(categoryId: string) {
     await this.db.transaction(async (tx) => {
-      const targets = (await this.db.select({ id: branches.id }).from(branches)).map((b) => b.id)
+      // Đọc bằng `tx`, KHÔNG bằng pool — xem ghi chú ở `emitUpdate`
+      const targets = (await tx.select({ id: branches.id }).from(branches)).map((b) => b.id)
       for (const id of targets) {
         await emit(tx, {
           branchId: id,
