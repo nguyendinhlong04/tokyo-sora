@@ -200,9 +200,14 @@ export const ACTIONS = {
     label: 'Phát hành / phát hành lại HĐĐT tại quầy',
     grants: { R2: A, R7: A, R8: A, R10: A },
   },
+  /**
+   * Khách đưa MST sau khi hoá đơn đã ra là chuyện ở quầy, lúc khách còn đứng đó:
+   * thu ngân lập hoá đơn thay thế với PIN quản lý ca (chốt 22/10/2026), không đợi
+   * kế toán. Hoá đơn máy tính tiền sai thì chỉ thay thế (TT 91/2026 Điều 10).
+   */
   'einvoice.void-replace-adjust': {
     label: 'Huỷ / thay thế / điều chỉnh HĐĐT',
-    grants: { R7: P, R8: A, R10: A },
+    grants: { R2: P, R7: A, R8: A, R10: A },
   },
   'cms.edit': {
     label: 'Sửa nội dung website',

@@ -705,3 +705,53 @@ describe('Đơn online: người mua đi cùng đơn', () => {
     expect(row).toMatchObject({ state: 'issued', buyerTaxCode: COMPANY.taxCode })
   })
 })
+
+describe('Thu ngân lập hoá đơn thay thế tại quầy', () => {
+  it('khách đưa MST sau khi hoá đơn đã ra: thu ngân thay thế, quản lý ca duyệt PIN', async () => {
+    const { sessionId } = await tableWith([{ dishId: 'bachibo', qty: 1 }], fx.plainTableId)
+    const old = (await payCash(sessionId, 308_000)).invoice
+    expect(old).toMatchObject({ state: 'issued', document: { buyer: null } })
+
+    const replace = (approval?: unknown) =>
+      inject({
+        method: 'POST',
+        url: `/api/accounting/invoices/${old.id}/replace`,
+        headers: auth(),
+        payload: { reason: 'Khách bổ sung MST công ty', buyer: COMPANY, approval },
+      })
+
+    const ask = await replace()
+    expect(ask.statusCode).toBe(400)
+    expect(ask.json().code).toBe('requires_approval')
+
+    const wrongPin = await replace({
+      approverStaffId: fx.managerId,
+      approverPin: '0000',
+      reason: 'Khách bổ sung MST công ty',
+    })
+    expect(wrongPin.statusCode).toBe(403)
+
+    const ok = await replace({
+      approverStaffId: fx.managerId,
+      approverPin: fx.pins[fx.managerId],
+      reason: 'Khách bổ sung MST công ty',
+    })
+    expect(ok.statusCode, ok.payload).toBe(201)
+    const replacement = ok.json().replacement
+    expect(replacement).toMatchObject({ state: 'issued', replacesId: old.id })
+    expect(replacement.document.buyer).toEqual(COMPANY)
+    expect(replacement.invoiceNo).not.toBe(old.invoiceNo)
+
+    // Bàn thấy hoá đơn mới; bản cũ giữ nguyên số, chỉ đổi trạng thái, có dấu người duyệt
+    const status = await inject({
+      method: 'GET',
+      url: `/api/table-sessions/${sessionId}/invoice`,
+      headers: auth(),
+    })
+    expect(status.json()).toMatchObject({ buyer: COMPANY, invoice: { id: replacement.id } })
+    const [oldRow] = await db.select().from(invoices).where(eq(invoices.id, old.id))
+    expect(oldRow).toMatchObject({ state: 'replaced', invoiceNo: old.invoiceNo })
+    expect(oldRow!.approvalId).not.toBeNull()
+    await closeTable(sessionId)
+  })
+})

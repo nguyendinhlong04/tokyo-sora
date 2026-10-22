@@ -30,6 +30,8 @@ let shiftLead: string
 let orderId: number
 let secondOrderId: number
 let invoiceId: number
+/** Hoá đơn của đơn tháng 7 — quản lý ca thay thế ở cuối nhóm F3 */
+let thirdInvoiceId: number
 /** Phiếu chi và tờ hoá đơn đầu vào của nhóm bài C5 · F4 */
 let voucherId: number
 let inputInvoiceId: number
@@ -223,17 +225,6 @@ describe('F3 — Sổ hoá đơn điện tử', () => {
     expect(res.json().code).toBe('invoice_issued')
   })
 
-  it('quản lý ca chạm được hoá đơn nhưng PHẢI xin duyệt (dòng △ của §4.2)', async () => {
-    const res = await inject({
-      method: 'POST',
-      url: `/api/accounting/invoices/${invoiceId}/replace`,
-      headers: bearer(shiftLead),
-      payload: { reason: 'Khách đổi thông tin xuất hoá đơn' },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().code).toBe('requires_approval')
-  })
-
   it('thay thế: bản cũ chuyển trạng thái và GIỮ NGUYÊN số đã cấp, bản mới trỏ về nó', async () => {
     // Nhà cung cấp trả lỗi lần này: bản thay thế nằm lại hàng đợi cho F6 bên dưới
     app.get<MockEinvoiceProvider>(EINVOICE_PROVIDER).failNext('provider_busy', 'Hệ thống thuế bận')
@@ -309,6 +300,18 @@ describe('F3 — Sổ hoá đơn điện tử', () => {
     expect(retry.statusCode, retry.payload).toBe(201)
     // 00000003 thuộc về bản thay thế ở trên — số đã cấp không ai lấy lại
     expect(retry.json().invoiceNo).toBe('00000004')
+    thirdInvoiceId = retry.json().id
+  })
+
+  it('quản lý ca lập hoá đơn thay thế thẳng, không cần ai duyệt (§4.2)', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: `/api/accounting/invoices/${thirdInvoiceId}/replace`,
+      headers: bearer(shiftLead),
+      payload: { reason: 'Khách đổi thông tin xuất hoá đơn' },
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+    expect(res.json().replacement).toMatchObject({ state: 'issued', replacesId: thirdInvoiceId })
   })
 })
 

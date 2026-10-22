@@ -134,7 +134,7 @@ Vì sao tách Sora Table và Sora POS dù cùng là "gọi món": khách cần �
 | So sánh liên chi nhánh | – | – | – | – | – | – | – | – | ✓ | – | ✓ | – | ✓ |
 | Sổ kế toán / khoá sổ kỳ | – | – | – | – | – | – | – | – | ✓ | – | – | – | ✓ |
 | Phát hành / phát hành lại HĐĐT tại quầy | – | – | ✓ | – | – | – | – | ✓ | ✓ | – | – | – | ✓ |
-| Huỷ / thay thế / điều chỉnh HĐĐT | – | – | – | – | – | – | – | △ | ✓ | – | – | – | ✓ |
+| Huỷ / thay thế / điều chỉnh HĐĐT | – | – | △ | – | – | – | – | ✓ | ✓ | – | – | – | ✓ |
 | Sửa nội dung website | – | – | – | – | – | – | – | – | – | ✓ | – | – | ✓ |
 | Quản lý tài khoản & quyền | – | – | – | – | – | – | – | – | – | – | – | – | ✓ |
 | Xem nhật ký thao tác | – | – | – | – | – | – | – | ✓ | ✓ | – | ✓ | – | ✓ |

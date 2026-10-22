@@ -54,13 +54,10 @@ const LockBody = z.object({
 /**
  * Kế toán — F2 · F3 · F4 · F5 · F6.
  *
- * Quyền theo §4.2: mọi màn sổ sách gắn `accounting.ledger-close-period` (R8 · R10),
- * riêng huỷ/thay thế hoá đơn dùng dòng `einvoice.void-replace-adjust` — dòng duy
- * nhất trong ma trận cho quản lý ca R7 chạm tới hoá đơn, và chỉ ở mức △.
- *
- * Phát hành hoá đơn (`issue`) KHÔNG gắn dòng huỷ/thay thế: phát hành là việc bình
- * thường của thu ngân khi in bill, còn huỷ mới là việc phải duyệt. Ở bản dựng này
- * cửa phát hành nằm trong Office nên vẫn để mức kế toán.
+ * Quyền theo §4.2: mọi màn sổ sách gắn `accounting.ledger-close-period` (R8 · R10).
+ * Hoá đơn là việc của quầy nên đi theo dòng riêng: phát hành `einvoice.issue` (thu
+ * ngân trở lên), huỷ/thay thế `einvoice.void-replace-adjust` — thu ngân △, quản lý
+ * ca duyệt bằng PIN ngay tại quầy; POS và F3 gọi chung các cửa này.
  */
 @Controller('api/accounting')
 export class AccountingController {
@@ -94,7 +91,7 @@ export class AccountingController {
   }
 
   @Post('invoices/issue/:orderId')
-  @RequirePermission('accounting.ledger-close-period')
+  @RequirePermission('einvoice.issue')
   issue(@Param('orderId', ParseIntPipe) orderId: number, @Req() req: RequestWithActor) {
     return this.einvoice.issueForOrder(orderId, req.actor!)
   }

@@ -51,7 +51,7 @@ const DOC_ROWS: [ActionKey, string][] = [
   ['report.compare-branches', '........x.x.x'],
   ['accounting.ledger-close-period', '........x...x'],
   ['einvoice.issue', '..x....xx...x'],
-  ['einvoice.void-replace-adjust', '.......ax...x'],
+  ['einvoice.void-replace-adjust', '..a....xx...x'],
   ['cms.edit', '.........x..x'],
   ['admin.manage-accounts-roles', '............x'],
   ['audit.view-log', '.......xx.x.x'],
