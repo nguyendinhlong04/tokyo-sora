@@ -7,15 +7,15 @@ import {
 } from '@sora/contracts'
 import { Button, ErrorState, useToast } from '@sora/ui'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { lazy, startTransition, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api, type InvoiceBookFilters } from '../api'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Money, formatDay, formatPercent, formatTime } from '../components/report'
 import { Field, SearchField, Select } from '../components/form'
+import { INVOICE_STATE_LABELS } from '../components/invoice-state'
 import { useSession } from '../session-context'
-import { INVOICE_STATE_LABELS, InvoiceDrawer } from './InvoiceDetail'
 
 /**
  * Kế toán — F2 nhật ký · F3 hoá đơn · F4 thuế · F5 công nợ · F6 khoá sổ.
@@ -223,6 +223,14 @@ export function RevenueJournal() {
 
 // ---------------------------------------------------------------- F3
 
+/**
+ * Ngăn chi tiết kéo theo form người mua và zod — chỉ tải khi mở một tờ, nên F2/F4/F5/F6
+ * (chung chunk với file này) và chính danh sách F3 không phải tải.
+ */
+const InvoiceDrawer = lazy(() =>
+  import('./InvoiceDetail').then((m) => ({ default: m.InvoiceDrawer })),
+)
+
 const STATE_OPTIONS = INVOICE_STATES.map((state) => ({
   value: state,
   label: INVOICE_STATE_LABELS[state].label,
@@ -244,6 +252,10 @@ export function InvoiceBook() {
   const [search, setSearch] = useState('')
   const [q, setQ] = useState('')
   const [openId, setOpenId] = useState<number | null>(null)
+  // Mở trong `startTransition`: lần đầu React giữ sổ tới khi chunk của ngăn về rồi hiện ngăn
+  // luôn, như bấm menu sang màn chưa tải (ScreenBoundary). Đừng bọc ngăn trong Suspense có
+  // khung chờ: React giữ khung chờ ít nhất 300 ms dù chunk về sớm hơn nhiều.
+  const openInvoice = (id: number) => startTransition(() => setOpenId(id))
 
   // Gõ tìm không bắn một lượt đọc sổ cho mỗi phím
   useEffect(() => {
@@ -344,7 +356,7 @@ export function InvoiceBook() {
                     <li key={row.id}>
                       <button
                         type="button"
-                        onClick={() => setOpenId(row.id)}
+                        onClick={() => openInvoice(row.id)}
                         className="flex w-full items-baseline gap-3 border-b border-line-1 py-2 text-left text-[length:var(--fs-c1)] hover:bg-surface-2"
                       >
                         <span className="w-28 font-mono text-ink-body">{row.orderCode}</span>
@@ -370,7 +382,7 @@ export function InvoiceBook() {
                 <ul className="mt-3 flex flex-wrap gap-2">
                   {data.needsAction.map((row) => (
                     <li key={row.id}>
-                      <Button size="sm" onClick={() => setOpenId(row.id)}>
+                      <Button size="sm" onClick={() => openInvoice(row.id)}>
                         {row.serial} · {row.invoiceNo ?? '—'} · {row.orderCode}
                       </Button>
                     </li>
@@ -415,7 +427,7 @@ export function InvoiceBook() {
                 rowKey={(row) => row.id}
                 loading={book.isFetching && book.isPlaceholderData}
                 resetKey={JSON.stringify(filters)}
-                onRowClick={(row) => setOpenId(row.id)}
+                onRowClick={(row) => openInvoice(row.id)}
                 empty={
                   state || buyer || q
                     ? 'Không có hoá đơn nào khớp bộ lọc.'

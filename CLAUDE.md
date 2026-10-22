@@ -545,7 +545,9 @@ ra log hay chat.
   `screen(() => import('./routes/X'), 'X')`; `components/ScreenBoundary.tsx` giữ chỗ bằng
   skeleton khi chunk đang về và báo "Tải lại trang" khi chunk hỏng (tab cũ sau deploy).
   Chỉ N1 (trang mở đầu) và màn đăng nhập ở chunk đầu — **import tĩnh một màn là kéo nó về
-  chunk đầu**.
+  chunk đầu**. Ngăn nặng chỉ mở theo yêu cầu (ngăn chi tiết F3) thì `lazy` riêng và mở trong
+  `startTransition`: React giữ màn tới khi chunk về, như bấm menu. Đừng bọc nó trong
+  `Suspense` có khung chờ — React 19 giữ khung chờ ít nhất 300 ms dù chunk về sớm hơn nhiều.
 - Thiết bị đích theo app (§1) quyết định bố cục; không có media query theo hướng xoay.
   Khi một thành phần phải chạy ở nhiều khổ (POS iPad/điện thoại — §9.3) ưu tiên
   **container query** hơn `lg:` toàn trang.
@@ -615,9 +617,10 @@ làm và cách áp lại cho các app khác: **§8.1**. Sora Table dùng chung b
 - Ảnh thumbnail (176–400px) ≤ 40 KB · thẻ 4:3 (800px) ≤ 120 KB · hero/chi tiết (1600px)
   ≤ 250 KB · tổng ảnh một màn thực đơn ≤ 1,5 MB · JS mỗi SPA ≤ 250 KB gzip, web ≤ 200 KB.
 - Office (22/10/2026, tách chunk theo màn — §6): chunk đầu 122 KB gzip sau khi gộp nhánh tổ
-  chức và hoá đơn điện tử (112 KB trên gd1 riêng), mỗi màn thêm 2–11 KB khi mở lần đầu —
-  riêng F2–F6 (chung file `Accounting.tsx`) 31 KB vì form người mua của F3 cần zod; trước đó
-  một chunk 281 KB.
+  chức và hoá đơn điện tử (112 KB trên gd1 riêng), mỗi màn thêm 2–11 KB khi mở lần đầu
+  (F2–F6 chung file `Accounting.tsx`: 10 KB); trước đó một chunk 281 KB. Ngăn chi tiết hoá
+  đơn của F3 là chunk riêng 25 KB, chỉ tải lúc mở một tờ vì form người mua cần zod — vào
+  F2–F6 (chunk đầu + chunk của màn) 155 → 132 kB gzip.
 - `@sora/contracts` và `@sora/core` khai `"sideEffects": false` (22/10/2026): bundler bỏ cả
   file mà app không dùng export nào. zod chỉ còn ở nơi thật sự parse — form người mua hoá đơn
   `@sora/ui/InvoiceBuyer` (POS, iPad bàn, web O5/O7, Office F3); Dexie rời Office và staff

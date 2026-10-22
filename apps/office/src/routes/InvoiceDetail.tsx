@@ -3,7 +3,6 @@ import {
   formatVnd,
   invoiceNumberLabel,
   type InvoiceDocument,
-  type InvoiceState,
   type InvoiceView,
 } from '@sora/contracts'
 import { ApiError } from '@sora/core'
@@ -13,6 +12,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { api, type InvoiceDetail } from '../api'
 import { Field, TextInput } from '../components/form'
+import { INVOICE_STATE_LABELS } from '../components/invoice-state'
 import { formatDay } from '../components/report'
 import { useSession } from '../session-context'
 
@@ -24,16 +24,6 @@ import { useSession } from '../session-context'
  * chưa lên cơ quan thuế và chưa cấp số. R7 · R8 · R10 làm thẳng nên Office không có
  * ô duyệt PIN; thu ngân (△) làm ở POS P11 với PIN quản lý ca.
  */
-
-export const INVOICE_STATE_LABELS: Record<InvoiceState, { label: string; tone: BadgeTone }> = {
-  pending: { label: 'Chờ phát hành', tone: 'warn' },
-  issued: { label: 'Đã phát hành', tone: 'ok' },
-  failed: { label: 'Chưa lên được', tone: 'danger' },
-  voided: { label: 'Đã huỷ', tone: 'neutral' },
-  replaced: { label: 'Đã thay thế', tone: 'neutral' },
-}
-
-type BadgeTone = 'neutral' | 'ok' | 'warn' | 'danger'
 
 const rateLabel = (rateBp: number | null) =>
   rateBp === null ? 'KCT' : `${(rateBp / 100).toLocaleString('vi-VN')}%`
