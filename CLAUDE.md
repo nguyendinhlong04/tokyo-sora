@@ -377,6 +377,9 @@ không thì chủ bàn duyệt) → cookie `sora_table`. Luồng này **sắp th
 - **Ghi offline:** `enqueue` của `@sora/core` (Dexie `sora-outbox`, FIFO, header
   `idempotency-key`); server `IdempotencyInterceptor` so hash body (khác → 409
   `idempotency_key_reused`). Chỉ đơn và trạng thái; **không** cache kết quả đọc.
+  `QueryClient` phải đặt `mutations.networkMode: 'always'`: mặc định `'online'` của
+  TanStack **hoãn** lệnh ghi khi trình duyệt báo mất mạng — `mutationFn` không chạy, lệnh
+  không vào outbox, reload lúc đó là mất. Đã đặt ở table (22/10/2026); POS và KDS chưa.
 - **PWA:** chỉ `pos` và `kitchen` (`vite-plugin-pwa`, `registerType:'prompt'`, fullscreen
   landscape; precache js/css/html/woff2/png/svg; `/api` không cache trừ KDS `NetworkFirst`
   `/api/recipes`). POS cập nhật khi thu ngân bấm; KDS tự cập nhật khi hàng vé rỗng.

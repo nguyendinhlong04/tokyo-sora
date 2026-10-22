@@ -27,6 +27,13 @@ const queryClient = new QueryClient({
       retry: 1,
       staleTime: 5_000,
     },
+    mutations: {
+      // Không để thư viện tự hoãn lệnh ghi khi trình duyệt báo mất mạng (mặc định
+      // của nó). Hoãn ở đây thì "Gửi bếp" đứng im và món không bao giờ vào hàng đợi
+      // offline — chính chỗ lo chuyện mất mạng; còn gọi nhân viên, trả tiền thì phải
+      // báo lỗi ngay, chứ không phải bắn đi vài phút sau khi đã vô nghĩa.
+      networkMode: 'always',
+    },
   },
 })
 
