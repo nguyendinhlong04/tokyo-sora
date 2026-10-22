@@ -490,9 +490,10 @@ ra log hay chat.
   ném "Thiếu TEST_DATABASE_URL" — đó là thiếu môi trường, không phải lỗi code.
 - 22/10/2026 cả bộ e2e đã chạy với pool **1 kết nối** như Vercel: trên PGlite (lớp giả `pg`
   ngoài repo, rồi `pg` thật + `DATABASE_POOL_MAX=1` qua `@electric-sql/pglite-socket`) 36 đỏ
-  trước khi sửa §11 mục 7; sau khi sửa còn 14, trên PGlite lẫn Postgres 16 thật
-  (`embedded-postgres` từ npm) — 12 ca hr.e2e (mục 8), B15 của crm.e2e (khung ngày cố định
-  05–08/2026, cùng bệnh mục 8), sổ COD của online-order; cả 14 đều đỏ sẵn ở `074a7cf`.
+  trước khi sửa §11 mục 7, sau còn 14 — đều đỏ sẵn ở `074a7cf`: 12 ca hr.e2e và B15 của
+  crm.e2e (ngày cố định, mục 8), sổ COD của online-order (`codBook`, §5.4). Sửa cả ba
+  (`70a8448`, `b28d92c`) rồi chạy trên Postgres 16 thật (`embedded-postgres` từ npm), pool 1
+  và pool mặc định: cả bộ xanh — 1328 ca, 9 bỏ qua.
 
 **Quy tắc khi làm việc**
 - Sửa bug nghiệp vụ → viết test tái hiện trước (domain nếu được, e2e nếu đụng DB/quyền),
@@ -741,9 +742,15 @@ Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
    transaction ở ~36 chỗ (tính tiền, vé bếp, thanh toán, webhook…). Còn hở: nạp lúc khởi động
    mà hỏng thì quay về nạp lười — lần đọc đầu nằm trong transaction vẫn kẹt; và chỉ
    `pool-one-connection.e2e` chạy pool 1, chỗ kẹt mới ở luồng khác không tự lộ (§7).
-8. `src/test/hr.e2e.test.ts` dùng tuần cố định `2026-08-03`, nay đã qua: sửa lịch tuần đã
-   qua là `timesheet.edit-manual` (△ với R7) nên nhóm H2–H7 đỏ dây chuyền, cả trên Postgres
-   thật. Tính tuần từ ngày chạy test.
+8. **Ngày cứng trong e2e — đã sửa 22/10/2026.** `hr.e2e` dùng tuần cố định `2026-08-03`;
+   qua ngày đó, xếp lịch thành "sửa lịch tuần đã qua" (`timesheet.edit-manual`, △ với R7) và
+   H2–H7 đỏ dây chuyền. Nay tuần = thứ Hai đầu tháng sau (giờ VN lúc chạy), kỳ lương = cả
+   tháng đó. Cùng nguyên nhân: `crm.e2e` B15 (khung bảng kê cứng tới 31/08/2026, dòng nợ mang
+   ngày chạy thật) và `access.e2e` A9 (hạn chứng thư `2027-01-01`). Luật nào so với HÔM NAY
+   thì test tính ngày từ `businessDateOf(new Date(), 'Asia/Ho_Chi_Minh')`, không viết cứng.
+   Còn lệch, chưa sửa: `inventory.e2e` "F7: đủ cả giá vốn lẫn nhân sự" lấy hôm nay theo UTC
+   còn F7 neo giờ VN → đỏ nếu chạy 00:00–07:00; `HrService` xét "tuần đã qua" bằng ngày UTC
+   (`todayIso`).
 
 Thấp hơn:
 - `var(--sora-accent)` không tồn tại (`apps/office/src/routes/Cms.tsx:1035`).
