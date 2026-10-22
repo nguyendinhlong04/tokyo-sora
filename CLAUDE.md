@@ -238,7 +238,7 @@ Không emoji trong UI vận hành.
 
 Ảnh món: **PNG tách nền** đặt trên "đĩa ảnh" CSS (radial gradient `--sora-line-1` →
 `--sora-surface-4`, drop-shadow, món chiếm ~80% khung). Khung: 1:1 thumbnail · 4:3 thẻ ·
-3:2 chi tiết. Chưa có ảnh: đĩa trống + kanji đầu tên món (`DishGlyph` web, `Plate` table).
+3:2 chi tiết. Chưa có ảnh: đĩa trống + kanji đầu tên món (`DishGlyph` web, `DishArt` table).
 Không ảnh stock. Yêu cầu kỹ thuật về kích thước/định dạng/tải ảnh ở **§8** — bắt buộc.
 
 ---
@@ -574,9 +574,10 @@ chọn im lặng.
   theo `batchNo` — món gọi từ bàn luôn ở đợt 1) · T9 · T11–T15 · T16 kèm 2 món thay · T17 ·
   màn mờ 3 phút · "Bí quyết thưởng thức" (đọc `/api/site/menu`, chỉ món có bài kể như trang
   web) · giá khuyến mãi (§9.6) · tự về màn đầu khi đóng bàn · màn chờ quảng cáo (§9.1b) ·
-  tự nạp bản mới ở màn chờ. **Chưa:** VI/EN/JA, manifest standalone + Wake Lock, service
-  worker, Realtime thay polling, ảnh lưới thực đơn qua bộ tối ưu (§8 — bắt buộc trước khi
-  lắp iPad thật: lưới đang phát ảnh gốc; dùng `@sora/ui/image` như màn chờ).
+  tự nạp bản mới ở màn chờ · ảnh món qua bộ tối ưu của web (`@sora/ui/image`): thẻ lưới
+  tấm 256 (ô 140 — ≤ 2× theo §8), chi tiết món và "Bí quyết" tấm 640; 10 ảnh món đo được
+  65 MB gốc → 63 KB. **Chưa:** VI/EN/JA, manifest standalone + Wake Lock, service worker
+  (precache ảnh thực đơn của bundle — §8 quy tắc 5), Realtime thay polling.
 - **Offline:** giỏ và lệnh gửi qua outbox như hiện tại; màn chờ vẫn hiển thị khi mất mạng
   (ảnh đã tải nằm trong bộ đệm trình duyệt — chưa có service worker nên bật máy lúc mất
   mạng thì app không lên); thanh toán bị chặn kèm "Vui lòng gọi thu ngân".

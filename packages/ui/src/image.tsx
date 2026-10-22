@@ -30,6 +30,7 @@ export function optimizedSrc(src: string, width: OptimizerWidth): string {
  *
  * `sizes` bắt buộc như `SiteImage` của web — nó quyết định trình duyệt tải tấm nào
  * trong `widths`. `eager` chỉ cho ảnh đang hoặc sắp hiện ngay; còn lại tải lười.
+ * `width`/`height` là tỉ lệ giữ chỗ khi ô ảnh không tự có kích thước (§8).
  */
 export function OptimizedImage({
   src,
@@ -37,6 +38,8 @@ export function OptimizedImage({
   sizes,
   alt,
   eager = false,
+  width,
+  height,
   className,
   style,
 }: {
@@ -45,6 +48,8 @@ export function OptimizedImage({
   sizes: string
   alt: string
   eager?: boolean
+  width?: number
+  height?: number
   className?: string
   style?: CSSProperties
 }) {
@@ -58,6 +63,8 @@ export function OptimizedImage({
       srcSet={direct ? undefined : widths.map((w) => `${optimizedSrc(src, w)} ${w}w`).join(', ')}
       sizes={direct ? undefined : sizes}
       alt={alt}
+      width={width}
+      height={height}
       loading={eager ? 'eager' : 'lazy'}
       fetchPriority={eager ? 'high' : undefined}
       decoding="async"

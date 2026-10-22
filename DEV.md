@@ -133,8 +133,8 @@ location.reload()
    ở màn "Ghép iPad với bàn".
 2. Bàn trống: iPad chiếu màn chờ quảng cáo — khung bật cờ **Chiếu trên iPad tại bàn** ở
    Office → **Nội dung website → W1**; DB seed chưa có khung nào và món chưa có ảnh nên màn
-   chờ là tấm chữ 空. Ảnh đi qua bộ tối ưu của web production (`tokyo-sora.vn/_next/image`)
-   ngay cả trên máy dev. Chạm màn chờ → chọn số người → **Bắt đầu gọi món** là khách tự
+   chờ là tấm chữ 空. Ảnh (màn chờ, thực đơn) đi qua bộ tối ưu của web production
+   (`tokyo-sora.vn/_next/image`) ngay cả trên máy dev. Chạm màn chờ → chọn số người → **Bắt đầu gọi món** là khách tự
    mở bàn, POS thấy bàn "Có khách". Bàn đã mở ở POS thì iPad hỏi lại số khách. Chọn đông
    hơn sức chứa → bàn mở đúng sức chứa và POS nhận yêu cầu "Nhóm N khách — cần ghép thêm
    bàn".

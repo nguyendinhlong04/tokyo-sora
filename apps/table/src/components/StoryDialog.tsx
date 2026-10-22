@@ -1,5 +1,6 @@
 import type { DishStory } from '@sora/contracts'
 import { Money } from '@sora/ui'
+import { OptimizedImage } from '@sora/ui/image'
 import { useEffect, type ReactNode } from 'react'
 import type { Dish } from '../api'
 import { IconClose, IconPlus } from '../icons'
@@ -97,12 +98,15 @@ export function StoryDialog({
             className="relative grid h-[270px] place-items-center border-y border-accent/16 bg-[radial-gradient(120%_100%_at_50%_30%,var(--sora-line-1)_0%,var(--sora-surface-4)_70%)]"
           >
             {dish.imageUrl ? (
-              <img
+              // Ô 329×268, ảnh 263×214 — tấm 640 cho màn mật độ 2×, qua bộ tối ưu (§8.1)
+              <OptimizedImage
                 src={dish.imageUrl}
+                widths={[384, 640]}
+                sizes="263px"
                 alt=""
+                eager
                 width={400}
                 height={300}
-                decoding="async"
                 className="h-[80%] w-[80%] object-contain drop-shadow-lg"
               />
             ) : (
