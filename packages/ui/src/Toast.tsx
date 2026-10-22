@@ -23,7 +23,18 @@ const TONES: Record<ToastTone, string> = {
   info: 'border-info',
 }
 
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({
+  children,
+  placement = 'bottom-right',
+}: {
+  children: ReactNode
+  /**
+   * `bottom-center` cho iPad gọi món tại bàn: cột phải ở đó là giỏ với nút Gửi
+   * bếp, lời báo góc phải đè đúng lên nút — mà lời báo lỗi gửi bếp thì luôn
+   * hiện đúng lúc khách cần bấm lại.
+   */
+  placement?: 'bottom-right' | 'bottom-center'
+}) {
   const [items, setItems] = useState<ToastItem[]>([])
 
   const push = useCallback((message: string, tone: ToastTone = 'info') => {
@@ -43,7 +54,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           tấm trượt ở Table đều ghim z-100, tấm phủ thực đơn Table còn 110. Ở 60
           thì lời báo nằm sau chúng — mà "đã lưu" thì luôn được bấm từ trong ngăn
           kéo, tức là đúng lúc cần báo nhất lại là lúc không thấy gì. */}
-      <div className="pointer-events-none fixed right-6 bottom-6 z-[200] flex flex-col gap-2">
+      <div
+        className={[
+          'pointer-events-none fixed bottom-6 z-[200] flex flex-col gap-2',
+          placement === 'bottom-center' ? 'left-1/2 -translate-x-1/2 items-center' : 'right-6',
+        ].join(' ')}
+      >
         {items.map((item) => (
           <div
             key={item.id}

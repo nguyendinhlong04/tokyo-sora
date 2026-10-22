@@ -1,3 +1,4 @@
+import type { SiteMenu } from '@sora/contracts'
 import { apiFetch, enqueue } from '@sora/core'
 
 export interface TableSession {
@@ -92,9 +93,14 @@ export interface OrderLineRow {
   qty: number
   unitPrice: number
   priceTotal: number
+  /** Tuỳ chọn đóng băng lúc gọi — "Tương Sora · Tỏi nướng" ở Đơn của bàn */
+  modifiers: { optionId: string; name: string; priceDelta: number }[] | null
   note: string | null
   setLabel: string | null
   state: 'draft' | 'queued' | 'cooking' | 'ready' | 'served' | 'voided'
+  voidReason: string | null
+  /** Mọi dòng của cùng một lần "Gửi bếp" mang cùng mốc này — xem `sendRounds` */
+  sentAt: string | null
 }
 
 export interface SessionOrder {
@@ -228,6 +234,12 @@ export const api = {
 
   availability: (branchId: string) =>
     apiFetch<AvailabilityRow[]>(`/api/availability?branch=${branchId}`),
+
+  /**
+   * Thực đơn công khai của trang web — chỉ để đọc phần kể chuyện của món cho nút
+   * "Bí quyết thưởng thức". Giá và món gọi được vẫn lấy từ bundle cấu hình.
+   */
+  siteMenu: () => apiFetch<SiteMenu>('/api/site/menu'),
 
   order: (sessionId: number) => apiFetch<SessionOrder | null>(`/api/table-sessions/${sessionId}/order`),
 

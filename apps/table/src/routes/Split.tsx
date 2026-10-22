@@ -8,9 +8,9 @@ import { myPayments, rememberPayment } from '../my-payments'
 import { useTableSession } from '../table-context'
 import { useCallStaff, useOutbox } from './Shell'
 
-type Mode = 'all' | 'even' | 'pick'
+export type Mode = 'all' | 'even' | 'pick'
 
-const MODES: { mode: Mode; name: string; hint: string }[] = [
+export const MODES: { mode: Mode; name: string; hint: string }[] = [
   { mode: 'all', name: 'Trả hết', hint: 'Một người trả trọn số còn lại của bàn.' },
   { mode: 'even', name: 'Chia đều', hint: 'Chia số còn lại thành các phần bằng nhau.' },
   { mode: 'pick', name: 'Chọn món mình trả', hint: 'Chỉ trả những món bạn ăn.' },

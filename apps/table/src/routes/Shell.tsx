@@ -149,7 +149,7 @@ function IconButton({
  * "quét lại mã để bắt đầu" thì thấy như bị đuổi khéo; còn người mới mở app mà
  * đọc lời cảm ơn thì không hiểu chuyện gì.
  */
-function ScanAgain({ ended }: { ended: boolean }) {
+export function ScanAgain({ ended }: { ended: boolean }) {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-canvas px-8 text-center">
       <span className="font-jp text-[56px] leading-none text-gold-900">{ended ? '謝' : '空'}</span>

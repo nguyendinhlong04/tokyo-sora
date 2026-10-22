@@ -3,19 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { api, type OrderLineRow } from '../api'
 import { BottomBar, BottomBarSpacer } from '../components/BottomBar'
+import { LABELS, STEPS } from '../order-status'
 import { useTableSession } from '../table-context'
-
-/** Bốn nấc khách nhìn thấy; `draft` là món chưa gửi nên chưa vào thang này */
-const STEPS: OrderLineRow['state'][] = ['queued', 'cooking', 'ready', 'served']
-
-const LABELS: Record<OrderLineRow['state'], string> = {
-  draft: 'Chờ gửi bếp',
-  queued: 'Bếp đã nhận',
-  cooking: 'Đang làm',
-  ready: 'Sắp ra',
-  served: 'Đã ra',
-  voided: 'Đã huỷ',
-}
 
 /**
  * T8 Đơn của bàn.

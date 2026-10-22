@@ -32,9 +32,10 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
   chạy bản giả lập (`MockBankProvider`); chưa có cầu in; **chưa có app nào nghe
   realtime** — tất cả đang polling (§5.6). Nhánh làm việc: `gd1-xuong-song-van-hanh`.
 - **Định hướng 10/2026** (§9): mỗi bàn một **iPad Gen 7** gắn cố định để khách gọi món
-  (thay QR điện thoại); **bàn đôi** chạy độc lập hoặc ghép; **màn chờ chạy quảng cáo**
-  khi bàn chưa mở; POS gọi món của nhân viên chạy tốt trên **cả iPad lẫn điện thoại**;
-  **dựng lại màn bếp**; **tốc độ là yêu cầu cứng** — ảnh trên web hiện quá chậm (§8).
+  và **tự mở bàn** (QR điện thoại **bỏ hẳn**); **bàn đôi** chạy độc lập hoặc ghép; **màn
+  chờ chạy quảng cáo** khi bàn chưa mở; POS gọi món của nhân viên chạy tốt trên **cả iPad
+  lẫn điện thoại**; **dựng lại màn bếp**; **khuyến mãi áp dụng chung** mọi kênh, giá giảm
+  ghi thẳng vào đơn (§9.6); **tốc độ là yêu cầu cứng** — ảnh trên web hiện quá chậm (§8).
 
 ---
 
@@ -44,7 +45,7 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
 |---|---|---|---|---|---|
 | `apps/api` | `@sora/api` | API NestJS | — | `:3000` | `api.tokyo-sora.vn` (Vercel Function, vùng `sin1`) |
 | `apps/web` | `@sora/web` | Sora Web (Next 15) | Khách online · máy tính + điện thoại | `:3001` | `tokyo-sora.vn` |
-| `apps/table` | `@sora/table` | Sora Table | Khách tại bàn · hiện: điện thoại quét QR → **sắp tới: iPad gắn bàn** | `:5173` | `ban.tokyo-sora.vn` |
+| `apps/table` | `@sora/table` | Sora Table | Khách tại bàn · **iPad gắn bàn** (bố cục iPad đã dựng — §9.1) · điện thoại quét QR **sẽ gỡ** | `:5173` | `ban.tokyo-sora.vn` |
 | `apps/pos` | `@sora/pos` | Sora POS (PWA) | Phục vụ, thu ngân · tablet 11″ ngang + máy thu ngân 22″ → **sắp tới thêm iPad & điện thoại** | `:5174` | `pos.tokyo-sora.vn` |
 | `apps/kitchen` | `@sora/kitchen` | Sora Kitchen / KDS (PWA) | Bếp từng trạm, ra món · TV 32–43″ 1920×1080, Android box | `:5175` | `kds.tokyo-sora.vn` |
 | `apps/office` | `@sora/office` | Sora Office | Chủ, quản lý, kế toán, HR, marketing · desktop 1440+, **nền sáng** | `:5176` | `admin.tokyo-sora.vn` |
@@ -203,7 +204,8 @@ Thành phần dùng `h-[var(--hit-target)]`, không hard-code chiều cao nút.
 ### 4.5 Bố cục và điều kiện thực tế
 Bếp hơi nước, tay ướt → nút to, không hover, không kéo-thả. Sàn ồn 75 dB → không dựa
 vào âm thanh. Bàn ăn tối → tương phản dư. Nhân viên cầm khay → POS thao tác một tay,
-phím chính nửa dưới màn. Khách: nút hành động ở 1/3 dưới màn, chữ nhỏ nhất 14px.
+phím chính nửa dưới màn. Khách: nút hành động ở 1/3 dưới màn, chữ nhỏ nhất 14px
+(iPad tại bàn: chữ phụ 13px theo thang đã duyệt ở §9.1).
 Trạng thái: rỗng = một câu + một nút (`EmptyState`); đang tải = `Skeleton` đúng hình,
 không spinner toàn màn; lỗi = nói chuyện gì xảy ra và làm gì tiếp (`ErrorState`);
 mất mạng = dải báo + hàng đợi cục bộ, màn thanh toán bị chặn.
@@ -360,7 +362,8 @@ có sẵn nhưng **chưa được đọc/ghi** — bàn đôi ở §9.2 sẽ dù
 
 **Luồng QR điện thoại hiện tại:** QR dán cố định `${VITE_TABLE_ORIGIN}/t/<branchId>/<tableCode>`
 → `POST /api/table-devices/join` (bàn phải mở; Wi-Fi quán theo IP hop `TRUSTED_PROXY_HOPS`;
-không thì chủ bàn duyệt) → cookie `sora_table`. Luồng này **sắp thành đường phụ** (§9.1).
+không thì chủ bàn duyệt) → cookie `sora_table`. Luồng này **sẽ gỡ hẳn** (chốt 22/10/2026,
+§9.1) cùng lúc với ghép iPad kind `table` — tới lúc đó iPad vẫn vào bàn bằng chính đường này.
 
 ### 5.6 Realtime và offline — hiện trạng cần biết
 - **Phát:** `emit(tx, …)` ghi `outbox_events`; trigger `sora_broadcast_outbox` (migration
@@ -513,31 +516,47 @@ trước khi làm — hỏi, đừng tự chọn im lặng.
   ghép bằng mã 6 số sinh ở Office A4 có chọn bàn. Xác thực qua lớp 3 của `AuthGuard`
   (`x-sora-device`) → actor thiết bị-bàn, phạm vi = **phiên đang mở của chính bàn đó**.
   Không còn cookie `sora_table`, không còn kiểm Wi-Fi, không còn chủ bàn duyệt cho luồng
-  chính. Thu hồi từ xa ở A4 như mọi thiết bị. **[quyết định mở]** luồng QR điện thoại giữ
-  làm đường phụ (khách muốn gọi trên máy mình) hay gỡ hẳn — mặc định: giữ code, không mở
-  rộng, không hiện QR trên POS.
+  chính. Thu hồi từ xa ở A4 như mọi thiết bị. **Luồng QR điện thoại: gỡ hẳn** (chốt
+  22/10/2026) — gỡ cùng lúc với ghép thiết bị kind `table`, vì iPad đang vào bàn bằng chính
+  luồng đó: `table-devices/*`, cookie `sora_table`, màn `Enter`/`Waiting`/`HostApproval`,
+  bố cục điện thoại của `apps/table`, mã QR ở POS P3.
 - **Vòng đời màn hình** (server quyết định, iPad chỉ render theo phiên của bàn):
   1. **Bàn chưa mở → màn chờ quảng cáo** (§9.1b).
   2. Mở phiên: nhân viên mở ở POS P3 như hiện tại, **và** khách chạm "Bắt đầu gọi món" trên
-     iPad → hỏi số khách → tạo phiên, POS thấy bàn chuyển "có khách" ngay. **[quyết định
-     mở]** có cho khách tự mở phiên hay bắt buộc nhân viên.
+     iPad → hỏi số khách → tạo phiên, POS thấy bàn chuyển "có khách" ngay. **Khách được
+     tự mở bàn** (chốt 22/10/2026); bàn có đặt chỗ trong 90′ thì iPad không mở mà mời gọi
+     nhân viên (409 `table_reserved`).
   3. T2 thực đơn → giỏ → gửi bếp → T8 theo dõi → T9 gọi nhân viên (than, đá/nước, phục vụ,
      tính tiền, khác) → T10 tạm tính → VietQR hoặc gọi thu ngân → "Đã thanh toán, chờ dọn".
   4. Nhân viên đóng bàn ở POS → iPad **tự quay về màn chờ** trong ≤ 3 s (cần realtime hoặc
      polling 2 s khi ở trạng thái `paid_wait_clear`).
-- **Bố cục T2 trên iPad** (tham khảo cách Torikizoku đặt tablet gắn đế mỗi bàn, tổng tiền
-  luôn hiện, nút tính tiền hỏi số người, nhóm "dịch vụ" để gọi nước/gia vị; không có tài
-  liệu công khai mô tả bố cục màn của họ — bố cục dưới là quyết định của ta):
-  - Thanh trên 56px: số bàn + khu, ngôn ngữ **VI / EN / JA**, **Gọi nhân viên**, **Đơn của
-    bàn** (kèm số món đang làm), đồng hồ.
-  - Cột trái 200px: 10 nhóm món dính, kanji nhóm + tên Việt, nhóm con khi > 12 món.
-  - Giữa: lưới **3 cột** thẻ 4:3, ảnh đĩa, tên VI + JA, giá mono, nút **+** nhanh (món
-    không bắt buộc tuỳ chọn); món hết xám hoá, không ẩn; chạm thẻ → sheet chi tiết T3.
-  - Cột phải 320px: giỏ cố định, **tổng tiền luôn thấy**, nút **Gửi bếp** cao ≥ 64px ở
-    dưới cùng; sau khi gửi: tóm tắt đợt vừa gửi 2 s rồi trở lại.
-  - Chữ nhỏ nhất **16px**; vùng chạm **≥ 52px** (dùng `data-scale="pos"` hoặc thêm
-    `data-scale="table-ipad"`); không hover, không kéo-thả; một tay cầm đũa bấm được.
-  - Món nướng ở bàn không bếp hiện nhãn "Bếp nướng sẵn · thêm N phút" (đã có logic).
+- **Bố cục iPad — đã duyệt 22/10/2026** (bản vẽ canvas "Gọi món tại bàn · iPad"; thay bản
+  16px/52px trước đó — chủ dự án thấy chữ to, kém tinh tế). Khung thiết kế **1080×740**:
+  màn 1080×810 trừ thanh trạng thái và thanh Safari (707 khi mở hai tab — vẫn vừa).
+  - Thanh trên 56px: TOKYO SORA · bàn + khu + số khách · **Gọi nhân viên** · **Đơn của
+    bàn** kèm tổng tiền. Ngôn ngữ VI / EN / JA có trong bản vẽ nhưng **chưa làm** (app chưa
+    có i18n).
+  - Cột nhóm 184px: kanji + tên nhóm + số phần đang chọn; **Tìm món** và **Bộ lọc** ở đáy
+    cột, mở ngay trong cột giữa. Nhóm có > 1 chặng (bò/heo/hải sản/rau) có thẻ nhóm con.
+  - Giữa: lưới **3 cột** thẻ 4:3 (~176px), tên Việt 2 dòng rồi tên Nhật 1 dòng, giá mono,
+    nút **+** 32px vẽ trong vùng chạm 44px ở hàng giá; món phải chọn vị có chấm kem; món
+    hết đóng dấu "Đã hết" và xám, không ẩn; chạm thẻ → hộp chi tiết T3 hai cột 820×620.
+  - Cột giỏ 304px: "Món đang chọn", tạm tính đợt này, **Gửi bếp** (Button `lg`) ở đáy;
+    nhãn +1/+2/+3 bay vào giỏ; gửi xong tóm tắt đợt 2 s rồi trở lại.
+  - Chữ: **13** phụ · **14** nội dung · **16** nút chính · **22** tên món ở chi tiết ·
+    **30** tiêu đề Cormorant; chữ vàng vẫn ≥ 14. Vùng chạm **44px** (không dùng
+    `data-scale`). Bo 4 nút/ô nhập/nhãn · 8 thẻ · 12 hộp thoại. Không hover, không kéo-thả.
+  - Món nướng định tuyến theo bàn: bàn có bếp → "Món ra sống — tự nướng tại bàn"; không
+    bếp → "Bếp nướng sẵn, chậm hơn khoảng 8 phút".
+- **Trạng thái 22/10/2026 — đã dựng trong `apps/table`** (bố cục chọn theo bề rộng
+  ≥ 900px ở `src/layout.ts`; màn `routes/Ipad*.tsx`; cùng địa chỉ với bố cục điện thoại):
+  T1 số khách (1–6 + ô "Khác"; quá sức chứa bàn thì gọi nhân viên ghép bàn) · T2–T7 ·
+  T8+T10 chung một màn (nhóm theo **lượt gửi bếp** `sentAt`, không theo `batchNo` — món gọi
+  từ bàn luôn ở đợt 1) · T9 · T11–T15 · T16 kèm 2 món thay · T17 · màn mờ 3 phút ·
+  "Bí quyết thưởng thức" (đọc `/api/site/menu`, chỉ món có bài kể như trang web). **Chưa:**
+  thiết bị kind `table`, màn chờ, khách tự mở bàn, tự về màn chờ, gỡ QR, VI/EN/JA, giá
+  khuyến mãi (§9.6), manifest standalone + Wake Lock, ảnh qua bộ tối ưu (§8 — bắt buộc
+  trước khi lắp iPad thật: lưới đang phát ảnh gốc).
 - **Offline:** giỏ và lệnh gửi qua outbox như hiện tại; màn chờ vẫn hiển thị khi mất mạng
   (nội dung đã cache); thanh toán bị chặn kèm "Vui lòng gọi thu ngân".
 - **Cập nhật phần mềm:** chỉ tự reload khi đang ở **màn chờ** (không bao giờ giữa bữa).
@@ -618,10 +637,24 @@ Mục tiêu bản dựng lại (giữ nguyên API; đổi client):
 1. Đường ống ảnh + sửa hero/thumbnail web (§8) — thấy ngay, không đụng nghiệp vụ.
 2. Realtime client dùng chung (`@sora/core`), áp cho KDS trước.
 3. Dựng lại KDS (§9.4).
-4. Thiết bị kind `table` + vòng đời phiên theo bàn + màn chờ + T2 iPad (§9.1).
+4. Thiết bị kind `table` + vòng đời phiên theo bàn + màn chờ + khách tự mở bàn + gỡ QR
+   (§9.1). Giao diện T1–T17 iPad đã dựng (22/10/2026).
 5. Bàn đôi (§9.2).
 6. POS ba khổ (§9.3).
 Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
+Chen ngay sau giao diện iPad, theo yêu cầu 22/10/2026: **khuyến mãi áp dụng chung** (§9.6).
+
+### 9.6 Khuyến mãi áp dụng chung (chốt 22/10/2026)
+Hiện khuyến mãi (Office B11 `/khuyen-mai`, `crm.promotions`) chỉ được thu ngân áp ở P10
+(`promotions/quote` + `/redeem`); khách ở bàn, trên web hay trên POS không thấy giá giảm ở
+đâu cả. Đã chốt:
+- **Một bộ máy cho mọi kênh** — iPad tại bàn, web, POS, giao hàng — thay cho áp tay ở quầy.
+- **Đích áp:** từng món, set, cả hoá đơn, cùng các dạng phổ biến của nhà hàng (nghiên cứu
+  khi làm).
+- **Giá giảm ghi thẳng vào dòng đơn qua API** lúc gọi món, đóng băng như giá (kèm giá gốc
+  và chương trình để báo cáo, kế toán đối chiếu); app chỉ hiển thị.
+- **Trang B11 làm lại** theo mô hình mới.
+Thiết kế chi tiết (loại, điều kiện, cộng dồn, kế toán, hiển thị) viết vào đây khi làm.
 
 ---
 

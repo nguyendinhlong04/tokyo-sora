@@ -5,7 +5,7 @@ import { api, type RequestKind } from '../api'
 import { useTable } from '../table-context'
 import { Sheet } from './Sheet'
 
-const KINDS: { kind: RequestKind; label: string }[] = [
+export const KINDS: { kind: RequestKind; label: string }[] = [
   { kind: 'phuc-vu', label: 'Gọi phục vụ' },
   { kind: 'them-than', label: 'Thêm than' },
   { kind: 'da-nuoc', label: 'Đá · nước' },

@@ -9,10 +9,10 @@ import { useCart } from '../cart-context'
 import { matches, needsChoice, useMenu } from '../menu'
 import { useTableSession } from '../table-context'
 
-const RECENT_KEY = 'sora.table.recent-searches'
-const RECENT_MAX = 4
+export const RECENT_KEY = 'sora.table.recent-searches'
+export const RECENT_MAX = 4
 
-function loadRecent(): string[] {
+export function loadRecent(): string[] {
   try {
     const raw = sessionStorage.getItem(RECENT_KEY)
     return raw ? (JSON.parse(raw) as string[]) : []
