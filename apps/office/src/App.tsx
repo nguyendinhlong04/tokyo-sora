@@ -391,7 +391,11 @@ function Shell() {
 
   // Nhóm chứa trang đang xem luôn tự mở. Không có cái này thì bấm một liên kết
   // trong trang (ví dụ M4 mở màn sửa công thức) sẽ để menu chỉ vào chỗ khác.
-  const activeGroup = visible.find((g) => g.items.some((i) => pathname.startsWith(i.to)))?.group
+  // So theo đoạn đường dẫn như NavLink, không theo ký tự: `startsWith` trần cho
+  // `/nhat-ky-thao-tac` (A7) khớp `/nhat-ky` (F2) và mở nhầm nhóm Tài chính.
+  const activeGroup = visible.find((g) =>
+    g.items.some((i) => pathname === i.to || pathname.startsWith(`${i.to}/`)),
+  )?.group
   useEffect(() => {
     if (activeGroup) setOpenGroup(activeGroup)
   }, [activeGroup])
