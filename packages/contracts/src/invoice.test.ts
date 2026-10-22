@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   buyerLabelOf,
   CONSUMER_BUYER_LABEL,
-  InvoiceBuyerSchema,
   isOrgTaxCode,
   isPersonalTaxCode,
   normalizeTaxCode,
   taxCodeChecksumOk,
 } from './invoice'
+import { InvoiceBuyerSchema } from './invoice-buyer'
 
 describe('Mã số thuế', () => {
   it.each([

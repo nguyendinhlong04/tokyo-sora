@@ -615,22 +615,24 @@ làm và cách áp lại cho các app khác: **§8.1**. Sora Table dùng chung b
 - Ảnh thumbnail (176–400px) ≤ 40 KB · thẻ 4:3 (800px) ≤ 120 KB · hero/chi tiết (1600px)
   ≤ 250 KB · tổng ảnh một màn thực đơn ≤ 1,5 MB · JS mỗi SPA ≤ 250 KB gzip, web ≤ 200 KB.
 - Office (22/10/2026, tách chunk theo màn — §6): chunk đầu 122 KB gzip sau khi gộp nhánh tổ
-  chức và hoá đơn điện tử (112 KB trên gd1 riêng), mỗi màn thêm 2–11 KB khi mở lần đầu;
-  trước đó một chunk 281 KB.
+  chức và hoá đơn điện tử (112 KB trên gd1 riêng), mỗi màn thêm 2–11 KB khi mở lần đầu —
+  riêng F2–F6 (chung file `Accounting.tsx`) 31 KB vì form người mua của F3 cần zod; trước đó
+  một chunk 281 KB.
 - `@sora/contracts` và `@sora/core` khai `"sideEffects": false` (22/10/2026): bundler bỏ cả
-  file mà app không dùng export nào. zod còn ở form người mua hoá đơn `@sora/ui/InvoiceBuyer`
-  (POS, iPad bàn, web O5/O7, Office F3) — nơi thật sự parse — và ở M1 Office: `DishEditor`
-  dùng `VAT_CODES` của `invoice.ts`, file dựng `InvoiceBuyerSchema` ở cấp module (trái quy tắc
-  2 dưới đây). Dexie rời Office và staff (không dùng outbox). Chunk đầu, kB gzip trước → sau:
-  Office 176 → 122 · staff 156 → 102 · KDS 137 → 117 · kiosk 128 → 108 · POS 192 và table 187
-  gần như giữ nguyên (form người mua); web: First Load JS của 8 trang giảm 19–22 kB (trang
-  chủ 142 → 121).
+  file mà app không dùng export nào. zod chỉ còn ở nơi thật sự parse — form người mua hoá đơn
+  `@sora/ui/InvoiceBuyer` (POS, iPad bàn, web O5/O7, Office F3); Dexie rời Office và staff
+  (không dùng outbox). Chunk đầu, kB gzip trước → sau: Office 176 → 122 · staff 156 → 102 ·
+  KDS 137 → 117 · kiosk 128 → 108 · POS 192 và table 187 gần như giữ nguyên (form người mua);
+  web: First Load JS của 8 trang giảm 19–22 kB (trang chủ 142 → 121). Vào M1 `/mon` của
+  Office (chunk đầu + chunk của màn): 188 → 135 kB gzip.
   Giữ được nhờ hai quy tắc:
   1. Không file nào trong hai gói được trông vào "import là chạy" (polyfill, đăng ký toàn
      cục, `import './x'` trần). Cần thì liệt kê đúng file đó trong `"sideEffects"`.
   2. Hằng và hàm mà client dùng **không** đặt chung file với schema zod dựng ở cấp module
-     (`domain.ts`, `events.ts`): dùng một export của file là bundler giữ luôn các lệnh dựng
-     schema, kéo theo cả zod (~18 kB gzip). Vì vậy `IDEMPOTENCY_HEADER` nằm riêng ở `http.ts`.
+     (`domain.ts`, `events.ts`, `invoice-buyer.ts`): dùng một export của file là bundler giữ
+     luôn các lệnh dựng schema, kéo theo cả zod (~18 kB gzip). Vì vậy `IDEMPOTENCY_HEADER`
+     nằm riêng ở `http.ts`, và `InvoiceBuyerSchema` nằm riêng ở `invoice-buyer.ts` — M1 chỉ
+     cần `VAT_CODES` của `invoice.ts`.
 
 **Quy tắc ảnh (áp cho mọi app, mọi ảnh mới):**
 1. **Không bao giờ phát ảnh gốc.** Mọi ảnh đi qua một đường ống sinh biến thể
@@ -999,8 +1001,9 @@ chỉ ghi khi khách yêu cầu, không thì "Bán cho người tiêu dùng". Mo
 - **Bất biến:** tờ `issued` không sửa, không xoá; sai thì **thay thế** (TT 91 Điều 10): bản
   cũ sang `replaced` kèm lý do, bản mới số mới trỏ `replaces_id`. `voided` chỉ cho tờ chưa
   cấp số.
-- **Người mua:** `orders.invoice_buyer` (`InvoiceBuyer` ở `packages/contracts/src/invoice.ts`;
-  null = người tiêu dùng). `company`: MST 10 hoặc 10-3 số, tên, địa chỉ bắt buộc, email,
+- **Người mua:** `orders.invoice_buyer` (`InvoiceBuyer` ở
+  `packages/contracts/src/invoice-buyer.ts`; null = người tiêu dùng). `company`: MST 10 hoặc
+  10-3 số, tên, địa chỉ bắt buộc, email,
   người mua hàng, `corporateId` (chỉ nhân viên gắn được). `person`: họ tên; có MST 10 số hay
   số định danh 12 số thì bắt buộc địa chỉ. Khai bằng `PUT table-sessions/:id/invoice-buyer`
   (POS, iPad — quyền `order.create`) và `customer.invoiceBuyer` lúc đặt hay
