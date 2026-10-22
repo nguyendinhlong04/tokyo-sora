@@ -23,6 +23,7 @@ import {
   tableSessions,
 } from '../../db/schema'
 import { CustomersService } from '../crm/customers.service'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 import { alreadyPaid } from './payments.service'
@@ -41,6 +42,7 @@ export class SplitPaymentService {
     private readonly audit: AuditService,
     private readonly customers: CustomersService,
     private readonly ordering: OrderingService,
+    private readonly einvoice: EinvoiceService,
   ) {}
 
   /**
@@ -518,6 +520,12 @@ export class SplitPaymentService {
         paidVnd: order.moneyTotal,
         businessDate: order.businessDate,
       })
+      /**
+       * Hoá đơn chỉ được XẾP ở đây, không phát hành: webhook ngân hàng không được
+       * đứng chờ nhà cung cấp hoá đơn (ngân hàng gửi lại khi trả lời chậm). Lượt đọc
+       * kế tiếp — iPad hỏi hoá đơn, POS hỏi hàng chờ — sẽ phát hành nó.
+       */
+      await this.einvoice.enqueueForPaidOrder(tx, orderId)
     }
     return state
   }

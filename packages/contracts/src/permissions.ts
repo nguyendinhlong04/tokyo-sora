@@ -191,6 +191,15 @@ export const ACTIONS = {
     label: 'Sổ kế toán / khoá sổ kỳ',
     grants: { R8: A, R10: A },
   },
+  /**
+   * Hoá đơn lập lúc thu đủ tiền (NĐ 254/2026 Điều 9) — việc thường ngày của quầy,
+   * không phải việc của kế toán. Phát hành lại chỉ đẩy lại đúng hoá đơn đã dựng,
+   * không đổi nội dung, nên không cần duyệt.
+   */
+  'einvoice.issue': {
+    label: 'Phát hành / phát hành lại HĐĐT tại quầy',
+    grants: { R2: A, R7: A, R8: A, R10: A },
+  },
   'einvoice.void-replace-adjust': {
     label: 'Huỷ / thay thế / điều chỉnh HĐĐT',
     grants: { R7: P, R8: A, R10: A },

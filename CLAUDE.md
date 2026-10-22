@@ -309,7 +309,7 @@ bridge`); (4) 401 trừ `@Public`. Route khách chạm được **phải** gọi
 `assertOwnTableSession(actor, sessionId)` (chặn cả iPad bàn chưa mở); việc của nhân viên —
 mở bàn bất kỳ, nhả đợt, huỷ dòng, sơ đồ P2, hàng đợi P12, Expo — chặn `customer` và iPad.
 
-Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 58 action
+Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 59 action
 `domain.verb`, mỗi ô `allow | approve | deny`. `PermissionGuard` chỉ chặn `deny`; ô
 `approve` (△) thì service phải `ApprovalService.authorize(tx, …)` với body
 `approval: {approverStaffId, approverPin, reason}` — người duyệt phải khác người làm

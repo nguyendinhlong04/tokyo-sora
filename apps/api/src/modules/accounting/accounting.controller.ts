@@ -39,6 +39,12 @@ const ReplaceBody = z.object({
   approval: Approval,
 })
 
+/** Trần mỗi lượt bấm: mỗi hoá đơn một lượt gọi nhà cung cấp, hàm Vercel sống 30 giây */
+const RetryBody = z.object({
+  branchId: z.string().min(1),
+  limit: z.number().int().min(1).max(20).default(10),
+})
+
 const LockBody = z.object({
   branchId: z.string().min(1),
   month: BusinessDate,
@@ -91,6 +97,23 @@ export class AccountingController {
   @RequirePermission('accounting.ledger-close-period')
   issue(@Param('orderId', ParseIntPipe) orderId: number, @Req() req: RequestWithActor) {
     return this.einvoice.issueForOrder(orderId, req.actor!)
+  }
+
+  /**
+   * Hàng hoá đơn chưa lên được — trạm thu ngân POS hỏi định kỳ, và mỗi lượt hỏi
+   * đẩy vài hoá đơn tới lượt (máy chủ không có tiến trình nền).
+   */
+  @Get('invoices/pending')
+  @RequirePermission('einvoice.issue')
+  pending(@Query('branch') branch: string) {
+    return this.einvoice.queue(this.requireBranch(branch))
+  }
+
+  @Post('invoices/retry')
+  @RequirePermission('accounting.ledger-close-period')
+  retry(@Body() body: unknown, @Req() req: RequestWithActor) {
+    const { branchId, limit } = RetryBody.parse(body)
+    return this.einvoice.retryAll(branchId, limit, req.actor!)
   }
 
   @Post('invoices/:id/void')

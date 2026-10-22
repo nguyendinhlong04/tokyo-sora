@@ -19,6 +19,7 @@ import {
   tables,
 } from '../../db/schema'
 import { CustomersService } from '../crm/customers.service'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 
@@ -40,6 +41,7 @@ export class ReconcileService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly customers: CustomersService,
+    private readonly einvoice: EinvoiceService,
   ) {}
 
   // ------------------------------------------------------- P14 đóng ca
@@ -730,6 +732,8 @@ export class ReconcileService {
         paidVnd: order.moneyTotal,
         businessDate: order.businessDate,
       })
+      // Chỉ xếp hoá đơn; trạm thu ngân hỏi hàng chờ vài chục giây một lần sẽ phát hành
+      await this.einvoice.enqueueForPaidOrder(tx, orderId)
     }
     return state
   }

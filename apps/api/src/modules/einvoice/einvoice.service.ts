@@ -11,6 +11,7 @@ import {
   type InvoiceBuyer,
   type InvoiceDocument,
   type InvoiceState,
+  type InvoiceStatus,
   type InvoiceView,
   type VatCode,
 } from '@sora/contracts'
@@ -31,13 +32,14 @@ import {
   orders,
   payments,
   promotions,
+  tableSessions,
 } from '../../db/schema'
 import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
 import { vatRatesOf } from '../ordering/vat-rates'
 import { buildInvoiceDocument, type DocumentResult } from './domain/document'
-import { assertInvoiceSerial, formatInvoiceNo, serialForDate } from './domain/serial'
+import { assertInvoiceSerial, formatInvoiceNo, retryDelayMs, serialForDate } from './domain/serial'
 import {
   EINVOICE_PROVIDER,
   type EinvoiceIssueInput,
@@ -116,7 +118,13 @@ export class EinvoiceService {
     try {
       return await tx.transaction(async (sp) => {
         const [order] = await sp.select().from(orders).where(eq(orders.id, orderId))
-        if (!order || order.paymentState !== 'paid' || order.status === 'cancelled') return null
+        if (!order || order.status === 'cancelled') return null
+        // Bill 0đ mà có món (toàn món tặng) vẫn phải có hoá đơn — hàng khuyến mại
+        const settled =
+          order.paymentState === 'paid' || (order.moneyTotal === 0 && order.moneySub > 0)
+        if (!settled) return null
+        // Đơn giao lập lúc giao xong (bán hàng hoá — lúc chuyển giao), không lúc trả trước
+        if (order.type === 'delivery' && order.status !== 'done') return null
         if (EXTERNAL_CHANNELS.has(order.channel)) return null
         if (!(await this.enabledFor(order.branchId))) return null
         return this.insertPending(sp, order)
@@ -384,6 +392,138 @@ export class EinvoiceService {
   }
 
   // ================================================================ Đọc
+
+  /**
+   * Hoá đơn của một bàn — POS P10/P11 và iPad T10/T11/T15 hỏi cùng một chỗ.
+   *
+   * Hỏi cũng là đẩy: hoá đơn còn chờ mà tới lượt thử thì phát hành rồi mới trả
+   * lời. Webhook VietQR chỉ xếp hàng, nên chính lượt hỏi của iPad sau khi khách
+   * chuyển khoản là lượt phát hành.
+   */
+  async statusForSession(sessionId: number): Promise<InvoiceStatus> {
+    const [session] = await this.db
+      .select({ branchId: tableSessions.branchId, status: tableSessions.status })
+      .from(tableSessions)
+      .where(eq(tableSessions.id, sessionId))
+    if (!session) throw new NotFoundException('Không có phiên bàn này')
+    const [order] = await this.db.select().from(orders).where(eq(orders.tableSessionId, sessionId))
+    if (!order) {
+      return {
+        enabled: await this.enabledFor(session.branchId),
+        editable: false,
+        buyer: null,
+        invoice: null,
+      }
+    }
+    return this.statusOf(order, session.status !== 'closed')
+  }
+
+  /** Hoá đơn của một đơn bất kỳ — POS (đơn online), Office */
+  async statusForOrder(orderId: number): Promise<InvoiceStatus> {
+    const [order] = await this.db.select().from(orders).where(eq(orders.id, orderId))
+    if (!order) throw new NotFoundException('Không có đơn này')
+    return this.statusOf(order, order.status !== 'cancelled')
+  }
+
+  private async statusOf(order: OrderRow, open: boolean): Promise<InvoiceStatus> {
+    let live = await this.liveOf(order.id)
+    if (live && this.due(live)) {
+      const view = await this.issueQuietly(live.id)
+      if (view) live = await this.row(live.id)
+    }
+    return {
+      enabled: await this.enabledFor(order.branchId),
+      editable: open && live?.state !== 'issued',
+      buyer: order.invoiceBuyer ?? null,
+      invoice: live ? this.view(live) : null,
+    }
+  }
+
+  /**
+   * Hàng hoá đơn chưa lên được của chi nhánh — trạm thu ngân hỏi vài chục giây
+   * một lần. Mỗi lượt hỏi đẩy tối đa hai hoá đơn tới lượt, trong năm giây: lượt hỏi
+   * không được thành lượt chờ, và máy chủ không có tiến trình nền nào làm thay.
+   */
+  async queue(branchId: string) {
+    const rows = await this.db
+      .select()
+      .from(invoices)
+      .where(and(eq(invoices.branchId, branchId), inArray(invoices.state, ['pending', 'failed'])))
+      .orderBy(asc(invoices.id))
+      .limit(50)
+
+    const started = Date.now()
+    let pushed = 0
+    for (const row of rows) {
+      if (pushed >= 2 || Date.now() - started > 5_000) break
+      if (!this.due(row)) continue
+      await this.issueQuietly(row.id)
+      pushed++
+    }
+
+    const left = await this.db
+      .select({
+        id: invoices.id,
+        orderId: invoices.orderId,
+        state: invoices.state,
+        lastError: invoices.lastError,
+        attempts: invoices.attempts,
+        orderCode: orders.displayCode,
+      })
+      .from(invoices)
+      .innerJoin(orders, eq(orders.id, invoices.orderId))
+      .where(and(eq(invoices.branchId, branchId), inArray(invoices.state, ['pending', 'failed'])))
+      .orderBy(asc(invoices.id))
+    return {
+      counts: {
+        pending: left.filter((r) => r.state === 'pending').length,
+        failed: left.filter((r) => r.state === 'failed').length,
+      },
+      items: left.slice(0, 20),
+    }
+  }
+
+  /**
+   * F3 "Phát hành lại": đẩy lần lượt các hoá đơn chưa lên được, không đợi lượt
+   * thử tự động. Có trần mỗi lượt bấm — hàm Vercel sống 30 giây.
+   */
+  async retryAll(branchId: string, limit: number, actor: Actor) {
+    const rows = await this.db
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(and(eq(invoices.branchId, branchId), inArray(invoices.state, ['pending', 'failed'])))
+      .orderBy(asc(invoices.id))
+      .limit(limit)
+
+    let issued = 0
+    let failed = 0
+    for (const { id } of rows) {
+      const row = await this.tryIssue(id, actor)
+      if (row.state === 'issued') issued++
+      else failed++
+    }
+    const [rest] = await this.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(invoices)
+      .where(and(eq(invoices.branchId, branchId), inArray(invoices.state, ['pending', 'failed'])))
+    return { processed: rows.length, issued, failed, remaining: Number(rest?.n ?? 0) }
+  }
+
+  /** Tới lượt thử tự động chưa: chưa thử lần nào thì tới ngay, hỏng thì giãn dần */
+  private due(row: InvoiceRow): boolean {
+    if (row.state !== 'pending' && row.state !== 'failed') return false
+    if (row.leaseUntil && row.leaseUntil > new Date()) return false
+    if (!row.lastAttemptAt) return true
+    return Date.now() - row.lastAttemptAt.getTime() >= retryDelayMs(row.attempts)
+  }
+
+  private async liveOf(orderId: number): Promise<InvoiceRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(invoices)
+      .where(and(eq(invoices.orderId, orderId), inArray(invoices.state, LIVE)))
+    return row ?? null
+  }
 
   view(row: InvoiceRow): InvoiceView {
     return {

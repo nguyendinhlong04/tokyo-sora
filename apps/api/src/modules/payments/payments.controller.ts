@@ -33,6 +33,12 @@ const CashBody = z.object({
   tendered: z.number().int().min(0).nullish(),
 })
 
+/** Số phiếu / mã chuẩn chi của máy POS ngân hàng — không bắt buộc, để đối soát */
+const CardBody = z.object({
+  amount: z.number().int().min(1),
+  reference: z.string().trim().max(40).nullish(),
+})
+
 /** P15 gán giao dịch chưa khớp vào bill của một bàn */
 const AssignBody = z.object({
   sessionId: z.number().int().positive(),
@@ -156,5 +162,16 @@ export class PaymentsController {
     @Req() req: RequestWithActor,
   ) {
     return this.payments.payCash(id, CashBody.parse(body), req.actor!)
+  }
+
+  /** P10 thu bằng thẻ — bấm sau khi máy POS ngân hàng in phiếu chuẩn chi */
+  @Post('table-sessions/:id/pay/card')
+  @RequirePermission('payment.reconcile-self-serve')
+  payCard(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: RequestWithActor,
+  ) {
+    return this.payments.payCard(id, CardBody.parse(body), req.actor!)
   }
 }

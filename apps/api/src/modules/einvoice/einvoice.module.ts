@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { createEinvoiceProvider, EINVOICE_PROVIDER } from './einvoice-provider'
+import { EinvoiceController } from './einvoice.controller'
 import { EinvoiceService } from './einvoice.service'
 
 /**
@@ -8,6 +9,7 @@ import { EinvoiceService } from './einvoice.service'
  * Đi ngược chiều đó là vòng phụ thuộc (Accounting → CRM → Ordering đã có sẵn).
  */
 @Module({
+  controllers: [EinvoiceController],
   providers: [EinvoiceService, { provide: EINVOICE_PROVIDER, useFactory: createEinvoiceProvider }],
   exports: [EinvoiceService, EINVOICE_PROVIDER],
 })

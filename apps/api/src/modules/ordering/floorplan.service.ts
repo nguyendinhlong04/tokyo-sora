@@ -10,6 +10,7 @@ import { areas, branches, orders, reservations, tableSessions, tables } from '..
 
 /** Bàn có đặt chỗ trong ngần này phút tới thì hiện nhãn ở P2 và cảnh báo ở P3 (§P2) */
 const RESERVATION_WARN_MINUTES = 90
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 
@@ -18,6 +19,7 @@ export class FloorplanService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly einvoice: EinvoiceService,
   ) {}
 
   /**
@@ -312,11 +314,18 @@ export class FloorplanService {
         })
         .where(eq(tableSessions.id, sessionId))
 
+      let invoiceId: number | null = null
       if (order) {
         await tx
           .update(orders)
           .set({ status: 'done', doneAt: new Date() })
           .where(and(eq(orders.id, order.id), sql`${orders.status} <> 'cancelled'`))
+        /**
+         * Lưới cuối cho hoá đơn: bill trả qua VietQR mà chưa ai hỏi hoá đơn thì đóng
+         * bàn là lúc đẩy nó đi; bàn 0đ toàn món tặng cũng phải có hoá đơn (hàng
+         * khuyến mại vẫn lập hoá đơn — NĐ 254 Điều 4). Đã có hoá đơn thì không làm gì.
+         */
+        invoiceId = await this.einvoice.enqueueForPaidOrder(tx, order.id)
       }
 
       await emit(tx, {
@@ -333,7 +342,10 @@ export class FloorplanService {
         entityId: String(sessionId),
       })
 
-      return { sessionId, changed: true }
+      return { sessionId, changed: true, invoiceId }
+    }).then(async ({ invoiceId, ...result }) => {
+      await this.einvoice.issueQuietly(invoiceId ?? null, actor)
+      return result
     })
   }
 }

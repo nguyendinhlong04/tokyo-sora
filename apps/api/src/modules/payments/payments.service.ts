@@ -22,6 +22,7 @@ import {
   tableSessions,
 } from '../../db/schema'
 import { CustomersService } from '../crm/customers.service'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import type { Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 
@@ -36,6 +37,7 @@ export class PaymentsService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly customers: CustomersService,
+    private readonly einvoice: EinvoiceService,
   ) {}
 
   // ------------------------------------------------------------ Ca (P1/P14)
@@ -200,16 +202,37 @@ export class PaymentsService {
    * nên ghi `paid` luôn. Chuyển khoản thì CHỈ webhook ngân hàng mới đóng khoản —
    * nút của khách không bao giờ đổi trạng thái (quy tắc §20, làm ở GĐ2).
    */
-  async payCash(
+  payCash(sessionId: number, input: { amount: number; tendered?: number | null }, actor: Actor) {
+    return this.collect(sessionId, { kind: 'cash', ...input }, actor)
+  }
+
+  /**
+   * P10 thu bằng thẻ, quẹt trên máy POS của ngân hàng.
+   *
+   * Như tiền mặt, ghi `paid` ngay: thu ngân chỉ bấm sau khi máy POS in phiếu chuẩn
+   * chi — tiền đã được ngân hàng duyệt. Số phiếu (`reference`) để đối soát với sao
+   * kê ngân hàng; không đếm vào quỹ tiền mặt của ca.
+   */
+  payCard(sessionId: number, input: { amount: number; reference?: string | null }, actor: Actor) {
+    return this.collect(sessionId, { kind: 'card', ...input }, actor)
+  }
+
+  /**
+   * Một khoản thu tại quầy. Trả đủ thì xếp hoá đơn điện tử ngay trong transaction
+   * và phát hành sau commit — hoá đơn lập lúc thu đủ tiền (NĐ 254/2026 Điều 9).
+   */
+  private async collect(
     sessionId: number,
-    input: { amount: number; tendered?: number | null },
+    input:
+      | { kind: 'cash'; amount: number; tendered?: number | null }
+      | { kind: 'card'; amount: number; reference?: string | null },
     actor: Actor,
   ) {
     if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
       throw new BadRequestException('Số tiền không hợp lệ')
     }
 
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       const [session] = await tx
         .select()
         .from(tableSessions)
@@ -248,10 +271,11 @@ export class PaymentsService {
           orderId: order.id,
           tableSessionId: sessionId,
           shiftId: shift.id,
-          kind: 'cash',
+          kind: input.kind,
           amount: input.amount,
           state: 'paid',
           paidAt: now,
+          reference: input.kind === 'card' ? (input.reference?.trim() || null) : null,
           createdByKind: 'staff',
           createdById: actor.kind === 'staff' ? String(actor.staffId) : null,
           businessDate: shift.businessDate,
@@ -266,7 +290,7 @@ export class PaymentsService {
         paymentId: payment!.id,
         amount: input.amount,
         actorId: actor.kind === 'staff' ? actor.staffId : null,
-        memo: `Tiền mặt ${order.displayCode}`,
+        memo: `${input.kind === 'card' ? 'Thẻ' : 'Tiền mặt'} ${order.displayCode}`,
         businessDate: shift.businessDate,
       })
 
@@ -274,8 +298,10 @@ export class PaymentsService {
       const paymentState = nowPaid >= order.moneyTotal ? 'paid' : 'partial'
       await tx.update(orders).set({ paymentState }).where(eq(orders.id, order.id))
 
+      let invoiceId: number | null = null
       // Trả đủ thì bàn chuyển "chờ dọn" — KHÔNG tự đóng (§20)
       if (paymentState === 'paid') {
+        invoiceId = await this.einvoice.enqueueForPaidOrder(tx, order.id)
         await tx
           .update(tableSessions)
           .set({ status: 'paid_wait_clear' })
@@ -308,7 +334,7 @@ export class PaymentsService {
 
       await this.audit.write(tx, {
         actor,
-        action: 'payment.cash',
+        action: `payment.${input.kind}`,
         entity: 'payment',
         entityId: String(payment!.id),
         payload: { amount: input.amount, orderId: order.id },
@@ -321,9 +347,17 @@ export class PaymentsService {
         outstanding: Math.max(0, order.moneyTotal - nowPaid),
         paymentState,
         // P11 in bill: tiền thối tính ở đây cho khỏi sai
-        change: input.tendered ? Math.max(0, input.tendered - input.amount) : 0,
+        change:
+          input.kind === 'cash' && input.tendered
+            ? Math.max(0, input.tendered - input.amount)
+            : 0,
+        invoiceId,
       }
     })
+
+    // Sau commit, ngoài transaction: gọi nhà cung cấp không được giữ kết nối CSDL
+    const { invoiceId, ...rest } = result
+    return { ...rest, invoice: await this.einvoice.issueQuietly(invoiceId, actor) }
   }
 
   private async requireOpenShift(tx: Tx, branchId: string) {

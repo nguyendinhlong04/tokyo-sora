@@ -13,6 +13,7 @@ import { emit } from '../../common/outbox'
 import type { Db } from '../../db/client'
 import { orderLines, orders, payments, ticketItems, tickets } from '../../db/schema'
 import { CustomersService } from '../crm/customers.service'
+import { EinvoiceService } from '../einvoice/einvoice.service'
 import { actorRoles, type Actor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
 import { prepayDueOf } from '../ordering/domain/prepay'
@@ -38,6 +39,7 @@ export class DispatchService {
     private readonly ordering: OrderingService,
     private readonly audit: AuditService,
     private readonly customers: CustomersService,
+    private readonly einvoice: EinvoiceService,
   ) {}
 
   /**
@@ -201,6 +203,16 @@ export class DispatchService {
       // Xác nhận đơn = gửi bếp. Vé sinh qua đúng miền định tuyến của đơn tại bàn.
       const tickets = to === 'confirmed' ? await this.ordering.fireOnlineOrder(tx, order, actor) : 0
 
+      /**
+       * Đơn giao lập hoá đơn lúc giao xong — bán hàng hoá thì lập lúc chuyển giao
+       * (NĐ 254 Điều 9). Đơn trả trước đã "đã trả đủ" từ lúc ngân hàng báo có;
+       * đơn COD thì chờ shipper nộp tiền (`settleCod`). Hàm tự bỏ qua đơn chưa trả.
+       */
+      const invoiceId =
+        to === 'done' && order.type === 'delivery'
+          ? await this.einvoice.enqueueForPaidOrder(tx, orderId)
+          : null
+
       await this.audit.write(tx, {
         actor,
         action: `order.status.${to}`,
@@ -216,7 +228,11 @@ export class DispatchService {
         payload: { orderId, displayCode: order.displayCode, status: to },
       })
 
-      return { orderId, status: to, changed: true, tickets }
+      return { orderId, status: to, changed: true, tickets, invoiceId }
+    }).then(async ({ invoiceId, ...result }) => {
+      // Sau commit, ngoài transaction — xem EinvoiceService
+      await this.einvoice.issueQuietly(invoiceId ?? null, actor)
+      return result
     })
   }
 
