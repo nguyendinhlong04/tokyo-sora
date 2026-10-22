@@ -1313,4 +1313,28 @@ describe('F5 — Phải thu là số dư tại cuối kỳ, không phải hôm n
     expect(statement.statusCode, statement.payload).toBe(200)
     expect(statement.json().totals.outstandingVnd).toBe(500_000)
   })
+
+  it('kỳ chưa hết thì tính tới hôm nay: tuổi nợ khớp B15 từng khoang', async () => {
+    // Cuối kỳ còn 31 ngày nữa. Đếm tới đó thì DN-004 (tới hạn sau 30 ngày) thành quá hạn
+    // khi chưa tới hạn, và VNG-09 quá hạn thêm những ngày chưa trôi qua
+    const today = realToday()
+    const to = new Date(Date.parse(`${today}T00:00:00Z`) + 31 * 86_400_000)
+      .toISOString()
+      .slice(0, 10)
+    const f5 = await inject({
+      method: 'GET',
+      url: `/api/accounting/debts?branch=${fx.branchId}&from=${today.slice(0, 7)}-01&to=${to}`,
+      headers: bearer(accountant),
+    })
+    expect(f5.statusCode, f5.payload).toBe(200)
+    const b15 = await inject({
+      method: 'GET',
+      url: '/api/crm/corporate',
+      headers: bearer(accountant),
+    })
+
+    const owing = (rows: { code: string; aging: { totalVnd: number } }[]) =>
+      Object.fromEntries(rows.filter((r) => r.aging.totalVnd > 0).map((r) => [r.code, r.aging]))
+    expect(owing(f5.json().receivable.companies)).toEqual(owing(b15.json()))
+  })
 })

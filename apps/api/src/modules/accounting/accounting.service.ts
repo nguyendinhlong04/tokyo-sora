@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import { and, asc, desc, eq, gte, inArray, isNotNull, lte, ne, sql, type SQLWrapper } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
+import { businessDateOf } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
 import type { Tx } from '../../common/tx'
@@ -560,8 +561,10 @@ export class AccountingService {
 
     const receivedVnd = receipts.reduce((sum, r) => sum + Number(r.costVnd), 0)
     // Số dư và tuổi nợ tại hết ngày CUỐI KỲ đang xem, không tại hôm nay: mở lại báo
-    // cáo tháng trước phải ra đúng con số của tháng trước
-    const receivable = await this.corporate.receivables(to)
+    // cáo tháng trước phải ra đúng con số của tháng trước. Kỳ chưa hết thì tính tới
+    // hôm nay — đếm tới ngày cuối kỳ chưa tới là xếp bill chưa tới hạn vào quá hạn
+    const today = businessDateOf(new Date(), 'Asia/Ho_Chi_Minh')
+    const receivable = await this.corporate.receivables(to < today ? to : today)
 
     return {
       branchId,
@@ -579,7 +582,7 @@ export class AccountingService {
       receivable: {
         ...receivable,
         note:
-          'Tuổi nợ đếm từ NGÀY ĐẾN HẠN của từng bill ghi nợ, không từ ngày ăn. Số này của cả chuỗi: một công ty ăn ở ba chi nhánh vẫn nợ một hợp đồng. Là số dư tại hết ngày cuối kỳ đang xem: bill ghi nợ và tiền về sau ngày đó chưa tính, còn B15 luôn là số hôm nay.',
+          'Tuổi nợ đếm từ NGÀY ĐẾN HẠN của từng bill ghi nợ, không từ ngày ăn. Số này của cả chuỗi: một công ty ăn ở ba chi nhánh vẫn nợ một hợp đồng. Là số dư tại hết ngày cuối kỳ đang xem (kỳ chưa hết thì tới hôm nay): bill ghi nợ và tiền về sau ngày đó chưa tính, còn B15 luôn là số hôm nay.',
       },
     }
   }

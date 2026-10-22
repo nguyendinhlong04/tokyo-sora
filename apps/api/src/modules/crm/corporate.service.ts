@@ -411,9 +411,10 @@ export class CorporateService {
    * Để ở đây chứ không ở `AccountingService` vì dữ liệu là của B15; F5 gọi sang.
    * Nhân đôi phép tính ở hai miền là hẹn ngày hai màn báo hai con số.
    *
-   * F5 xem theo kỳ nên sổ cắt ở `asOf` = ngày cuối kỳ. Không cắt thì mở lại tháng 8
-   * vào tháng 10 sẽ thấy cả bill tháng 10 và mất khoản tháng 9 mới trả — con số của
-   * một kỳ đã qua đổi theo ngày mở báo cáo.
+   * F5 xem theo kỳ nên sổ cắt ở `asOf`: ngày cuối kỳ, kỳ chưa hết thì hôm nay — `debts()`
+   * chọn ngày đó, ở đây chỉ tính. Không cắt thì mở lại tháng 8 vào tháng 10 sẽ thấy cả
+   * bill tháng 10 và mất khoản tháng 9 mới trả — con số của một kỳ đã qua đổi theo ngày
+   * mở báo cáo.
    */
   async receivables(asOf: string) {
     const companies = await this.db

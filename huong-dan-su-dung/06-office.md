@@ -182,9 +182,9 @@ flowchart TD
 - **F4 · Báo cáo thuế** — VAT đầu ra − VAT đầu vào = VAT phải nộp; TNCN đã khấu
   trừ; khối đối chiếu hoá đơn vs doanh thu — lệch là đỏ kèm giải thích.
 - **F5 · Công nợ** — phải trả NCC và phải thu khách doanh nghiệp (cùng nguồn
-  với B15). Phải thu là số dư **tại hết ngày cuối kỳ** đang xem: bill ghi nợ và
-  tiền về sau ngày đó chưa tính, nên mở lại tháng trước ra đúng con số của tháng
-  đó; B15 thì luôn là số hôm nay.
+  với B15). Phải thu là số dư **tại hết ngày cuối kỳ** đang xem (kỳ chưa hết thì
+  tính tới hôm nay): bill ghi nợ và tiền về sau ngày đó chưa tính, nên mở lại
+  tháng trước ra đúng con số của tháng đó; B15 thì luôn là số hôm nay.
 - **F6 · Khoá sổ kỳ** — màn có hệ quả lớn nhất Office: liệt kê **việc còn dở**
   và khoá nút cho tới khi xử lý hết; khoá xong thì **doanh thu, phiếu chi, bảng
   công, kỳ lương của kỳ ngừng nhận sửa và không có nút mở lại** — chỉ bút toán
