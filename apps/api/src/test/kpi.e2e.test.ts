@@ -1,13 +1,15 @@
 /**
  * Nghiệm thu KPI — N9 · N10 · N11 Office, N14 Kênh nhân viên, thưởng gợi ý H7.
  *
- * Năm thứ phải chứng minh:
+ * Sáu thứ phải chứng minh:
  *   1. **Bộ KPI đủ 100%** mới lưu được.
  *   2. **Luật chấm đóng băng lúc mở kỳ** — đổi A6 giữa kỳ không đổi kỳ đang chạy.
  *   3. **KPI doanh thu = B2**, cùng chi nhánh, cùng kỳ.
  *   4. **Vòng trọn**: tự đánh giá trên điện thoại → cấp trên chấm, kết thúc → R13 chốt
  *      → nhân viên ghi ý kiến; chốt xong là đóng băng.
  *   5. **Thưởng gợi ý chỉ người tính lương thấy**; quản lý ca không thấy cột thưởng.
+ *   6. **Không tự chấm bằng phiếu kiểm tra** — phiếu người được chấm tự ghi không tính
+ *      cho chính người đó.
  */
 import { hash } from '@node-rs/argon2'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
@@ -297,6 +299,44 @@ describe('N10 — kỳ KPI', () => {
     expect(res.json<{ code: string }>().code).toBe('param_not_overridable')
   })
 
+  it('phiếu kiểm tra: ngày tương lai bị chặn, huỷ đúng một lần', async () => {
+    const observe = async (token: string, observedOn: string, score: number) =>
+      inject({
+        method: 'POST',
+        url: '/api/performance/observations',
+        headers: bearer(token),
+        payload: {
+          branchId: fx.branchId,
+          kind: 've-sinh',
+          observedOn,
+          score,
+          evidenceUrl: 'https://drive.example.vn/kiem-tra.pdf',
+          note: null,
+        },
+      })
+    // Lan tự kiểm chi nhánh mình: 60 điểm; quản lý chuỗi kiểm: 90 điểm
+    expect((await observe(branchLead, day(5), 60)).statusCode).toBe(201)
+    expect((await observe(chainLead, day(6), 90)).statusCode).toBe(201)
+    expect((await observe(chainLead, '2099-01-01', 90)).statusCode).toBe(400)
+
+    const wrong = await observe(chainLead, day(7), 0)
+    const wrongId = wrong.json<{ id: number }>().id
+    const voided = await inject({
+      method: 'POST',
+      url: `/api/performance/observations/${wrongId}/void`,
+      headers: bearer(chainLead),
+      payload: { reason: 'Ghi nhầm chi nhánh' },
+    })
+    expect(voided.statusCode, voided.payload).toBe(201)
+    const twice = await inject({
+      method: 'POST',
+      url: `/api/performance/observations/${wrongId}/void`,
+      headers: bearer(chainLead),
+      payload: { reason: 'Lần nữa' },
+    })
+    expect(twice.json<{ code: string }>().code).toBe('kpi_observation_voided')
+  })
+
   it('KPI doanh thu bằng đúng doanh thu B2 của cùng kỳ', async () => {
     const computed = await inject({
       method: 'POST',
@@ -328,6 +368,11 @@ describe('N10 — kỳ KPI', () => {
     expect(b2.statusCode, b2.payload).toBe(200)
     expect(revenue.actualMilli).toBe(b2.json<{ total: { value: number } }>().total.value * 1000)
     expect(revenue.actualMilli).toBe(2_000_000_000)
+
+    // Vệ sinh của Lan: phiếu Lan tự ghi không tính cho Lan, phiếu đã huỷ không tính
+    const hygiene = detail.items.find((i) => i.metricCode === 'nt.ve-sinh')!
+    expect(hygiene.actualMilli).toBe(90_000)
+    expect(hygiene.sampleCount).toBe(1)
   })
 
   it('quản lý ca không thấy cột thưởng; người tính lương thấy', async () => {

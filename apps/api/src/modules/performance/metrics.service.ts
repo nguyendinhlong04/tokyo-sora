@@ -302,19 +302,6 @@ export class MetricsService {
              AND (t.state IN ('submitted','done') OR t.due_at < now())`)
         return { actualMilli: milli(ratio(num(row.ok), num(row.n))), sampleCount: num(row.n) }
       }
-      case 'nt.ve-sinh':
-      case 'nt.khach-bi-mat': {
-        const row = await one(sql`
-          SELECT avg(score_milli)::float8 AS v, count(*)::int AS n
-            FROM kpi_observations
-           WHERE branch_id = ${branchId} AND voided_at IS NULL
-             AND kind = ${code === 'nt.ve-sinh' ? 've-sinh' : 'khach-bi-mat'}
-             AND observed_on BETWEEN ${w.from} AND ${w.to}`)
-        return {
-          actualMilli: num(row.n) > 0 ? Math.round(num(row.v)) : null,
-          sampleCount: num(row.n),
-        }
-      }
       default:
         // Chỉ số nhập tay (nt.thai-do, nt.tay-nghe) không có nguồn tự động
         return { actualMilli: null, sampleCount: null }
@@ -473,6 +460,22 @@ export class MetricsService {
              AND (d.signed_at AT TIME ZONE ${tz})::date BETWEEN ${w.from} AND ${w.to}`)
         return { actualMilli: milli(ratio(num(row.ok), num(row.n))), sampleCount: num(row.n) }
       }
+      case 'nt.ve-sinh':
+      case 'nt.khach-bi-mat': {
+        // Phiếu của cả chi nhánh, nhưng phiếu do chính người được chấm ghi thì không
+        // tính cho người đó — quản lý tự kiểm chi nhánh mình vẫn chấm được cho bếp,
+        // sảnh, chỉ không chấm được cho chính mình
+        const row = await one(sql`
+          SELECT avg(score_milli)::float8 AS v, count(*)::int AS n
+            FROM kpi_observations
+           WHERE branch_id = ${s.branchId} AND voided_at IS NULL AND observer_id <> ${s.staffId}
+             AND kind = ${code === 'nt.ve-sinh' ? 've-sinh' : 'khach-bi-mat'}
+             AND observed_on BETWEEN ${w.from} AND ${w.to}`)
+        return {
+          actualMilli: num(row.n) > 0 ? Math.round(num(row.v)) : null,
+          sampleCount: num(row.n),
+        }
+      }
       default:
         return this.branchMetric(code, s.branchId, w, tz, db)
     }
@@ -499,6 +502,4 @@ const BRANCH_WIDE = new Set<KpiMetricCode>([
   'kt.khoa-so',
   'kt.duyet-phieu-chi',
   'tc.su-co-dung-han',
-  'nt.ve-sinh',
-  'nt.khach-bi-mat',
 ])

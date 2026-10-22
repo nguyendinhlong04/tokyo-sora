@@ -350,7 +350,8 @@ export const KPI_METRICS = {
   // ---- Nhập tay và phiếu kiểm tra
   'nt.ve-sinh': {
     label: 'Điểm kiểm tra vệ sinh ATTP',
-    formula: 'Trung bình điểm các phiếu kiểm tra vệ sinh (N11) của chi nhánh trong kỳ',
+    formula:
+      'Trung bình điểm các phiếu kiểm tra vệ sinh (N11) của chi nhánh trong kỳ, trừ phiếu do chính người được chấm ghi',
     source: 'phieu-kiem-tra',
     subject: 'chi-nhanh',
     direction: 'cao',
@@ -359,7 +360,8 @@ export const KPI_METRICS = {
   },
   'nt.khach-bi-mat': {
     label: 'Điểm khách bí mật',
-    formula: 'Trung bình điểm các phiếu khách bí mật (N11) của chi nhánh trong kỳ',
+    formula:
+      'Trung bình điểm các phiếu khách bí mật (N11) của chi nhánh trong kỳ, trừ phiếu do chính người được chấm ghi',
     source: 'phieu-kiem-tra',
     subject: 'chi-nhanh',
     direction: 'cao',

@@ -795,7 +795,10 @@ export class PerformanceService {
   ) {
     const me = requireStaff(actor)
     if (input.observedOn > todayVN()) {
-      throw new BadRequestException('Ngày kiểm tra không thể ở tương lai')
+      throw new BadRequestException({
+        code: 'observation_in_future',
+        message: 'Ngày kiểm tra không thể ở tương lai',
+      })
     }
     const [row] = await this.db
       .insert(kpiObservations)
