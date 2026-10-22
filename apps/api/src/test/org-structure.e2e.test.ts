@@ -336,14 +336,14 @@ describe('N2 — gán chức danh', () => {
 })
 
 describe('N2 — phạm vi theo cây và cấp trên trực tiếp', () => {
-  it('quản lý ca chỉ nhận cây chi nhánh mình, không có nút sửa', async () => {
+  it('quản lý ca XEM được cả sơ đồ nhưng không sửa, không có danh sách chưa xếp ghế', async () => {
+    // Cấu trúc không phải bí mật — phạm vi theo cây áp cho thao tác, không cho việc xem
     const c = await chart(shiftLead)
     expect(c.chainWide).toBe(false)
     expect(c.canManage).toBe(false)
-    expect(c.units.some((u) => u.branchId === fx.branchId)).toBe(true)
-    expect(unitNamed(c, 'Khối văn phòng')).toBeUndefined()
-    // Tâm ở Hồ Tây chưa xếp ghế — ngoài phạm vi của quản lý ca Cầu Giấy
-    expect(c.unassigned.some((p) => p.fullName === 'Tâm')).toBe(false)
+    expect(unitNamed(c, 'Khối văn phòng')).toBeDefined()
+    expect(c.unassigned).toEqual([])
+    expect(c.missingBranches).toEqual([])
   })
 
   it('cấp trên trực tiếp của quản lý ca là người ngồi ghế trưởng chi nhánh', async () => {

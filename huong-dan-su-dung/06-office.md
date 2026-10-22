@@ -132,8 +132,10 @@ trước khi dùng làm căn cứ tuyển dụng.
   và chỉ đọc — đổi bằng điều chuyển ở N2.
 - **Sơ đồ không cấp quyền.** Mỗi chức danh có vai trò gợi ý (R1–R13); người giữ
   ghế chưa có vai trò đó thì sơ đồ nhắc, việc cấp vẫn làm ở **A1**.
-- **Ai thấy gì:** R10 · R11 · R13 thấy và sửa cả chuỗi; quản lý ca chỉ thấy cây
-  chi nhánh của mình, không sửa được; R1–R4 không mở Office.
+- **Ai thấy gì:** mọi vai trò có tài khoản Office **xem** được cả sơ đồ (không có số
+  lương nào ở đây); chỉ R10 · R11 · R13 **sửa** được và thấy danh sách "chưa xếp vào
+  sơ đồ". Phạm vi theo cây áp cho **thao tác** — giao việc, ký văn bản, chấm KPI —
+  không áp cho việc xem. R1–R4 không mở Office.
 
 ## 6.5 Chi phí & tài sản (C1–C5)
 

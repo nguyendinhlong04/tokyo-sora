@@ -44,7 +44,6 @@ import { AuditService } from '../identity/audit.service'
 import {
   branchOfUnit,
   buildSnapshot,
-  inScope,
   managersOf,
   scopeOf,
   wouldCycle,
@@ -191,6 +190,18 @@ export class OrgService {
     }))
   }
 
+  /** Chức danh chính đang giữ của từng người — cho danh sách người ký, người nhận việc */
+  async titlesOf(snap: OrgSnapshot): Promise<Map<number, string>> {
+    const rows = await this.db.select({ id: positions.id, title: positions.title }).from(positions)
+    const titles = new Map(rows.map((p) => [p.id, p.title]))
+    const out = new Map<number, string>()
+    for (const h of snap.holdings) {
+      const title = titles.get(h.positionId)
+      if (h.kind === 'chinh' && title) out.set(h.staffId, title)
+    }
+    return out
+  }
+
   /** Phạm vi của người gọi ở một miền — cho các module khác dùng chung */
   async scopeFor(actor: Actor, domain: ScopeDomain, snap?: OrgSnapshot) {
     const me = requireStaff(actor)
@@ -207,14 +218,19 @@ export class OrgService {
     // không được ghi nhãn tháng sau vào hồ sơ H1
     await this.syncTitles(this.db)
     const scope = scopeOf(me.staffId, 'org', snap)
-    const visibleUnit = (id: number) => scope.chain || scope.unitIds.has(id)
+    const canManage = checkPermission('org.manage', actorRoles(actor)) === 'allow'
 
-    const unitRows = await this.db
+    /**
+     * CẤU TRÚC xem được cả chuỗi: ai ngồi ghế nào không phải bí mật (không có số
+     * lương ở đây), và người soạn văn bản, giao việc cần thấy đơn vị để chọn nơi
+     * nhận. Phạm vi theo cây áp cho THAO TÁC — giao việc, ký, chấm KPI — chứ
+     * không cho việc xem sơ đồ.
+     */
+    const units = await this.db
       .select()
       .from(orgUnits)
       .where(eq(orgUnits.active, true))
       .orderBy(asc(orgUnits.sort), asc(orgUnits.id))
-    const units = unitRows.filter((u) => visibleUnit(u.id))
     const unitIds = new Set(units.map((u) => u.id))
 
     const positionRows = await this.db
@@ -283,9 +299,10 @@ export class OrgService {
         }
       })
 
+    // "Chưa xếp ghế" là danh sách việc của người dựng sơ đồ — người chỉ xem thì không cần
     const holding = new Set(open.map((row) => row.a.staffId))
     const unassigned: OrgPersonView[] = people
-      .filter((p) => p.active && !holding.has(p.id))
+      .filter((p) => canManage && p.active && !holding.has(p.id))
       .map((p) => {
         const person = snap.people.get(p.id)
         return {
@@ -297,18 +314,18 @@ export class OrgService {
         }
       })
       // Người chưa có vai trò nào (tài khoản dở dang) không thuộc bộ máy
-      .filter((p) => p.roles.length > 0 && inScope(scope, p.staffId, snap))
+      .filter((p) => p.roles.length > 0)
 
     const branchRows = await this.db
       .select({ id: branches.id, name: branches.name })
       .from(branches)
       .where(eq(branches.active, true))
       .orderBy(asc(branches.id))
-    const placed = new Set(unitRows.map((u) => u.branchId).filter(Boolean))
+    const placed = new Set(units.map((u) => u.branchId).filter(Boolean))
 
     return {
       date,
-      canManage: checkPermission('org.manage', actorRoles(actor)) === 'allow',
+      canManage,
       chainWide: scope.chain,
       units: units.map((u) => ({
         id: u.id,
@@ -322,7 +339,7 @@ export class OrgService {
       })),
       positions: positionViews,
       unassigned,
-      missingBranches: scope.chain ? branchRows.filter((b) => !placed.has(b.id)) : [],
+      missingBranches: canManage ? branchRows.filter((b) => !placed.has(b.id)) : [],
     }
   }
 
