@@ -45,6 +45,29 @@ docker run -d --name sora-test-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=sora_
 
 Rồi khai `TEST_DATABASE_URL=postgres://postgres:test@localhost:55432/sora_test`.
 
+**macOS không có Docker:** cài [Postgres.app](https://postgresapp.com) (chọn PostgreSQL
+16), bấm _Initialize_. Superuser là tên tài khoản macOS, không mật khẩu, cổng 5432.
+
+```bash
+PG=/Applications/Postgres.app/Contents/Versions/16/bin
+"$PG/pg_isready"
+"$PG/createdb" sora_dev && "$PG/createdb" sora_test
+```
+
+Khai `apps/api/.env`: `DATABASE_MIGRATION_URL=postgres://$USER@localhost:5432/sora_dev`,
+`DATABASE_URL=postgres://sora_app:<mật khẩu tự đặt>@localhost:5432/sora_dev`,
+`TEST_DATABASE_URL=postgres://$USER@localhost:5432/sora_test`. Thứ tự lần đầu:
+
+```bash
+pnpm --filter @sora/api db:migrate
+"$PG/psql" "postgres://$USER@localhost:5432/sora_dev" -v app_password="<mật khẩu tự đặt>" -f deploy/db-roles.sql
+pnpm extract-seed          # seed đọc JSON sinh từ bản thiết kế; thư mục out/ bị gitignore
+pnpm --filter @sora/api db:seed
+pnpm --filter @sora/api db:dev-bootstrap
+```
+
+`db-roles.sql` chạy SAU migration vì nó thu hồi quyền trên các bảng sổ đã có.
+
 Phân quyền role chạy một lần cho mỗi môi trường:
 
 ```bash
@@ -167,13 +190,20 @@ từ thiết bị đó mới sinh được mã ghép 6 số cho các máy sau.
 Sora Office (`localhost:5176`) đăng nhập bằng **email + mật khẩu**, không cần thiết bị
 ghép — Office chạy trên máy tính của quản lý, không phải máy của chi nhánh:
 
-| Tài khoản | Vai trò | Mật khẩu |
-|---|---|---|
-| chu@tokyosora.vn | R10 Chủ / Admin | `sora-dev-2026` |
-| chuoi@tokyosora.vn | R11 Quản lý chuỗi | `sora-dev-2026` |
-| ketoan@tokyosora.vn | R8 Kế toán | `sora-dev-2026` |
-| nhansu@tokyosora.vn | R13 Quản lý nhân sự | `sora-dev-2026` |
-| marketing@tokyosora.vn | R9 Marketing | `sora-dev-2026` |
+| Tài khoản | Vai trò | Mật khẩu | PIN |
+|---|---|---|---|
+| chu@tokyosora.vn | R10 Chủ / Admin | `sora-dev-2026` | 2101 |
+| chuoi@tokyosora.vn | R11 Quản lý chuỗi | `sora-dev-2026` | 2102 |
+| ketoan@tokyosora.vn | R8 Kế toán | `sora-dev-2026` | 2103 |
+| nhansu@tokyosora.vn | R13 Quản lý nhân sự | `sora-dev-2026` | 2104 |
+| marketing@tokyosora.vn | R9 Marketing | `sora-dev-2026` | 2105 |
+| lan@tokyosora.vn | R7 Quản lý ca (chi nhánh đầu) | `sora-dev-2026` | 1104 |
+
+> **PIN và tài khoản của Lan do `db:dev-bootstrap` đặt, không phải `db:seed`** — seed
+> còn chạy trên production (DEPLOY.md), mà mọi chuỗi ở đây nằm công khai trong repo.
+> Chưa chạy bootstrap thì tài khoản Office không có PIN: dải duyệt △ và bước ký văn
+> bản sẽ báo "PIN không đúng". `lan@` dùng để thử phạm vi của R7 — chỉ thấy chi nhánh
+> của mình, không sửa được những gì R7 không được sửa.
 
 > Cả nhóm quản trị (A1–A6, A9, A10) và R3 gắn quyền `admin.manage-accounts-roles` — theo
 > ma trận §4.2 chỉ R10 có. Đăng nhập bằng `chuoi@` sẽ vào được Office nhưng cột trái không

@@ -10,15 +10,32 @@
  * Chỉ dùng cho dev — token cố định, không bao giờ chạy ở môi trường thật.
  */
 import 'dotenv/config'
+import { hash } from '@node-rs/argon2'
 import { createHash } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { Pool } from 'pg'
 import { ParamsService } from '../common/params.service'
 import { createDb } from './client'
-import { branches, devices } from './schema'
+import { branches, devices, staff } from './schema'
 import { ConfigBundleService } from '../modules/config-bundle/config-bundle.service'
 
 const DEV_DEVICE_TOKEN = 'dev-device-token'
+
+/**
+ * PIN của tài khoản Office mẫu. Đặt ở đây chứ KHÔNG ở `db:seed`: DEPLOY.md chạy
+ * seed cả trên production, mà mọi chuỗi trong file này đều nằm công khai trong
+ * repo. Có PIN thì máy dev mới thử được các luồng cần người thứ hai — duyệt △,
+ * ký ban hành văn bản.
+ */
+const DEV_OFFICE_PINS: Record<string, string> = {
+  CHU01: '2101',
+  CHUOI01: '2102',
+  KETOAN01: '2103',
+  NHANSU01: '2104',
+  MARKETING01: '2105',
+}
+/** Trùng với `DEV_OFFICE_PASSWORD` của seed.ts — import file đó là chạy luôn cả seed */
+const DEV_OFFICE_PASSWORD = 'sora-dev-2026'
 
 async function main() {
   if (process.env.NODE_ENV === 'production') {
@@ -56,6 +73,19 @@ async function main() {
       })
     }
 
+    for (const [code, pin] of Object.entries(DEV_OFFICE_PINS)) {
+      await db
+        .update(staff)
+        .set({ pinHash: await hash(pin) })
+        .where(eq(staff.code, code))
+    }
+    // Quản lý ca Lan có thêm cửa Office để thử phạm vi của R7: chỉ thấy cây
+    // chi nhánh mình, không sửa được sơ đồ
+    await db
+      .update(staff)
+      .set({ email: 'lan@tokyosora.vn', passwordHash: await hash(DEV_OFFICE_PASSWORD) })
+      .where(eq(staff.code, 'LAN'))
+
     const params = new ParamsService(db)
     const bundles = new ConfigBundleService(db, params)
     const published = await bundles.publish(branch.id, { kind: 'system' })
@@ -76,6 +106,13 @@ async function main() {
         `\n  POS:      localStorage.setItem('sora.device.token', '${DEV_DEVICE_TOKEN}')` +
         "\n  Bếp nướng: localStorage.setItem('sora.device.token', 'dev-kds-st-06')" +
         '\n  location.reload()',
+    )
+    console.log(
+      '\nPIN Office (duyệt △, ký văn bản): ' +
+        Object.entries(DEV_OFFICE_PINS)
+          .map(([code, pin]) => `${code} ${pin}`)
+          .join(' · ') +
+        '\nQuản lý ca Lan vào Office bằng lan@tokyosora.vn',
     )
   } finally {
     await pool.end()
