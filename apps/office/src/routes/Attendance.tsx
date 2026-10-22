@@ -1,7 +1,7 @@
 import { Badge, ErrorState } from '@sora/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { api, type AttendanceRow, type AttendanceStatus } from '../api'
+import { api, type AttendanceStatus } from '../api'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, Field, formatTime } from '../components/report'

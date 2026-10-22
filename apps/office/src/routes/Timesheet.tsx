@@ -336,30 +336,6 @@ function DayTable({
     </>
   )
 }
-function Cell({
-  label,
-  value,
-  strong = false,
-}: {
-  label: string
-  value: string
-  strong?: boolean
-}) {
-  return (
-    <span className="text-right">
-      <span className="block text-[length:var(--fs-c2)] tracking-[0.08em] text-ink-mute uppercase">
-        {label}
-      </span>
-      <span
-        className={`mt-0.5 block font-mono text-[length:var(--fs-b2)] ${
-          strong ? 'text-ink-hi' : 'text-ink-body'
-        }`}
-      >
-        {value}
-      </span>
-    </span>
-  )
-}
 
 function EntryForm({
   draft,
