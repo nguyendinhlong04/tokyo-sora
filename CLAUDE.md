@@ -48,7 +48,7 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
 | `apps/pos` | `@sora/pos` | Sora POS (PWA) | Phục vụ, thu ngân · tablet 11″ ngang + máy thu ngân 22″ → **sắp tới thêm iPad & điện thoại** | `:5174` | `pos.tokyo-sora.vn` |
 | `apps/kitchen` | `@sora/kitchen` | Sora Kitchen / KDS (PWA) | Bếp từng trạm, ra món · TV 32–43″ 1920×1080, Android box | `:5175` | `kds.tokyo-sora.vn` |
 | `apps/office` | `@sora/office` | Sora Office | Chủ, quản lý, kế toán, HR, marketing · desktop 1440+, **nền sáng** | `:5176` | `admin.tokyo-sora.vn` |
-| `apps/staff` | `@sora/staff` | Kênh nhân viên (H8 lịch/công · H9 phiếu lương · N12 việc · N13 thông báo) — **không phải app gọi món** | `:5178` | `nv.tokyo-sora.vn` |
+| `apps/staff` | `@sora/staff` | Kênh nhân viên (H8 lịch/công · H9 phiếu lương · N12 việc · N13 thông báo · N15 báo cáo ca, sự cố) — **không phải app gọi món** | `:5178` | `nv.tokyo-sora.vn` |
 | `apps/kiosk` | `@sora/kiosk` | Kiosk chấm công (H10) · tablet 10″ gắn cố định | `:5179` | `chamcong.tokyo-sora.vn` |
 
 Tên miền thật có gạch nối (`tokyo-sora.vn`). Nhiều tài liệu và `SITE_URL` mặc định

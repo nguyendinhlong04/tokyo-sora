@@ -76,6 +76,11 @@ không sửa ngược, sai sẽ được cộng/trừ ở kỳ sau."*
   tích thì phải ghi lý do mới nộp được. Bị trả lại thì việc quay về "Cần làm" kèm
   lý do ở đầu việc.
 - **Đã nộp gần đây** — việc 7 ngày qua: chờ nghiệm thu hay đã xong.
+- **Báo cáo cần nộp** — báo cáo ca của ghế bạn giữ (vd. báo cáo ca bếp của bếp trưởng).
+  Chữ đã gõ giữ trong máy cho tới khi nộp xong. Báo cáo có số tiền (cuối ngày, giao ca)
+  hiện ở đây để nhắc nhưng **nộp ở máy của quán**.
+- **Báo sự cố** (nút cuối màn) — loại, mức, chuyện gì, đã làm gì ngay. Có người bị
+  thương, cháy nổ, ngộ độc thì gọi quản lý và cấp cứu trước, báo ở đây sau.
 
 **Thông báo (N13):** thông báo, quyết định, quy định đã ký ban hành gửi tới bạn.
 

@@ -1,9 +1,11 @@
-import type { TaskRow } from '@sora/contracts'
+import type { ReportSlot, TaskRow } from '@sora/contracts'
 import { dueLabel } from '@sora/core'
-import { Badge, EmptyState, ErrorState, SectionLabel, Skeleton } from '@sora/ui'
-import { useQuery } from '@tanstack/react-query'
+import { Badge, Button, EmptyState, ErrorState, SectionLabel, Skeleton, useToast } from '@sora/ui'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../api'
+import { IncidentSheet } from './IncidentSheet'
+import { ReportSheet } from './ReportSheet'
 import { TaskSheet } from './TaskSheet'
 
 /**
@@ -14,8 +16,18 @@ import { TaskSheet } from './TaskSheet'
  * người đứng đúng ca đã công bố — xin nghỉ được duyệt là checklist tự đi.
  */
 export function Tasks() {
+  const toast = useToast()
   const [openId, setOpenId] = useState<number | null>(null)
+  const [reportId, setReportId] = useState<number | null>(null)
+  const [reporting, setReporting] = useState(false)
   const tasks = useQuery({ queryKey: ['my-tasks'], queryFn: api.myTasks, refetchInterval: 60_000 })
+  const reports = useQuery({ queryKey: ['reports-due'], queryFn: api.reportsDue })
+  const openSlot = useMutation({
+    mutationFn: (slot: ReportSlot) => api.openReport(slot),
+    onSuccess: (detail) => setReportId(detail.id),
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+  const dueReports = (reports.data ?? []).filter((s) => s.state === null || s.state === 'draft')
 
   if (tasks.isPending) {
     return (
@@ -37,6 +49,38 @@ export function Tasks() {
           ? `Hôm nay · ${shiftToday.label} · ${shiftToday.branchName}`
           : 'Hôm nay bạn không có ca đã công bố.'}
       </p>
+
+      {dueReports.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <SectionLabel>Báo cáo cần nộp</SectionLabel>
+          {dueReports.map((s) => (
+            <button
+              key={`${s.templateId}|${s.periodKey}|${s.shiftTemplateId ?? 0}`}
+              type="button"
+              disabled={!s.kenhNv || openSlot.isPending}
+              onClick={() => openSlot.mutate(s)}
+              className={[
+                'flex min-h-[var(--hit-target)] flex-col gap-1 rounded-md border bg-surface-1 px-4 py-3 text-left',
+                'focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default',
+                s.overdue ? 'border-danger' : 'border-line-2',
+              ].join(' ')}
+            >
+              <span className="text-[length:var(--fs-b1)] font-semibold text-ink-hi">
+                {s.templateName}
+              </span>
+              <span className="text-[length:var(--fs-c1)]">
+                <span className={s.overdue ? 'font-semibold text-danger' : 'text-ink-body'}>
+                  {dueLabel(s.dueAt)}
+                </span>
+                <span className="text-ink-mute">
+                  {s.shiftLabel ? ` · ${s.shiftLabel}` : ''}
+                  {s.kenhNv ? '' : ' · có số tiền — nộp ở máy của quán'}
+                </span>
+              </span>
+            </button>
+          ))}
+        </section>
+      ) : null}
 
       {toReview.length > 0 ? (
         <section className="flex flex-col gap-2">
@@ -65,7 +109,13 @@ export function Tasks() {
         </section>
       ) : null}
 
+      <Button block variant="ghost" onClick={() => setReporting(true)}>
+        Báo sự cố
+      </Button>
+
       <TaskSheet taskId={openId} onClose={() => setOpenId(null)} />
+      <ReportSheet reportId={reportId} onClose={() => setReportId(null)} />
+      <IncidentSheet open={reporting} onClose={() => setReporting(false)} />
     </div>
   )
 }

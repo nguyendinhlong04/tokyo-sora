@@ -21,8 +21,10 @@ export function TabBar() {
   })
   const unread = inbox.data?.documents.unread ?? 0
   const tasks = inbox.data?.tasks
-  const pending = (tasks?.open ?? 0) + (tasks?.toReview ?? 0)
-  const overdue = tasks?.overdue ?? 0
+  const reports = inbox.data?.reports
+  // Tab Việc gồm cả báo cáo ca phải nộp — cùng là "việc của ca này"
+  const pending = (tasks?.open ?? 0) + (tasks?.toReview ?? 0) + (reports?.due ?? 0)
+  const overdue = (tasks?.overdue ?? 0) + (reports?.overdue ?? 0)
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line-2 bg-surface-1 pb-[env(safe-area-inset-bottom)]">

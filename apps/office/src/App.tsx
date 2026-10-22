@@ -75,6 +75,10 @@ const Tasks = lazy(() => import('./routes/Tasks').then((m) => ({ default: m.Task
 const TaskTemplates = lazy(() =>
   import('./routes/TaskTemplates').then((m) => ({ default: m.TaskTemplates })),
 )
+const WorkReports = lazy(() =>
+  import('./routes/WorkReports').then((m) => ({ default: m.WorkReports })),
+)
+const Incidents = lazy(() => import('./routes/Incidents').then((m) => ({ default: m.Incidents })))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5_000, refetchOnWindowFocus: true } },
@@ -146,6 +150,8 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
       { to: '/van-ban', label: 'N4 · Văn bản & thông báo', need: 'doc.compose' },
       { to: '/giao-viec', label: 'N5 · Giao việc', need: 'task.assign' },
       { to: '/viec-dinh-ky', label: 'N6 · Việc định kỳ & SOP', need: 'task.assign' },
+      { to: '/bao-cao-cong-viec', label: 'N7 · Báo cáo công việc', need: 'workreport.review' },
+      { to: '/su-co', label: 'N8 · Sự cố', need: 'incident.manage' },
     ],
   },
   {
@@ -291,6 +297,8 @@ export function App() {
                 <Route path="/ban-lam-viec" element={<MyDesk />} />
                 <Route path="/giao-viec" element={<Tasks />} />
                 <Route path="/viec-dinh-ky" element={<TaskTemplates />} />
+                <Route path="/bao-cao-cong-viec" element={<WorkReports />} />
+                <Route path="/su-co" element={<Incidents />} />
                 <Route path="/chi-phi-tong-quan" element={<ExpenseOverview />} />
                 <Route path="/chi-phi" element={<Expenses />} />
                 <Route path="/dinh-ky" element={<RecurringExpenses />} />

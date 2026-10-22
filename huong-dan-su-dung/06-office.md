@@ -14,9 +14,10 @@ nhân sự (R13), marketing (R9), bếp trưởng (R5), thủ kho (R6).
   "kho" hay "S5" đều ra. Menu chỉ hiện màn mà vai trò của bạn dùng được.
 - Trang mở đầu là **N1 · Bàn làm việc** — việc của chính bạn hôm nay (§6.4b).
 - **Chuông "Việc cần xử lý"** cạnh logo: số trên chuông là tổng việc đang chờ bạn
-  (việc được giao, việc chờ bạn nghiệm thu, khiếu nại bạn đang xử lý, văn bản chưa
-  đọc, văn bản chờ bạn ký). Có việc hoặc khiếu nại **quá hạn** thì chấm số chuyển đỏ
-  và dòng tương ứng ghi rõ "quá hạn". Bấm để xem từng nhóm và đi thẳng tới màn xử lý.
+  (việc được giao, việc chờ bạn nghiệm thu, báo cáo cần nộp / cần xem, sự cố đang mở,
+  khiếu nại bạn đang xử lý, văn bản chưa đọc, văn bản chờ bạn ký). Có việc, báo cáo,
+  khiếu nại **quá hạn** hoặc sự cố nghiêm trọng đang mở thì chấm số chuyển đỏ và dòng
+  tương ứng ghi rõ. Bấm để xem từng nhóm và đi thẳng tới màn xử lý.
   Số tự cập nhật mỗi phút — chưa có thông báo đẩy.
 
 **Ba cách nói "chi nhánh nào"** — nhầm lẫn phổ biến nhất khi mới dùng:
@@ -114,19 +115,21 @@ flowchart LR
   kiểm, chủ duyệt và phát. Quản lý ca thấy *công* nhưng không bao giờ thấy
   *lương*.
 
-## 6.4b Tổ chức & điều hành (N1 – N6)
+## 6.4b Tổ chức & điều hành (N1 – N8)
 
 Sơ đồ tổ chức là trục của giao việc, văn bản, báo cáo và KPI: **cấp trên trực
 tiếp** của một người là người ngồi ghế **trưởng** của đơn vị gần nhất phía trên.
 
 | Màn | Dùng để |
 |---|---|
-| **N1 · Bàn làm việc** | Trang mở đầu: việc của tôi (quá hạn → hôm nay → sắp tới), việc chờ tôi nghiệm thu, văn bản cần đọc/ký, khiếu nại tôi đang xử lý. Bấm một việc để tích checklist, nộp, nghiệm thu |
+| **N1 · Bàn làm việc** | Trang mở đầu: việc của tôi (quá hạn → hôm nay → sắp tới), báo cáo cần nộp, việc chờ tôi nghiệm thu, văn bản cần đọc/ký, khiếu nại tôi đang xử lý; nút **Báo sự cố**. Bấm một việc để tích checklist, nộp, nghiệm thu; bấm một báo cáo để điền và nộp |
 | **N2 · Sơ đồ tổ chức** | Cây đơn vị (công ty → khối/phòng → chi nhánh → bộ phận → tổ). Mỗi thẻ đơn vị liệt kê chức danh: người đang giữ, **thực có/định biên**, thanh than hồng (càng nóng càng thiếu người — đỏ là ghế trưởng trống). Bố cục **Dọc/Ngang**, thu phóng, **tìm người** (mở nhánh và đưa thẻ ra giữa), lọc chi nhánh, **In sơ đồ** (A3 ngang) |
 | **N3 · Chức danh & định biên** | Cùng dữ liệu dạng bảng: lọc "chỉ ghế còn trống", cột vai trò gợi ý báo người giữ ghế chưa có quyền ở A1 |
 | **N4 · Văn bản & thông báo** | Sổ thông báo, quyết định, quy định nội bộ. Tab **Gửi tôi · Chờ tôi ký · Tôi soạn · Tất cả**. Soạn, trình ký, ký bằng PIN, thu hồi; theo dõi ai đã đọc/xác nhận |
 | **N5 · Giao việc** | Tab **Tôi giao · Đơn vị tôi · Chờ tôi nghiệm thu**. Giao cho người trong phạm vi, theo dõi đã nhận / checklist / quá hạn, nghiệm thu hoặc trả lại, huỷ kèm lý do |
 | **N6 · Việc định kỳ & SOP** | Tab **Hôm nay** (checklist từng ca: ai làm, ai nghiệm thu, còn gì trễ) · **Mẫu việc** (SOP giao cho chức danh, lặp theo ca / ngày / tuần / tháng). Nút **Dùng bộ SOP chuẩn** |
+| **N7 · Báo cáo công việc** | Tab **Cần tôi xem · Còn thiếu · Tất cả · Mẫu**. Xem, xác nhận (hoặc "Nhận ca" với sổ giao ca), viết bổ sung; mẫu báo cáo theo chi nhánh. Nút **Dùng bộ mẫu chuẩn** |
+| **N8 · Sự cố** | Danh sách sự cố đang mở / đã đóng, lọc theo mức. Điều tra, giao việc khắc phục, ghi mốc khai báo ra ngoài, đóng |
 
 **Bắt đầu nhanh — dựng theo mẫu chuẩn:** nút **Dựng khung chuỗi theo mẫu** tạo Ban
 điều hành, Khối văn phòng (Kế toán, Nhân sự, Marketing), Khối vận hành; dải
@@ -187,6 +190,39 @@ trước khi dùng làm căn cứ tuyển dụng.
    một checklist, mỗi mục ghi tên người tích; ai trong ca cũng nộp được.
 5. Tab **Hôm nay**: từng ca, việc nào xong / chờ nghiệm thu / quá hạn (viền đỏ), ai
    nộp. Bấm vào để xem từng mục và nghiệm thu.
+
+**Báo cáo công việc (N7, nộp ở N1):**
+
+- Ba mẫu chuẩn (**Dùng bộ mẫu chuẩn**, quản lý chuỗi / chủ): **Báo cáo cuối ngày** (quản
+  lý chi nhánh nộp, quản lý ca nộp thay khi quá hạn; hạn 9 giờ sáng hôm sau), **Sổ giao
+  ca** (quản lý ca, mỗi ca, hạn 30 phút sau giờ kết ca; quản lý ca của ca sau bấm **Nhận
+  ca**), **Báo cáo ca bếp** (bếp trưởng / bếp phó, nộp được trên điện thoại).
+- Báo cáo **tự xuất hiện** ở mục *Báo cáo cần nộp* của N1 khi tới kỳ — không ai phải
+  tạo. Báo cáo theo ca chỉ tới người đứng đúng ca đã công bố.
+- **Trường tự điền** (doanh thu thuần, số đơn, khách, đơn huỷ, món huỷ sau gửi bếp, vé
+  bếp trễ, khách chấm 1–2 sao, điểm chấm, chênh lệch két, QR chưa về, người đứng ca,
+  checklist SOP) máy tính đúng như B2/B5; lúc còn nháp là số xem trước, **bấm Nộp thì
+  chốt lại**. Két lệch quá 20.000₫ thì bắt buộc giải trình — hệ thống không tự trừ
+  lương ai.
+- Đã nộp thì **không sửa** — dùng **Thêm bổ sung**. Nộp sau hạn (cộng 15 phút ân hạn, A6
+  `workreport.graceMinutes`) ghi "trễ hạn".
+- Tab **Còn thiếu**: suất đã quá hạn mà chưa nộp. Người viết không tự xác nhận báo cáo
+  của mình.
+- Báo cáo có số tiền chỉ nộp ở Office; Kênh nhân viên nộp được mẫu không có tiền.
+
+**Sự cố (N8):**
+
+- Ai cũng **Báo sự cố** được (Office N1/N8, Kênh nhân viên): loại, mức, giờ xảy ra,
+  chuyện gì, đã làm gì ngay. Mã `SC-…`.
+- **Tai nạn lao động, an toàn thực phẩm, cháy nổ** mức nghiêm trọng trở lên: hệ thống
+  đánh dấu **phải khai báo ra ngoài** — người xử lý ghi mốc và nơi đã khai báo (số hiệu
+  văn bản pháp luật cụ thể: hỏi pháp chế).
+- Người xử lý (bếp trưởng, quản lý ca, quản lý chuỗi, nhân sự, chủ) ghi **nguyên nhân
+  gốc**, **biện pháp**, thiệt hại ước tính, **giao việc khắc phục** (hạn mặc định 7
+  ngày) rồi **Đóng sự cố…**. Chỉ đóng được khi đủ nguyên nhân, biện pháp, mốc khai báo
+  (nếu phải) và mọi việc khắc phục đã xong.
+- Sự cố **nghiêm trọng** chỉ quản lý chuỗi hoặc chủ đóng, và người báo không tự đóng.
+  Sự cố không xoá; đã đóng thì không sửa.
 
 **Văn bản (N4) — soạn, trình, ký:**
 

@@ -43,7 +43,8 @@ const PERMISSION_MARK: Record<Permission, { mark: string; className: string; tit
 const GROUPS: { label: string; test: (action: ActionKey) => boolean }[] = [
   {
     label: 'Tổ chức & điều hành (§4.2c)',
-    test: (a) => a.startsWith('org.') || a.startsWith('doc.') || a.startsWith('task.'),
+    test: (a) =>
+      ['org.', 'doc.', 'task.', 'workreport.', 'incident.'].some((prefix) => a.startsWith(prefix)),
   },
   {
     label: 'Nhân sự (§4.2b)',

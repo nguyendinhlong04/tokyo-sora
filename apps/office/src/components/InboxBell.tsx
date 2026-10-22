@@ -56,6 +56,37 @@ export function InboxBell() {
               },
             ]
           : []),
+        {
+          label: 'Báo cáo quá hạn chưa nộp',
+          count: data.reports.overdue,
+          to: '/ban-lam-viec',
+          urgent: true,
+        },
+        {
+          label: 'Báo cáo cần nộp',
+          count: data.reports.due - data.reports.overdue,
+          to: '/ban-lam-viec',
+        },
+        {
+          label: 'Báo cáo chờ bạn xem',
+          count: data.reports.toReview,
+          to: '/bao-cao-cong-viec?tab=can-xem',
+        },
+        ...(data.incidents
+          ? [
+              {
+                label: 'Sự cố nghiêm trọng đang mở',
+                count: data.incidents.severeOpen,
+                to: '/su-co',
+                urgent: true,
+              },
+              {
+                label: 'Sự cố đang mở',
+                count: data.incidents.open - data.incidents.severeOpen,
+                to: '/su-co',
+              },
+            ]
+          : []),
         { label: 'Văn bản chưa đọc', count: data.documents.unread, to: '/van-ban?tab=gui-toi' },
         {
           label: 'Văn bản cần xác nhận đã đọc',
@@ -70,9 +101,17 @@ export function InboxBell() {
     (data?.tasks.open ?? 0) +
     (data?.tasks.toReview ?? 0) +
     (data?.feedback?.assigned ?? 0) +
+    (data?.reports.due ?? 0) +
+    (data?.reports.toReview ?? 0) +
+    (data?.incidents?.open ?? 0) +
     (data?.documents.unread ?? 0) +
     (data?.documents.toSign ?? 0)
-  const urgent = (data?.tasks.overdue ?? 0) + (data?.feedback?.overdue ?? 0) > 0
+  const urgent =
+    (data?.tasks.overdue ?? 0) +
+      (data?.feedback?.overdue ?? 0) +
+      (data?.reports.overdue ?? 0) +
+      (data?.incidents?.severeOpen ?? 0) >
+    0
 
   return (
     <div className="relative">

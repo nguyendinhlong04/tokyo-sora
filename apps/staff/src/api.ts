@@ -1,6 +1,12 @@
 import type {
   DocAttachment,
+  IncidentCategory,
+  IncidentSeverity,
   InboxCounts,
+  MyIncident,
+  ReportSlot,
+  ReportValue,
+  WorkReportDetail,
   MyDocument,
   MyDocumentDetail,
   MyTasks,
@@ -225,4 +231,42 @@ export const api = {
       method: 'POST',
       body: { accept, note },
     }),
+
+  // ---- N15 Báo cáo ca và báo sự cố — báo cáo có tiền nộp ở Office, không ở đây
+
+  reportsDue: () => apiFetch<ReportSlot[]>('/api/work-reports/me/due'),
+
+  openReport: (slot: Pick<ReportSlot, 'templateId' | 'periodKey' | 'shiftTemplateId'>) =>
+    apiFetch<WorkReportDetail>('/api/work-reports/me/drafts', {
+      method: 'POST',
+      body: {
+        templateId: slot.templateId,
+        periodKey: slot.periodKey,
+        shiftTemplateId: slot.shiftTemplateId,
+      },
+    }),
+
+  report: (id: number) => apiFetch<WorkReportDetail>(`/api/work-reports/me/${id}`),
+
+  saveReport: (id: number, values: Record<string, ReportValue>) =>
+    apiFetch<{ id: number }>(`/api/work-reports/me/${id}`, { method: 'PUT', body: { values } }),
+
+  submitReport: (id: number) =>
+    apiFetch<{ id: number; onTime: boolean }>(`/api/work-reports/me/${id}/submit`, {
+      method: 'POST',
+    }),
+
+  reportIncident: (input: {
+    category: IncidentCategory
+    severity: IncidentSeverity
+    occurredAt: string
+    title: string
+    description: string
+    immediateAction: string | null
+    injuredCount: number
+    customerInvolved: boolean
+    evidenceUrls: string[]
+  }) => apiFetch<{ id: number; code: string }>('/api/incidents', { method: 'POST', body: input }),
+
+  myIncidents: () => apiFetch<MyIncident[]>('/api/incidents/me'),
 }

@@ -8,6 +8,10 @@ import type {
   DocumentDetail,
   DocumentRow,
   InboxCounts,
+  IncidentCategory,
+  IncidentDetail,
+  IncidentRow,
+  IncidentSeverity,
   MyDocument,
   MyDocumentDetail,
   MyTasks,
@@ -24,6 +28,14 @@ import type {
   TaskRow,
   TaskState,
   TaskTemplateView,
+  ReportCadence,
+  ReportField,
+  ReportReviewMode,
+  ReportSlot,
+  ReportTemplateView,
+  ReportValue,
+  WorkReportDetail,
+  WorkReportRow,
 } from '@sora/contracts'
 import { apiFetch } from '@sora/core'
 
@@ -3369,6 +3381,138 @@ export const api = {
       method: 'POST',
       body: { accept, note },
     }),
+
+  // ---- N7 Báo cáo công việc · N8 Sự cố — kiểu lấy từ @sora/contracts
+
+  reportTemplates: (branch?: string) =>
+    apiFetch<ReportTemplateView[]>(
+      `/api/work-reports/templates${branch ? `?branch=${encodeURIComponent(branch)}` : ''}`,
+    ),
+
+  saveReportTemplate: (id: number | null, input: ReportTemplateInput) =>
+    apiFetch<{ id: number }>(`/api/work-reports/templates${id ? `/${id}` : ''}`, {
+      method: id ? 'PUT' : 'POST',
+      body: input,
+    }),
+
+  applyStandardReports: (branchId: string) =>
+    apiFetch<{
+      created: number
+      skipped: { name: string; reason: string }[]
+      withoutShifts: boolean
+    }>('/api/work-reports/templates/apply-standard', { method: 'POST', body: { branchId } }),
+
+  workReports: (q: { view: 'can-xem' | 'tat-ca'; branch?: string; from?: string; to?: string }) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(q)) if (value) params.set(key, value)
+    return apiFetch<WorkReportRow[]>(`/api/work-reports?${params.toString()}`)
+  },
+
+  missingReports: (branch?: string) =>
+    apiFetch<ReportSlot[]>(
+      `/api/work-reports/missing${branch ? `?branch=${encodeURIComponent(branch)}` : ''}`,
+    ),
+
+  workReport: (id: number) => apiFetch<WorkReportDetail>(`/api/work-reports/${id}`),
+
+  reviewWorkReport: (id: number, note: string | null) =>
+    apiFetch<{ id: number }>(`/api/work-reports/${id}/review`, { method: 'POST', body: { note } }),
+
+  addWorkReportAddendum: (id: number, body: string, mine: boolean) =>
+    apiFetch<{ id: number }>(`/api/work-reports/${mine ? 'me/' : ''}${id}/addenda`, {
+      method: 'POST',
+      body: { body },
+    }),
+
+  myReportsDue: () => apiFetch<ReportSlot[]>('/api/work-reports/me/due'),
+
+  openMyReport: (slot: Pick<ReportSlot, 'templateId' | 'periodKey' | 'shiftTemplateId'>) =>
+    apiFetch<WorkReportDetail>('/api/work-reports/me/drafts', {
+      method: 'POST',
+      body: {
+        templateId: slot.templateId,
+        periodKey: slot.periodKey,
+        shiftTemplateId: slot.shiftTemplateId,
+      },
+    }),
+
+  myReport: (id: number) => apiFetch<WorkReportDetail>(`/api/work-reports/me/${id}`),
+
+  saveMyReport: (id: number, values: Record<string, ReportValue>) =>
+    apiFetch<{ id: number }>(`/api/work-reports/me/${id}`, { method: 'PUT', body: { values } }),
+
+  submitMyReport: (id: number) =>
+    apiFetch<{ id: number; onTime: boolean }>(`/api/work-reports/me/${id}/submit`, {
+      method: 'POST',
+    }),
+
+  reportIncident: (input: IncidentInput) =>
+    apiFetch<{ id: number; code: string }>('/api/incidents', { method: 'POST', body: input }),
+
+  incidents: (q: { state?: string; branch?: string; severity?: string }) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(q)) if (value) params.set(key, value)
+    return apiFetch<IncidentRow[]>(`/api/incidents?${params.toString()}`)
+  },
+
+  incident: (id: number) => apiFetch<IncidentDetail>(`/api/incidents/${id}`),
+
+  updateIncident: (id: number, patch: Partial<IncidentPatch>) =>
+    apiFetch<{ id: number }>(`/api/incidents/${id}`, { method: 'PUT', body: patch }),
+
+  addIncidentTask: (
+    id: number,
+    input: { title: string; note: string | null; assigneeStaffIds: number[]; dueAt: string | null },
+  ) => apiFetch<{ ids: number[] }>(`/api/incidents/${id}/tasks`, { method: 'POST', body: input }),
+
+  reportIncidentExternally: (id: number, reportedAt: string, ref: string) =>
+    apiFetch<{ id: number }>(`/api/incidents/${id}/external-report`, {
+      method: 'POST',
+      body: { reportedAt, ref },
+    }),
+
+  closeIncident: (id: number, note: string | null) =>
+    apiFetch<{ id: number }>(`/api/incidents/${id}/close`, { method: 'POST', body: { note } }),
+}
+
+export interface ReportTemplateInput {
+  code: string
+  name: string
+  cadence: ReportCadence
+  branchId: string
+  fields: ReportField[]
+  shiftTemplateIds: number[]
+  dueOffsetMinutes: number
+  reviewMode: ReportReviewMode
+  kenhNv: boolean
+  active: boolean
+  positions: { positionId: number; role: 'nop' | 'du-phong' }[]
+}
+
+export interface IncidentInput {
+  category: IncidentCategory
+  severity: IncidentSeverity
+  /** ISO có múi giờ */
+  occurredAt: string
+  title: string
+  description: string
+  immediateAction: string | null
+  injuredCount: number
+  customerInvolved: boolean
+  evidenceUrls: string[]
+}
+
+export interface IncidentPatch {
+  category: IncidentCategory
+  severity: IncidentSeverity
+  title: string
+  description: string
+  immediateAction: string | null
+  rootCause: string | null
+  correctiveAction: string | null
+  lossEstimateVnd: number | null
+  ownerId: number | null
+  evidenceUrls: string[]
 }
 
 export type TaskView = 'assigned' | 'unit' | 'to-review' | 'sop'

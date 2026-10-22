@@ -1,11 +1,15 @@
-import type { MyDocument, TaskRow } from '@sora/contracts'
-import { Badge, Button, ErrorState, Skeleton } from '@sora/ui'
-import { useQuery } from '@tanstack/react-query'
+import type { MyDocument, ReportSlot, TaskRow } from '@sora/contracts'
+import { Badge, Button, ErrorState, Skeleton, useToast } from '@sora/ui'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api } from '../api'
 import { PageHeader } from '../components/PageHeader'
+import { IncidentFormDrawer } from '../components/reports/IncidentFormDrawer'
+import { ReportDrawer } from '../components/reports/ReportDrawer'
+import { slotTitle } from '../components/reports/report-ui'
 import { ChecklistProgress, DueText, assigneeOf, TaskStateBadge } from '../components/tasks/task-ui'
+import { formatDateTime } from '../components/tasks/task-ui'
 import { TaskDrawer } from '../components/tasks/TaskDrawer'
 import { useSession } from '../session-context'
 
@@ -25,8 +29,19 @@ const endOfTodayVN = () => {
 export function MyDesk() {
   const { staff } = useSession()
   const navigate = useNavigate()
+  const toast = useToast()
   const [openId, setOpenId] = useState<number | null>(null)
+  const [reportId, setReportId] = useState<number | null>(null)
+  const [reporting, setReporting] = useState(false)
   const tasks = useQuery({ queryKey: ['my-tasks'], queryFn: api.myTasks, refetchInterval: 60_000 })
+  const slots = useQuery({ queryKey: ['report-slots', 'mine'], queryFn: api.myReportsDue })
+  // Mở suất: lần đầu tạo bản nháp, các lần sau lấy lại đúng bản đó
+  const openSlot = useMutation({
+    mutationFn: (slot: ReportSlot) => api.openMyReport(slot),
+    onSuccess: (detail) => setReportId(detail.id),
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+  const dueSlots = (slots.data ?? []).filter((s) => s.state === null || s.state === 'draft')
   const docs = useQuery({ queryKey: ['docs', 'mine'], queryFn: api.myDocuments })
   const inbox = useQuery({ queryKey: ['org-inbox'], queryFn: api.inbox, staleTime: 30_000 })
 
@@ -48,7 +63,8 @@ export function MyDesk() {
     <>
       <PageHeader
         title="Bàn làm việc"
-        subtitle={`Việc của ${staff?.fullName ?? 'bạn'}: việc được giao, checklist ca, văn bản cần đọc, việc chờ bạn nghiệm thu.`}
+        subtitle={`Việc của ${staff?.fullName ?? 'bạn'}: việc được giao, checklist ca, báo cáo cần nộp, văn bản cần đọc, việc chờ bạn nghiệm thu.`}
+        action={<Button onClick={() => setReporting(true)}>Báo sự cố</Button>}
       />
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
         {tasks.isError ? (
@@ -86,6 +102,33 @@ export function MyDesk() {
           </div>
 
           <aside className="grid content-start gap-4">
+            {dueSlots.length > 0 ? (
+              <Panel title={`Báo cáo cần nộp · ${dueSlots.length}`}>
+                <div className="grid gap-1">
+                  {dueSlots.map((s) => (
+                    <button
+                      key={`${s.templateId}|${s.periodKey}|${s.shiftTemplateId ?? 0}`}
+                      type="button"
+                      disabled={openSlot.isPending}
+                      onClick={() => openSlot.mutate(s)}
+                      className="flex flex-col items-start rounded-sm px-2 py-2 text-left text-[length:var(--fs-b2)] hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      <span className="text-ink-hi">{slotTitle(s)}</span>
+                      <span
+                        className={[
+                          'text-[length:var(--fs-c1)]',
+                          s.overdue ? 'font-semibold text-danger-line' : 'text-ink-mute',
+                        ].join(' ')}
+                      >
+                        {s.overdue ? 'Quá hạn' : 'Hạn'} {formatDateTime(s.dueAt)}
+                        {s.state === 'draft' ? ' · có nháp' : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </Panel>
+            ) : null}
+
             <Panel title={`Chờ tôi nghiệm thu · ${tasks.data?.toReview.length ?? 0}`}>
               {(tasks.data?.toReview ?? []).length === 0 ? (
                 <p className="text-[length:var(--fs-c1)] text-ink-mute">
@@ -156,6 +199,8 @@ export function MyDesk() {
       </div>
 
       <TaskDrawer taskId={openId} mode="mine" onClose={() => setOpenId(null)} />
+      <ReportDrawer reportId={reportId} mode="mine" onClose={() => setReportId(null)} />
+      {reporting ? <IncidentFormDrawer onClose={() => setReporting(false)} /> : null}
     </>
   )
 }
