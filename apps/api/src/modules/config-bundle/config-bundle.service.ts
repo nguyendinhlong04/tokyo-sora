@@ -4,7 +4,6 @@ import { rooms } from '@sora/contracts'
 import { and, desc, eq } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { emit } from '../../common/outbox'
-import { ParamsService } from '../../common/params.service'
 import type { Db } from '../../db/client'
 import {
   areas,
@@ -33,13 +32,15 @@ import type { Actor } from '../identity/actor'
  *
  * Cố tình KHÔNG chứa trạng thái hết món: 86 đổi nhiều lần mỗi ca, nhét vào đây sẽ
  * phá pattern cache 304. Hết món là live state, đi đường riêng (module kitchen).
+ *
+ * Cũng KHÔNG chứa tham số A6. Bundle xuống tới mọi máy đã ghép — kể cả iPad đặt
+ * trên bàn khách — trong khi bảng tham số có mã số thuế, chứng thư số, thuế suất,
+ * tham số lương. Không app nào đọc chúng từ bundle; app cần con số nào thì hỏi
+ * endpoint của miền đó (KDS lấy `undoSeconds` qua hàng vé).
  */
 @Injectable()
 export class ConfigBundleService {
-  constructor(
-    @Inject(DB) private readonly db: Db,
-    private readonly params: ParamsService,
-  ) {}
+  constructor(@Inject(DB) private readonly db: Db) {}
 
   /** Dựng bundle từ dữ liệu hiện tại, đã áp ghi đè theo chi nhánh */
   async build(branchId: string): Promise<Record<string, unknown>> {
@@ -211,7 +212,6 @@ export class ConfigBundleService {
        * in phải sửa file trên cái máy đặt ở góc bếp.
        */
       printers: await activePrintersOf(this.db, branchId),
-      params: await this.params.allForBranch(branchId),
     }
   }
 

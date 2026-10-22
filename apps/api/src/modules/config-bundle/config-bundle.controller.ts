@@ -38,7 +38,10 @@ export class ConfigBundleController {
       return reply.status(304).send()
     }
 
-    return reply.send({ version: latest.version, publishedAt: latest.publishedAt, ...(latest.payload as object) })
+    // Bản phát hành trước 10/2026 còn mang cả bảng tham số A6 (xem ConfigBundleService)
+    // — gỡ ra lúc trả, không đợi Office phát hành lại mới hết lộ.
+    const { params: _legacyParams, ...payload } = latest.payload as Record<string, unknown>
+    return reply.send({ version: latest.version, publishedAt: latest.publishedAt, ...payload })
   }
 
   /**

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { DB } from './db.module'
 import type { Db } from '../db/client'
 import { parameterHistory, parameters } from '../db/schema'
@@ -58,19 +58,6 @@ export class ParamsService {
     for (const key of Object.keys(keys) as K[]) {
       out[key] = await this.getNumber(key, keys[key], branchId)
     }
-    return out
-  }
-
-  /** Mọi tham số áp dụng cho một chi nhánh — nguồn cho config bundle và màn A6 */
-  async allForBranch(branchId: string): Promise<Record<string, unknown>> {
-    const rows = await this.db
-      .select()
-      .from(parameters)
-      .where(or(isNull(parameters.branchId), eq(parameters.branchId, branchId)))
-    const out: Record<string, unknown> = {}
-    // Mặc định trước, ghi đè theo chi nhánh sau
-    for (const row of rows.filter((r) => r.branchId === null)) out[row.key] = row.value
-    for (const row of rows.filter((r) => r.branchId !== null)) out[row.key] = row.value
     return out
   }
 
