@@ -522,6 +522,13 @@ export class ReconcileService {
    *
    * Đơn cũ chưa nộp vẫn nằm trên sổ (bảy ngày): shipper chạy tối muộn về nộp hôm
    * sau là chuyện thường, và món nợ đó không được biến mất lúc sang ngày mới.
+   *
+   * Phần khách đã trả cộng bằng LEFT JOIN + GROUP BY chứ không bằng truy vấn con
+   * tương quan: select chỉ có một bảng thì Drizzle in `${orders.id}` thành `"id"`
+   * trần, và trong truy vấn con trên `payments` Postgres gắn nó vào `p.id` — sổ
+   * thấy đơn chưa trả đồng nào và đòi shipper cả tiền món khách đã chuyển khoản
+   * trước. Điều kiện `paid` nằm ở ON: đặt ở WHERE thì đơn chưa trả đồng nào rơi
+   * khỏi sổ.
    */
   async codBook(branchId: string) {
     const rows = await this.db
@@ -529,14 +536,12 @@ export class ReconcileService {
         id: orders.id,
         displayCode: orders.displayCode,
         total: orders.moneyTotal,
-        paid: sql<number>`coalesce((
-          select sum(p.amount) from payments p
-          where p.order_id = ${orders.id} and p.state = 'paid'
-        ), 0)::int`,
+        paid: sql<number>`coalesce(sum(${payments.amount}), 0)::int`,
         shipper: orders.shipper,
         doneAt: orders.doneAt,
       })
       .from(orders)
+      .leftJoin(payments, and(eq(payments.orderId, orders.id), eq(payments.state, 'paid')))
       .where(
         and(
           eq(orders.branchId, branchId),
@@ -547,6 +552,7 @@ export class ReconcileService {
           sql`${orders.businessDate} >= current_date - ${sql.raw(String(COD_WINDOW_DAYS))}`,
         ),
       )
+      .groupBy(orders.id)
       .orderBy(orders.id)
 
     interface CodOrder {

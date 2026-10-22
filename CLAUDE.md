@@ -348,6 +348,10 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   **Không có down**; file đã chạy thì sửa không có tác dụng → luôn thêm file mới.
   Vercel build **không** chạy migration — chạy tay trước khi deploy API.
 - Không dùng Drizzle `.prepare()` (pooler transaction của Supabase).
+- Không viết truy vấn con tương quan trong `sql` ở **phần select** của truy vấn **không
+  join**: khi đó Drizzle bỏ tên bảng, `${orders.id}` thành `"id"` trần và Postgres gắn nó
+  vào bảng của truy vấn con — sai lặng lẽ (sổ COD đòi shipper cả tiền món, 22/10/2026).
+  Dùng LEFT JOIN + GROUP BY (`codBook`, `balancesFor`); ở WHERE Drizzle vẫn giữ tên bảng.
 
 ### 5.5 Mô hình và vòng đời tại bàn
 Enum chính (giá trị đúng như CHECK):
