@@ -467,17 +467,20 @@ ra log hay chat.
 ## 7. Kiểm thử
 
 **Hiện có** (vitest; chỉ `@sora/api`, `@sora/contracts`, `@sora/core` có script `test`):
-- **Test domain thuần** `src/modules/*/domain/*.test.ts` cạnh file nguồn (19 file) —
+- **Test domain thuần** `src/modules/*/domain/*.test.ts` cạnh file nguồn (25 file) —
   không DB, chạy ở mọi máy. Fixture ở `kitchen/domain/__fixtures__/`.
 - **Test PGlite** (`new PGlite()` + `runMigrations`) — 3 file, kiểm schema/trigger.
-- **Test tích hợp** `src/test/*.e2e.test.ts` (22 file, ~645 case): `bootTestApp()` trong
+- **Test tích hợp** `src/test/*.e2e.test.ts` (27 file, ~720 case): `bootTestApp()` trong
   `src/test/harness.ts` **DROP SCHEMA** trên `TEST_DATABASE_URL`, chạy migration, seed
   fixture (chi nhánh `cg`, 6 trạm, bàn A4 có bếp / 05 không bếp, 4 nhân viên có PIN), boot
   cả `AppModule`, gọi bằng `app.inject` với `Authorization: Bearer` + `x-sora-device`.
   Không mock, không factory. `fileParallelism: false`, timeout 30 s.
 - **Front-end: 0 test tự động.** Kiểm bằng typecheck + lint + build + mở app đúng viewport.
-- Trên máy chưa có Postgres: `pnpm -r test` → domain xanh (519 case), 22 file e2e ném
-  "Thiếu TEST_DATABASE_URL" — đó là thiếu môi trường, không phải lỗi code.
+- Trên máy chưa có Postgres: `pnpm -r test` → domain + PGlite xanh (605 case), 27 file e2e
+  ném "Thiếu TEST_DATABASE_URL" — đó là thiếu môi trường, không phải lỗi code.
+- 22/10/2026 cả bộ e2e đã chạy trên PGlite qua một lớp giả `pg` giữ nguyên ngữ nghĩa
+  node-postgres và pool **1 kết nối** như Vercel (lớp giả không nằm trong repo): 1287 xanh;
+  36 đỏ đều đỏ sẵn ở `074a7cf` — nguyên nhân ở §11 mục 7 và 8.
 
 **Quy tắc khi làm việc**
 - Sửa bug nghiệp vụ → viết test tái hiện trước (domain nếu được, e2e nếu đụng DB/quyền),
@@ -716,6 +719,16 @@ Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
 5. Kiosk ghép máy: một `catch` chung (`apps/kiosk/src/screens/Pair.tsx:21-38`) — ghép
    thành công nhưng `me()` lỗi vẫn báo "Mã không đúng" (KDS đã sửa ở `04ffd9b`).
 6. CI không chạy trên nhánh làm việc và không có Postgres (§7).
+7. **Pool 1 kết nối tự kẹt** (Vercel, `DATABASE_POOL_MAX` không đặt): truy vấn qua `this.db`
+   bên trong `db.transaction(...)` chờ đúng transaction đang giữ kết nối duy nhất → treo 10 s
+   rồi lỗi 500. Đã thấy ở `IdentityService.verifyPinOnly` gọi trong `ApprovalService.authorize(tx)`
+   — **mọi luồng duyệt PIN △** —, `HrService.computeDraft` → `TimesheetService.workedSplits`
+   (H7 Tính nháp), `PeriodLockService.assertOpen`, `CatalogAdminService.announceCategories`
+   (M10); cả `ParamsService` khi cache chưa nạp (instance vừa khởi động). Máy dev pool 10
+   không lộ. Hàm chạy trong transaction phải nhận `tx` (§5.2).
+8. `src/test/hr.e2e.test.ts` dùng tuần cố định `2026-08-03`, nay đã qua: sửa lịch tuần đã
+   qua là `timesheet.edit-manual` (△ với R7) nên nhóm H2–H7 đỏ dây chuyền, cả trên Postgres
+   thật. Tính tuần từ ngày chạy test.
 
 Thấp hơn:
 - `var(--sora-accent)` không tồn tại (`apps/office/src/routes/Cms.tsx:1035`).
