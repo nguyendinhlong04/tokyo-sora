@@ -66,6 +66,7 @@ export class ApprovalService {
       input.approval.approverStaffId,
       input.approval.approverPin,
       input.actor.branchId,
+      `approve:${input.actor.staffId}:${input.approval.approverStaffId}`,
     )
     if (!approverRoles) throw new ForbiddenException('PIN người duyệt không đúng')
 

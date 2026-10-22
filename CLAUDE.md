@@ -300,7 +300,8 @@ Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–
 `domain.verb`, mỗi ô `allow | approve | deny`. `PermissionGuard` chỉ chặn `deny`; ô
 `approve` (△) thì service phải `ApprovalService.authorize(tx, …)` với body
 `approval: {approverStaffId, approverPin, reason}` — người duyệt phải khác người làm
-(DB check `approvals_separation_of_duties`). Phiên mở bằng link cá nhân có `scope:'self'`:
+(DB check `approvals_separation_of_duties`). PIN người duyệt có chặn thử sai như cửa đăng
+nhập, khoá theo **cặp** người xin–người duyệt. Phiên mở bằng link cá nhân có `scope:'self'`:
 chỉ qua được route gắn `staff.view-own-record` hoặc `@SelfOpen()` (đăng xuất, `/api/auth/me`)
 — route **không gắn quyền** cũng đóng với phiên này.
 Đăng nhập: POS/KDS = PIN **trên thiết bị đã ghép**; Office = email + mật khẩu; Kênh nhân
