@@ -371,6 +371,20 @@ beforeAll(async () => {
       dueAt: at(DAY1, 18, 30),
     })
     .returning({ id: tickets.id })
+  // Bếp đã báo XONG nhưng phục vụ chưa bấm mang ra: vẫn là công của bếp — 19 phút, đúng hạn
+  await db.insert(tickets).values({
+    displayCode: 'A-0003',
+    orderId: order!.id,
+    branchId: fx.branchId,
+    stationId: 'ST-01',
+    source: 'pos',
+    batchNo: 3,
+    state: 'ready',
+    prepSeconds: 1200,
+    queuedAt: at(DAY1, 19, 0),
+    readyAt: at(DAY1, 19, 19),
+    dueAt: at(DAY1, 19, 20),
+  })
 
   const [line] = await db.select({ id: orderLines.id }).from(orderLines).limit(1)
   for (const [ticketId, dishId, name] of [
@@ -540,17 +554,17 @@ describe('B5 — Hiệu suất bếp', () => {
    * chưa bấm "Ra đợt", tính cả quãng đó vào là đổ lỗi cho bếp về quyết định của
    * phục vụ.
    */
-  it('đo từ lúc vé vào hàng tới lúc bếp báo xong', async () => {
+  it('đo từ lúc vé vào hàng tới lúc bếp báo xong — kể cả vé xong mà chưa mang ra', async () => {
     const res = await get(`/api/reports/kitchen?branch=${fx.branchId}&${period}`)
     expect(res.statusCode, res.payload).toBe(200)
-    // Vé 1: 8 phút · vé 2: 30 phút ⇒ trung bình 19 phút = 1140 giây
+    // Vé 1: 8 phút · vé 2: 30 phút · vé 3 (xong, chưa mang ra): 19 phút ⇒ trung bình 19 phút
     expect(res.json().avgSeconds.value).toBe(1_140)
-    expect(res.json().tickets.value).toBe(2)
+    expect(res.json().tickets.value).toBe(3)
   })
 
   it('tỉ lệ trễ SLA đếm vé ra sau hạn', async () => {
     const res = await get(`/api/reports/kitchen?branch=${fx.branchId}&${period}`)
-    expect(res.json().lateRate.value).toBe(0.5)
+    expect(res.json().lateRate.value).toBeCloseTo(1 / 3)
   })
 
   it('tách hai kênh tại bàn và online của cùng một trạm', async () => {

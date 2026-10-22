@@ -381,7 +381,9 @@ export class BusinessReportsService {
     const inRange = (range: DateRange) =>
       and(
         eq(tickets.branchId, branchId),
-        eq(tickets.state, 'closed'),
+        // Bếp xong là lúc báo "ra món" (ready); vé chờ phục vụ mang ra vẫn là công của
+        // bếp — chỉ đếm vé đã `closed` là bỏ sót đúng những vé giờ cao điểm
+        inArray(tickets.state, ['ready', 'closed']),
         sql`${tickets.queuedAt} is not null and ${tickets.readyAt} is not null`,
         gte(sql`(${tickets.queuedAt} at time zone 'Asia/Ho_Chi_Minh')::date`, range.from),
         lte(sql`(${tickets.queuedAt} at time zone 'Asia/Ho_Chi_Minh')::date`, range.to),
