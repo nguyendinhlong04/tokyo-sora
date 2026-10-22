@@ -24,6 +24,7 @@ const GROUP_LABEL: Record<string, string> = {
   corporate: 'Công nợ doanh nghiệp',
   feedback: 'Phản hồi khách',
   report: 'Báo cáo',
+  workreport: 'Báo cáo công việc & sự cố',
 }
 
 /**
@@ -144,6 +145,11 @@ const NOTE: Record<string, string> = {
 
   'report.foodCostTarget':
     'Mốc food cost để màn giá vốn & lãi gộp so vào — mục tiêu, không phải số sổ.',
+
+  'workreport.graceMinutes': 'Nộp báo cáo sau hạn trong ngần này phút vẫn tính đúng hạn.',
+  'workreport.incidentReportHours':
+    'Sự cố báo sau ngần này giờ kể từ lúc xảy ra thì N8 ghi "Báo trễ" — để thấy, không để phạt.',
+  'workreport.incidentCorrectiveDays': 'Hạn mặc định của việc khắc phục giao từ một sự cố.',
 }
 
 /**

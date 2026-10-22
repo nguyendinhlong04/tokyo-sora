@@ -413,6 +413,13 @@ export class IncidentsService {
           .groupBy(tasks.entityId)
       ).map((t) => [t.entityId, t.n]),
     )
+    const reportHours = new Map<string, number>()
+    for (const branchId of new Set(rows.map((r) => r.branchId))) {
+      reportHours.set(
+        branchId,
+        await this.params.getNumber('workreport.incidentReportHours', 24, branchId),
+      )
+    }
     return rows.map((r) => ({
       id: r.id,
       code: r.code,
@@ -427,6 +434,8 @@ export class IncidentsService {
       ownerName: r.ownerId !== null ? (names.get(r.ownerId) ?? null) : null,
       externalReportRequired: r.externalReportRequired,
       externalReportedAt: r.externalReportedAt?.toISOString() ?? null,
+      reportedLate:
+        r.reportedAt.getTime() - r.occurredAt.getTime() > reportHours.get(r.branchId)! * 3_600_000,
       openTasks: openTasks.get(r.id) ?? 0,
     }))
   }

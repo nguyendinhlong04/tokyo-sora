@@ -265,6 +265,8 @@ export interface IncidentRow {
   ownerName: string | null
   externalReportRequired: boolean
   externalReportedAt: string | null
+  /** Báo sau hơn `workreport.incidentReportHours` kể từ lúc xảy ra — để thấy, không để phạt */
+  reportedLate: boolean
   /** Việc khắc phục chưa xong */
   openTasks: number
 }

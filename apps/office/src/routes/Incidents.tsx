@@ -85,7 +85,16 @@ export function Incidents() {
       key: 'reported',
       header: 'Báo lúc',
       width: '150px',
-      cell: (i) => formatDateTime(i.reportedAt),
+      cell: (i) => (
+        <span className="flex flex-col">
+          <span>{formatDateTime(i.reportedAt)}</span>
+          {i.reportedLate ? (
+            <span className="text-[length:var(--fs-c1)] font-semibold text-danger-line">
+              Báo trễ
+            </span>
+          ) : null}
+        </span>
+      ),
     },
     {
       key: 'state',

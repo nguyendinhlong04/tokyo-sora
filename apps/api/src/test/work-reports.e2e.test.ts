@@ -14,6 +14,7 @@ import { hash } from '@node-rs/argon2'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import type {
   IncidentDetail,
+  IncidentRow,
   InboxCounts,
   OrgChart,
   ReportSlot,
@@ -389,6 +390,29 @@ describe('N8 — sự cố nghiêm trọng', () => {
     expect(res.statusCode, res.payload).toBe(201)
     expect(res.json<{ code: string }>().code).toMatch(/^SC-\d{4}-0001$/)
     incidentId = res.json<{ id: number }>().id
+  })
+
+  it('báo sau quá workreport.incidentReportHours thì hiện là báo trễ', async () => {
+    const late = await inject({
+      method: 'POST',
+      url: '/api/incidents',
+      headers: minh,
+      payload: {
+        category: 'hong-thiet-bi',
+        severity: 'nhe',
+        occurredAt: new Date(Date.now() - 30 * 3_600_000).toISOString(),
+        title: 'Vòi rửa khu bếp lạnh rò nước',
+        description: 'Phát hiện từ hôm qua, giờ mới báo',
+        injuredCount: 0,
+        customerInvolved: false,
+      },
+    })
+    expect(late.statusCode, late.payload).toBe(201)
+    const rows = (
+      await inject({ method: 'GET', url: '/api/incidents', headers: bearer(chainLead) })
+    ).json<IncidentRow[]>()
+    expect(rows.find((r) => r.id === late.json<{ id: number }>().id)?.reportedLate).toBe(true)
+    expect(rows.find((r) => r.id === incidentId)?.reportedLate).toBe(false)
   })
 
   it('quản lý ca không đóng được sự cố nghiêm trọng', async () => {

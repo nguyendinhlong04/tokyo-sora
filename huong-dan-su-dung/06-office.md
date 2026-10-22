@@ -213,7 +213,8 @@ trước khi dùng làm căn cứ tuyển dụng.
 **Sự cố (N8):**
 
 - Ai cũng **Báo sự cố** được (Office N1/N8, Kênh nhân viên): loại, mức, giờ xảy ra,
-  chuyện gì, đã làm gì ngay. Mã `SC-…`.
+  chuyện gì, đã làm gì ngay. Mã `SC-…`. Báo sau hơn 24 giờ kể từ lúc xảy ra (A6
+  `workreport.incidentReportHours`) thì danh sách ghi **Báo trễ**.
 - **Tai nạn lao động, an toàn thực phẩm, cháy nổ** mức nghiêm trọng trở lên: hệ thống
   đánh dấu **phải khai báo ra ngoài** — người xử lý ghi mốc và nơi đã khai báo (số hiệu
   văn bản pháp luật cụ thể: hỏi pháp chế).
