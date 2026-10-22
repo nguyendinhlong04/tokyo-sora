@@ -904,8 +904,9 @@ describe('H5 — không ai tự duyệt yêu cầu của chính mình', () => {
         branchId: fx.branchId,
         employeeId: profile.json<{ id: number }>().id,
         kind: 'nghi-phep',
-        fromDate: day(12),
-        toDate: day(12),
+        // Tháng 9: tháng 8 đã chốt công ở phần H7, duyệt nghỉ trong đó là 409 trước
+        fromDate: day(40),
+        toDate: day(40),
         reason: 'Đi khám',
       },
     })
