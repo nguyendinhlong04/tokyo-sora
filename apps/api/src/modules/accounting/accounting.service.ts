@@ -412,6 +412,7 @@ export class AccountingService {
       .select({
         netVnd: sql<number>`(${orders.moneySub} - ${orders.moneyDiscount} + ${orders.moneyService})::float8`,
         vatVnd: sql<number>`${orders.moneyVat}::float8`,
+        breakdown: orders.vatBreakdown,
       })
       .from(orders)
       .where(
@@ -424,7 +425,11 @@ export class AccountingService {
       )
 
     const buckets = vatBuckets(
-      orderRows.map((r) => ({ netVnd: Number(r.netVnd), vatVnd: Number(r.vatVnd) })),
+      orderRows.map((r) => ({
+        netVnd: Number(r.netVnd),
+        vatVnd: Number(r.vatVnd),
+        breakdown: r.breakdown,
+      })),
     )
 
     /**

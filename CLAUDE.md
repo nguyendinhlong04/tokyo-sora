@@ -704,6 +704,12 @@ vào đơn; app chỉ hiển thị.
   `money_discount` = giảm món + giảm hoá đơn → `computeOrderTotals`. Màn khách hiện "tiền
   món" = `money_sub − giảm món` (khớp tổng các dòng) rồi dòng giảm hoá đơn (`moneyOf` ở
   `apps/table/src/promotions.tsx`); phiếu hoá đơn in giá gốc + dòng giảm dưới từng món.
+- **VAT theo thuế suất** (NĐ 254/2026): món mang nhóm thuế `dishes.vat_code`
+  (`standard` · `alcohol`), đóng băng vào `order_lines.vat_code`. Thuế suất là tham số A6
+  `sales.vatRate` (món ăn — đang giảm còn 8% tới 31/12/2026) và `sales.vatRateAlcohol` (bia,
+  rượu 10%, không được giảm). `computeOrderTotals` tính thuế riêng từng thuế suất; phần giảm
+  hoá đơn chia về dòng qua `priceBill().shares`; đơn lưu `orders.vat_breakdown`, F4 đọc nó.
+  Phí giao chưa chịu VAT — chờ kế toán xác nhận.
 - **Trần luật** (NĐ 81/2018 sửa bởi NĐ 128/2024): giảm ≤ 50% giá ngay trước khuyến mãi, quà
   ≤ 50% giá trị hàng mua; **khuyến mại tập trung** (`concentrated`) được tới 100%. Tham số
   `promo.maxDiscountRate` = 0,5. B11 chặn lúc soạn (% > 50, `get × pct > 50 × buy`); bộ chấm

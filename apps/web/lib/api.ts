@@ -5,7 +5,7 @@
  * của Next. Trên máy chủ Next (server component): phải là địa chỉ tuyệt đối vì
  * `fetch` của Node không có khái niệm "trang hiện tại".
  */
-import type { PromoClock, PromotionRule } from '@sora/contracts'
+import type { PromoClock, PromotionRule, VatCode } from '@sora/contracts'
 
 const SERVER_ORIGIN = process.env.SORA_API_URL ?? 'http://localhost:3000'
 
@@ -74,11 +74,16 @@ export interface OnlineDish {
   soldOut: boolean
   /** Món rời vỉ than là nguội — O3 nhắc chọn khung giờ gần nhất */
   bestWithin30: boolean
+  /** Nhóm thuế — bia, rượu chịu thuế suất riêng */
+  vatCode: VatCode
 }
 
-/** Hai tham số để web tự cộng ra đúng tổng máy chủ sẽ tính (`computeOrderTotals`) */
+/** Tham số để web tự cộng ra đúng tổng máy chủ sẽ tính (`computeOrderTotals`) */
 export interface MenuPricing {
+  /** Thuế suất món ăn & đồ uống không cồn, tỉ lệ như tham số A6 */
   vatRate: number
+  /** Thuế suất bia, rượu — máy chủ cũ chưa trả thì theo `vatRate` */
+  vatRateAlcohol?: number
   roundingUnit: number
 }
 

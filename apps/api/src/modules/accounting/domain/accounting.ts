@@ -76,22 +76,39 @@ export interface VatBucket {
 /**
  * Gộp doanh thu theo THUẾ SUẤT cho tờ khai.
  *
- * Suy thuế suất từ cặp (doanh thu, VAT) của từng đơn chứ không đọc `vatCode` của
- * món: một đơn có nhiều món khác thuế suất thì con số trên đơn mới là thứ đã thật
- * sự tính, còn mã thuế của món chỉ là thứ dùng để tính ra nó. Làm tròn về 4 chữ số
- * để 0,08000001 và 0,08 không thành hai dòng khác nhau trên tờ khai.
+ * Đơn tính từ khi có VAT theo nhóm thuế mang sẵn tiền từng thuế suất
+ * (`orders.vat_breakdown`): một bill có món ăn 8% và bia 10% ra đúng hai dòng.
+ * Suy thuế suất từ tổng của bill như trước thì ra một thuế suất "pha" kiểu 8,6% —
+ * không có dòng nào như vậy trên tờ khai.
+ *
+ * Đơn cũ hơn chỉ có tổng: suy thuế suất từ cặp (doanh thu, VAT) của đơn — hồi đó
+ * cả đơn một thuế suất nên phép suy là đúng. Làm tròn về 4 chữ số để 0,08000001
+ * và 0,08 không thành hai dòng khác nhau trên tờ khai.
  */
 export function vatBuckets(
-  orders: readonly { netVnd: number; vatVnd: number }[],
+  orders: readonly {
+    netVnd: number
+    vatVnd: number
+    /** `orders.vat_breakdown`; rỗng hoặc thiếu với đơn tính trước khi có nhóm thuế */
+    breakdown?: readonly { rateBp: number; net: number; vat: number }[]
+  }[],
 ): VatBucket[] {
   const byRate = new Map<number, VatBucket>()
+  const add = (rate: number, netVnd: number, vatVnd: number) => {
+    const bucket = byRate.get(rate) ?? { rate, netVnd: 0, vatVnd: 0 }
+    bucket.netVnd += netVnd
+    bucket.vatVnd += vatVnd
+    byRate.set(rate, bucket)
+  }
 
   for (const order of orders) {
-    const rate = order.netVnd === 0 ? 0 : Math.round((order.vatVnd / order.netVnd) * 10_000) / 10_000
-    const bucket = byRate.get(rate) ?? { rate, netVnd: 0, vatVnd: 0 }
-    bucket.netVnd += order.netVnd
-    bucket.vatVnd += order.vatVnd
-    byRate.set(rate, bucket)
+    if (order.breakdown && order.breakdown.length > 0) {
+      for (const part of order.breakdown) add(part.rateBp / 10_000, part.net, part.vat)
+      continue
+    }
+    const rate =
+      order.netVnd === 0 ? 0 : Math.round((order.vatVnd / order.netVnd) * 10_000) / 10_000
+    add(rate, order.netVnd, order.vatVnd)
   }
 
   return [...byRate.values()].sort((a, b) => a.rate - b.rate)

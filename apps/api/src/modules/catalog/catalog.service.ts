@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+import type { VatCode } from '@sora/contracts'
 import { and, eq, inArray } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import type { DbOrTx } from '../../common/tx'
@@ -28,6 +29,8 @@ export interface CatalogDish {
   routing: DishRouting | null
   /** Lịch bán M11 — chỗ duy nhất mọi cửa gọi món đi qua, nên cũng là chỗ cưỡng chế */
   schedule: SaleSchedule
+  /** Nhóm thuế suất — đóng băng vào dòng đơn như giá */
+  vatCode: VatCode
 }
 
 /**
@@ -85,6 +88,7 @@ export class CatalogService {
               }
             : null,
         schedule: scheduleOf(dish),
+        vatCode: dish.vatCode as VatCode,
       })
     }
     return out

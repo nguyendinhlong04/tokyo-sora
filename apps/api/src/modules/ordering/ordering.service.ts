@@ -47,6 +47,7 @@ import { explodeSet, SetSelectionError, type SetSelection } from '../kitchen/dom
 import type { ServiceContext } from '../kitchen/domain/routing'
 import { syncSetParents } from './set-parent'
 import { clockOf, contextOf, heldFor, pricedLinesOf, ruleOf, rulesOn } from './promo-pricing'
+import { vatRatesOf } from './vat-rates'
 import {
   buildTickets,
   type OrderChannel,
@@ -300,6 +301,8 @@ export class OrderingService {
           priceTotal: unitPrice * input.qty,
           modifiers: modifiers.length ? modifiers : null,
           note: input.note ?? null,
+          // Cả set theo nhóm thuế của set — giá của set nằm ở dòng này
+          vatCode: dish.vatCode,
           state: 'draft',
         })
         .returning({ id: orderLines.id })
@@ -366,6 +369,7 @@ export class OrderingService {
           note: child.note,
           setLabel: child.setLabel,
           portionLabel: child.portionLabel,
+          vatCode: childDish.vatCode,
           state: 'draft',
         })
       }
@@ -386,6 +390,8 @@ export class OrderingService {
         priceTotal: unitPrice * input.qty,
         modifiers: modifiers.length ? modifiers : null,
         note: input.note ?? null,
+        // Đóng băng như giá: Office đổi nhóm thuế của món không làm đổi đơn đã gọi
+        vatCode: dish.vatCode,
         state: 'draft',
       })
       .returning({ id: orderLines.id })
@@ -1648,9 +1654,21 @@ export class OrderingService {
       lines,
     )
     const lineDiscount = lines.reduce((sum, l) => sum + l.discountVnd, 0)
+    const rates = await vatRatesOf(this.params, branchId)
 
     const money = computeOrderTotals({
-      lines: lines.map<OrderLineInput>((l) => ({ qty: l.qty, unitPrice: l.unitPrice })),
+      /**
+       * Mỗi dòng mang phần giảm của nó và thuế suất của nhóm thuế đã đóng băng: hoá
+       * đơn GTGT ghi thuế theo từng thuế suất, nên phần giảm hoá đơn phải biết rơi
+       * vào món ăn bao nhiêu, bia rượu bao nhiêu (`priceBill().shares`).
+       */
+      lines: lines.map<OrderLineInput>((l) => ({
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        discount: l.discountVnd,
+        billDiscount: bill?.shares[l.key] ?? 0,
+        vatRateBp: rates[l.vatCode],
+      })),
       // Tiền món giữ GIÁ NIÊM YẾT, mọi phần giảm (món + hoá đơn) nằm ở `money_discount`:
       // báo cáo và hoá đơn cần thấy cả doanh thu gộp lẫn chiết khấu
       discount: lineDiscount + (bill?.discountVnd ?? 0),
@@ -1658,7 +1676,6 @@ export class OrderingService {
         order.type === 'dinein'
           ? await this.params.getNumber('sales.serviceFeeRate', 0, branchId)
           : 0,
-      vatRate: await this.params.getNumber('sales.vatRate', 0, branchId),
       ship: order.moneyShip,
       roundingUnit: await this.params.getNumber('sales.roundingUnit', 1000, branchId),
     })
@@ -1672,6 +1689,7 @@ export class OrderingService {
         moneyVat: money.vat,
         moneyRound: money.round,
         moneyTotal: money.total,
+        vatBreakdown: money.byRate,
         billPromotionId: bill?.promotionId ?? null,
         moneyBillDiscount: bill?.discountVnd ?? 0,
         version: sql`${orders.version} + 1`,

@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { formatVnd, rooms } from '@sora/contracts'
+import { formatVnd, rooms, VAT_RATE_PARAMS } from '@sora/contracts'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { businessDateOf, minuteOfDayIn, startOfBusinessDay } from '../../common/business-date'
 import { DB } from '../../common/db.module'
@@ -164,6 +164,8 @@ export class OnlineService {
          * trạm nướng chứ không khai tay: món nào ra khỏi vỉ than cũng vậy.
          */
         bestWithin30: d.stationGrill === 'ST-06' || d.stationNoGrill === 'ST-06',
+        /** Nhóm thuế — web cộng VAT theo đúng thuế suất của từng món như máy chủ */
+        vatCode: d.vatCode,
       }))
 
     return {
@@ -185,10 +187,17 @@ export class OnlineService {
        * chính `computeOrderTotals` (§9.6): giá khuyến mãi lẻ đồng thì làm tròn mới
        * khớp số tiền mã QR đòi. Phí phục vụ chỉ thu ăn tại chỗ nên không có ở đây.
        */
-      pricing: {
-        vatRate: await this.params.getNumber('sales.vatRate', 0, branchId),
-        roundingUnit: await this.params.getNumber('sales.roundingUnit', 1000, branchId),
-      },
+      pricing: await this.pricingOf(branchId),
+    }
+  }
+
+  /** Thuế suất hai nhóm thuế (tỉ lệ, như tham số A6) và bội số làm tròn — `vatRatesOf` ở dạng web đọc */
+  private async pricingOf(branchId: string) {
+    const vatRate = await this.params.getNumber(VAT_RATE_PARAMS.standard, 0, branchId)
+    return {
+      vatRate,
+      vatRateAlcohol: await this.params.getNumber(VAT_RATE_PARAMS.alcohol, vatRate, branchId),
+      roundingUnit: await this.params.getNumber('sales.roundingUnit', 1000, branchId),
     }
   }
 

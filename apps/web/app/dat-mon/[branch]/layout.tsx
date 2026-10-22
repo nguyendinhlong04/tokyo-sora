@@ -35,6 +35,7 @@ export default async function BranchLayout({
         id: d.id,
         categoryId: d.categoryId,
         price: d.price,
+        vatCode: d.vatCode ?? 'standard',
       }))}
       pricing={menu?.pricing ?? { vatRate: 0, roundingUnit: 1000 }}
     >

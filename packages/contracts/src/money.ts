@@ -185,6 +185,14 @@ export function computeOrderTotals(input: OrderTotalsInput): OrderTotals {
 /** 1 = 0,01% — đơn vị của mọi tỉ lệ thuế, phí trong module này */
 const BP = 10_000
 
+/**
+ * Tỉ lệ (tham số A6, 0.08) → basis point (800) để đưa vào `vatRateBp` của dòng.
+ * Một chỗ đổi cho mọi nơi gọi: API, web ước giá trước khi đặt.
+ */
+export function rateToBp(rate: number): number {
+  return toBp(rate, 'rate')
+}
+
 /** 0.08 → 800. Tỉ lệ phải nằm trong [0, 1] và biểu diễn được bằng basis point */
 function toBp(rate: number, label: string): number {
   if (!Number.isFinite(rate)) throw new RangeError(`${label} không hợp lệ: ${rate}`)

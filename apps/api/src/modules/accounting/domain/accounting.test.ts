@@ -93,6 +93,25 @@ describe('doanh thu theo thuế suất', () => {
   it('danh sách rỗng ra bảng rỗng', () => {
     expect(vatBuckets([])).toEqual([])
   })
+
+  it('bill có món ăn 8% và bia 10% ra hai dòng, không ra một thuế suất pha', () => {
+    const buckets = vatBuckets([
+      {
+        netVnd: 684_000,
+        vatVnd: 58_140,
+        breakdown: [
+          { rateBp: 800, net: 513_000, vat: 41_040 },
+          { rateBp: 1000, net: 171_000, vat: 17_100 },
+        ],
+      },
+      // Đơn tính trước khi có nhóm thuế: suy thuế suất từ tổng như cũ
+      { netVnd: 500_000, vatVnd: 40_000, breakdown: [] },
+    ])
+    expect(buckets).toEqual([
+      { rate: 0.08, netVnd: 1_013_000, vatVnd: 81_040 },
+      { rate: 0.1, netVnd: 171_000, vatVnd: 17_100 },
+    ])
+  })
 })
 
 describe('tổng hợp thuế', () => {
