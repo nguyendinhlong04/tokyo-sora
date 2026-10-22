@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common'
 import { z } from 'zod'
+import { parsePatch } from '../../common/patch'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { CatalogAdminService } from './catalog-admin.service'
@@ -70,7 +71,8 @@ const MoveSchema = z.object({
   position: z.number().int().min(0).max(999),
 })
 
-const UpdateSchema = DishSchema.partial().extend({ approval: ApprovalSchema })
+/** Thân PATCH đi qua `parsePatch` — hộp lịch bán của M11 chỉ gửi năm trường lịch */
+const UpdateSchema = DishSchema.extend({ approval: ApprovalSchema })
 
 /**
  * Nội dung trang chi tiết món trên web (W3).
@@ -211,7 +213,7 @@ export class CatalogAdminController {
   @Patch(':id')
   @RequirePermission('menu.edit-price')
   update(@Param('id') id: string, @Body() body: unknown, @Req() req: RequestWithActor) {
-    const { approval, ...patch } = UpdateSchema.parse(body)
+    const { approval, ...patch } = parsePatch(UpdateSchema, body)
     return this.catalog.update(id, patch, req.actor!, approval)
   }
 
@@ -282,7 +284,7 @@ export class CategoryAdminController {
   @Patch(':id')
   @RequirePermission('menu.edit-price')
   update(@Param('id') id: string, @Body() body: unknown, @Req() req: RequestWithActor) {
-    return this.catalog.updateCategory(id, CategorySchema.partial().parse(body), req.actor!)
+    return this.catalog.updateCategory(id, parsePatch(CategorySchema, body), req.actor!)
   }
 
   /** Kéo thả: cha mới + vị trí trong danh sách anh em mới */

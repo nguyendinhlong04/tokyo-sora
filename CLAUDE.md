@@ -798,10 +798,12 @@ vào đơn; app chỉ hiển thị.
 5. Kiosk ghép máy: một `catch` chung (`apps/kiosk/src/screens/Pair.tsx:21-38`) — ghép
    thành công nhưng `me()` lỗi vẫn báo "Mã không đúng" (KDS đã sửa ở `04ffd9b`).
 6. CI không chạy trên nhánh làm việc và không có Postgres (§7).
-7. **PATCH ghi đè dữ liệu:** zod 4 `.partial()` vẫn điền `.default()` cho trường vắng mặt.
-   Đã xác nhận: lưu lịch bán của set (Office `Sets.tsx`) xoá ảnh và giá online của món; sửa
-   thông tin một tài khoản đã khoá (`AccountPatch`, `active` mặc định true) mở khoá lại nó.
-   A8 đã sửa bằng `common/patch.ts`; còn M1 món/set, M10, A3, A5, A1, nguyên liệu kho.
+7. **Dữ liệu production có thể đã bị PATCH cũ ghi đè** — code đã sửa 22/10/2026: mọi cửa
+   PATCH có `.default()` (A8, M1 món/set, M10, A3, A5, A1, nguyên liệu kho) đi qua
+   `parsePatch` (§5.2), mỗi cửa một e2e "thân một trường không đổi trường khác". Còn chờ chủ
+   dự án kiểm dữ liệu: hộp "Lịch bán" M11 (`Sets.tsx`) đã đưa ảnh và giá online của set về
+   null — tra `audit_log` `dish.updated` có `saleDays` và `imageUrl` mà không có `nameVi`; nút
+   Bật/Tắt A8 đã đưa số vị trí tuyển về 1, tâm ảnh hero về 50/50 và thứ tự về 0.
 
 Thấp hơn:
 - `var(--sora-accent)` không tồn tại (`apps/office/src/routes/Cms.tsx:1035`).

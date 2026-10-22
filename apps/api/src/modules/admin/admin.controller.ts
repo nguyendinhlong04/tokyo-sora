@@ -13,6 +13,7 @@ import {
   Req,
 } from '@nestjs/common'
 import { z } from 'zod'
+import { parsePatch } from '../../common/patch'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
 import { AdminService } from './admin.service'
@@ -189,7 +190,7 @@ export class AdminController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    return this.admin.updateTable(id, TableBody.partial().parse(body), req.actor!)
+    return this.admin.updateTable(id, parsePatch(TableBody, body), req.actor!)
   }
 
   /** Ngừng dùng bàn — dữ liệu cũ giữ nguyên, xem `deactivateTable` */

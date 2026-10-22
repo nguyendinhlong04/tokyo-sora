@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common'
 import { ROLES } from '@sora/contracts'
 import { z } from 'zod'
+import { parsePatch } from '../../common/patch'
 import { actorBranchId } from '../identity/actor'
 import type { RequestWithActor } from '../identity/auth.guard'
 import { RequirePermission } from '../identity/permission.guard'
@@ -35,13 +36,14 @@ const AccountBody = z.object({
   roles: z.array(RoleGrant).max(20),
 })
 
+/** Thân PATCH đi qua `parsePatch` — thiếu `active` mà điền mặc định là mở khoá tài khoản đã khoá */
 const AccountPatch = AccountBody.pick({
   code: true,
   fullName: true,
   phone: true,
   email: true,
   active: true,
-}).partial()
+})
 
 const SecretBody = z.object({ value: z.string().min(1).max(200) })
 const RolesBody = z.object({ roles: z.array(RoleGrant).min(1).max(20) })
@@ -89,7 +91,7 @@ export class AccessAdminController {
     @Body() body: unknown,
     @Req() req: RequestWithActor,
   ) {
-    return this.access.updateAccount(id, AccountPatch.parse(body), req.actor!)
+    return this.access.updateAccount(id, parsePatch(AccountPatch, body), req.actor!)
   }
 
   @Put('accounts/:id/password')

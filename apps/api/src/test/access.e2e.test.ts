@@ -257,6 +257,52 @@ describe('A1 — Tài khoản', () => {
     await db.update(staffSessions).set({ revokedAt: null }).where(eq(staffSessions.staffId, ownerId))
   })
 
+  /**
+   * Thân PATCH chỉ mang trường cần đổi. zod 4 vẫn điền mặc định cho trường vắng
+   * mặt trong `.partial()` (`active` = true), nên trước đây sửa tên một tài khoản
+   * đã khoá là mở khoá lại nó — người đã nghỉ đăng nhập POS lại được bằng PIN cũ.
+   */
+  it('sửa tên tài khoản đã khoá không mở khoá lại nó', async () => {
+    const created = await inject({
+      method: 'POST',
+      url: '/api/admin/accounts',
+      headers: asOwner(),
+      payload: {
+        code: 'PV93',
+        fullName: 'Người đã nghỉ',
+        pin: '8642',
+        roles: [{ roleCode: 'R1', branchId: fx.branchId }],
+      },
+    })
+    expect(created.statusCode, created.payload).toBe(201)
+    const id = created.json().id as number
+
+    const lock = await inject({
+      method: 'PATCH',
+      url: `/api/admin/accounts/${id}`,
+      headers: asOwner(),
+      payload: { active: false },
+    })
+    expect(lock.statusCode, lock.payload).toBe(200)
+
+    const rename = await inject({
+      method: 'PATCH',
+      url: `/api/admin/accounts/${id}`,
+      headers: asOwner(),
+      payload: { fullName: 'Người đã nghỉ việc' },
+    })
+    expect(rename.statusCode, rename.payload).toBe(200)
+    expect(rename.json()).toMatchObject({ fullName: 'Người đã nghỉ việc', active: false })
+
+    const login = await inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { [DEVICE_HEADER]: SEED_DEVICE },
+      payload: { branchId: fx.branchId, staffId: id, pin: '8642' },
+    })
+    expect(login.statusCode).not.toBe(201)
+  })
+
   it('marketing không mở được màn tài khoản', async () => {
     const res = await inject({ method: 'GET', url: '/api/admin/accounts', headers: asMarketing() })
     expect(res.statusCode).toBe(403)
@@ -503,6 +549,40 @@ describe('A5 — Máy in', () => {
     })
     const names = bundle.json().printers.map((p: { name: string }) => p.name)
     expect(names).not.toContain('Quầy thu ngân')
+  })
+
+  /**
+   * Thân PATCH chỉ mang trường cần đổi. zod 4 vẫn điền mặc định cho trường vắng
+   * mặt trong `.partial()`, nên trước đây đổi địa chỉ một máy in đã tắt là bật lại
+   * nó, đưa cổng về 9100 và số liên về 1.
+   */
+  it('đổi địa chỉ máy in không bật lại nó, không đổi cổng hay số liên', async () => {
+    const created = await inject({
+      method: 'POST',
+      url: '/api/admin/printers',
+      headers: asOwner(),
+      payload: {
+        branchId: fx.branchId,
+        name: 'Quầy bar',
+        kind: 'bill',
+        stationId: null,
+        host: '10.0.0.23',
+        port: 9101,
+        template: 'k80-bill',
+        copies: 2,
+        active: false,
+      },
+    })
+    expect(created.statusCode, created.payload).toBe(201)
+
+    const res = await inject({
+      method: 'PATCH',
+      url: `/api/admin/printers/${created.json().id}`,
+      headers: asOwner(),
+      payload: { host: '10.0.0.24' },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    expect(res.json()).toMatchObject({ host: '10.0.0.24', port: 9101, copies: 2, active: false })
   })
 })
 
