@@ -1027,12 +1027,25 @@ export class PerformanceService {
           .where(inArray(staff.id, ids))
       ).map((s) => [s.id, s.fullName]),
     )
+    const cycles = new Map(
+      (
+        await this.db
+          .select()
+          .from(kpiCycles)
+          .where(inArray(kpiCycles.id, [...new Set(rows.map((r) => r.cycleId))]))
+      ).map((c) => [c.id, c]),
+    )
     return rows.map((r) => ({
       id: r.id,
       cycleId: r.cycleId,
+      cycleKind: cycles.get(r.cycleId)!.kind,
+      periodStart: cycles.get(r.cycleId)!.periodStart,
+      periodEnd: cycles.get(r.cycleId)!.periodEnd,
+      cycleState: cycles.get(r.cycleId)!.state,
       staffId: r.staffId,
       fullName: names.get(r.staffId) ?? '',
       positionTitle: r.positionTitle,
+      reviewerId: r.reviewerId,
       reviewerName: r.reviewerId !== null ? (names.get(r.reviewerId) ?? null) : null,
       selfSubmittedAt: iso(r.selfSubmittedAt),
       finalizedAt: iso(r.finalizedAt),

@@ -1,3 +1,4 @@
+import { formatVnd } from './money.js'
 import type { ActionKey } from './permissions.js'
 
 /**
@@ -474,9 +475,15 @@ export interface KpiItemView {
 export interface KpiReviewRow {
   id: number
   cycleId: number
+  /** Kỳ của phiếu — để danh sách "KPI của tôi" ghi được "Tháng 9/2026 · Đã chốt" */
+  cycleKind: 'thang' | 'quy'
+  periodStart: string
+  periodEnd: string
+  cycleState: KpiCycleState
   staffId: number
   fullName: string
   positionTitle: string | null
+  reviewerId: number | null
   reviewerName: string | null
   selfSubmittedAt: string | null
   finalizedAt: string | null
@@ -527,4 +534,35 @@ export interface KpiBonusSuggestions {
     suggestedBonusVnd: number
     basis: string
   }[]
+}
+
+/** Một chữ số thập phân, dấu phẩy thập phân, dấu chấm nghìn — như `formatVnd` */
+function decimal(value: number): string {
+  const [whole, fraction] = Math.abs(value).toFixed(1).split('.')
+  const grouped = whole!.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  const sign = value < 0 && Number(value.toFixed(1)) !== 0 ? '−' : ''
+  return `${sign}${grouped}${fraction === '0' ? '' : `,${fraction}`}`
+}
+
+/**
+ * Số KPI để đọc — `milli` là giá trị × 1000. Một hàm cho Office và Kênh nhân viên:
+ * cùng một chỉ số không được hiện "8,5%" ở chỗ này và "8.5 %" ở chỗ kia.
+ */
+export function formatKpiValue(milli: number, unit: KpiUnit): string {
+  const value = milli / 1000
+  switch (unit) {
+    case 'vnd':
+      return formatVnd(Math.round(value))
+    case 'vnd-gio':
+      return `${formatVnd(Math.round(value))}/giờ công`
+    case 'pct':
+      return `${decimal(value)}%`
+    default:
+      return `${decimal(value)} ${KPI_UNIT_LABELS[unit]}`
+  }
+}
+
+/** Điểm tổng hay % đạt — `103_571` ⇒ "103,6" */
+export function formatKpiScore(milli: number): string {
+  return decimal(milli / 1000)
 }

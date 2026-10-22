@@ -3,6 +3,9 @@ import type {
   IncidentCategory,
   IncidentSeverity,
   InboxCounts,
+  KpiMetricCode,
+  KpiReviewDetail,
+  KpiReviewRow,
   MyIncident,
   ReportSlot,
   ReportValue,
@@ -269,4 +272,28 @@ export const api = {
   }) => apiFetch<{ id: number; code: string }>('/api/incidents', { method: 'POST', body: input }),
 
   myIncidents: () => apiFetch<MyIncident[]>('/api/incidents/me'),
+
+  // ---- N14 KPI của tôi — số tiền máy chủ đã che với phiên điện thoại, không có số thưởng
+
+  myKpi: () => apiFetch<KpiReviewRow[]>('/api/performance/me'),
+
+  myKpiReview: (id: number) => apiFetch<KpiReviewDetail>(`/api/performance/me/reviews/${id}`),
+
+  selfReviewKpi: (
+    id: number,
+    input: {
+      comment: string | null
+      items: { metricCode: KpiMetricCode; selfScore: number | null }[]
+    },
+  ) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/me/reviews/${id}/self`, {
+      method: 'PUT',
+      body: input,
+    }),
+
+  ackKpi: (id: number, feedback: string | null) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/me/reviews/${id}/ack`, {
+      method: 'POST',
+      body: { feedback },
+    }),
 }

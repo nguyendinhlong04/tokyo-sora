@@ -35,7 +35,7 @@ export const SELF_OPEN = 'sora:self-open'
 export const SelfOpen = () => SetMetadata(SELF_OPEN, true)
 
 const SELF_DENIED =
-  'Kênh nhân viên chỉ mở lịch, công, lương, việc và văn bản của chính bạn. Việc quản lý cần đăng nhập ở máy của quán.'
+  'Kênh nhân viên chỉ mở lịch, công, lương, việc, văn bản và KPI của chính bạn. Việc quản lý cần đăng nhập ở máy của quán.'
 
 @Injectable()
 export class PermissionGuard implements CanActivate {

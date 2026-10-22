@@ -47,6 +47,12 @@ export const IconWallet = () => (
   </Icon>
 )
 
+export const IconChart = () => (
+  <Icon>
+    <path d="M4 20h16M7 16.5V12M12 16.5V7M17 16.5v-6.5" />
+  </Icon>
+)
+
 export const IconBack = () => (
   <Icon>
     <path d="M15 5l-7 7 7 7" />

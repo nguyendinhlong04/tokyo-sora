@@ -3,12 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router'
 import { api } from './api'
-import { IconBell, IconCalendar, IconTasks, IconWallet } from './icons'
+import { IconBell, IconCalendar, IconChart, IconTasks, IconWallet } from './icons'
 
 /**
  * Thanh tab dính đáy — trong tầm ngón cái khi cầm máy một tay. Thay cho hai nút
- * ở đầu màn của bản H8 · H9: thêm Việc, Thông báo (và sau này KPI) thì đầu màn
- * không còn chỗ, mà nút ở đầu màn là nút xa tay nhất.
+ * ở đầu màn của bản H8 · H9: thêm Việc, Thông báo, KPI thì đầu màn không còn chỗ,
+ * mà nút ở đầu màn là nút xa tay nhất.
  *
  * Huy hiệu hỏi máy chủ mỗi 60 giây — chưa có thông báo đẩy. Có việc quá hạn thì
  * chấm đếm của tab Việc chuyển đỏ, nhãn đọc màn hình nói rõ "quá hạn".
@@ -24,6 +24,7 @@ export function TabBar() {
   const reports = inbox.data?.reports
   // Tab Việc gồm cả báo cáo ca phải nộp — cùng là "việc của ca này"
   const pending = (tasks?.open ?? 0) + (tasks?.toReview ?? 0) + (reports?.due ?? 0)
+  const kpiDue = inbox.data?.kpi.selfDue ?? 0
   const overdue = (tasks?.overdue ?? 0) + (reports?.overdue ?? 0)
 
   return (
@@ -49,6 +50,12 @@ export function TabBar() {
           badge={<CountBadge count={unread} label={`${unread} văn bản chưa đọc`} />}
         />
         <Tab to="/phieu-luong" icon={<IconWallet />} label="Lương" />
+        <Tab
+          to="/kpi"
+          icon={<IconChart />}
+          label="KPI"
+          badge={<CountBadge count={kpiDue} label={`${kpiDue} phiếu KPI cần tự đánh giá`} />}
+        />
       </div>
     </nav>
   )

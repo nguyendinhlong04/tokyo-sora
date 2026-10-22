@@ -8,6 +8,14 @@ import type {
   DocumentDetail,
   DocumentRow,
   InboxCounts,
+  KpiBonusSuggestions,
+  KpiCycleView,
+  KpiMetricCode,
+  KpiObservationKind,
+  KpiObservationView,
+  KpiReviewDetail,
+  KpiReviewRow,
+  KpiTemplateView,
   IncidentCategory,
   IncidentDetail,
   IncidentRow,
@@ -3475,6 +3483,127 @@ export const api = {
 
   closeIncident: (id: number, note: string | null) =>
     apiFetch<{ id: number }>(`/api/incidents/${id}/close`, { method: 'POST', body: { note } }),
+
+  // ---- N9 · N10 · N11 KPI, thưởng gợi ý cho H7 — kiểu lấy từ @sora/contracts
+
+  kpiTemplates: () => apiFetch<KpiTemplateView[]>('/api/performance/templates'),
+
+  saveKpiTemplate: (input: {
+    positionId: number
+    items: { metricCode: KpiMetricCode; weightPct: number; defaultTargetMilli: number }[]
+  }) => apiFetch<{ id: number }>('/api/performance/templates', { method: 'POST', body: input }),
+
+  applyStandardKpi: (target: string) =>
+    apiFetch<{ created: number }>('/api/performance/templates/apply-standard', {
+      method: 'POST',
+      body: { target },
+    }),
+
+  kpiCycles: (branch?: string) =>
+    apiFetch<KpiCycleView[]>(
+      `/api/performance/cycles${branch ? `?branch=${encodeURIComponent(branch)}` : ''}`,
+    ),
+
+  createKpiCycle: (input: { branchId: string; kind: 'thang' | 'quy'; periodStart: string }) =>
+    apiFetch<{ id: number }>('/api/performance/cycles', { method: 'POST', body: input }),
+
+  openKpiCycle: (id: number, policyUrl: string | null) =>
+    apiFetch<{ id: number }>(`/api/performance/cycles/${id}/open`, {
+      method: 'POST',
+      body: { policyUrl },
+    }),
+
+  computeKpiCycle: (id: number) =>
+    apiFetch<{ reviews: number }>(`/api/performance/cycles/${id}/compute`, { method: 'POST' }),
+
+  kpiCycleStep: (id: number, step: 'start-review' | 'close') =>
+    apiFetch<{ id: number }>(`/api/performance/cycles/${id}/${step}`, { method: 'POST' }),
+
+  kpiReviews: (cycleId: number) =>
+    apiFetch<KpiReviewRow[]>(`/api/performance/cycles/${cycleId}/reviews`),
+
+  kpiReview: (id: number) => apiFetch<KpiReviewDetail>(`/api/performance/reviews/${id}`),
+
+  scoreKpiReview: (
+    id: number,
+    input: {
+      comment: string | null
+      items: {
+        metricCode: KpiMetricCode
+        managerScore?: number | null
+        excludedReason?: string | null
+      }[]
+    },
+  ) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/reviews/${id}/manager`, {
+      method: 'PUT',
+      body: input,
+    }),
+
+  finalizeKpiReview: (id: number) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/reviews/${id}/finalize`, { method: 'POST' }),
+
+  setKpiTarget: (
+    id: number,
+    input: { metricCode: KpiMetricCode; targetMilli: number; note: string },
+  ) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/reviews/${id}/targets`, {
+      method: 'PUT',
+      body: input,
+    }),
+
+  setKpiExempt: (id: number, reason: string | null) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/reviews/${id}/exempt`, {
+      method: 'PUT',
+      body: { reason },
+    }),
+
+  kpiBonusSuggestions: (payrollPeriodId: number) =>
+    apiFetch<KpiBonusSuggestions>(
+      `/api/performance/bonus-suggestions?payrollPeriodId=${payrollPeriodId}`,
+    ),
+
+  kpiObservations: (branch?: string) =>
+    apiFetch<KpiObservationView[]>(
+      `/api/performance/observations${branch ? `?branch=${encodeURIComponent(branch)}` : ''}`,
+    ),
+
+  createKpiObservation: (input: {
+    branchId: string
+    kind: KpiObservationKind
+    observedOn: string
+    score: number
+    evidenceUrl: string
+    note: string | null
+  }) => apiFetch<{ id: number }>('/api/performance/observations', { method: 'POST', body: input }),
+
+  voidKpiObservation: (id: number, reason: string) =>
+    apiFetch<{ id: number }>(`/api/performance/observations/${id}/void`, {
+      method: 'POST',
+      body: { reason },
+    }),
+
+  myKpi: () => apiFetch<KpiReviewRow[]>('/api/performance/me'),
+
+  myKpiReview: (id: number) => apiFetch<KpiReviewDetail>(`/api/performance/me/reviews/${id}`),
+
+  selfReviewKpi: (
+    id: number,
+    input: {
+      comment: string | null
+      items: { metricCode: KpiMetricCode; selfScore: number | null }[]
+    },
+  ) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/me/reviews/${id}/self`, {
+      method: 'PUT',
+      body: input,
+    }),
+
+  ackKpi: (id: number, feedback: string | null) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/me/reviews/${id}/ack`, {
+      method: 'POST',
+      body: { feedback },
+    }),
 }
 
 export interface ReportTemplateInput {

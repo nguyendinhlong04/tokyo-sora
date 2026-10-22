@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tan
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate, useParams } from 'react-router'
 import { api, clearChannelLink, getChannelLink, setChannelLink } from './api'
+import { Kpi } from './routes/Kpi'
 import { NoticeDetail } from './routes/NoticeDetail'
 import { Notices } from './routes/Notices'
 import { Payslips } from './routes/Payslips'
@@ -23,7 +24,7 @@ const queryClient = new QueryClient({
 })
 
 /**
- * H8 · H9 · N12 · N13 — Kênh nhân viên.
+ * H8 · H9 · N12 · N13 · N14 — Kênh nhân viên.
  *
  * Nền tối, một cột, mọi thứ trong tầm ngón cái: đây là màn xem trên điện thoại
  * riêng giữa lúc đứng chờ xe, không phải màn làm việc.
@@ -45,6 +46,7 @@ export function App() {
               <Route path="/thong-bao" element={<Notices />} />
               <Route path="/thong-bao/:id" element={<NoticeDetail />} />
               <Route path="/phieu-luong" element={<Payslips />} />
+              <Route path="/kpi" element={<Kpi />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

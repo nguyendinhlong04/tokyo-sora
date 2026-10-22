@@ -218,6 +218,21 @@ có cron — tải lại trang là thấy):
 4. **H1** → **Link** của người phục vụ → mở link ở cửa sổ ẩn danh, nhập PIN → tab **Việc**
    có "Mở ca – Sảnh". Tích, nộp → Lan thấy ở chuông và **N1 · Chờ tôi nghiệm thu**.
 
+**Thử KPI → thưởng gợi ý H7** (kỳ đánh giá chỉ vào bước chấm được SAU ngày cuối kỳ — thử
+bằng kỳ của tháng trước):
+
+1. `nhansu@` → **N9** → **Dùng bộ KPI mẫu** (chọn phạm vi chi nhánh, rồi "Văn phòng
+   chuỗi"). Ghế chưa có bộ thì người ngồi ghế đó được miễn đánh giá.
+2. **N10** → **Mở kỳ mới** cho tháng trước → **Công bố…** → **Tính lại**. Mở một phiếu để
+   xem số tự động; chỉ số thiếu dữ liệu ghi "không tính".
+3. **Bắt đầu đánh giá**. Người phục vụ mở tab **KPI** trên Kênh nhân viên, tự chấm, gửi.
+   Người đánh giá (cấp trên trực tiếp theo sơ đồ lúc mở kỳ — cột _Người đánh giá_ ở N10)
+   mở phiếu, chấm thái độ 1–5, **Kết thúc đánh giá…**. Phiếu của người chưa tự đánh giá phải chờ
+   `kpi.selfReviewDays` (A6, mặc định 5 ngày) — để thử nhanh đặt về 0.
+4. `nhansu@` → **Chốt kỳ…** (người có phiếu trong kỳ không chốt được).
+5. **H7** → mở kỳ lương cùng tháng → **Chốt công** → **Tính nháp…**: thưởng gợi ý điền
+   sẵn; sửa một dòng thì phải ghi lý do.
+
 > Cả nhóm quản trị (A1–A6, A9, A10) và R3 gắn quyền `admin.manage-accounts-roles` — theo
 > ma trận §4.2 chỉ R10 có. Đăng nhập bằng `chuoi@` sẽ vào được Office nhưng cột trái không
 > hiện những màn đó. Hai ngoại lệ: **A7 nhật ký** mở cho R7 · R8 · R11 · R10 (`audit.view-log`),

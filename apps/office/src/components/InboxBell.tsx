@@ -87,6 +87,12 @@ export function InboxBell() {
               },
             ]
           : []),
+        {
+          label: 'Phiếu KPI cần bạn tự đánh giá',
+          count: data.kpi.selfDue,
+          to: '/ban-lam-viec',
+        },
+        { label: 'Phiếu KPI chờ bạn chấm', count: data.kpi.toReview, to: '/danh-gia-kpi' },
         { label: 'Văn bản chưa đọc', count: data.documents.unread, to: '/van-ban?tab=gui-toi' },
         {
           label: 'Văn bản cần xác nhận đã đọc',
@@ -104,6 +110,8 @@ export function InboxBell() {
     (data?.reports.due ?? 0) +
     (data?.reports.toReview ?? 0) +
     (data?.incidents?.open ?? 0) +
+    (data?.kpi.selfDue ?? 0) +
+    (data?.kpi.toReview ?? 0) +
     (data?.documents.unread ?? 0) +
     (data?.documents.toSign ?? 0)
   const urgent =

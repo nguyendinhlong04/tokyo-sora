@@ -1,9 +1,17 @@
-import type { MyDocument, ReportSlot, TaskRow } from '@sora/contracts'
-import { Badge, Button, ErrorState, Skeleton, useToast } from '@sora/ui'
+import {
+  KPI_CYCLE_STATE_LABELS,
+  type KpiReviewRow,
+  type MyDocument,
+  type ReportSlot,
+  type TaskRow,
+} from '@sora/contracts'
+import { Badge, Button, ErrorState, GradeChip, Skeleton, useToast } from '@sora/ui'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api } from '../api'
+import { cycleLabel, Score } from '../components/kpi/kpi-ui'
+import { MyKpiDrawer } from '../components/kpi/MyKpiDrawer'
 import { PageHeader } from '../components/PageHeader'
 import { IncidentFormDrawer } from '../components/reports/IncidentFormDrawer'
 import { ReportDrawer } from '../components/reports/ReportDrawer'
@@ -17,9 +25,17 @@ import { useSession } from '../session-context'
  * N1 — Bàn làm việc: trang mở đầu của Office.
  *
  * Trả lời một câu: "hôm nay tôi phải làm gì". Việc của tôi (quá hạn → hôm nay →
- * sắp tới, máy chủ đã sắp), việc chờ tôi nghiệm thu, văn bản cần đọc / cần ký.
- * Mỗi dòng mở thẳng chỗ xử lý — không có số liệu kinh doanh ở đây, đó là việc của B1.
+ * sắp tới, máy chủ đã sắp), việc chờ tôi nghiệm thu, văn bản cần đọc / cần ký,
+ * phiếu KPI của tôi. Mỗi dòng mở thẳng chỗ xử lý — không có số liệu kinh doanh ở
+ * đây, đó là việc của B1.
  */
+
+/** Phiếu đang chờ chính người này tự đánh giá */
+const selfDue = (r: KpiReviewRow) =>
+  (r.cycleState === 'open' || r.cycleState === 'review') &&
+  !r.selfSubmittedAt &&
+  !r.finalizedAt &&
+  !r.exempt
 
 const endOfTodayVN = () => {
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
@@ -33,6 +49,7 @@ export function MyDesk() {
   const [openId, setOpenId] = useState<number | null>(null)
   const [reportId, setReportId] = useState<number | null>(null)
   const [reporting, setReporting] = useState(false)
+  const [kpiId, setKpiId] = useState<number | null>(null)
   const tasks = useQuery({ queryKey: ['my-tasks'], queryFn: api.myTasks, refetchInterval: 60_000 })
   const slots = useQuery({ queryKey: ['report-slots', 'mine'], queryFn: api.myReportsDue })
   // Mở suất: lần đầu tạo bản nháp, các lần sau lấy lại đúng bản đó
@@ -44,6 +61,8 @@ export function MyDesk() {
   const dueSlots = (slots.data ?? []).filter((s) => s.state === null || s.state === 'draft')
   const docs = useQuery({ queryKey: ['docs', 'mine'], queryFn: api.myDocuments })
   const inbox = useQuery({ queryKey: ['org-inbox'], queryFn: api.inbox, staleTime: 30_000 })
+  const kpi = useQuery({ queryKey: ['kpi', 'mine'], queryFn: api.myKpi })
+  const kpiToReview = inbox.data?.kpi.toReview ?? 0
 
   const buckets = useMemo(() => {
     const end = endOfTodayVN()
@@ -175,6 +194,57 @@ export function MyDesk() {
               )}
             </Panel>
 
+            {(kpi.data ?? []).length > 0 || kpiToReview > 0 ? (
+              <Panel title="KPI">
+                {kpiToReview > 0 ? (
+                  <Link
+                    to="/danh-gia-kpi"
+                    className="mb-2 flex items-center justify-between rounded-sm border border-accent px-3 py-2 text-[length:var(--fs-b2)] text-ink-hi hover:bg-surface-3"
+                  >
+                    Phiếu chờ bạn chấm <span className="font-mono tabular-nums">{kpiToReview}</span>
+                  </Link>
+                ) : null}
+                <div className="grid gap-1">
+                  {(kpi.data ?? []).slice(0, 4).map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setKpiId(r.id)}
+                      className="flex items-center gap-3 rounded-sm px-2 py-2 text-left text-[length:var(--fs-b2)] hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-ink-hi">
+                          {cycleLabel({
+                            kind: r.cycleKind,
+                            periodStart: r.periodStart,
+                            periodEnd: r.periodEnd,
+                          })}
+                        </span>
+                        <span
+                          className={[
+                            'text-[length:var(--fs-c1)]',
+                            selfDue(r) ? 'font-semibold text-ink-hi' : 'text-ink-mute',
+                          ].join(' ')}
+                        >
+                          {selfDue(r)
+                            ? 'Cần bạn tự đánh giá'
+                            : KPI_CYCLE_STATE_LABELS[r.cycleState]}
+                        </span>
+                      </span>
+                      {r.exempt ? (
+                        <span className="text-[length:var(--fs-c1)] text-ink-mute">Miễn</span>
+                      ) : (
+                        <span className="flex flex-none flex-col items-end">
+                          <Score milli={r.scoreMilli} />
+                          <GradeChip grade={r.grade} />
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </Panel>
+            ) : null}
+
             {feedback ? (
               <Panel title="Khiếu nại bạn đang xử lý">
                 <Link
@@ -201,6 +271,7 @@ export function MyDesk() {
       <TaskDrawer taskId={openId} mode="mine" onClose={() => setOpenId(null)} />
       <ReportDrawer reportId={reportId} mode="mine" onClose={() => setReportId(null)} />
       {reporting ? <IncidentFormDrawer onClose={() => setReporting(false)} /> : null}
+      <MyKpiDrawer reviewId={kpiId} onClose={() => setKpiId(null)} />
     </>
   )
 }

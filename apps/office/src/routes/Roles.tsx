@@ -44,7 +44,9 @@ const GROUPS: { label: string; test: (action: ActionKey) => boolean }[] = [
   {
     label: 'Tổ chức & điều hành (§4.2c)',
     test: (a) =>
-      ['org.', 'doc.', 'task.', 'workreport.', 'incident.'].some((prefix) => a.startsWith(prefix)),
+      ['org.', 'doc.', 'task.', 'workreport.', 'incident.', 'kpi.'].some((prefix) =>
+        a.startsWith(prefix),
+      ),
   },
   {
     label: 'Nhân sự (§4.2b)',

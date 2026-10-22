@@ -32,10 +32,11 @@ cấp, xin lại là xong.
 
 ### Thanh tab ở đáy màn
 
-Bốn tab trong tầm ngón cái: **Lịch** (mở đầu) · **Việc** · **Thông báo** · **Lương**.
-Chấm số trên tab Việc là số việc đang chờ bạn (đỏ khi có việc quá hạn), trên tab
-Thông báo là số văn bản chưa đọc — tự cập nhật mỗi phút khi app đang mở; chưa có
-thông báo đẩy, nên quán vẫn dán link văn bản vào nhóm Zalo.
+Năm tab trong tầm ngón cái: **Lịch** (mở đầu) · **Việc** · **Thông báo** · **Lương** ·
+**KPI**. Chấm số trên tab Việc là số việc đang chờ bạn (đỏ khi có việc quá hạn), trên
+tab Thông báo là số văn bản chưa đọc, trên tab KPI là số phiếu đang chờ bạn tự đánh
+giá — tự cập nhật mỗi phút khi app đang mở; chưa có thông báo đẩy, nên quán vẫn dán
+link văn bản vào nhóm Zalo.
 
 **Lịch & công (H8):**
 
@@ -94,12 +95,26 @@ không sửa ngược, sai sẽ được cộng/trừ ở kỳ sau."*
 - Quyết định bổ nhiệm/điều chuyển về chính bạn cũng tới đây; chức danh ở đầu màn
   đổi theo ngày hiệu lực.
 
+**KPI của tôi (N14):** mỗi kỳ đánh giá một thẻ — điểm (_tạm tính_ khi kỳ còn chạy),
+hạng A–D trên thanh than hồng, và nhãn **Cần tự đánh giá** khi tới lượt bạn.
+
+- Mở một kỳ: từng chỉ số bạn được chấm, trọng số, **% đạt**. Chỉ số chưa đủ dữ liệu
+  ghi "không tính" — nó không kéo điểm của bạn xuống. Doanh thu, giá vốn không hiện
+  số tiền trên điện thoại, chỉ % đạt.
+- **Tự đánh giá:** chạm 1–5 cho từng chỉ số, viết vài dòng tự nhận xét, bấm **Gửi tự
+  đánh giá** (gửi lại được tới khi cấp trên kết thúc phiếu). Tự chấm chỉ để cấp trên
+  đối chiếu — điểm tính từ số thật và phần cấp trên chấm.
+- Kỳ đã chốt: đọc nhận xét của cấp trên, ghi ý kiến nếu muốn, bấm **Tôi đã xem kết
+  quả** — một lần.
+- Không có số thưởng ở đây; thưởng (nếu có) nằm trong phiếu lương H9. KPI không phạt,
+  không trừ lương.
+
 ### Ranh giới phạm vi `self` (cố ý)
 
 Phiên mở bằng link cá nhân **chỉ xem được dữ liệu của chính mình** — kể cả thu
 ngân hay bếp trưởng cũng không mở được màn vận hành nào từ điện thoại:
-*"Kênh nhân viên chỉ mở lịch, công, lương, việc và văn bản của chính bạn. Việc
-quản lý cần đăng nhập ở máy của quán."* Chấm công từ đây cũng bị chặn — phải ra
+*"Kênh nhân viên chỉ mở lịch, công, lương, việc, văn bản và KPI của chính bạn. Việc
+quản lý cần đăng nhập ở máy của quán."* Chấm KPI cho người khác làm ở Office (N10). Chấm công từ đây cũng bị chặn — phải ra
 kiosk. Link cá nhân cũng không xin được luồng tin trực tiếp (realtime) của quán.
 
 ## 7.2 Kiosk chấm công (`chamcong.tokyosora.vn`)

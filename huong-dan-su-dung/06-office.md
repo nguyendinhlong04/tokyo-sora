@@ -115,14 +115,22 @@ flowchart LR
   kiểm, chủ duyệt và phát. Quản lý ca thấy *công* nhưng không bao giờ thấy
   *lương*.
 
-## 6.4b Tổ chức & điều hành (N1 – N8)
+  **Tính nháp…** mở bảng điều chỉnh từng người: **thưởng**, **tạm ứng**, **ghi chú**.
+  Kỳ KPI cùng tháng đã chốt (N10) thì người chưa có dòng lương được điền sẵn thưởng
+  gợi ý (hạng, điểm, số gợi ý hiện ngay trên dòng); **Lấy thưởng KPI** điền lại cả
+  bảng. Sửa được, nhưng **khác gợi ý thì bắt buộc ghi lý do**. Kỳ KPI chưa chốt thì
+  khung trên nói rõ vì sao chưa có thưởng — ô thưởng không tự về 0. Tính nháp lại
+  không làm mất thưởng đã nhập. Phiếu chi tạm ứng (C2) trong kỳ được lấy tự động,
+  thay cho số nhập tay. Bảng lương tách riêng cột **Thưởng** và hiện ghi chú.
+
+## 6.4b Tổ chức & điều hành (N1 – N11)
 
 Sơ đồ tổ chức là trục của giao việc, văn bản, báo cáo và KPI: **cấp trên trực
 tiếp** của một người là người ngồi ghế **trưởng** của đơn vị gần nhất phía trên.
 
 | Màn | Dùng để |
 |---|---|
-| **N1 · Bàn làm việc** | Trang mở đầu: việc của tôi (quá hạn → hôm nay → sắp tới), báo cáo cần nộp, việc chờ tôi nghiệm thu, văn bản cần đọc/ký, khiếu nại tôi đang xử lý; nút **Báo sự cố**. Bấm một việc để tích checklist, nộp, nghiệm thu; bấm một báo cáo để điền và nộp |
+| **N1 · Bàn làm việc** | Trang mở đầu: việc của tôi (quá hạn → hôm nay → sắp tới), báo cáo cần nộp, việc chờ tôi nghiệm thu, văn bản cần đọc/ký, phiếu KPI của tôi và phiếu chờ tôi chấm, khiếu nại tôi đang xử lý; nút **Báo sự cố**. Bấm một việc để tích checklist, nộp, nghiệm thu; bấm một báo cáo để điền và nộp |
 | **N2 · Sơ đồ tổ chức** | Cây đơn vị (công ty → khối/phòng → chi nhánh → bộ phận → tổ). Mỗi thẻ đơn vị liệt kê chức danh: người đang giữ, **thực có/định biên**, thanh than hồng (càng nóng càng thiếu người — đỏ là ghế trưởng trống). Bố cục **Dọc/Ngang**, thu phóng, **tìm người** (mở nhánh và đưa thẻ ra giữa), lọc chi nhánh, **In sơ đồ** (A3 ngang) |
 | **N3 · Chức danh & định biên** | Cùng dữ liệu dạng bảng: lọc "chỉ ghế còn trống", cột vai trò gợi ý báo người giữ ghế chưa có quyền ở A1 |
 | **N4 · Văn bản & thông báo** | Sổ thông báo, quyết định, quy định nội bộ. Tab **Gửi tôi · Chờ tôi ký · Tôi soạn · Tất cả**. Soạn, trình ký, ký bằng PIN, thu hồi; theo dõi ai đã đọc/xác nhận |
@@ -130,6 +138,9 @@ tiếp** của một người là người ngồi ghế **trưởng** của đơ
 | **N6 · Việc định kỳ & SOP** | Tab **Hôm nay** (checklist từng ca: ai làm, ai nghiệm thu, còn gì trễ) · **Mẫu việc** (SOP giao cho chức danh, lặp theo ca / ngày / tuần / tháng). Nút **Dùng bộ SOP chuẩn** |
 | **N7 · Báo cáo công việc** | Tab **Cần tôi xem · Còn thiếu · Tất cả · Mẫu**. Xem, xác nhận (hoặc "Nhận ca" với sổ giao ca), viết bổ sung; mẫu báo cáo theo chi nhánh. Nút **Dùng bộ mẫu chuẩn** |
 | **N8 · Sự cố** | Danh sách sự cố đang mở / đã đóng, lọc theo mức. Điều tra, giao việc khắc phục, ghi mốc khai báo ra ngoài, đóng |
+| **N9 · Bộ KPI** | Tab **Bộ KPI theo chức danh** (mỗi ghế 3–6 chỉ số, trọng số đúng 100%) · **Danh mục chỉ số** (cách tính, nguồn số, khi nào "không tính"). Nút **Dùng bộ KPI mẫu** |
+| **N10 · Kỳ đánh giá KPI** | Mở kỳ, đặt chỉ tiêu riêng, công bố, tính lại số, chấm phiếu, chốt kỳ. Thưởng gợi ý chỉ người xem được lương thấy |
+| **N11 · Phiếu kiểm tra** | Điểm kiểm tra vệ sinh ATTP và khách bí mật (0–100) kèm đường dẫn bằng chứng; huỷ kèm lý do |
 
 **Bắt đầu nhanh — dựng theo mẫu chuẩn:** nút **Dựng khung chuỗi theo mẫu** tạo Ban
 điều hành, Khối văn phòng (Kế toán, Nhân sự, Marketing), Khối vận hành; dải
@@ -224,6 +235,42 @@ trước khi dùng làm căn cứ tuyển dụng.
   (nếu phải) và mọi việc khắc phục đã xong.
 - Sự cố **nghiêm trọng** chỉ quản lý chuỗi hoặc chủ đóng, và người báo không tự đóng.
   Sự cố không xoá; đã đóng thì không sửa.
+
+**KPI (N9 – N11):**
+
+- **N9 · Bộ KPI** — mỗi chức danh 3–6 chỉ số trong danh mục, trọng số cộng đúng 100%
+  (thiếu hay thừa thì nút **Lưu bộ KPI** không bấm được), chỉ tiêu mặc định theo đơn vị
+  của chỉ số. Lưu là tạo **phiên bản mới** — kỳ đã mở vẫn chấm theo bộ lúc mở. **Dùng
+  bộ KPI mẫu** dựng bộ cho các chức danh chuẩn còn trống (văn phòng chuỗi hoặc từng
+  chi nhánh). Ghế chưa có bộ KPI thì người ngồi ghế đó được miễn đánh giá khi mở kỳ.
+- **N10 · Kỳ đánh giá KPI** — đi đúng một chiều:
+  1. **Mở kỳ mới** (chi nhánh, tháng hoặc quý): dựng phiếu cho mọi nhân viên đang làm,
+     người đánh giá là **cấp trên trực tiếp** theo sơ đồ lúc đó. Kỳ nháp là lúc đặt
+     **chỉ tiêu riêng** cho từng người (bắt buộc lý do) và **miễn đánh giá** người nghỉ
+     dài.
+  2. **Công bố…** chụp thang chấm và mức thưởng từ A6 (nhóm "KPI & thưởng") — đổi A6
+     sau đó không đổi kỳ này (quy chế thưởng công bố trước, Điều 104). Dán đường dẫn
+     văn bản quy chế nếu có.
+  3. **Tính lại** lấy số thật từ dữ liệu (giãn cách 5 phút giữa hai lần bấm).
+  4. Sau ngày cuối kỳ: **Bắt đầu đánh giá** (số được tính lại lần cuối). Người đánh giá
+     mở từng phiếu: chấm 1–5 phần thái độ, tay nghề; **loại** chỉ số có dữ liệu sai
+     (bắt buộc lý do); nhận xét; **Kết thúc đánh giá…** khi nhân viên đã tự đánh giá
+     hoặc đã chờ quá 5 ngày.
+  5. R13 hoặc R10 **Chốt kỳ…** khi mọi phiếu đã kết thúc; người có phiếu trong kỳ không
+     tự chốt. Chốt rồi thì phiếu đóng băng, thưởng gợi ý sang H7.
+- **Cách chấm:** điểm là trung bình có trọng số của % đạt (mỗi chỉ số kẹp ở 120%), **chỉ
+  tính chỉ số có dữ liệu** — thiếu dữ liệu hiện "không tính", không phải 0. Phần trọng
+  số có dữ liệu dưới 70% thì không xếp loại. Hạng A ≥ 105 · B ≥ 95 · C ≥ 80 · D. Cột
+  **Thưởng gợi ý** chỉ người xem được lương (kế toán, nhân sự, chủ) mới có. Số doanh
+  thu, giá vốn bị che với người không có quyền xem — chỉ còn % đạt.
+- **N11 · Phiếu kiểm tra** — điểm kiểm tra vệ sinh ATTP hay khách bí mật (0–100), bắt
+  buộc **đường dẫn bằng chứng**; là nguồn của hai chỉ số cùng tên. Sai thì **Huỷ
+  phiếu…** kèm lý do. Phiếu do chính người được chấm ghi không tính cho người đó.
+- **KPI của tôi:** khối **KPI** ở N1 — mở phiếu của mình để tự chấm 1–5 từng chỉ số (chỉ
+  để cấp trên đối chiếu, không cộng vào điểm) và gửi tự nhận xét; kỳ chốt rồi thì đọc
+  nhận xét, bấm **Tôi đã xem kết quả** kèm ý kiến (một lần). Nhân viên tuyến đầu làm
+  việc này trên Kênh nhân viên (chương 7).
+- **Không phạt, không khấu trừ** (Điều 127): hạng D nghĩa là thưởng gợi ý bằng 0.
 
 **Văn bản (N4) — soạn, trình, ký:**
 
@@ -414,7 +461,7 @@ gia vị… **Bỏ trống là hợp lệ ở mọi ô** — trang web tự lùi
 | **A3 · Khu vực & bàn** | Khai khu, bàn: loại chỗ (thường / nướng có bếp / phòng riêng), loại bếp, sức chứa min–max. Ba thuộc tính đổ thẳng vào W6, định tuyến bếp và lưới khung giờ |
 | **A4 · Thiết bị** | Sinh **mã ghép 6 số** (sống 10 phút, dùng một lần) cho 5 loại máy: Tablet phục vụ · Máy thu ngân · **Màn bếp (bắt buộc ghim trạm)** · Kiosk chấm công · Cầu in. Nút **Ngắt máy** cắt cả token thiết bị lẫn phiên đang mở — máy mất là ngắt từ xa ngay |
 | **A5 · Máy in** | Khai máy in bill/tem theo trạm, địa chỉ LAN, mẫu in. *Sửa xong phải phát hành lại bundle cấu hình* (xem 6.11) |
-| **A6 · Trung tâm tham số** | Một sổ cho mọi ngưỡng/hệ số của hệ thống, nhóm theo mảng, mỗi dòng có chú thích hệ quả + lịch sử ai đổi. Hai nút lưu: **"Lưu cho chuỗi"** / **"Chỉ chi nhánh này"** (+ **Bỏ ghi đè**). Hiệu lực ngay, không cần triển khai lại |
+| **A6 · Trung tâm tham số** | Một sổ cho mọi ngưỡng/hệ số của hệ thống, nhóm theo mảng, mỗi dòng có chú thích hệ quả + lịch sử ai đổi. Hai nút lưu: **"Lưu cho chuỗi"** / **"Chỉ chi nhánh này"** (+ **Bỏ ghi đè**). Hiệu lực ngay, không cần triển khai lại. Nhóm **KPI & thưởng**: thang chấm và mức thưởng chỉ đặt ở cấp chuỗi, kỳ KPI đã công bố giữ số lúc công bố |
 | **A7 · Nhật ký thao tác** | Sổ bất biến mọi hành động nhạy cảm; lọc theo ngày/hành động/người; 50 dòng/trang |
 | **A8 · Nội dung website** | Hai tab **Tin tức** và **Tuyển dụng**; bài giữ nháp được. Giá món sửa ở M1, địa chỉ/giờ mở sửa ở A10 — không ở đây |
 | **A9 · Hoá đơn điện tử** | Phần chuỗi: MST, nhà cung cấp HĐĐT, chứng thư số (đếm ngày hết hạn); phần chi nhánh: **ký hiệu 6 ký tự có chữ M** + công tắc bật phát hành. Khai ở đây, phát hành ở F3 |

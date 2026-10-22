@@ -406,6 +406,7 @@ describe('Vòng trọn — tự đánh giá, chấm, chốt, ý kiến', () => {
       KpiReviewRow[]
     >()
     minhReview = mine[0]!.id
+    expect(mine[0]).toMatchObject({ periodStart: lastMonth, cycleState: 'open' })
     expect('suggestedBonusVnd' in mine[0]!).toBe(false)
     const res = await inject({
       method: 'PUT',

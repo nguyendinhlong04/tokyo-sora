@@ -48,7 +48,7 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
 | `apps/pos` | `@sora/pos` | Sora POS (PWA) | Phục vụ, thu ngân · tablet 11″ ngang + máy thu ngân 22″ → **sắp tới thêm iPad & điện thoại** | `:5174` | `pos.tokyo-sora.vn` |
 | `apps/kitchen` | `@sora/kitchen` | Sora Kitchen / KDS (PWA) | Bếp từng trạm, ra món · TV 32–43″ 1920×1080, Android box | `:5175` | `kds.tokyo-sora.vn` |
 | `apps/office` | `@sora/office` | Sora Office | Chủ, quản lý, kế toán, HR, marketing · desktop 1440+, **nền sáng** | `:5176` | `admin.tokyo-sora.vn` |
-| `apps/staff` | `@sora/staff` | Kênh nhân viên (H8 lịch/công · H9 phiếu lương · N12 việc · N13 thông báo · N15 báo cáo ca, sự cố) — **không phải app gọi món** | `:5178` | `nv.tokyo-sora.vn` |
+| `apps/staff` | `@sora/staff` | Kênh nhân viên (H8 lịch/công · H9 phiếu lương · N12 việc · N13 thông báo · N14 KPI của tôi · N15 báo cáo ca, sự cố) — **không phải app gọi món** | `:5178` | `nv.tokyo-sora.vn` |
 | `apps/kiosk` | `@sora/kiosk` | Kiosk chấm công (H10) · tablet 10″ gắn cố định | `:5179` | `chamcong.tokyo-sora.vn` |
 
 Tên miền thật có gạch nối (`tokyo-sora.vn`). Nhiều tài liệu và `SITE_URL` mặc định
@@ -219,7 +219,9 @@ mất mạng = dải báo + hàng đợi cục bộ, màn thanh toán bị chặ
 `QrCode` (entry riêng `@sora/ui/QrCode` để web không kéo Dexie) · `EmberBar` (thanh than
 hồng: độ dài = tỉ lệ, màu = độ "nóng"; nơi gọi luôn in chữ đi kèm) · `CountBadge` (chấm
 đếm của chuông Office và thanh tab Kênh NV; màu trung tính, chỉ đỏ khi `urgent`) · `Sheet`
-(tấm trượt từ đáy cho điện thoại một tay — Table, Kênh NV; không dùng Modal giữa màn ở đó).
+(tấm trượt từ đáy cho điện thoại một tay — Table, Kênh NV; không dùng Modal giữa màn ở đó) ·
+`GradeChip` + `kpiHeat` (hạng KPI A–D trên thang than hồng, A tro → D lửa, luôn kèm chữ;
+`kpiHeat` tô thanh % đạt theo đúng ngưỡng hạng của kỳ).
 
 Quy tắc: mọi `<button>` có `type="button"`; variant là `Record<Union,string>` UPPER_CASE;
 không responsive prefix trong gói; app Vite **phải** có `@source '../../../packages/ui/src'`
@@ -450,7 +452,9 @@ ra log hay chat.
   `sora.web.order`). Không thêm store toàn cục.
 - Màn hình theo mã thiết kế (T/P/K/O/R/W/M/S/B/H/C/F/A, và N cho Tổ chức & điều hành —
   `tokyo-sora-ke-hoach-thiet-ke.md` §26b) — ghi mã ở đầu file. Màn nhóm N tải theo yêu cầu
-  (`React.lazy` trong `App.tsx`): bản dựng Office đã vượt ngân sách JS của §8 từ trước.
+  (`React.lazy` trong `App.tsx`), H7 cũng vậy: bản dựng Office đã vượt ngân sách JS của §8
+  từ trước — màn mới đừng làm gói chính nặng thêm. Số KPI định dạng bằng `formatKpiValue` /
+  `formatKpiScore` của `@sora/contracts` (milli → "8,5%", "103,6"), không tự chia 1000.
   Trang mở đầu của Office là **N1 · Bàn làm việc** (`/ban-lam-viec`), không còn là M1.
 - Thiết bị đích theo app (§1) quyết định bố cục; không có media query theo hướng xoay.
   Khi một thành phần phải chạy ở nhiều khổ (POS iPad/điện thoại — §9.3) ưu tiên

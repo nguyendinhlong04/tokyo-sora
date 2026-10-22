@@ -50,7 +50,6 @@ import { Modifiers } from './routes/Modifiers'
 import { KitchenReport, OnlineReport, StaffReport, TableTurnover } from './routes/OperationsReports'
 import { OnlineMenu } from './routes/OnlineMenu'
 import { Parameters } from './routes/Parameters'
-import { Payroll } from './routes/Payroll'
 import { ProfitLoss } from './routes/ProfitLoss'
 import { RecipeEditor, RecipeList } from './routes/Recipes'
 import { ReservationConfig } from './routes/ReservationConfig'
@@ -79,6 +78,15 @@ const WorkReports = lazy(() =>
   import('./routes/WorkReports').then((m) => ({ default: m.WorkReports })),
 )
 const Incidents = lazy(() => import('./routes/Incidents').then((m) => ({ default: m.Incidents })))
+// H7 tải lười: bảng điều chỉnh thưởng KPI làm màn này nặng lên, mà chỉ R8/R13/R10 mở
+const Payroll = lazy(() => import('./routes/Payroll').then((m) => ({ default: m.Payroll })))
+const KpiTemplates = lazy(() =>
+  import('./routes/KpiTemplates').then((m) => ({ default: m.KpiTemplates })),
+)
+const KpiCycles = lazy(() => import('./routes/KpiCycles').then((m) => ({ default: m.KpiCycles })))
+const Observations = lazy(() =>
+  import('./routes/Observations').then((m) => ({ default: m.Observations })),
+)
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5_000, refetchOnWindowFocus: true } },
@@ -152,6 +160,9 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
       { to: '/viec-dinh-ky', label: 'N6 · Việc định kỳ & SOP', need: 'task.assign' },
       { to: '/bao-cao-cong-viec', label: 'N7 · Báo cáo công việc', need: 'workreport.review' },
       { to: '/su-co', label: 'N8 · Sự cố', need: 'incident.manage' },
+      { to: '/kpi', label: 'N9 · Bộ KPI', need: 'kpi.configure' },
+      { to: '/danh-gia-kpi', label: 'N10 · Kỳ đánh giá KPI', need: 'kpi.review-team' },
+      { to: '/phieu-kiem-tra', label: 'N11 · Phiếu kiểm tra', need: 'kpi.observe' },
     ],
   },
   {
@@ -299,6 +310,9 @@ export function App() {
                 <Route path="/viec-dinh-ky" element={<TaskTemplates />} />
                 <Route path="/bao-cao-cong-viec" element={<WorkReports />} />
                 <Route path="/su-co" element={<Incidents />} />
+                <Route path="/kpi" element={<KpiTemplates />} />
+                <Route path="/danh-gia-kpi" element={<KpiCycles />} />
+                <Route path="/phieu-kiem-tra" element={<Observations />} />
                 <Route path="/chi-phi-tong-quan" element={<ExpenseOverview />} />
                 <Route path="/chi-phi" element={<Expenses />} />
                 <Route path="/dinh-ky" element={<RecurringExpenses />} />
