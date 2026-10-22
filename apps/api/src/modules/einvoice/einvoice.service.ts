@@ -517,9 +517,14 @@ export class EinvoiceService {
       const view = await this.issueQuietly(live.id)
       if (view) live = await this.row(live.id)
     }
+    // Bill ghi nợ công ty: hoá đơn đứng tên công ty nợ tiền (`invoice_buyer_locked`)
+    const [charge] = await this.db
+      .select({ id: corporateCharges.id })
+      .from(corporateCharges)
+      .where(eq(corporateCharges.orderId, order.id))
     return {
       enabled: await this.enabledFor(order.branchId),
-      editable: open && (live === null || lockOf(live) === null),
+      editable: open && !charge && (live === null || lockOf(live) === null),
       buyer: order.invoiceBuyer ?? null,
       invoice: live ? this.view(live) : null,
     }

@@ -985,6 +985,13 @@ describe('Ghi nợ công ty: hoá đơn đứng tên công ty nợ tiền', () =
     const change = await setBuyer(sessionId, null, auth())
     expect(change.statusCode).toBe(409)
     expect(change.json().code).toBe('invoice_buyer_locked')
+    // POS không mời sửa người mua khi máy chủ sẽ từ chối
+    const status = await inject({
+      method: 'GET',
+      url: `/api/table-sessions/${sessionId}/invoice`,
+      headers: auth(),
+    })
+    expect(status.json().editable).toBe(false)
 
     expect((await issueAgain(orderId)).json()).toMatchObject({ state: 'issued' })
     await closeTable(sessionId)
