@@ -1,3 +1,21 @@
+import type {
+  DocAttachment,
+  IncidentCategory,
+  IncidentSeverity,
+  InboxCounts,
+  KpiMetricCode,
+  KpiReviewDetail,
+  KpiReviewRow,
+  MyIncident,
+  ReportSlot,
+  ReportValue,
+  WorkReportDetail,
+  MyDocument,
+  MyDocumentDetail,
+  MyTasks,
+  TaskDetail,
+  TaskState,
+} from '@sora/contracts'
 import { apiFetch } from '@sora/core'
 
 /**
@@ -175,4 +193,107 @@ export const api = {
   }) => apiFetch<{ id: number; state: string }>('/api/hr/leaves', { method: 'POST', body: input }),
 
   payslips: () => apiFetch<Payslip[]>('/api/hr/payroll/my-payslips'),
+
+  // ---- N13 Thông báo · hộp "Việc cần xử lý" — kiểu lấy từ @sora/contracts
+
+  inbox: () => apiFetch<InboxCounts>('/api/me/inbox'),
+
+  notices: () => apiFetch<MyDocument[]>('/api/org/me/documents'),
+
+  notice: (id: number) => apiFetch<MyDocumentDetail>(`/api/org/me/documents/${id}`),
+
+  markNotice: (id: number, ack: boolean) =>
+    apiFetch<{ readAt: string | null; ackedAt: string | null }>(
+      `/api/org/me/documents/${id}/receipt`,
+      { method: 'POST', body: { ack } },
+    ),
+
+  // ---- N12 Việc của tôi — nhận, tích checklist, nộp, nghiệm thu khi được chỉ định
+
+  myTasks: () => apiFetch<MyTasks>('/api/org/me/tasks'),
+
+  myTask: (id: number) => apiFetch<TaskDetail>(`/api/org/me/tasks/${id}`),
+
+  acceptTask: (id: number) =>
+    apiFetch<{ id: number }>(`/api/org/me/tasks/${id}/accept`, { method: 'POST' }),
+
+  checkTask: (id: number, idx: number, checked: boolean) =>
+    apiFetch<{ idx: number }>(`/api/org/me/tasks/${id}/check`, {
+      method: 'POST',
+      body: { idx, checked },
+    }),
+
+  submitTask: (id: number, note: string | null, attachments: DocAttachment[] | null) =>
+    apiFetch<{ id: number; state: TaskState }>(`/api/org/me/tasks/${id}/submit`, {
+      method: 'POST',
+      body: { note, attachments },
+    }),
+
+  reviewTask: (id: number, accept: boolean, note: string | null) =>
+    apiFetch<{ id: number; state: TaskState }>(`/api/org/me/tasks/${id}/review`, {
+      method: 'POST',
+      body: { accept, note },
+    }),
+
+  // ---- N15 Báo cáo ca và báo sự cố — báo cáo có tiền nộp ở Office, không ở đây
+
+  reportsDue: () => apiFetch<ReportSlot[]>('/api/work-reports/me/due'),
+
+  openReport: (slot: Pick<ReportSlot, 'templateId' | 'periodKey' | 'shiftTemplateId'>) =>
+    apiFetch<WorkReportDetail>('/api/work-reports/me/drafts', {
+      method: 'POST',
+      body: {
+        templateId: slot.templateId,
+        periodKey: slot.periodKey,
+        shiftTemplateId: slot.shiftTemplateId,
+      },
+    }),
+
+  report: (id: number) => apiFetch<WorkReportDetail>(`/api/work-reports/me/${id}`),
+
+  saveReport: (id: number, values: Record<string, ReportValue>) =>
+    apiFetch<{ id: number }>(`/api/work-reports/me/${id}`, { method: 'PUT', body: { values } }),
+
+  submitReport: (id: number) =>
+    apiFetch<{ id: number; onTime: boolean }>(`/api/work-reports/me/${id}/submit`, {
+      method: 'POST',
+    }),
+
+  reportIncident: (input: {
+    category: IncidentCategory
+    severity: IncidentSeverity
+    occurredAt: string
+    title: string
+    description: string
+    immediateAction: string | null
+    injuredCount: number
+    customerInvolved: boolean
+    evidenceUrls: string[]
+  }) => apiFetch<{ id: number; code: string }>('/api/incidents', { method: 'POST', body: input }),
+
+  myIncidents: () => apiFetch<MyIncident[]>('/api/incidents/me'),
+
+  // ---- N14 KPI của tôi — số tiền máy chủ đã che với phiên điện thoại, không có số thưởng
+
+  myKpi: () => apiFetch<KpiReviewRow[]>('/api/performance/me'),
+
+  myKpiReview: (id: number) => apiFetch<KpiReviewDetail>(`/api/performance/me/reviews/${id}`),
+
+  selfReviewKpi: (
+    id: number,
+    input: {
+      comment: string | null
+      items: { metricCode: KpiMetricCode; selfScore: number | null }[]
+    },
+  ) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/me/reviews/${id}/self`, {
+      method: 'PUT',
+      body: input,
+    }),
+
+  ackKpi: (id: number, feedback: string | null) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/me/reviews/${id}/ack`, {
+      method: 'POST',
+      body: { feedback },
+    }),
 }

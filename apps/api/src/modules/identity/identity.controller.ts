@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { isTableDevice } from './actor'
 import { Public, STAFF_COOKIE, type RequestWithActor } from './auth.guard'
 import { IdentityService } from './identity.service'
-import { RequirePermission } from './permission.guard'
+import { RequirePermission, SelfOpen } from './permission.guard'
 
 const PairingCodeBody = z.object({
   branchId: z.string().min(1),
@@ -163,6 +163,7 @@ export class IdentityController {
     }
   }
 
+  @SelfOpen()
   @Post('logout')
   async logout(@Req() req: RequestWithActor, @Res({ passthrough: true }) reply: FastifyReply) {
     const actor = req.actor!
@@ -172,6 +173,7 @@ export class IdentityController {
   }
 
   /** Ai đang đăng nhập — POS/KDS gọi lúc khởi động để khôi phục phiên */
+  @SelfOpen()
   @Get('me')
   me(@Req() req: RequestWithActor) {
     return req.actor

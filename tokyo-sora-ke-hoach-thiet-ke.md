@@ -44,7 +44,8 @@
 | Q14 | Kiến trúc **module hoá để mở rộng** về sau | Mục 6 |
 | Q15 | Có module **Nhân sự** (lịch làm, chấm công, lương, thưởng) và **Chi phí & tài sản** để tính lợi nhuận toàn diện, phục vụ kê khai thuế | Mục 26, 27, 28 |
 | Q16 | **Một pháp nhân, một mã số thuế** cho cả chuỗi · **Page riêng từng chi nhánh** · khởi động với **1 chi nhánh** | Phương án tài chính – pháp lý chốt ở Mục 30.1, 30.2, 30.3 |
-| Q17 | Nâng **tích điểm & hạng thành viên**, **công nợ khách doanh nghiệp**, **bảo trì thiết bị** vào bản chốt. **Không đấu nối** API app giao đồ ăn, **không làm** app native (ship gọi thủ công), **không triển khai** checklist nhiệt độ tủ | Chi tiết G.2, G.3 |
+| Q17 | Nâng **tích điểm & hạng thành viên**, **công nợ khách doanh nghiệp**, **bảo trì thiết bị** vào bản chốt. **Không đấu nối** API app giao đồ ăn, **không làm** app native (ship gọi thủ công), **không triển khai** checklist nhiệt độ tủ | Chi tiết G.2, G.3 · checklist ca nay làm theo Q18 |
+| Q18 | (22/10/2026) Có module **Tổ chức & điều hành**: sơ đồ tổ chức theo **chức danh trên cây đơn vị** (cấp trên trực tiếp suy từ cây, sơ đồ không cấp quyền), **văn bản** thông báo / quyết định / quy định ký bằng PIN người ký, **giao việc** + **việc định kỳ theo ca** (checklist SOP mở/đóng ca, vệ sinh ATTP — không làm nhật ký nhiệt độ), **báo cáo công việc & sự cố**, **KPI** chốt kỳ sinh **thưởng gợi ý** (người tính lương xác nhận, không tự cộng). Nhân viên tuyến đầu dùng **Kênh nhân viên**, không làm trên POS. Đính kèm bằng **đường dẫn** (chưa có kho tệp) | Mục 4.2c, 26b |
 
 Không còn câu hỏi nào chặn tiến độ. Việc còn lại là điền giá trị tham số và giấy tờ ở Mục 34.
 
@@ -170,6 +171,40 @@ Cột `NV` = mọi nhân viên vận hành (R1–R6), thao tác qua Kênh nhân 
 **Quyền tích điểm & công nợ:** đổi điểm tại quầy — R2 được, trong trần mỗi giao dịch (tham số); điều chỉnh điểm tay — chỉ R11/R10, kèm lý do, ghi A7; ghi nợ công ty tại P10 — R2 thao tác nhưng cần R7 duyệt + chữ ký khách; gạch nợ / xoá nợ — R8, mức lớn R10; hồ sơ khách doanh nghiệp — R2 xem, R8/R11 sửa.
 
 **Nguyên tắc cứng thứ tư: lương là dữ liệu nhạy cảm.** Quản lý ca thấy *công* của nhân viên mình nhưng không bao giờ thấy *lương*; báo cáo Lãi/Lỗ cho quản lý ca chỉ hiện tổng chi nhân sự chi nhánh, không xuống được từng người. Chỉ R8, R13, R10 chạm được số lương cá nhân.
+
+**Xem việc của mình** (Q18): dòng "xem lịch, công, lương của mình" mở rộng thành "xem lịch, công, lương, việc, văn bản, KPI của mình" và cấp cho **mọi vai trò có tài khoản**, kể cả R9 và R12 — marketing và điều phối cũng nhận việc, đọc văn bản. Đây là khoá duy nhất mà phiên Kênh nhân viên (link cá nhân) đi qua được.
+
+### 4.2c Ma trận bổ sung — Tổ chức & điều hành (Q18)
+
+Ma trận chỉ nói vai trò nào được đụng tới việc đó. Được đụng tới **ai** do sơ đồ tổ chức quyết: người ngồi ghế trưởng chỉ với tới cây con của đơn vị mình; quản lý ca (R7) với tới cả chi nhánh của mình; R10 · R11 nhìn toàn chuỗi, R13 toàn chuỗi ở sơ đồ, văn bản, KPI.
+
+| Hành động | R1–R4 | R5 | R6 | R7 | R8 | R9 | R11 | R12 | R13 | R10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Xem sơ đồ tổ chức | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Sửa cơ cấu, chức danh, định biên; gán chức danh | – | – | – | – | – | – | ✓ | – | ✓ | ✓ |
+| Soạn văn bản nội bộ (thông báo, quyết định, quy định) | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Ký ban hành thông báo | – | – | – | ✓ | – | – | ✓ | – | ✓ | ✓ |
+| Ký ban hành quyết định, quy định | – | – | – | – | – | – | ✓ | – | – | ✓ |
+| Giao việc, nghiệm thu, việc định kỳ & SOP (trong phạm vi) | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Cấu hình mẫu báo cáo công việc | – | – | – | – | – | – | ✓ | – | – | ✓ |
+| Xem, xác nhận báo cáo của cấp dưới | – | ✓ | ✓ | ✓ | ✓ | – | ✓ | – | ✓ | ✓ |
+| Xử lý sự cố, giao việc khắc phục, đóng sự cố thường | – | ✓ | – | ✓ | – | – | ✓ | – | ✓ | ✓ |
+| Đóng sự cố nghiêm trọng | – | – | – | – | – | – | ✓ | – | – | ✓ |
+| Bộ KPI theo chức danh | – | – | – | – | – | – | – | – | ✓ | ✓ |
+| Mở kỳ KPI, đặt chỉ tiêu, bắt đầu đánh giá | – | – | – | – | – | – | ✓ | – | ✓ | ✓ |
+| Đánh giá KPI cấp dưới, tính lại số | – | ✓ | ✓ | ✓ | ✓ | – | ✓ | – | ✓ | ✓ |
+| Ghi phiếu kiểm tra (vệ sinh ATTP, khách bí mật) | – | ✓ | – | ✓ | – | ✓ | ✓ | – | ✓ | ✓ |
+| Chốt kỳ KPI | – | – | – | – | – | – | – | – | ✓ | ✓ |
+
+R1–R4 không mở Office: chức danh và cấp trên của họ hiện ở Kênh nhân viên. Không ai tự gán chức danh cho chính mình.
+
+**Việc**: giao tay luôn giao cho một NGƯỜI trong phạm vi (mỗi người nhận một việc riêng); việc định kỳ (SOP mở/đóng ca, vệ sinh ATTP) giao cho một CHỨC DANH — ai giữ ghế và đứng ca **đã công bố** đúng ngày thì thấy, checklist dùng chung, mỗi mục ghi người tích. Nộp → nghiệm thu đạt hoặc trả lại kèm lý do; còn mục chưa tích thì phải ghi lý do mới nộp được. Không ai tự giao việc cho mình hay tự nghiệm thu việc mình nộp; việc đã quá hạn không dời hạn được. Nhân viên tuyến đầu nhận, tích, nộp trên Kênh nhân viên; trưởng ca được chỉ định làm ghế nghiệm thu thì nghiệm thu ngay trên điện thoại — ngoại lệ có chủ ý, không đụng tiền. Phạm vi giao việc: R10 · R11 toàn chuỗi; R13 KHÔNG giao việc vận hành hộ quản lý chi nhánh.
+
+**Báo cáo công việc**: mẫu theo chi nhánh (trường, lịch nộp mỗi ca / ngày / tuần / tháng, ghế nộp, người xác nhận); suất phải nộp tính từ mẫu + lịch đã công bố, quá hạn mà chưa nộp là "còn thiếu". Số tự điền (doanh thu, đơn huỷ, vé trễ, két, điểm khách chấm, checklist SOP…) tính đúng định nghĩa của B2/B5 và **đóng băng lúc nộp**; sai thì viết bổ sung. Báo cáo có tiền chỉ nộp ở Office; báo cáo ca bếp nộp được trên Kênh nhân viên. **Sự cố**: ai cũng báo (Kênh nhân viên), mã `SC-yyMM-NNNN`; TNLĐ, ATTP, cháy nổ mức nghiêm trọng trở lên phải khai báo ra ngoài (hệ thống nhắc và lưu mốc); chỉ đóng khi có nguyên nhân gốc, biện pháp và việc khắc phục đã xong; sự cố nghiêm trọng do R11/R10 đóng và người báo không tự đóng. Không chấm KPI bằng số sự cố.
+
+**KPI**: danh mục chỉ số nằm trong code (số tự động lấy từ dữ liệu thật, đúng định nghĩa báo cáo; số nhập tay do quản lý chấm 1–5; điểm kiểm tra vệ sinh/khách bí mật từ phiếu có bằng chứng — phiếu do chính người được chấm ghi không tính cho người đó); bộ KPI theo chức danh 3–6 chỉ số, trọng số đúng 100%. Kỳ theo chi nhánh (tháng, tuỳ chọn quý): mở kỳ dựng phiếu, người đánh giá là cấp trên trực tiếp lúc mở kỳ; **luật chấm và mức thưởng đóng băng lúc công bố kỳ** (Điều 104). Tự đánh giá chỉ để đối chiếu; quản lý chấm phần nhập tay, được loại chỉ số có dữ liệu sai kèm lý do; R13/R10 chốt (người chốt không là người được chấm). Không đủ dữ liệu là "không có dữ liệu", không phải 0; độ phủ dưới 70% không xếp loại. Hạng A ≥ 105 · B ≥ 95 · C ≥ 80 · D. Thưởng gợi ý theo hạng (người lương giờ nhân hệ số giờ công) chỉ R8/R13/R10 thấy; H7 điền sẵn, R13 sửa được kèm ghi chú, **không tự cộng**. KPI không phạt, không khấu trừ (Điều 127); không chấm cá nhân bằng doanh thu, upsell hay số sự cố.
+
+**Văn bản** đi theo luồng ký: nháp → trình (chọn người ký) → người ký **nhập PIN của chính mình** → ban hành, có số hiệu `TB|QD|QYD-yyMM-NNNN` → thu hồi kèm lý do. Từ lúc trình, nội dung bị khoá ở tầng CSDL; người ký trả lại thì về nháp. Người ký chỉ ký được văn bản mà mọi người nhận nằm trong phạm vi của mình. Quyết định **bổ nhiệm / điều chuyển / miễn nhiệm** đổi sơ đồ ngay lúc ký và **không thu hồi được** — sai thì ban hành quyết định khác; người có tên trong quyết định không ký chính quyết định đó. Danh sách người nhận chụp lại lúc ký (không gồm người soạn và người ký); quy định còn hiệu lực tự đến tay người mới vào làm.
 
 ### 4.3 Ba quy tắc cứng
 
@@ -701,6 +736,27 @@ Ba quyết định nghiệp vụ giữ nguyên: giá bình quân gia quyền di 
 
 **Chống gian lận chấm công:** PIN + ảnh chụp thời điểm chấm (bật/tắt ở A6) · kiosk gắn cứng chi nhánh · đối chiếu chéo với phiên đăng nhập POS/KDS (có làm mà không chấm → nhắc; có chấm mà không có hoạt động → cảnh báo trên H3).
 
+## 26b. SORA OFFICE — Tổ chức & điều hành (Q18 · mới 10/2026)
+
+**Trục là sơ đồ tổ chức.** Người gắn vào **chức danh**, chức danh nằm trong **đơn vị**, đơn vị xếp thành cây (công ty → khối/phòng → chi nhánh → bộ phận → tổ). Cấp trên trực tiếp của một người = người ngồi ghế **trưởng** của đơn vị gần nhất phía trên — không có cột "báo cáo cho" riêng. Giao việc, văn bản, báo cáo, KPI đều đi theo cây này. Sơ đồ không cấp quyền: chức danh mang vai trò gợi ý để cảnh báo lệch với A1.
+
+| # | Màn hình | Nội dung |
+|---|---|---|
+| N1 | Bàn làm việc của tôi | Việc của tôi, văn bản cần đọc/ký, chờ nghiệm thu, báo cáo cần nộp, phiếu KPI đến hạn — trang mở đầu của Office |
+| N2 | Sơ đồ tổ chức | Cây đơn vị → chức danh → người; dọc/ngang, thu phóng, tìm người; định biên / thực có / trống theo thang than hồng; ngăn kéo đơn vị và chức danh (mô tả công việc ba phần, người giữ, lịch sử); dựng theo **mẫu chuẩn nhà hàng**; in A3 |
+| N3 | Chức danh & định biên | Bảng ghế: định biên, thực có (chỉ chức chính), trống, vượt, lệch quyền A1 |
+| N4 | Văn bản & thông báo | Thông báo · quyết định (bổ nhiệm, điều chuyển, miễn nhiệm, khen thưởng, kỷ luật) · quy định; trình ký, **ký bằng PIN người ký**, thu hồi; theo dõi đã đọc / đã xác nhận |
+| N5 | Giao việc | Giao cho người trong phạm vi, hạn, ưu tiên, checklist, nghiệm thu, trả lại |
+| N6 | Việc định kỳ & SOP | Mẫu việc lặp theo ngày/tuần/tháng/**ca H2**, giao cho chức danh: mở ca, đóng ca, vệ sinh ATTP |
+| N7 | Báo cáo công việc | Cuối ngày, giao ca, ca bếp — trường tự điền số liệu đóng băng lúc nộp; báo cáo thiếu tính lúc đọc |
+| N8 | Sự cố | Phân loại, mức độ, khai báo ra ngoài khi bắt buộc, việc khắc phục, đóng có điều kiện |
+| N9 | Bộ KPI | Danh mục chỉ số (tự động từ dữ liệu thật, nhập tay); bộ KPI theo chức danh, trọng số đủ 100% |
+| N10 | Kỳ đánh giá KPI | Mở kỳ, chỉ tiêu, tự đánh giá → quản lý chấm → chốt; thưởng gợi ý sang H7 |
+| N11 | Phiếu kiểm tra | Điểm kiểm tra vệ sinh/ATTP, khách bí mật, kèm đường dẫn bằng chứng |
+| N12–N15 | Kênh nhân viên | Việc & checklist ca, Thông báo, KPI của tôi, Báo cáo ca & báo sự cố |
+
+**Lịch sử chức danh bất biến:** khoảng hiệu lực nửa mở `[từ, đến)`, mỗi dòng chỉ đóng một lần, không xoá. Chức danh chính đổi theo sơ đồ thì chữ chức danh trên hồ sơ H1 đổi theo; H1 không sửa ngược được.
+
 ## 27. SORA OFFICE — Chi phí & tài sản (6 màn, mới)
 
 **Nguyên tắc: máy tự ghi mọi khoản máy biết, người chỉ nhập khoản máy không biết.** Tự động: giá vốn hàng bán (tiêu hao kho S11) · chi nhân sự (kỳ lương H7) · khấu hao (C4) · phí thanh toán. Nhập tay: thuê nhà, điện nước, sửa chữa, marketing, chi vặt.
@@ -830,7 +886,7 @@ Chạy trình duyệt thuần thì thông báo giải quyết ba tầng: (1) **P
 
 # PHẦN F — TRIỂN KHAI
 
-## 31. Tổng khối lượng — 139 màn hình
+## 31. Tổng khối lượng — 154 màn hình (139 + 15 màn Tổ chức & điều hành, Q18)
 
 | Ứng dụng | Màn | Ưu tiên |
 |---|---|---|
@@ -845,7 +901,9 @@ Chạy trình duyệt thuần thì thông báo giải quyết ba tầng: (1) **P
 | Office — Chi phí & tài sản | 6 | P2 |
 | Office — Kế toán | 7 | P2 |
 | Office — Quản trị (gồm O10, O11, R3) | 13 | P2 |
-| **Tổng** | **139** | |
+| Office — Tổ chức & điều hành (N1–N11) | 11 | P2 |
+| Kênh nhân viên — việc, thông báo, KPI, báo cáo (N12–N15) | 4 | P2 |
+| **Tổng** | **154** | |
 
 Cộng: 44 thành phần dùng chung × 2 chủ đề · 3 ngôn ngữ khối khách · bộ chọn chi nhánh xuyên suốt.
 

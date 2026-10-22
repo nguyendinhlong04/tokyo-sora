@@ -25,6 +25,8 @@ const GROUP_LABEL: Record<string, string> = {
   corporate: 'Công nợ doanh nghiệp',
   feedback: 'Phản hồi khách',
   report: 'Báo cáo',
+  workreport: 'Báo cáo công việc & sự cố',
+  kpi: 'KPI & thưởng',
 }
 
 /**
@@ -152,6 +154,41 @@ const NOTE: Record<string, string> = {
 
   'report.foodCostTarget':
     'Mốc food cost để màn giá vốn & lãi gộp so vào — mục tiêu, không phải số sổ.',
+
+  'workreport.graceMinutes': 'Nộp báo cáo sau hạn trong ngần này phút vẫn tính đúng hạn.',
+  'workreport.incidentReportHours':
+    'Sự cố báo sau ngần này giờ kể từ lúc xảy ra thì N8 ghi "Báo trễ" — để thấy, không để phạt.',
+  'workreport.incidentCorrectiveDays': 'Hạn mặc định của việc khắc phục giao từ một sự cố.',
+
+  'kpi.gradeA':
+    'Điểm từ mức này trở lên là hạng A. Thang chấm chỉ đặt ở cấp chuỗi; kỳ đã công bố giữ thang lúc công bố.',
+  'kpi.gradeB': 'Điểm từ mức này tới dưới ngưỡng A là hạng B.',
+  'kpi.gradeC': 'Điểm từ mức này tới dưới ngưỡng B là hạng C; dưới nữa là D.',
+  'kpi.achievementCapPct':
+    'Trần % đạt của một chỉ số — vượt xa đến mấy cũng chỉ tính tới đây, để một chỉ số không gánh cả phiếu.',
+  'kpi.zeroTargetPenaltyPct':
+    'Chỉ số đếm có chỉ tiêu 0 (ca vắng, QR treo): không lần nào là đạt 100%, mỗi lần trừ ngần này %.',
+  'kpi.minCoveragePct':
+    'Phần trọng số có dữ liệu dưới mức này thì phiếu không xếp loại và không có thưởng gợi ý.',
+  'kpi.minSampleTickets': 'Ít vé bếp hơn số này thì tỉ lệ vé trễ là "không tính", không phải 0.',
+  'kpi.minSampleRatings': 'Ít lượt khách chấm hơn số này thì điểm hài lòng là "không tính".',
+  'kpi.minSampleEvents':
+    'Ngưỡng mẫu chung cho các chỉ số tỉ lệ (đặt bàn, đơn online, phản hồi bàn, chấm công…).',
+  'kpi.minSampleTasks': 'Ít việc đến hạn hơn số này thì chỉ số việc / checklist là "không tính".',
+  'kpi.bonusAVnd':
+    'Thưởng gợi ý cho hạng A. Chỉ là gợi ý cho H7 — người tính lương xác nhận, không tự cộng.',
+  'kpi.bonusBVnd': 'Thưởng gợi ý cho hạng B.',
+  'kpi.bonusCVnd': 'Thưởng gợi ý cho hạng C.',
+  'kpi.bonusDVnd':
+    'Để 0. KPI không phạt, không khấu trừ lương (Bộ luật Lao động, Điều 127) — số âm bị chặn.',
+  'kpi.bonusProrateByHours':
+    'Bật: người lương giờ nhận thưởng gợi ý theo tỉ lệ giờ công thực tế / giờ chuẩn tháng.',
+  'kpi.cashToleranceVnd':
+    'Ca đóng két lệch không quá số này vẫn tính là khớp ở chỉ số "Ca két khớp". Không trừ lương ai.',
+  'kpi.recomputeMinMinutes':
+    'Bấm "Tính lại" ở N10 lần nữa trong khoảng này thì bị chặn — mỗi lượt tính đọc cả tháng số liệu.',
+  'kpi.selfReviewDays':
+    'Từ lúc kỳ vào bước đánh giá, người đánh giá chờ nhân viên tự đánh giá tối đa ngần này ngày.',
 }
 
 /**
@@ -314,7 +351,11 @@ function ParameterLine({
             row.scope === 'branch' ? 'bg-accent/15 text-accent' : 'bg-surface-3 text-ink-mute'
           }`}
         >
-          {row.scope === 'branch' ? 'Riêng chi nhánh' : 'Toàn chuỗi'}
+          {row.scope === 'branch'
+            ? 'Riêng chi nhánh'
+            : row.overridable
+              ? 'Toàn chuỗi'
+              : 'Chỉ cấp chuỗi'}
         </span>
         {row.unit ? (
           <span className="text-[length:var(--fs-c1)] text-ink-mute">{row.unit}</span>
@@ -329,9 +370,11 @@ function ParameterLine({
             <Button variant="primary" disabled={disabled} onClick={() => onSave(parse(), 'chain')}>
               Lưu cho chuỗi
             </Button>
-            <Button disabled={disabled} onClick={() => onSave(parse(), 'branch')}>
-              Chỉ chi nhánh này
-            </Button>
+            {row.overridable ? (
+              <Button disabled={disabled} onClick={() => onSave(parse(), 'branch')}>
+                Chỉ chi nhánh này
+              </Button>
+            ) : null}
           </>
         ) : null}
         {!dirty && row.scope === 'branch' ? (

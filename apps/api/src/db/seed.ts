@@ -137,6 +137,11 @@ const PARAMETERS: {
   { key: 'expense.ownerApprovalVnd', value: 20_000_000, unit: 'đồng', sensitive: true },
   { key: 'expense.assetThresholdVnd', value: 5_000_000, unit: 'đồng', sensitive: true },
 
+  // Báo cáo công việc & sự cố (Q18) — cùng giá trị với migration 9011
+  { key: 'workreport.graceMinutes', value: 15, unit: 'phút' },
+  { key: 'workreport.incidentReportHours', value: 24, unit: 'giờ' },
+  { key: 'workreport.incidentCorrectiveDays', value: 7, unit: 'ngày' },
+
   // Kho (§25 S4 · S9)
   { key: 'stock.consumptionWindowDays', value: 14, unit: 'ngày' },
   { key: 'stock.reorderCoverDays', value: 7, unit: 'ngày' },

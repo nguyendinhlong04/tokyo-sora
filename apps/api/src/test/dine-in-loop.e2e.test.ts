@@ -555,6 +555,29 @@ describe('4. Huỷ món đã gửi bếp cần quản lý duyệt (P8 · §4.2 d
     expect(res.statusCode).toBe(403)
   })
 
+  it('đoán PIN người duyệt bị khoá sau 5 lần sai — chỉ khoá đúng cặp người xin–người duyệt', async () => {
+    const attempt = (pin: string) =>
+      inject({
+        method: 'POST',
+        url: `/api/order-lines/${lineId}/void`,
+        headers: auth(cashier),
+        payload: {
+          reason: 'thử PIN',
+          approval: { approverStaffId: fx.managerId, approverPin: pin, reason: 'thử PIN' },
+        },
+      })
+    for (let i = 0; i < 5; i++) {
+      const res = await attempt('0000')
+      expect(res.statusCode).toBe(403)
+      expect(res.payload).toContain('PIN người duyệt không đúng')
+    }
+    // Lần thứ sáu bị khoá kể cả khi gõ đúng — người dò không biết mình đã trúng
+    const locked = await attempt(fx.pins[fx.managerId]!)
+    expect(locked.statusCode).toBe(403)
+    expect(locked.payload).toContain('quá nhiều lần')
+    // Ca dưới dùng cặp phục vụ–quản lý: vẫn duyệt được, PIN của quản lý không bị khoá theo
+  })
+
   it('quản lý duyệt bằng PIN → huỷ được, ghi bản ghi duyệt và nhật ký', async () => {
     const res = await inject({
       method: 'POST',

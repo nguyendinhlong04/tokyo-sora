@@ -651,7 +651,9 @@ describe('A9 — Hoá đơn điện tử', () => {
         taxCode: '0101234567',
         provider: 'Viettel',
         certificateSerial: 'CT-2026-001',
-        certificateExpiry: '2027-01-01',
+        // Hạn tính từ ngày chạy: hạn cứng 2027-01-01 trước đây qua ngày là
+        // `certificateDaysLeft` âm và bài kiểm cuối của khối này đỏ
+        certificateExpiry: `${new Date().getUTCFullYear() + 1}-12-31`,
       },
     })
     expect(chain.statusCode, chain.payload).toBe(200)
@@ -745,6 +747,25 @@ describe('A8 — CMS website', () => {
     const res = await inject({ method: 'GET', url: '/api/site/posts' })
     expect(res.json()).toHaveLength(1)
     expect(res.json()[0].title).toContain('than hoa Bình Định')
+  })
+
+  /**
+   * Thân PATCH chỉ mang trường cần đổi. zod 4 vẫn điền mặc định cho trường vắng
+   * mặt trong `.partial()` (`published` = false), nên trước đây sửa tiêu đề một
+   * bài đang hiện là gỡ bài khỏi website.
+   */
+  it('sửa tiêu đề bài đang hiện không gỡ bài khỏi website', async () => {
+    const res = await inject({
+      method: 'PATCH',
+      url: `/api/admin/cms/posts/${postId}`,
+      headers: asMarketing(),
+      payload: { title: 'Chúng tôi đổi sang than hoa Bình Định sau ba tháng thử' },
+    })
+    expect(res.statusCode, res.payload).toBe(200)
+    const site = await inject({ method: 'GET', url: '/api/site/posts' })
+    expect(site.json().map((p: { title: string }) => p.title)).toEqual([
+      'Chúng tôi đổi sang than hoa Bình Định sau ba tháng thử',
+    ])
   })
 
   it('bài hẹn ngày tương lai thì chưa lọt ra web', async () => {

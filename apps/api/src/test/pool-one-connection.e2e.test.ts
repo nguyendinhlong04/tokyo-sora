@@ -4,9 +4,9 @@
  * Transaction giữ kết nối duy nhất của pool; truy vấn nào trong lúc đó đi qua
  * `this.db` thay vì `tx` sẽ xin kết nối thứ hai, chờ tới `connectionTimeoutMillis`
  * (10 s) rồi ném lỗi — request thành 500. Máy dev pool 10 nên không bao giờ thấy.
- * Mỗi ca dưới đây đi qua một luồng từng kẹt đúng kiểu đó (CLAUDE.md §11 mục 8).
+ * Mỗi ca dưới đây đi qua một luồng từng kẹt đúng kiểu đó (CLAUDE.md §11 mục 7).
  *
- * Các file e2e khác giữ pool mặc định: ca đua thật giữa hai request cần hai kết nối,
+ * Các file e2e khác giữ pool mặc định: org-tasks có ca đua thật giữa hai request,
  * pool 1 sẽ xếp chúng nối đuôi nhau và ca đó không còn kiểm được gì.
  */
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'

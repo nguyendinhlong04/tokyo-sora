@@ -186,6 +186,28 @@ describe('A6 — Trung tâm tham số', () => {
     expect(res.json()[0]).toMatchObject({ newValue: 1440, changedBy: 'Chủ quán' })
   })
 
+  it('tham số khoá ở cấp chuỗi thì chi nhánh không ghi đè được — chỉ sửa ở cấp chuỗi', async () => {
+    await db
+      .update(parameters)
+      .set({ overridable: false })
+      .where(eq(parameters.key, 'online.slotCapacity'))
+    const branch = await inject({
+      method: 'PUT',
+      url: '/api/admin/parameters/online.slotCapacity',
+      headers: asOwner(),
+      payload: { value: 99, branchId: fx.branchId },
+    })
+    expect(branch.statusCode).toBe(409)
+    expect(branch.json().code).toBe('param_not_overridable')
+    const chain = await inject({
+      method: 'PUT',
+      url: '/api/admin/parameters/online.slotCapacity',
+      headers: asOwner(),
+      payload: { value: 8, branchId: null },
+    })
+    expect(chain.statusCode, chain.payload).toBe(200)
+  })
+
   it('gõ chữ vào tham số kiểu số thì bị chặn ngay', async () => {
     const res = await inject({
       method: 'PUT',

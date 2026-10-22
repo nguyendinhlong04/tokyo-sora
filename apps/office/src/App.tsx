@@ -1,9 +1,10 @@
 import type { ActionKey } from '@sora/contracts'
-import { ToastProvider } from '@sora/ui'
+import { Skeleton, ToastProvider } from '@sora/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router'
 import { ConfigBranchProvider } from './components/config-branch'
+import { InboxBell } from './components/InboxBell'
 import { PublishConfig } from './components/publish-config'
 import { ReportBranchProvider } from './components/report'
 import { Debts, InvoiceBook, PeriodClose, RevenueJournal, TaxReport } from './routes/Accounting'
@@ -49,7 +50,6 @@ import { Modifiers } from './routes/Modifiers'
 import { KitchenReport, OnlineReport, StaffReport, TableTurnover } from './routes/OperationsReports'
 import { OnlineMenu } from './routes/OnlineMenu'
 import { Parameters } from './routes/Parameters'
-import { Payroll } from './routes/Payroll'
 import { ProfitLoss } from './routes/ProfitLoss'
 import { RecipeEditor, RecipeList } from './routes/Recipes'
 import { ReservationConfig } from './routes/ReservationConfig'
@@ -57,6 +57,36 @@ import { Schedule } from './routes/Schedule'
 import { StockLevels, StockOverview } from './routes/Stock'
 import { Today } from './routes/Today'
 import { SessionProvider, useSession } from './session-context'
+
+/**
+ * Nhóm Tổ chức & điều hành (N…) tải theo yêu cầu: bản dựng Office đã vượt ngân
+ * sách JS của §8 trước khi có nhóm này, nên phần mới không được làm gói chính
+ * nặng thêm — người chỉ làm kho hay kế toán không phải tải sơ đồ tổ chức.
+ */
+const OrgChart = lazy(() => import('./routes/OrgChart').then((m) => ({ default: m.OrgChart })))
+const Positions = lazy(() => import('./routes/Positions').then((m) => ({ default: m.Positions })))
+const Documents = lazy(() => import('./routes/Documents').then((m) => ({ default: m.Documents })))
+const DocumentPage = lazy(() =>
+  import('./routes/DocumentPage').then((m) => ({ default: m.DocumentPage })),
+)
+const MyDesk = lazy(() => import('./routes/MyDesk').then((m) => ({ default: m.MyDesk })))
+const Tasks = lazy(() => import('./routes/Tasks').then((m) => ({ default: m.Tasks })))
+const TaskTemplates = lazy(() =>
+  import('./routes/TaskTemplates').then((m) => ({ default: m.TaskTemplates })),
+)
+const WorkReports = lazy(() =>
+  import('./routes/WorkReports').then((m) => ({ default: m.WorkReports })),
+)
+const Incidents = lazy(() => import('./routes/Incidents').then((m) => ({ default: m.Incidents })))
+// H7 tải lười: bảng điều chỉnh thưởng KPI làm màn này nặng lên, mà chỉ R8/R13/R10 mở
+const Payroll = lazy(() => import('./routes/Payroll').then((m) => ({ default: m.Payroll })))
+const KpiTemplates = lazy(() =>
+  import('./routes/KpiTemplates').then((m) => ({ default: m.KpiTemplates })),
+)
+const KpiCycles = lazy(() => import('./routes/KpiCycles').then((m) => ({ default: m.KpiCycles })))
+const Observations = lazy(() =>
+  import('./routes/Observations').then((m) => ({ default: m.Observations })),
+)
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5_000, refetchOnWindowFocus: true } },
@@ -117,6 +147,22 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
       { to: '/nghi-phep', label: 'H5 · Nghỉ phép & đổi ca', need: 'schedule.publish' },
       { to: '/co-che-luong', label: 'H6 · Cơ chế lương', need: 'payroll.configure' },
       { to: '/ky-luong', label: 'H7 · Kỳ lương', need: 'payroll.view-others' },
+    ],
+  },
+  {
+    group: 'Tổ chức & điều hành',
+    items: [
+      { to: '/ban-lam-viec', label: 'N1 · Bàn làm việc' },
+      { to: '/so-do-to-chuc', label: 'N2 · Sơ đồ tổ chức', need: 'org.view' },
+      { to: '/chuc-danh', label: 'N3 · Chức danh & định biên', need: 'org.view' },
+      { to: '/van-ban', label: 'N4 · Văn bản & thông báo', need: 'doc.compose' },
+      { to: '/giao-viec', label: 'N5 · Giao việc', need: 'task.assign' },
+      { to: '/viec-dinh-ky', label: 'N6 · Việc định kỳ & SOP', need: 'task.assign' },
+      { to: '/bao-cao-cong-viec', label: 'N7 · Báo cáo công việc', need: 'workreport.review' },
+      { to: '/su-co', label: 'N8 · Sự cố', need: 'incident.manage' },
+      { to: '/kpi', label: 'N9 · Bộ KPI', need: 'kpi.configure' },
+      { to: '/danh-gia-kpi', label: 'N10 · Kỳ đánh giá KPI', need: 'kpi.review-team' },
+      { to: '/phieu-kiem-tra', label: 'N11 · Phiếu kiểm tra', need: 'kpi.observe' },
     ],
   },
   {
@@ -254,6 +300,19 @@ export function App() {
                 <Route path="/nghi-phep" element={<Leaves />} />
                 <Route path="/co-che-luong" element={<PayrollRules />} />
                 <Route path="/ky-luong" element={<Payroll />} />
+                <Route path="/so-do-to-chuc" element={<OrgChart />} />
+                <Route path="/chuc-danh" element={<Positions />} />
+                <Route path="/van-ban" element={<Documents />} />
+                <Route path="/van-ban/moi" element={<DocumentPage />} />
+                <Route path="/van-ban/:id" element={<DocumentPage />} />
+                <Route path="/ban-lam-viec" element={<MyDesk />} />
+                <Route path="/giao-viec" element={<Tasks />} />
+                <Route path="/viec-dinh-ky" element={<TaskTemplates />} />
+                <Route path="/bao-cao-cong-viec" element={<WorkReports />} />
+                <Route path="/su-co" element={<Incidents />} />
+                <Route path="/kpi" element={<KpiTemplates />} />
+                <Route path="/danh-gia-kpi" element={<KpiCycles />} />
+                <Route path="/phieu-kiem-tra" element={<Observations />} />
                 <Route path="/chi-phi-tong-quan" element={<ExpenseOverview />} />
                 <Route path="/chi-phi" element={<Expenses />} />
                 <Route path="/dinh-ky" element={<RecurringExpenses />} />
@@ -278,7 +337,7 @@ export function App() {
                 <Route path="/menu-online" element={<OnlineMenu />} />
                 <Route path="/nhan-dat" element={<ReservationConfig />} />
               </Route>
-              <Route path="*" element={<Navigate to="/mon" replace />} />
+              <Route path="*" element={<Navigate to="/ban-lam-viec" replace />} />
             </Routes>
           </SessionProvider>
         </BrowserRouter>
@@ -339,15 +398,16 @@ function Shell() {
     : visible
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-canvas font-sans text-ink-body">
-      <aside className="flex w-64 flex-none flex-col border-r border-line-1 bg-surface-1">
-        <div className="flex-none border-b border-line-1 px-5 py-4">
+    <div className="flex h-dvh overflow-hidden bg-canvas font-sans text-ink-body print:h-auto print:overflow-visible">
+      <aside className="flex w-64 flex-none flex-col border-r border-line-1 bg-surface-1 print:hidden">
+        <div className="flex flex-none items-center justify-between gap-2 border-b border-line-1 px-5 py-4">
           <div className="flex items-baseline gap-2">
             <span className="font-jp text-[length:var(--fs-b2)] text-accent">東京空</span>
             <span className="text-[length:var(--fs-c1)] font-semibold tracking-[0.16em] text-ink-hi">
               TOKYO SORA
             </span>
           </div>
+          <InboxBell />
         </div>
 
         <div className="flex-none border-b border-line-1 px-5 py-3.5">
@@ -454,17 +514,30 @@ function Shell() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:overflow-visible">
         {/* Bộ lọc chi nhánh của nhóm báo cáo và chi nhánh đang cấu hình của
             nhóm cài đặt đều sống theo phiên đăng nhập: đăng xuất là Shell rơi
             về <Login /> và cả hai lựa chọn tự reset theo provider. Hai context
             cố ý tách nhau — xem chú thích ở components/config-branch.tsx. */}
         <ReportBranchProvider>
           <ConfigBranchProvider>
-            <Outlet />
+            <Suspense fallback={<RouteSkeleton />}>
+              <Outlet />
+            </Suspense>
           </ConfigBranchProvider>
         </ReportBranchProvider>
       </div>
+    </div>
+  )
+}
+
+/** Đang tải mã của một màn tải theo yêu cầu: khung đúng hình đầu trang + bảng (§13) */
+function RouteSkeleton() {
+  return (
+    <div className="grid gap-4 px-8 pt-6">
+      <Skeleton className="h-7 w-72" />
+      <Skeleton className="h-4 w-[520px]" />
+      <Skeleton className="mt-4 h-[320px]" />
     </div>
   )
 }

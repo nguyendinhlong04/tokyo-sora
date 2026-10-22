@@ -33,6 +33,7 @@ export function Login() {
     try {
       const result = await api.officeLogin({ branchId: chosen, email, password })
       signIn(chosen, {
+        staffId: result.staff.id ?? 0,
         fullName: result.staff.fullName ?? email,
         roles: (result.staff.roles ?? []) as Role[],
       })

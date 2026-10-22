@@ -26,6 +26,7 @@ import type { Actor } from '../identity/actor'
 import { ApprovalService, type ApprovalInput } from '../identity/approval.service'
 import { AuditService } from '../identity/audit.service'
 import { punctualityOf, splitWorkedDay, workedMinutesOf, type PayrollRates } from './domain/payroll'
+import { missingShiftDays } from './domain/timesheet'
 
 export interface ManualEntryInput {
   employeeId: number
@@ -260,6 +261,7 @@ export class TimesheetService {
     ])
 
     const locked = await this.lockedPeriod(branchId, from, to)
+    const today = businessDateOf(new Date(), await this.timezoneOf(branchId))
 
     const rows = people.map(({ employee, fullName }) => {
       const mine = entries.filter((e) => e.employeeId === employee.id)
@@ -301,14 +303,7 @@ export class TimesheetService {
         { worked: 0, otNormal: 0, otRest: 0, otHoliday: 0 },
       )
 
-      /** Ngày có ca mà không có bản ghi công, và cũng không có phép — vắng thật */
-      const missing = myShifts
-        .filter(
-          (s) =>
-            !mine.some((e) => e.workDate === s.workDate) &&
-            !myLeaves.some((l) => l.fromDate <= s.workDate && l.toDate >= s.workDate),
-        )
-        .map((s) => s.workDate)
+      const missing = missingShiftDays(myShifts, mine, myLeaves, today)
 
       return {
         employeeId: employee.id,
@@ -673,8 +668,31 @@ export class TimesheetService {
     if (row.state !== 'pending') throw new ConflictException('Yêu cầu này đã được quyết rồi')
     await this.assertTimesheetOpen(branchId, row.fromDate)
 
+    // Quản lý ca cũng xin nghỉ, cũng đổi ca. Người duyệt không được là một trong
+    // hai bên của chính yêu cầu đó — cùng quy tắc "không ai tự duyệt việc của
+    // mình" mà luồng PIN △ đã giữ.
+    if (actor.kind === 'staff') {
+      const parties = await this.db
+        .select({ staffId: employees.staffId })
+        .from(employees)
+        .where(
+          inArray(
+            employees.id,
+            row.counterpartId === null ? [row.employeeId] : [row.employeeId, row.counterpartId],
+          ),
+        )
+      if (parties.some((p) => p.staffId === actor.staffId)) {
+        throw new ForbiddenException({
+          code: 'self_decision',
+          message: 'Không ai tự duyệt yêu cầu của chính mình — nhờ quản lý khác duyệt',
+        })
+      }
+    }
+
     return this.db.transaction(async (tx) => {
-      await tx
+      // Hai quản lý bấm cùng lúc: chỉ một lượt đổi được trạng thái, lượt kia nhận
+      // 409 thay vì hoán ca lần thứ hai
+      const decided = await tx
         .update(leaveRequests)
         .set({
           state: decision.approve ? 'approved' : 'rejected',
@@ -682,7 +700,9 @@ export class TimesheetService {
           decidedAt: new Date(),
           decisionNote: decision.note?.trim() || null,
         })
-        .where(eq(leaveRequests.id, id))
+        .where(and(eq(leaveRequests.id, id), eq(leaveRequests.state, 'pending')))
+        .returning({ id: leaveRequests.id })
+      if (decided.length === 0) throw new ConflictException('Yêu cầu này đã được quyết rồi')
 
       let swapped = 0
       if (decision.approve && row.kind === 'doi-ca' && row.counterpartId !== null) {

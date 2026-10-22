@@ -11,6 +11,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { hash } from '@node-rs/argon2'
 import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { businessDateOf } from '../common/business-date'
 import type { Db } from '../db/client'
 import { ParamsService } from '../common/params.service'
 import { parameters, staff, staffRoles, timeEntries } from '../db/schema'
@@ -38,13 +39,37 @@ const HR_PIN = '4913'
 const inject = (opts: Parameters<NestFastifyApplication['inject']>[0]) => app.inject(opts)
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` })
 
-/** Thứ Hai 2026-08-03 — tuần dùng cho mọi bài kiểm lịch */
-const WEEK = '2026-08-03'
-const day = (offset: number) => {
-  const at = new Date(`${WEEK}T00:00:00Z`)
+const addDays = (date: string, offset: number) => {
+  const at = new Date(`${date}T00:00:00Z`)
   at.setUTCDate(at.getUTCDate() + offset)
   return at.toISOString().slice(0, 10)
 }
+
+/**
+ * Tuần dùng cho mọi bài kiểm lịch: thứ Hai đầu tiên của THÁNG SAU, theo giờ Việt Nam
+ * lúc chạy test.
+ *
+ * Phải là tuần CHƯA TỚI: sửa lịch tuần đã qua là `timesheet.edit-manual`, dòng mà quản
+ * lý ca chỉ có ở mức △ — tuần cố định 2026-08-03 trước đây trôi qua là cả nhóm H2–H7 đỏ
+ * dây chuyền. Lấy thứ Hai ĐẦU THÁNG chứ không phải thứ Hai tuần sau để cả tuần nằm gọn
+ * trong một tháng: kỳ lương thử là đúng tháng đó và phải phủ cả ca Chủ nhật.
+ */
+const WEEK = (() => {
+  const [y, m] = businessDateOf(new Date(), 'Asia/Ho_Chi_Minh').split('-').map(Number)
+  // Tháng đếm từ 1 nên Date.UTC(y, m, 1) là ngày 1 của tháng sau
+  const first = new Date(Date.UTC(y!, m!, 1))
+  // getUTCDay: Chủ nhật 0, thứ Hai 1 … ⇒ còn (8 − thứ) % 7 ngày nữa là thứ Hai
+  return addDays(first.toISOString().slice(0, 10), (8 - first.getUTCDay()) % 7)
+})()
+const day = (offset: number) => addDays(WEEK, offset)
+
+/** Kỳ lương thử: cả tháng chứa tuần WEEK */
+const PERIOD_START = `${WEEK.slice(0, 7)}-01`
+const PERIOD_END = (() => {
+  const [y, m] = WEEK.split('-').map(Number)
+  // Ngày 0 của tháng sau = ngày cuối của tháng này
+  return new Date(Date.UTC(y!, m!, 0)).toISOString().slice(0, 10)
+})()
 
 async function officeLogin(email: string) {
   const res = await inject({
@@ -333,8 +358,9 @@ describe('H3 · H4 — công THỰC TẾ, không phải lịch xếp', () => {
     expect(res.statusCode, res.payload).toBe(200)
     const me = res.json().rows.find((r: { employeeId: number }) => r.employeeId === cookEmployeeId)
     expect(me.days).toHaveLength(0)
-    // Sáu ngày có ca mà không có công và cũng không có phép — vắng thật
-    expect(me.missingDays).toHaveLength(6)
+    // Sáu ca đều chưa tới ngày nên chưa ai bị tính vắng — vắng chỉ xét ngày ĐÃ QUA (ca đã
+    // qua mà không công, không phép mới là vắng: kiểm ở domain/timesheet.test.ts)
+    expect(me.missingDays).toHaveLength(0)
   })
 
   it('quản lý CA sửa công tay phải có người khác duyệt — đây là dấu △ của §4.2b', async () => {
@@ -617,7 +643,7 @@ describe('H7 — Kỳ lương, năm bước khoá nhau', () => {
       method: 'POST',
       url: '/api/hr/payroll/periods',
       headers: bearer(hrManager),
-      payload: { branchId: fx.branchId, periodStart: '2026-08-01', periodEnd: '2026-08-31' },
+      payload: { branchId: fx.branchId, periodStart: PERIOD_START, periodEnd: PERIOD_END },
     })
     expect(res.statusCode, res.payload).toBe(201)
     periodId = res.json<{ id: number }>().id
@@ -696,6 +722,26 @@ describe('H7 — Kỳ lương, năm bước khoá nhau', () => {
     expect(line.netPayVnd).toBe(line.grossPayVnd - line.insuranceVnd - line.taxVnd - line.advanceVnd)
   })
 
+  it('tính nháp lại mà không gửi điều chỉnh thì thưởng, tạm ứng, ghi chú đã nhập giữ nguyên', async () => {
+    // Trước đây H7 bấm "Tính nháp" gửi danh sách rỗng là xoá sạch thưởng đã nhập
+    const res = await inject({
+      method: 'POST',
+      url: `/api/hr/payroll/periods/${periodId}/compute`,
+      headers: bearer(hrManager),
+      payload: {},
+    })
+    expect(res.statusCode, res.payload).toBe(201)
+    const detail = await inject({
+      method: 'GET',
+      url: `/api/hr/payroll/periods/${periodId}`,
+      headers: bearer(hrManager),
+    })
+    const line = detail
+      .json()
+      .lines.find((l: { employeeId: number }) => l.employeeId === cookEmployeeId)
+    expect(line.bonusVnd).toBe(1_000_000)
+  })
+
   it('tính lại được khi còn ở bước nháp', async () => {
     const res = await inject({
       method: 'POST',
@@ -711,7 +757,8 @@ describe('H7 — Kỳ lương, năm bước khoá nhau', () => {
       headers: bearer(hrManager),
     })
     const line = detail.json().lines[0]
-    expect(line.bonusVnd).toBe(0) // thưởng lần trước đã bị dựng lại
+    // Có dòng điều chỉnh cho người này thì dòng đó là toàn bộ điều chỉnh: thưởng bỏ trống = 0
+    expect(line.bonusVnd).toBe(0)
     expect(line.advanceVnd).toBe(500_000)
   })
 
@@ -819,7 +866,7 @@ describe('Kỳ lương đã duyệt chảy vào dòng Nhân sự của F7', () =
   const pnl = async () => {
     const res = await inject({
       method: 'GET',
-      url: `/api/reports/pnl?branch=${fx.branchId}&kind=tuy-chon&compare=ky-truoc&from=2026-08-01&to=2026-08-31`,
+      url: `/api/reports/pnl?branch=${fx.branchId}&kind=tuy-chon&compare=ky-truoc&from=${PERIOD_START}&to=${PERIOD_END}`,
       headers: bearer(owner),
     })
     expect(res.statusCode, res.payload).toBe(200)
@@ -851,5 +898,65 @@ describe('Kỳ lương đã duyệt chảy vào dòng Nhân sự của F7', () =
     const body = await pnl()
     expect(body.primeCost.value).toBeNull()
     expect(body.primeCost.blockedBy).toContain('doanh thu')
+  })
+})
+
+// Đặt cuối file: hồ sơ của quản lý ca tạo ở đây sẽ làm lệch tổng lương mà các
+// khối H7/F7 bên trên đã chốt con số
+describe('H5 — không ai tự duyệt yêu cầu của chính mình', () => {
+  it('quản lý ca xin nghỉ thì người khác phải duyệt', async () => {
+    const profile = await inject({
+      method: 'POST',
+      url: '/api/hr/employees',
+      headers: bearer(hrManager),
+      payload: {
+        staffId: fx.managerId,
+        branchId: fx.branchId,
+        position: 'Quản lý ca',
+        payKind: 'monthly',
+        hourlyRateVnd: 0,
+        monthlySalaryVnd: 12_000_000,
+        fixedAllowanceVnd: 0,
+        startedOn: '2026-01-05',
+        endedOn: null,
+        bankAccount: null,
+        active: true,
+      },
+    })
+    expect(profile.statusCode, profile.payload).toBe(201)
+
+    const sent = await inject({
+      method: 'POST',
+      url: '/api/hr/leaves',
+      headers: bearer(shiftLead),
+      payload: {
+        branchId: fx.branchId,
+        employeeId: profile.json<{ id: number }>().id,
+        kind: 'nghi-phep',
+        // Ngày đầu kỳ sau: kỳ lương ở phần H7 đã chốt công, duyệt nghỉ trong đó là 409 trước
+        fromDate: addDays(PERIOD_END, 1),
+        toDate: addDays(PERIOD_END, 1),
+        reason: 'Đi khám',
+      },
+    })
+    expect(sent.statusCode, sent.payload).toBe(201)
+    const id = sent.json<{ id: number }>().id
+
+    const self = await inject({
+      method: 'POST',
+      url: `/api/hr/leaves/${id}/decision`,
+      headers: bearer(shiftLead),
+      payload: { branchId: fx.branchId, approve: true, note: null },
+    })
+    expect(self.statusCode).toBe(403)
+    expect(self.json<{ code: string }>().code).toBe('self_decision')
+
+    const other = await inject({
+      method: 'POST',
+      url: `/api/hr/leaves/${id}/decision`,
+      headers: bearer(hrManager),
+      payload: { branchId: fx.branchId, approve: true, note: null },
+    })
+    expect(other.statusCode, other.payload).toBe(201)
   })
 })

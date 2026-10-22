@@ -31,29 +31,11 @@ import {
   type ResolvedPeriod,
 } from './domain/period'
 import type { PeriodQuery } from './reports.service'
+import { doneTickets, lateTicketCount, netRevenue, soldOrders } from './sql'
 
 /** Cùng lý do với `reports.service.ts`: tổng tiền cả kỳ vượt tầm int4 */
 const money = (expr: SQLWrapper) => sql<number>`coalesce(sum(${expr}), 0)::float8`
 const count = sql<number>`count(*)::int`
-
-/**
- * Doanh thu THỰC của một đơn: tạm tính trừ giảm giá cộng phí phục vụ.
- *
- * KHÔNG lấy `moneyTotal`: nó gồm cả VAT và phí ship, mà VAT là tiền thu hộ nhà
- * nước còn ship là tiền trả hộ người giao — cộng chúng vào doanh thu là tự khai
- * khống đúng bằng hai khoản không phải của quán.
- */
-const netRevenue = sql`${orders.moneySub} - ${orders.moneyDiscount} + ${orders.moneyService}`
-
-/** Đơn được tính vào doanh thu: đã trả tiền và không bị huỷ */
-const soldOrders = (branchId: string, range: DateRange) =>
-  and(
-    eq(orders.branchId, branchId),
-    gte(orders.businessDate, range.from),
-    lte(orders.businessDate, range.to),
-    eq(orders.paymentState, 'paid'),
-    ne(orders.status, 'cancelled'),
-  )
 
 export interface Slice {
   key: string
@@ -378,17 +360,11 @@ export class BusinessReportsService {
   async kitchenPerformance(branchId: string, input: PeriodQuery) {
     const period = await this.resolve(branchId, input)
 
-    const inRange = (range: DateRange) =>
-      and(
-        eq(tickets.branchId, branchId),
-        eq(tickets.state, 'closed'),
-        sql`${tickets.queuedAt} is not null and ${tickets.readyAt} is not null`,
-        gte(sql`(${tickets.queuedAt} at time zone 'Asia/Ho_Chi_Minh')::date`, range.from),
-        lte(sql`(${tickets.queuedAt} at time zone 'Asia/Ho_Chi_Minh')::date`, range.to),
-      )
+    // Bếp xong là lúc báo "ra món" (ready) — định nghĩa chung ở reports/sql.ts
+    const inRange = (range: DateRange) => doneTickets(branchId, range)
 
     const seconds = sql<number>`extract(epoch from ${tickets.readyAt} - ${tickets.queuedAt})`
-    const late = sql<number>`count(*) filter (where ${tickets.readyAt} > ${tickets.dueAt})::int`
+    const late = lateTicketCount
 
     const [overall, previous, byStation, byHour, slowest] = await Promise.all([
       this.db

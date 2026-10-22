@@ -2,6 +2,7 @@ import { formatVnd } from '@sora/contracts'
 import { Button, ErrorState, Modal, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { api, type EmployeeInput, type EmployeeRow, type PayKind } from '../api'
 import { DataTable } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
@@ -58,6 +59,21 @@ export function Employees() {
     queryFn: () => api.employeeCandidates(branchId!),
     enabled: Boolean(branchId),
   })
+
+  /**
+   * Chức danh theo sơ đồ tổ chức (N2). Người đã ngồi ghế thì chức danh do sơ đồ
+   * quản lý — sửa ở đây sẽ bị máy chủ chặn — nên màn chỉ hiện và dẫn sang sơ đồ.
+   * Không đọc được sơ đồ thì vẫn dùng ô chữ như trước.
+   */
+  const org = useQuery({ queryKey: ['org', 'chart'], queryFn: () => api.orgChart(), retry: false })
+  const seats = new Map<number, { positionId: number; title: string; unitName: string }>()
+  for (const p of org.data?.positions ?? []) {
+    for (const h of p.holders) {
+      if (h.kind !== 'chinh' || h.upcoming) continue
+      const unitName = org.data!.units.find((u) => u.id === p.unitId)?.name ?? ''
+      seats.set(h.staffId, { positionId: p.id, title: p.title, unitName })
+    }
+  }
 
   /**
    * Cấp link Kênh nhân viên (H8 · H9).
@@ -117,9 +133,19 @@ export function Employees() {
         {draft ? (
           <EmployeeForm
             draft={draft.input}
+            seat={seats.get(draft.input.staffId) ?? null}
             onChange={(input) => setDraft({ ...draft, input })}
             onCancel={() => setDraft(null)}
-            onSave={() => save.mutate(draft)}
+            // Người đã có ghế: chữ chức danh luôn lấy theo ghế, kể cả hồ sơ tạo mới
+            onSave={() =>
+              save.mutate({
+                ...draft,
+                input: {
+                  ...draft.input,
+                  position: seats.get(draft.input.staffId)?.title ?? draft.input.position,
+                },
+              })
+            }
             saving={save.isPending}
           />
         ) : null}
@@ -148,11 +174,28 @@ export function Employees() {
               },
               {
                 key: 'position',
-                header: 'Vị trí',
-                width: '150px',
-                cell: (row) => (
-                  <span className="text-[length:var(--fs-c1)] text-ink-body">{row.position}</span>
-                ),
+                header: 'Chức danh',
+                width: '190px',
+                cell: (row) => {
+                  const seat = seats.get(row.staffId)
+                  return seat ? (
+                    <Link
+                      to={`/so-do-to-chuc?chuc-danh=${seat.positionId}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="block text-[length:var(--fs-c1)] text-ink-hi hover:underline"
+                    >
+                      {seat.title}
+                      <span className="block text-ink-mute">{seat.unitName}</span>
+                    </Link>
+                  ) : (
+                    <span className="text-[length:var(--fs-c1)] text-ink-body">
+                      {row.position}
+                      {org.data && org.data.units.length > 0 ? (
+                        <span className="block text-ink-mute">chưa gắn sơ đồ</span>
+                      ) : null}
+                    </span>
+                  )
+                },
               },
               {
                 key: 'payKind',
@@ -223,8 +266,9 @@ export function Employees() {
         </div>
 
         <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
-          Chưa có trong bản dựng này: giấy tờ đính kèm, và luồng nghỉ việc có bàn giao. Hồ sơ ngừng
-          hoạt động thì không vào lưới xếp lịch và không vào kỳ lương mới.
+          Chức danh của người đã có ghế trên sơ đồ tổ chức (N2) đi theo sơ đồ — bổ nhiệm, điều
+          chuyển làm ở đó. Chưa có trong bản dựng này: giấy tờ đính kèm, và luồng nghỉ việc có bàn
+          giao. Hồ sơ ngừng hoạt động thì không vào lưới xếp lịch và không vào kỳ lương mới.
         </p>
       </div>
 
@@ -300,12 +344,15 @@ function toInput(row: EmployeeRow): EmployeeInput {
 
 function EmployeeForm({
   draft,
+  seat,
   onChange,
   onCancel,
   onSave,
   saving,
 }: {
   draft: EmployeeInput
+  /** Ghế đang ngồi trên sơ đồ — có thì chức danh chỉ đọc, đổi bằng điều chuyển ở N2 */
+  seat: { positionId: number; title: string; unitName: string } | null
   onChange: (next: EmployeeInput) => void
   onCancel: () => void
   onSave: () => void
@@ -317,13 +364,27 @@ function EmployeeForm({
   return (
     <section className="rounded-md border border-accent bg-surface-1 p-5">
       <div className="grid gap-4 lg:grid-cols-4">
-        <Field label="Vị trí">
-          <Input
-            value={draft.position}
-            onChange={(v) => set('position', v)}
-            placeholder="Bếp chính"
-          />
-        </Field>
+        {seat ? (
+          <Field label="Chức danh (theo sơ đồ)">
+            <p className="flex h-9 items-center text-[length:var(--fs-b2)] text-ink-hi">
+              {seat.title} · {seat.unitName}
+            </p>
+            <Link
+              to={`/so-do-to-chuc?chuc-danh=${seat.positionId}`}
+              className="text-[length:var(--fs-c1)] text-accent-ink hover:underline"
+            >
+              Điều chuyển ở sơ đồ →
+            </Link>
+          </Field>
+        ) : (
+          <Field label="Chức danh">
+            <Input
+              value={draft.position}
+              onChange={(v) => set('position', v)}
+              placeholder="Bếp chính"
+            />
+          </Field>
+        )}
 
         <Field label="Cách trả lương">
           <select

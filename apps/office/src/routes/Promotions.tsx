@@ -21,6 +21,7 @@ import {
   type PromotionScope,
   type PromotionState,
 } from '../api'
+import { ApprovalPrompt } from '../components/approval'
 import { PageHeader } from '../components/PageHeader'
 import {
   DateInput,
@@ -423,12 +424,12 @@ function PromotionCard({
   onEdit: () => void
   onChanged: () => void
 }) {
-  const { can } = useSession()
+  const { mustApprove } = useSession()
   const toast = useToast()
   const [pending, setPending] = useState<'active' | 'paused' | 'ended' | null>(null)
 
   /** R9 chỉ ở mức △ với `promo.activate` nên BẬT phải kèm PIN; dừng thì không */
-  const needsPin = !can('promo.activate')
+  const needsPin = mustApprove('promo.activate')
 
   const setState = async (state: 'active' | 'paused' | 'ended', approval?: Approval | null) => {
     try {
@@ -508,8 +509,9 @@ function PromotionCard({
       </div>
 
       {pending === 'active' ? (
-        <ApprovalBar
+        <ApprovalPrompt
           note="Bật chương trình là đụng giá bán — cần PIN của quản lý chuỗi hoặc chủ quán."
+          confirmLabel="Duyệt & bật"
           onCancel={() => setPending(null)}
           onConfirm={(approval) => void setState('active', approval)}
         />
@@ -1539,58 +1541,6 @@ function SectionTitle({ children, className = '' }: { children: ReactNode; class
     >
       {children}
     </p>
-  )
-}
-
-function ApprovalBar({
-  note,
-  onCancel,
-  onConfirm,
-}: {
-  note: string
-  onCancel: () => void
-  onConfirm: (approval: Approval) => void
-}) {
-  const [form, setForm] = useState({ approverStaffId: '', approverPin: '', reason: '' })
-  const ready = form.approverStaffId && form.approverPin.length >= 4 && form.reason.trim()
-
-  return (
-    <div className="flex flex-wrap items-end gap-3 border-t border-accent bg-canvas px-5 py-4">
-      <p className="w-full text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">{note}</p>
-      <Field label="Mã nhân viên duyệt">
-        <Input
-          type="number"
-          value={form.approverStaffId}
-          onChange={(v) => setForm({ ...form, approverStaffId: v })}
-          mono
-        />
-      </Field>
-      <Field label="PIN">
-        <Input
-          type="password"
-          value={form.approverPin}
-          onChange={(v) => setForm({ ...form, approverPin: v })}
-          mono
-        />
-      </Field>
-      <Field label="Lý do">
-        <Input value={form.reason} onChange={(v) => setForm({ ...form, reason: v })} />
-      </Field>
-      <Button onClick={onCancel}>Bỏ</Button>
-      <Button
-        variant="primary"
-        disabled={!ready}
-        onClick={() =>
-          onConfirm({
-            approverStaffId: Number(form.approverStaffId),
-            approverPin: form.approverPin,
-            reason: form.reason.trim(),
-          })
-        }
-      >
-        Duyệt & bật
-      </Button>
-    </div>
   )
 }
 

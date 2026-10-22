@@ -224,14 +224,28 @@ export const ACTIONS = {
 
   // ===================================================== §4.2b — Nhân sự
   //
-  // Cột `NV` của tài liệu = mọi nhân viên vận hành, tức R1–R6. R9 và R12 KHÔNG
-  // nằm trong nhóm đó và cũng không có cột riêng trong bảng, nên ở đây là `deny`
-  // — kể cả với dòng "xem của mình". Đó là điều bảng nói, và sửa nó là việc của
-  // bản thiết kế chứ không phải của lớp cài đặt.
+  // Cột `NV` của tài liệu = mọi nhân viên vận hành, tức R1–R6. R9 và R12 không
+  // nằm trong nhóm đó, nên bảng gốc để `deny` cả dòng "xem của mình". Bản thiết
+  // kế đã sửa (Q18, 22/10/2026): marketing và điều phối cũng nhận việc, đọc văn
+  // bản, xem KPI của chính mình — khoá này là cửa DUY NHẤT của mọi route "của tôi".
 
   'staff.view-own-record': {
-    label: 'Xem lịch làm, bảng công, phiếu lương của mình',
-    grants: { R1: A, R2: A, R3: A, R4: A, R5: A, R6: A, R7: A, R8: A, R13: A, R11: A, R10: A },
+    label: 'Xem lịch, công, lương, việc, văn bản, KPI của mình',
+    grants: {
+      R1: A,
+      R2: A,
+      R3: A,
+      R4: A,
+      R5: A,
+      R6: A,
+      R7: A,
+      R8: A,
+      R9: A,
+      R12: A,
+      R13: A,
+      R11: A,
+      R10: A,
+    },
   },
   'schedule.publish': {
     label: 'Xếp & công bố lịch chi nhánh',
@@ -375,6 +389,83 @@ export const ACTIONS = {
   'corporate.settle-writeoff': {
     label: 'Gạch nợ / xoá nợ khách doanh nghiệp',
     grants: { R8: A, R10: A },
+  },
+
+  // ===================================================== §4.2c — Tổ chức & điều hành
+  //
+  // Ma trận chỉ nói vai trò nào được ĐỤNG tới việc này. Được đụng tới AI thì do
+  // sơ đồ tổ chức quyết (cây con của chức danh trưởng mình giữ) — kiểm ở service
+  // bằng OrgScopeService, vì phạm vi đổi theo từng lần bổ nhiệm chứ không theo
+  // vai trò. R10 · R11 · R13 nhìn toàn chuỗi.
+
+  'org.view': {
+    label: 'Xem sơ đồ tổ chức',
+    grants: { R5: A, R6: A, R7: A, R8: A, R9: A, R11: A, R12: A, R13: A, R10: A },
+    note: 'Mọi vai trò có tài khoản Office. R1–R4 thấy chức danh và cấp trên của mình ở Kênh nhân viên',
+  },
+  'org.manage': {
+    label: 'Sửa cơ cấu, chức danh, định biên; gán chức danh',
+    grants: { R11: A, R13: A, R10: A },
+  },
+  'doc.compose': {
+    label: 'Soạn văn bản nội bộ (thông báo, quyết định, quy định)',
+    grants: { R5: A, R6: A, R7: A, R8: A, R9: A, R11: A, R12: A, R13: A, R10: A },
+    note: 'Ai có tài khoản Office cũng soạn được — CHỮ KÝ mới là chốt chặn',
+  },
+  'doc.sign-notice': {
+    label: 'Ký ban hành thông báo (trong phạm vi)',
+    grants: { R7: A, R11: A, R13: A, R10: A },
+  },
+  'doc.sign-decision': {
+    label: 'Ký ban hành quyết định, quy định',
+    grants: { R11: A, R10: A },
+    note: 'Người đại diện chuỗi. Nhân sự (R13) soạn và trình quyết định nhân sự, không tự ký',
+  },
+  'task.assign': {
+    label: 'Giao việc, nghiệm thu, việc định kỳ & SOP (trong phạm vi)',
+    grants: { R5: A, R6: A, R7: A, R8: A, R9: A, R11: A, R12: A, R13: A, R10: A },
+    note: 'Giao cho ai do sơ đồ quyết: người trong cây con mình làm trưởng. Nhận việc, tích checklist, nộp việc thì mọi người làm qua khoá "của mình"',
+  },
+  'workreport.configure': {
+    label: 'Cấu hình mẫu báo cáo công việc',
+    grants: { R11: A, R10: A },
+  },
+  'workreport.review': {
+    label: 'Xem, xác nhận báo cáo của cấp dưới',
+    grants: { R5: A, R6: A, R7: A, R8: A, R11: A, R13: A, R10: A },
+    note: 'Nộp báo cáo thì ai được giao chức danh nộp cũng làm qua khoá "của mình"',
+  },
+  'incident.manage': {
+    label: 'Xử lý sự cố: giao việc khắc phục, khai báo ra ngoài, đóng sự cố thường',
+    grants: { R5: A, R7: A, R11: A, R13: A, R10: A },
+    note: 'Báo sự cố thì mọi người làm được, qua khoá "của mình"',
+  },
+  'incident.close-severe': {
+    label: 'Đóng sự cố nghiêm trọng trở lên',
+    grants: { R11: A, R10: A },
+    note: 'Người đóng phải khác người báo',
+  },
+  'kpi.configure': {
+    label: 'Bộ KPI theo chức danh',
+    grants: { R13: A, R10: A },
+  },
+  'kpi.cycle-manage': {
+    label: 'Mở kỳ KPI, đặt chỉ tiêu, bắt đầu đánh giá',
+    grants: { R11: A, R13: A, R10: A },
+  },
+  'kpi.review-team': {
+    label: 'Đánh giá KPI cấp dưới, tính lại số',
+    grants: { R5: A, R6: A, R7: A, R8: A, R11: A, R13: A, R10: A },
+    note: 'Chấm ai do sơ đồ quyết: người đánh giá là cấp trên trực tiếp lúc mở kỳ. Không thấy số thưởng nếu không có payroll.view-others',
+  },
+  'kpi.observe': {
+    label: 'Ghi phiếu kiểm tra (vệ sinh ATTP, khách bí mật)',
+    grants: { R5: A, R7: A, R9: A, R11: A, R13: A, R10: A },
+  },
+  'kpi.close': {
+    label: 'Chốt kỳ KPI',
+    grants: { R13: A, R10: A },
+    note: 'Người chốt không được là người được chấm trong kỳ đó',
   },
 } as const satisfies Record<string, ActionDef>
 

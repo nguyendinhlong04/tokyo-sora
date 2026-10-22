@@ -2,12 +2,13 @@
  * Chuẩn bị môi trường dev để mở POS/KDS/Office lên là dùng được ngay:
  *   pnpm --filter @sora/api db:dev-bootstrap
  *
- * Làm ba việc mà ngoài đời người vận hành làm bằng tay lúc mở quán:
+ * Làm bốn việc mà ngoài đời người vận hành làm bằng tay lúc mở quán:
  *   1. Tạo TÀI KHOẢN DEV còn thiếu — Office và PIN nhân viên (`dev-accounts.ts`).
  *      Tài khoản đã có thì giữ nguyên, không đặt lại mật khẩu.
  *   2. Tạo THIẾT BỊ ĐẦU TIÊN của chi nhánh (bài toán con gà quả trứng: sinh mã
  *      ghép cần quyền quản trị, mà đăng nhập lại cần thiết bị đã ghép).
- *   3. Phát hành bundle cấu hình để POS có thực đơn.
+ *   3. Dựng sơ đồ tổ chức theo mẫu chuẩn (N2).
+ *   4. Phát hành bundle cấu hình để POS có thực đơn.
  *
  * Chỉ dùng cho dev — mật khẩu, PIN và token cố định, công khai trong repo. Script
  * từ chối mọi CSDL không nằm trên máy đang chạy.
@@ -20,6 +21,8 @@ import { createDb } from './client'
 import { assertLocalDatabase, seedDevAccounts } from './dev-accounts'
 import { branches, devices, tables } from './schema'
 import { ConfigBundleService } from '../modules/config-bundle/config-bundle.service'
+import { AuditService } from '../modules/identity/audit.service'
+import { OrgService } from '../modules/org/org.service'
 
 const DEV_DEVICE_TOKEN = 'dev-device-token'
 const DEV_TABLE_TOKEN = 'dev-table-token'
@@ -90,6 +93,14 @@ async function main() {
         tableId: device.tableId,
         tokenHash,
       })
+    }
+
+    // Sơ đồ tổ chức theo mẫu chuẩn — khung chuỗi rồi từng chi nhánh. Idempotent:
+    // chạy lại không nhân đôi, sửa tay trên Office không bị ghi đè
+    const org = new OrgService(db, new AuditService(db))
+    await org.applyStandard('chuoi', { kind: 'system' })
+    for (const b of await db.select({ id: branches.id }).from(branches)) {
+      await org.applyStandard(b.id, { kind: 'system' })
     }
 
     const bundles = new ConfigBundleService(db)

@@ -1,8 +1,8 @@
 # 7 · Kênh nhân viên & kiosk chấm công
 
 Hai bề mặt dành cho **mọi nhân viên** (phục vụ, bếp, thu ngân…): xem lịch —
-công — phiếu lương của chính mình trên điện thoại, và chấm công vào/ra ca tại
-quán. Chúng là hai app tách biệt vì hai vùng tin cậy khác nhau: điện thoại cá
+công — phiếu lương — việc — thông báo của chính mình trên điện thoại, và chấm
+công vào/ra ca tại quán. Chúng là hai app tách biệt vì hai vùng tin cậy khác nhau: điện thoại cá
 nhân mang đi khắp nơi, kiosk gắn cứng ở chi nhánh.
 
 ## 7.1 Kênh nhân viên (`nv.tokyosora.vn`)
@@ -30,7 +30,13 @@ qua Zalo.
 Nếu thấy *"Link không còn hiệu lực. Xin quản lý cấp lại."* — có link mới được
 cấp, xin lại là xong.
 
-### Hai màn duy nhất
+### Thanh tab ở đáy màn
+
+Năm tab trong tầm ngón cái: **Lịch** (mở đầu) · **Việc** · **Thông báo** · **Lương** ·
+**KPI**. Chấm số trên tab Việc là số việc đang chờ bạn (đỏ khi có việc quá hạn), trên
+tab Thông báo là số văn bản chưa đọc, trên tab KPI là số phiếu đang chờ bạn tự đánh
+giá — tự cập nhật mỗi phút khi app đang mở; chưa có thông báo đẩy, nên quán vẫn dán
+link văn bản vào nhóm Zalo.
 
 **Lịch & công (H8):**
 
@@ -55,12 +61,61 @@ tạm ứng) → **Thực lãnh**. Phiếu chỉ hiện **sau khi kỳ lương �
 hoàn toàn chỉ đọc — *"Thấy số chưa đúng thì nhắn quản lý nhân sự — kỳ đã chốt
 không sửa ngược, sai sẽ được cộng/trừ ở kỳ sau."*
 
+**Việc (N12):** dòng đầu là ca hôm nay của bạn (ca đã công bố). Bên dưới:
+
+- **Chờ bạn nghiệm thu** — chỉ có khi bạn giữ ghế được chỉ định nghiệm thu (vd. quản
+  lý ca nghiệm thu checklist mở ca). Mở việc, xem ai tích mục nào, bấm **Đạt** hoặc
+  **Trả lại…** kèm lý do.
+- **Cần làm** — quá hạn trước (chữ đỏ "Quá hạn N giờ"), rồi hôm nay, rồi sắp tới.
+  Checklist mở ca, đóng ca, vệ sinh ATTP **chỉ hiện khi bạn đứng đúng ca đã công bố**:
+  nghỉ được duyệt thì việc của ca đó không tới bạn. Việc quản lý giao tận tay ghi
+  "Giao bởi …".
+- Mở một việc: bấm **Nhận việc** để người giao biết việc đã tới tay; chạm từng mục
+  checklist để tích — lưu ngay, mất sóng thì mục tự bỏ tích và báo lỗi. Cả ca làm
+  chung một checklist, mỗi mục ghi tên người tích.
+- **Nộp nghiệm thu** (hoặc **Báo xong** nếu việc không cần nghiệm thu). Còn mục chưa
+  tích thì phải ghi lý do mới nộp được. Bị trả lại thì việc quay về "Cần làm" kèm
+  lý do ở đầu việc.
+- **Đã nộp gần đây** — việc 7 ngày qua: chờ nghiệm thu hay đã xong.
+- **Báo cáo cần nộp** — báo cáo ca của ghế bạn giữ (vd. báo cáo ca bếp của bếp trưởng).
+  Chữ đã gõ giữ trong máy cho tới khi nộp xong. Báo cáo có số tiền (cuối ngày, giao ca)
+  hiện ở đây để nhắc nhưng **nộp ở máy của quán**.
+- **Báo sự cố** (nút cuối màn) — loại, mức, chuyện gì, đã làm gì ngay. Có người bị
+  thương, cháy nổ, ngộ độc thì gọi quản lý và cấp cứu trước, báo ở đây sau.
+
+**Thông báo (N13):** thông báo, quyết định, quy định đã ký ban hành gửi tới bạn.
+
+- Văn bản **Cần bạn xác nhận** (nội quy, quy định ATTP…) nằm trên cùng, gắn nhãn
+  _Cần xác nhận_. Chưa đọc thì tiêu đề in đậm, có chấm vàng.
+- Mở văn bản là đã ghi **đã đọc**. Văn bản cần xác nhận có nút **Tôi đã đọc và
+  hiểu** dính đáy màn — bấm một lần, hiện _"Đã xác nhận {ngày}"_. Đó là bằng chứng
+  quán đã phổ biến cho bạn, không bấm lại hay huỷ được.
+- Tài liệu đính kèm mở bằng link (tab mới). Văn bản bị thu hồi tự biến khỏi danh
+  sách.
+- Quyết định bổ nhiệm/điều chuyển về chính bạn cũng tới đây; chức danh ở đầu màn
+  đổi theo ngày hiệu lực.
+
+**KPI của tôi (N14):** mỗi kỳ đánh giá một thẻ — điểm (_tạm tính_ khi kỳ còn chạy),
+hạng A–D trên thanh than hồng, và nhãn **Cần tự đánh giá** khi tới lượt bạn.
+
+- Mở một kỳ: từng chỉ số bạn được chấm, trọng số, **% đạt**. Chỉ số chưa đủ dữ liệu
+  ghi "không tính" — nó không kéo điểm của bạn xuống. Doanh thu, giá vốn không hiện
+  số tiền trên điện thoại, chỉ % đạt.
+- **Tự đánh giá:** chạm 1–5 cho từng chỉ số, viết vài dòng tự nhận xét, bấm **Gửi tự
+  đánh giá** (gửi lại được tới khi cấp trên kết thúc phiếu). Tự chấm chỉ để cấp trên
+  đối chiếu — điểm tính từ số thật và phần cấp trên chấm.
+- Kỳ đã chốt: đọc nhận xét của cấp trên, ghi ý kiến nếu muốn, bấm **Tôi đã xem kết
+  quả** — một lần.
+- Không có số thưởng ở đây; thưởng (nếu có) nằm trong phiếu lương H9. KPI không phạt,
+  không trừ lương.
+
 ### Ranh giới phạm vi `self` (cố ý)
 
 Phiên mở bằng link cá nhân **chỉ xem được dữ liệu của chính mình** — kể cả thu
 ngân hay bếp trưởng cũng không mở được màn vận hành nào từ điện thoại:
-*"Kênh nhân viên chỉ mở lịch, công và phiếu lương của chính bạn. Việc quản lý
-cần đăng nhập ở máy của quán."* Chấm công từ đây cũng bị chặn — phải ra kiosk.
+*"Kênh nhân viên chỉ mở lịch, công, lương, việc, văn bản và KPI của chính bạn. Việc
+quản lý cần đăng nhập ở máy của quán."* Chấm KPI cho người khác làm ở Office (N10). Chấm công từ đây cũng bị chặn — phải ra
+kiosk. Link cá nhân cũng không xin được luồng tin trực tiếp (realtime) của quán.
 
 ## 7.2 Kiosk chấm công (`chamcong.tokyosora.vn`)
 

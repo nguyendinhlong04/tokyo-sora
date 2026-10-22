@@ -7,6 +7,51 @@ import type {
   PromotionScope,
   TaxCodeLookupView,
   VatCode,
+  AssignableStaff,
+  AssignmentKind,
+  DecisionType,
+  DocAttachment,
+  DocKind,
+  DocTarget,
+  DocumentDetail,
+  DocumentRow,
+  InboxCounts,
+  KpiBonusSuggestions,
+  KpiCycleView,
+  KpiMetricCode,
+  KpiObservationKind,
+  KpiObservationView,
+  KpiReviewDetail,
+  KpiReviewRow,
+  KpiTemplateView,
+  IncidentCategory,
+  IncidentDetail,
+  IncidentRow,
+  IncidentSeverity,
+  MyDocument,
+  MyDocumentDetail,
+  MyTasks,
+  OrgAssignmentRow,
+  OrgChart,
+  OrgUnitKind,
+  PersonnelChange,
+  Role,
+  SignerOption,
+  TaskDetail,
+  TaskEntity,
+  TaskPriority,
+  TaskRecurrence,
+  TaskRow,
+  TaskState,
+  TaskTemplateView,
+  ReportCadence,
+  ReportField,
+  ReportReviewMode,
+  ReportSlot,
+  ReportTemplateView,
+  ReportValue,
+  WorkReportDetail,
+  WorkReportRow,
 } from '@sora/contracts'
 import { apiFetch } from '@sora/core'
 
@@ -41,6 +86,8 @@ export interface ParameterRow {
   key: string
   unit: string | null
   sensitive: boolean
+  /** false = chỉ sửa ở cấp chuỗi */
+  overridable: boolean
   chainValue: unknown
   branchValue: unknown
   /** Con số engine thật sự đọc cho chi nhánh đang chọn */
@@ -2195,7 +2242,13 @@ export const api = {
     }),
 
   me: () =>
-    apiFetch<{ kind: string; branchId: string; fullName?: string; roles?: string[] }>('/api/auth/me'),
+    apiFetch<{
+      kind: string
+      branchId: string
+      staffId?: number
+      fullName?: string
+      roles?: string[]
+    }>('/api/auth/me'),
 
   logout: () => apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 
@@ -3274,4 +3327,506 @@ export const api = {
     note: string | null
   }) =>
     apiFetch<{ id: number }>('/api/crm/corporate/settlements', { method: 'POST', body: input }),
+
+  // ---- N2 · N3 Sơ đồ tổ chức — kiểu lấy từ @sora/contracts, không viết tay
+
+  orgChart: (date?: string) => apiFetch<OrgChart>(`/api/org/chart${date ? `?date=${date}` : ''}`),
+
+  orgPositionHistory: (positionId: number) =>
+    apiFetch<OrgAssignmentRow[]>(`/api/org/positions/${positionId}/history`),
+
+  createOrgUnit: (input: OrgUnitInput) =>
+    apiFetch<{ id: number }>('/api/org/units', { method: 'POST', body: input }),
+
+  updateOrgUnit: (
+    id: number,
+    patch: Partial<Omit<OrgUnitInput, 'kind' | 'branchId'>> & { active?: boolean },
+  ) => apiFetch<{ id: number }>(`/api/org/units/${id}`, { method: 'PUT', body: patch }),
+
+  createPosition: (input: PositionInput) =>
+    apiFetch<{ id: number }>('/api/org/positions', { method: 'POST', body: input }),
+
+  updatePosition: (
+    id: number,
+    patch: Partial<Omit<PositionInput, 'unitId'>> & { active?: boolean },
+  ) => apiFetch<{ id: number }>(`/api/org/positions/${id}`, { method: 'PUT', body: patch }),
+
+  assignPosition: (input: {
+    staffIds: number[]
+    positionId: number
+    kind: AssignmentKind
+    fromDate: string
+    note: string
+    replaceMain?: boolean
+  }) => apiFetch<{ created: number[] }>('/api/org/assignments', { method: 'POST', body: input }),
+
+  endAssignment: (id: number, input: { toDate: string; note: string }) =>
+    apiFetch<{ id: number }>(`/api/org/assignments/${id}/end`, { method: 'POST', body: input }),
+
+  applyOrgStandard: (target: string) =>
+    apiFetch<{ unitsCreated: number; positionsCreated: number }>('/api/org/apply-standard', {
+      method: 'POST',
+      body: { target },
+    }),
+
+  // ---- N4 Văn bản & thông báo · hộp "Việc cần xử lý"
+
+  inbox: () => apiFetch<InboxCounts>('/api/me/inbox'),
+
+  documents: (filter: { state?: string; kind?: string; q?: string } = {}) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(filter)) if (value) params.set(key, value)
+    const query = params.toString()
+    return apiFetch<DocumentRow[]>(`/api/org/documents${query ? `?${query}` : ''}`)
+  },
+
+  document: (id: number) => apiFetch<DocumentDetail>(`/api/org/documents/${id}`),
+
+  createDocument: (input: DocumentInput) =>
+    apiFetch<{ id: number }>('/api/org/documents', { method: 'POST', body: input }),
+
+  updateDocument: (id: number, input: DocumentInput) =>
+    apiFetch<{ id: number }>(`/api/org/documents/${id}`, { method: 'PUT', body: input }),
+
+  deleteDocument: (id: number) =>
+    apiFetch<{ id: number }>(`/api/org/documents/${id}`, { method: 'DELETE' }),
+
+  submitDocument: (id: number, signerId: number) =>
+    apiFetch<{ id: number }>(`/api/org/documents/${id}/submit`, {
+      method: 'POST',
+      body: { signerId },
+    }),
+
+  returnDocument: (id: number, note: string) =>
+    apiFetch<{ id: number }>(`/api/org/documents/${id}/return`, { method: 'POST', body: { note } }),
+
+  signDocument: (id: number, pin: string) =>
+    apiFetch<{ id: number; number: string; recipients: number }>(`/api/org/documents/${id}/sign`, {
+      method: 'POST',
+      body: { pin },
+    }),
+
+  revokeDocument: (id: number, reason: string) =>
+    apiFetch<{ id: number }>(`/api/org/documents/${id}/revoke`, {
+      method: 'POST',
+      body: { reason },
+    }),
+
+  documentSigners: (kind: DocKind) =>
+    apiFetch<SignerOption[]>(`/api/org/documents/signers?kind=${kind}`),
+
+  documentAudience: (targets: DocTarget[]) =>
+    apiFetch<{ count: number }>('/api/org/documents/audience-preview', {
+      method: 'POST',
+      body: { targets },
+    }),
+
+  myDocuments: () => apiFetch<MyDocument[]>('/api/org/me/documents'),
+
+  myDocument: (id: number) => apiFetch<MyDocumentDetail>(`/api/org/me/documents/${id}`),
+
+  markDocument: (id: number, ack: boolean) =>
+    apiFetch<{ readAt: string | null; ackedAt: string | null }>(
+      `/api/org/me/documents/${id}/receipt`,
+      { method: 'POST', body: { ack } },
+    ),
+
+  // ---- N1 · N5 · N6 Việc và SOP — kiểu lấy từ @sora/contracts
+
+  tasks: (q: { view: TaskView; from?: string; to?: string; branch?: string; date?: string }) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(q)) if (value) params.set(key, value)
+    return apiFetch<TaskRow[]>(`/api/org/tasks?${params.toString()}`)
+  },
+
+  task: (id: number) => apiFetch<TaskDetail>(`/api/org/tasks/${id}`),
+
+  assignees: () => apiFetch<AssignableStaff[]>('/api/org/tasks/assignees'),
+
+  createTask: (input: TaskInput) =>
+    apiFetch<{ ids: number[] }>('/api/org/tasks', { method: 'POST', body: input }),
+
+  updateTask: (
+    id: number,
+    patch: Partial<Pick<TaskInput, 'title' | 'note' | 'priority' | 'dueAt'>>,
+  ) => apiFetch<{ id: number }>(`/api/org/tasks/${id}`, { method: 'PUT', body: patch }),
+
+  reviewTask: (id: number, accept: boolean, note: string | null) =>
+    apiFetch<{ id: number; state: TaskState }>(`/api/org/tasks/${id}/review`, {
+      method: 'POST',
+      body: { accept, note },
+    }),
+
+  cancelTask: (id: number, reason: string) =>
+    apiFetch<{ id: number }>(`/api/org/tasks/${id}/cancel`, { method: 'POST', body: { reason } }),
+
+  /** `branch`: mã chi nhánh, `van-phong` = mẫu của văn phòng, bỏ trống = tất cả */
+  taskTemplates: (branch?: string) =>
+    apiFetch<TaskTemplateView[]>(
+      `/api/org/task-templates${branch ? `?branch=${encodeURIComponent(branch)}` : ''}`,
+    ),
+
+  taskShifts: (branchId: string) =>
+    apiFetch<ShiftTemplate[]>(
+      `/api/org/task-templates/shifts?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  createTaskTemplate: (input: TaskTemplateInput) =>
+    apiFetch<TaskTemplateView>('/api/org/task-templates', { method: 'POST', body: input }),
+
+  updateTaskTemplate: (id: number, input: TaskTemplateInput) =>
+    apiFetch<TaskTemplateView>(`/api/org/task-templates/${id}`, { method: 'PUT', body: input }),
+
+  applyStandardSops: (branchId: string) =>
+    apiFetch<{
+      created: number
+      skipped: { title: string; reason: string }[]
+      withoutShifts: boolean
+    }>('/api/org/task-templates/apply-standard', { method: 'POST', body: { branchId } }),
+
+  myTasks: () => apiFetch<MyTasks>('/api/org/me/tasks'),
+
+  myTask: (id: number) => apiFetch<TaskDetail>(`/api/org/me/tasks/${id}`),
+
+  acceptMyTask: (id: number) =>
+    apiFetch<{ id: number }>(`/api/org/me/tasks/${id}/accept`, { method: 'POST' }),
+
+  checkMyTask: (id: number, idx: number, checked: boolean) =>
+    apiFetch<{ idx: number }>(`/api/org/me/tasks/${id}/check`, {
+      method: 'POST',
+      body: { idx, checked },
+    }),
+
+  submitMyTask: (id: number, note: string | null, attachments: DocAttachment[] | null) =>
+    apiFetch<{ id: number; state: TaskState }>(`/api/org/me/tasks/${id}/submit`, {
+      method: 'POST',
+      body: { note, attachments },
+    }),
+
+  reviewMyTask: (id: number, accept: boolean, note: string | null) =>
+    apiFetch<{ id: number; state: TaskState }>(`/api/org/me/tasks/${id}/review`, {
+      method: 'POST',
+      body: { accept, note },
+    }),
+
+  // ---- N7 Báo cáo công việc · N8 Sự cố — kiểu lấy từ @sora/contracts
+
+  reportTemplates: (branch?: string) =>
+    apiFetch<ReportTemplateView[]>(
+      `/api/work-reports/templates${branch ? `?branch=${encodeURIComponent(branch)}` : ''}`,
+    ),
+
+  saveReportTemplate: (id: number | null, input: ReportTemplateInput) =>
+    apiFetch<{ id: number }>(`/api/work-reports/templates${id ? `/${id}` : ''}`, {
+      method: id ? 'PUT' : 'POST',
+      body: input,
+    }),
+
+  applyStandardReports: (branchId: string) =>
+    apiFetch<{
+      created: number
+      skipped: { name: string; reason: string }[]
+      withoutShifts: boolean
+    }>('/api/work-reports/templates/apply-standard', { method: 'POST', body: { branchId } }),
+
+  workReports: (q: { view: 'can-xem' | 'tat-ca'; branch?: string; from?: string; to?: string }) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(q)) if (value) params.set(key, value)
+    return apiFetch<WorkReportRow[]>(`/api/work-reports?${params.toString()}`)
+  },
+
+  missingReports: (branch?: string) =>
+    apiFetch<ReportSlot[]>(
+      `/api/work-reports/missing${branch ? `?branch=${encodeURIComponent(branch)}` : ''}`,
+    ),
+
+  workReport: (id: number) => apiFetch<WorkReportDetail>(`/api/work-reports/${id}`),
+
+  reviewWorkReport: (id: number, note: string | null) =>
+    apiFetch<{ id: number }>(`/api/work-reports/${id}/review`, { method: 'POST', body: { note } }),
+
+  addWorkReportAddendum: (id: number, body: string, mine: boolean) =>
+    apiFetch<{ id: number }>(`/api/work-reports/${mine ? 'me/' : ''}${id}/addenda`, {
+      method: 'POST',
+      body: { body },
+    }),
+
+  myReportsDue: () => apiFetch<ReportSlot[]>('/api/work-reports/me/due'),
+
+  openMyReport: (slot: Pick<ReportSlot, 'templateId' | 'periodKey' | 'shiftTemplateId'>) =>
+    apiFetch<WorkReportDetail>('/api/work-reports/me/drafts', {
+      method: 'POST',
+      body: {
+        templateId: slot.templateId,
+        periodKey: slot.periodKey,
+        shiftTemplateId: slot.shiftTemplateId,
+      },
+    }),
+
+  myReport: (id: number) => apiFetch<WorkReportDetail>(`/api/work-reports/me/${id}`),
+
+  saveMyReport: (id: number, values: Record<string, ReportValue>) =>
+    apiFetch<{ id: number }>(`/api/work-reports/me/${id}`, { method: 'PUT', body: { values } }),
+
+  submitMyReport: (id: number) =>
+    apiFetch<{ id: number; onTime: boolean }>(`/api/work-reports/me/${id}/submit`, {
+      method: 'POST',
+    }),
+
+  reportIncident: (input: IncidentInput) =>
+    apiFetch<{ id: number; code: string }>('/api/incidents', { method: 'POST', body: input }),
+
+  incidents: (q: { state?: string; branch?: string; severity?: string }) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(q)) if (value) params.set(key, value)
+    return apiFetch<IncidentRow[]>(`/api/incidents?${params.toString()}`)
+  },
+
+  incident: (id: number) => apiFetch<IncidentDetail>(`/api/incidents/${id}`),
+
+  updateIncident: (id: number, patch: Partial<IncidentPatch>) =>
+    apiFetch<{ id: number }>(`/api/incidents/${id}`, { method: 'PUT', body: patch }),
+
+  addIncidentTask: (
+    id: number,
+    input: { title: string; note: string | null; assigneeStaffIds: number[]; dueAt: string | null },
+  ) => apiFetch<{ ids: number[] }>(`/api/incidents/${id}/tasks`, { method: 'POST', body: input }),
+
+  reportIncidentExternally: (id: number, reportedAt: string, ref: string) =>
+    apiFetch<{ id: number }>(`/api/incidents/${id}/external-report`, {
+      method: 'POST',
+      body: { reportedAt, ref },
+    }),
+
+  closeIncident: (id: number, note: string | null) =>
+    apiFetch<{ id: number }>(`/api/incidents/${id}/close`, { method: 'POST', body: { note } }),
+
+  // ---- N9 · N10 · N11 KPI, thưởng gợi ý cho H7 — kiểu lấy từ @sora/contracts
+
+  kpiTemplates: () => apiFetch<KpiTemplateView[]>('/api/performance/templates'),
+
+  saveKpiTemplate: (input: {
+    positionId: number
+    items: { metricCode: KpiMetricCode; weightPct: number; defaultTargetMilli: number }[]
+  }) => apiFetch<{ id: number }>('/api/performance/templates', { method: 'POST', body: input }),
+
+  applyStandardKpi: (target: string) =>
+    apiFetch<{ created: number }>('/api/performance/templates/apply-standard', {
+      method: 'POST',
+      body: { target },
+    }),
+
+  kpiCycles: (branch?: string) =>
+    apiFetch<KpiCycleView[]>(
+      `/api/performance/cycles${branch ? `?branch=${encodeURIComponent(branch)}` : ''}`,
+    ),
+
+  createKpiCycle: (input: { branchId: string; kind: 'thang' | 'quy'; periodStart: string }) =>
+    apiFetch<{ id: number }>('/api/performance/cycles', { method: 'POST', body: input }),
+
+  openKpiCycle: (id: number, policyUrl: string | null) =>
+    apiFetch<{ id: number }>(`/api/performance/cycles/${id}/open`, {
+      method: 'POST',
+      body: { policyUrl },
+    }),
+
+  computeKpiCycle: (id: number) =>
+    apiFetch<{ reviews: number }>(`/api/performance/cycles/${id}/compute`, { method: 'POST' }),
+
+  kpiCycleStep: (id: number, step: 'start-review' | 'close') =>
+    apiFetch<{ id: number }>(`/api/performance/cycles/${id}/${step}`, { method: 'POST' }),
+
+  kpiReviews: (cycleId: number) =>
+    apiFetch<KpiReviewRow[]>(`/api/performance/cycles/${cycleId}/reviews`),
+
+  kpiReview: (id: number) => apiFetch<KpiReviewDetail>(`/api/performance/reviews/${id}`),
+
+  scoreKpiReview: (
+    id: number,
+    input: {
+      comment: string | null
+      items: {
+        metricCode: KpiMetricCode
+        managerScore?: number | null
+        excludedReason?: string | null
+      }[]
+    },
+  ) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/reviews/${id}/manager`, {
+      method: 'PUT',
+      body: input,
+    }),
+
+  finalizeKpiReview: (id: number) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/reviews/${id}/finalize`, { method: 'POST' }),
+
+  setKpiTarget: (
+    id: number,
+    input: { metricCode: KpiMetricCode; targetMilli: number; note: string },
+  ) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/reviews/${id}/targets`, {
+      method: 'PUT',
+      body: input,
+    }),
+
+  setKpiExempt: (id: number, reason: string | null) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/reviews/${id}/exempt`, {
+      method: 'PUT',
+      body: { reason },
+    }),
+
+  kpiBonusSuggestions: (payrollPeriodId: number) =>
+    apiFetch<KpiBonusSuggestions>(
+      `/api/performance/bonus-suggestions?payrollPeriodId=${payrollPeriodId}`,
+    ),
+
+  kpiObservations: (branch?: string) =>
+    apiFetch<KpiObservationView[]>(
+      `/api/performance/observations${branch ? `?branch=${encodeURIComponent(branch)}` : ''}`,
+    ),
+
+  createKpiObservation: (input: {
+    branchId: string
+    kind: KpiObservationKind
+    observedOn: string
+    score: number
+    evidenceUrl: string
+    note: string | null
+  }) => apiFetch<{ id: number }>('/api/performance/observations', { method: 'POST', body: input }),
+
+  voidKpiObservation: (id: number, reason: string) =>
+    apiFetch<{ id: number }>(`/api/performance/observations/${id}/void`, {
+      method: 'POST',
+      body: { reason },
+    }),
+
+  myKpi: () => apiFetch<KpiReviewRow[]>('/api/performance/me'),
+
+  myKpiReview: (id: number) => apiFetch<KpiReviewDetail>(`/api/performance/me/reviews/${id}`),
+
+  selfReviewKpi: (
+    id: number,
+    input: {
+      comment: string | null
+      items: { metricCode: KpiMetricCode; selfScore: number | null }[]
+    },
+  ) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/me/reviews/${id}/self`, {
+      method: 'PUT',
+      body: input,
+    }),
+
+  ackKpi: (id: number, feedback: string | null) =>
+    apiFetch<{ reviewId: number }>(`/api/performance/me/reviews/${id}/ack`, {
+      method: 'POST',
+      body: { feedback },
+    }),
+}
+
+export interface ReportTemplateInput {
+  code: string
+  name: string
+  cadence: ReportCadence
+  branchId: string
+  fields: ReportField[]
+  shiftTemplateIds: number[]
+  dueOffsetMinutes: number
+  reviewMode: ReportReviewMode
+  kenhNv: boolean
+  active: boolean
+  positions: { positionId: number; role: 'nop' | 'du-phong' }[]
+}
+
+export interface IncidentInput {
+  category: IncidentCategory
+  severity: IncidentSeverity
+  /** ISO có múi giờ */
+  occurredAt: string
+  title: string
+  description: string
+  immediateAction: string | null
+  injuredCount: number
+  customerInvolved: boolean
+  evidenceUrls: string[]
+}
+
+export interface IncidentPatch {
+  category: IncidentCategory
+  severity: IncidentSeverity
+  title: string
+  description: string
+  immediateAction: string | null
+  rootCause: string | null
+  correctiveAction: string | null
+  lossEstimateVnd: number | null
+  ownerId: number | null
+  evidenceUrls: string[]
+}
+
+export type TaskView = 'assigned' | 'unit' | 'to-review' | 'sop'
+
+export interface TaskInput {
+  title: string
+  note: string | null
+  priority: TaskPriority
+  assigneeStaffIds: number[]
+  /** Bỏ trống = người giao tự nghiệm thu; null = nộp là xong */
+  reviewerStaffId?: number | null
+  /** ISO có múi giờ */
+  dueAt: string
+  checklist: string[]
+  attachments: DocAttachment[]
+  entity: TaskEntity | null
+  entityId: number | null
+}
+
+export interface TaskTemplateInput {
+  title: string
+  note: string | null
+  checklist: string[]
+  assigneePositionId: number
+  reviewerPositionId: number | null
+  recurrence: TaskRecurrence
+  weekday: number | null
+  monthDay: number | null
+  shiftTemplateId: number | null
+  dueMinute: number | null
+  priority: TaskPriority
+  documentId: number | null
+  startsOn: string | null
+  active: boolean
+}
+
+export interface DocumentInput {
+  kind: DocKind
+  decisionType: DecisionType | null
+  title: string
+  body: string
+  attachments: DocAttachment[]
+  targets: DocTarget[]
+  changes: PersonnelChange[] | null
+  requiresAck: boolean
+  effectiveFrom: string
+  effectiveTo: string | null
+}
+
+export interface OrgUnitInput {
+  parentId: number
+  kind: Exclude<OrgUnitKind, 'cong-ty'>
+  name: string
+  branchId: string | null
+  stationId: string | null
+  sort: number
+}
+
+export interface PositionInput {
+  unitId: number
+  title: string
+  isHead: boolean
+  headcount: number
+  suggestedRole: Role | null
+  duties: string[]
+  authorities: string[]
+  requirements: string[]
+  sort: number
 }

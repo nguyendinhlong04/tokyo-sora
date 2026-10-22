@@ -96,6 +96,8 @@ export class AdminService {
         key: p.key,
         unit: p.unit,
         sensitive: p.sensitive,
+        /** false = chỉ sửa ở cấp chuỗi, chi nhánh không ghi đè */
+        overridable: p.overridable,
         chainValue: p.value,
         branchValue: override ? override.p.value : null,
         /** Giá trị engine thật sự đọc cho chi nhánh này */
@@ -142,6 +144,14 @@ export class AdminService {
       .from(parameters)
       .where(and(eq(parameters.key, key), sql`${parameters.branchId} IS NULL`))
     if (!current) throw new NotFoundException(`Không có tham số ${key}`)
+    // Cột `overridable` có từ đầu mà chưa ai đọc: thang chấm KPI, mức thưởng phải
+    // MỘT cho cả chuỗi — chi nhánh tự nới thang là thưởng không còn công bằng
+    if (input.branchId !== null && !current.overridable) {
+      throw new ConflictException({
+        code: 'param_not_overridable',
+        message: `Tham số ${key} áp chung cả chuỗi — chi nhánh không ghi đè được`,
+      })
+    }
 
     const expected = typeof current.value
     if (typeof input.value !== expected) {

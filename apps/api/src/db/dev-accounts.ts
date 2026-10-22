@@ -24,26 +24,62 @@ export const DEV_OFFICE_PASSWORD = 'sora-dev-2026'
  * trên hạn mức phải người khác duyệt (§4.3.1 không ai tự duyệt việc của mình), và
  * kỳ lương đi qua ba vai — R13 trình, R8 kiểm, R10 duyệt. Chỉ có một tài khoản chủ
  * thì hai luồng đó không chạy thử được trên máy dev.
+ *
+ * Có cả PIN: các luồng cần người thứ hai — duyệt △ ở Office, ký ban hành văn bản
+ * (N4) — đòi PIN của người duyệt, tài khoản chỉ có mật khẩu thì không thử được.
  */
-const OFFICE_ACCOUNTS: { code: string; fullName: string; email: string; roles: string[] }[] = [
-  { code: 'CHU01', fullName: 'Chủ quán', email: 'chu@tokyosora.vn', roles: ['R10'] },
-  { code: 'CHUOI01', fullName: 'Quản lý chuỗi', email: 'chuoi@tokyosora.vn', roles: ['R11'] },
-  { code: 'KETOAN01', fullName: 'Kế toán', email: 'ketoan@tokyosora.vn', roles: ['R8'] },
-  { code: 'NHANSU01', fullName: 'Quản lý nhân sự', email: 'nhansu@tokyosora.vn', roles: ['R13'] },
+const OFFICE_ACCOUNTS: {
+  code: string
+  fullName: string
+  email: string
+  roles: string[]
+  pin: string
+}[] = [
+  { code: 'CHU01', fullName: 'Chủ quán', email: 'chu@tokyosora.vn', roles: ['R10'], pin: '2101' },
+  {
+    code: 'CHUOI01',
+    fullName: 'Quản lý chuỗi',
+    email: 'chuoi@tokyosora.vn',
+    roles: ['R11'],
+    pin: '2102',
+  },
+  {
+    code: 'KETOAN01',
+    fullName: 'Kế toán',
+    email: 'ketoan@tokyosora.vn',
+    roles: ['R8'],
+    pin: '2103',
+  },
+  {
+    code: 'NHANSU01',
+    fullName: 'Quản lý nhân sự',
+    email: 'nhansu@tokyosora.vn',
+    roles: ['R13'],
+    pin: '2104',
+  },
   // R9 chỉ mở được đúng một màn — A8 nội dung website. Có tài khoản này thì thử
   // được ranh giới đó thật, thay vì tin rằng nó hẹp.
-  { code: 'MARKETING01', fullName: 'Marketing', email: 'marketing@tokyosora.vn', roles: ['R9'] },
+  {
+    code: 'MARKETING01',
+    fullName: 'Marketing',
+    email: 'marketing@tokyosora.vn',
+    roles: ['R9'],
+    pin: '2105',
+  },
 ]
 
 /**
  * Nhân viên quán của prototype POS — Thu ngân → R2, Phục vụ → R1, Trưởng ca → R7
  * theo ma trận §4.2. Mỗi người một PIN 4 số khác nhau, vai trò ở chi nhánh dev.
+ *
+ * Quản lý ca Lan có thêm cửa Office để thử phạm vi của R7: chỉ thấy cây chi nhánh
+ * mình, không sửa được sơ đồ tổ chức.
  */
-const POS_STAFF: { code: string; fullName: string; role: string; pin: string }[] = [
+const POS_STAFF: { code: string; fullName: string; role: string; pin: string; email?: string }[] = [
   { code: 'HOA', fullName: 'Hoa', role: 'R2', pin: '1101' },
   { code: 'MINH', fullName: 'Minh', role: 'R1', pin: '1102' },
   { code: 'TUAN', fullName: 'Tuấn', role: 'R1', pin: '1103' },
-  { code: 'LAN', fullName: 'Lan', role: 'R7', pin: '1104' },
+  { code: 'LAN', fullName: 'Lan', role: 'R7', pin: '1104', email: 'lan@tokyosora.vn' },
   { code: 'DUC', fullName: 'Đức', role: 'R1', pin: '1105' },
 ]
 
@@ -84,15 +120,22 @@ export async function seedDevAccounts(db: Db, branchId: string) {
         fullName: a.fullName,
         email: a.email,
         passwordHash: await hash(DEV_OFFICE_PASSWORD),
+        pinHash: await hash(a.pin),
       },
       // branchId NULL = phạm vi toàn chuỗi
       a.roles.map((roleCode) => ({ roleCode, branchId: null })),
     )
   }
   for (const p of POS_STAFF) {
-    await addIfMissing({ code: p.code, fullName: p.fullName, pinHash: await hash(p.pin) }, [
-      { roleCode: p.role, branchId },
-    ])
+    await addIfMissing(
+      {
+        code: p.code,
+        fullName: p.fullName,
+        pinHash: await hash(p.pin),
+        ...(p.email ? { email: p.email, passwordHash: await hash(DEV_OFFICE_PASSWORD) } : {}),
+      },
+      [{ roleCode: p.role, branchId }],
+    )
   }
   return { created, kept }
 }

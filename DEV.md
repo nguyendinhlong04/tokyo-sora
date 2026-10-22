@@ -46,6 +46,29 @@ docker run -d --name sora-test-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=sora_
 
 Rồi khai `TEST_DATABASE_URL=postgres://postgres:test@localhost:55432/sora_test`.
 
+**macOS không có Docker:** cài [Postgres.app](https://postgresapp.com) (chọn PostgreSQL
+16), bấm _Initialize_. Superuser là tên tài khoản macOS, không mật khẩu, cổng 5432.
+
+```bash
+PG=/Applications/Postgres.app/Contents/Versions/16/bin
+"$PG/pg_isready"
+"$PG/createdb" sora_dev && "$PG/createdb" sora_test
+```
+
+Khai `apps/api/.env`: `DATABASE_MIGRATION_URL=postgres://$USER@localhost:5432/sora_dev`,
+`DATABASE_URL=postgres://sora_app:<mật khẩu tự đặt>@localhost:5432/sora_dev`,
+`TEST_DATABASE_URL=postgres://$USER@localhost:5432/sora_test`. Thứ tự lần đầu:
+
+```bash
+pnpm --filter @sora/api db:migrate
+"$PG/psql" "postgres://$USER@localhost:5432/sora_dev" -v app_password="<mật khẩu tự đặt>" -f deploy/db-roles.sql
+pnpm extract-seed          # seed đọc JSON sinh từ bản thiết kế; thư mục out/ bị gitignore
+pnpm --filter @sora/api db:seed
+pnpm --filter @sora/api db:dev-bootstrap
+```
+
+`db-roles.sql` chạy SAU migration vì nó thu hồi quyền trên các bảng sổ đã có.
+
 Phân quyền role chạy một lần cho mỗi môi trường:
 
 ```bash
@@ -120,9 +143,11 @@ của món mẫu bị xoá rồi chèn lại. Cờ chỉ nhận CSDL trên chín
 pnpm --filter @sora/api db:dev-bootstrap
 ```
 
-Lệnh này làm ba việc mà ngoài đời người vận hành làm tay lúc mở quán: tạo các tài
-khoản dev còn thiếu (xem mục Tài khoản dev), tạo thiết bị đầu tiên của chi nhánh và phát
-hành bundle cấu hình. Nó in ra token của từng máy.
+Lệnh này làm bốn việc mà ngoài đời người vận hành làm tay lúc mở quán: tạo các tài
+khoản dev còn thiếu (xem mục Tài khoản dev — tài khoản Office có cả PIN), tạo thiết bị
+đầu tiên của chi nhánh, dựng **sơ đồ tổ chức theo mẫu chuẩn** (khung chuỗi + từng chi
+nhánh — N2) và phát hành bundle cấu hình. Nó in ra token của từng máy. Chạy lại không
+nhân đôi gì.
 
 Mật khẩu, PIN và token ở đây công khai trong repo, nên lệnh **chỉ chạy khi `DATABASE_URL`
 trỏ vào CSDL trên chính máy này** (localhost, 127.x, ::1 hoặc socket) — trỏ vào Supabase
@@ -201,13 +226,46 @@ từ thiết bị đó mới sinh được mã ghép 6 số cho các máy sau.
 Sora Office (`localhost:5176`) đăng nhập bằng **email + mật khẩu**, không cần thiết bị
 ghép — Office chạy trên máy tính của quản lý, không phải máy của chi nhánh:
 
-| Tài khoản | Vai trò | Mật khẩu |
-|---|---|---|
-| chu@tokyosora.vn | R10 Chủ / Admin | `sora-dev-2026` |
-| chuoi@tokyosora.vn | R11 Quản lý chuỗi | `sora-dev-2026` |
-| ketoan@tokyosora.vn | R8 Kế toán | `sora-dev-2026` |
-| nhansu@tokyosora.vn | R13 Quản lý nhân sự | `sora-dev-2026` |
-| marketing@tokyosora.vn | R9 Marketing | `sora-dev-2026` |
+| Tài khoản | Vai trò | Mật khẩu | PIN |
+|---|---|---|---|
+| chu@tokyosora.vn | R10 Chủ / Admin | `sora-dev-2026` | 2101 |
+| chuoi@tokyosora.vn | R11 Quản lý chuỗi | `sora-dev-2026` | 2102 |
+| ketoan@tokyosora.vn | R8 Kế toán | `sora-dev-2026` | 2103 |
+| nhansu@tokyosora.vn | R13 Quản lý nhân sự | `sora-dev-2026` | 2104 |
+| marketing@tokyosora.vn | R9 Marketing | `sora-dev-2026` | 2105 |
+| lan@tokyosora.vn | R7 Quản lý ca (chi nhánh đầu) | `sora-dev-2026` | 1104 |
+
+> PIN của tài khoản Office để thử các luồng cần người thứ hai — dải duyệt △, ký ban hành
+> văn bản (N4). Bootstrap chỉ tạo tài khoản còn thiếu, nên CSDL dev đã có tài khoản Office
+> từ trước khi có PIN (trước 22/10/2026) sẽ báo "PIN không đúng" ở hai luồng đó — dựng lại
+> CSDL dev rồi chạy lại bootstrap. `lan@` dùng để thử phạm vi của R7 — chỉ thấy chi nhánh
+> của mình, không sửa được những gì R7 không được sửa.
+
+**Thử SOP theo ca từ đầu tới cuối** (việc định kỳ sinh khi có người mở hộp việc, không
+có cron — tải lại trang là thấy):
+
+1. `nhansu@` → **N2**: xếp một phục vụ vào ghế _Sảnh · Phục vụ_ và Lan vào _Sảnh · Quản lý
+   ca_ (SOP giao cho chức danh — người chưa có ghế không nhận được).
+2. `lan@` → **H2**: thêm ca mẫu (vd. Ca sáng 07:00–15:00, Ca tối 15:00–23:00), xếp người
+   phục vụ đó vào ca sáng hôm nay **bằng ca mẫu**, rồi **Công bố**.
+3. `lan@` → **N6 · Mẫu việc** → **Dùng bộ SOP chuẩn**.
+4. **H1** → **Link** của người phục vụ → mở link ở cửa sổ ẩn danh, nhập PIN → tab **Việc**
+   có "Mở ca – Sảnh". Tích, nộp → Lan thấy ở chuông và **N1 · Chờ tôi nghiệm thu**.
+
+**Thử KPI → thưởng gợi ý H7** (kỳ đánh giá chỉ vào bước chấm được SAU ngày cuối kỳ — thử
+bằng kỳ của tháng trước):
+
+1. `nhansu@` → **N9** → **Dùng bộ KPI mẫu** (chọn phạm vi chi nhánh, rồi "Văn phòng
+   chuỗi"). Ghế chưa có bộ thì người ngồi ghế đó được miễn đánh giá.
+2. **N10** → **Mở kỳ mới** cho tháng trước → **Công bố…** → **Tính lại**. Mở một phiếu để
+   xem số tự động; chỉ số thiếu dữ liệu ghi "không tính".
+3. **Bắt đầu đánh giá**. Người phục vụ mở tab **KPI** trên Kênh nhân viên, tự chấm, gửi.
+   Người đánh giá (cấp trên trực tiếp theo sơ đồ lúc mở kỳ — cột _Người đánh giá_ ở N10)
+   mở phiếu, chấm thái độ 1–5, **Kết thúc đánh giá…**. Phiếu của người chưa tự đánh giá phải chờ
+   `kpi.selfReviewDays` (A6, mặc định 5 ngày) — để thử nhanh đặt về 0.
+4. `nhansu@` → **Chốt kỳ…** (người có phiếu trong kỳ không chốt được).
+5. **H7** → mở kỳ lương cùng tháng → **Chốt công** → **Tính nháp…**: thưởng gợi ý điền
+   sẵn; sửa một dòng thì phải ghi lý do.
 
 > Cả nhóm quản trị (A1–A6, A9, A10) và R3 gắn quyền `admin.manage-accounts-roles` — theo
 > ma trận §4.2 chỉ R10 có. Đăng nhập bằng `chuoi@` sẽ vào được Office nhưng cột trái không

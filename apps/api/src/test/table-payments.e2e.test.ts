@@ -22,6 +22,7 @@ import {
   payments,
   reservations,
   tableFeedback,
+  tableRequests,
   tableSessions,
   ticketItems,
 } from '../db/schema'
@@ -673,6 +674,19 @@ describe('4. Gọi nhân viên (T9 → P12)', () => {
     expect(after.json<{ requests: { id: number }[] }>().requests.some((r) => r.id === first.id)).toBe(
       false,
     )
+
+    // Bấm lần hai (máy khác chưa kịp tải lại) là no-op: người và mốc xử lý giữ
+    // nguyên — thời gian phản hồi bàn là số đo của ca, ghi đè là đo sai
+    const [before] = await db.select().from(tableRequests).where(eq(tableRequests.id, first.id))
+    const again = await inject({
+      method: 'POST',
+      url: `/api/table-requests/${first.id}/done`,
+      headers: staffAuth(),
+    })
+    expect(again.statusCode, again.payload).toBe(201)
+    expect(again.json<{ changed: boolean }>().changed).toBe(false)
+    const [still] = await db.select().from(tableRequests).where(eq(tableRequests.id, first.id))
+    expect(still!.handledAt?.getTime()).toBe(before!.handledAt?.getTime())
   })
 })
 

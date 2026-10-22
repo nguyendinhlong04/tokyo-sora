@@ -27,3 +27,149 @@
     display: none;
   }
 }
+
+/**
+ * Đường nối của sơ đồ tổ chức (N2) — vẽ bằng pseudo-element trên <ul>/<li> lồng
+ * nhau, không thư viện vẽ sơ đồ.
+ *
+ * Màu `line-4`: ở chủ đề sáng line-1…3 đều là washi-200, gần như vô hình trên
+ * nền washi-50 — đường nối mảnh mà không thấy thì cây chỉ còn là các thẻ rời.
+ *
+ * Mọi <ul>/<li> bên trong khối này đều bị vẽ đường nối, nên thẻ trong cây KHÔNG
+ * được dùng danh sách — dùng <div>.
+ */
+@utility org-tree-v {
+  & ul {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    padding-top: 24px;
+  }
+  & li {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 8px 0;
+  }
+  /* Hai nửa thanh ngang phía trên mỗi nút; nửa phải mang đoạn dọc xuống nút */
+  & li::before,
+  & li::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 50%;
+    height: 24px;
+    border-top: 1px solid var(--color-line-4);
+  }
+  & li::before {
+    right: 50%;
+  }
+  & li::after {
+    left: 50%;
+    border-left: 1px solid var(--color-line-4);
+  }
+  & li:first-child::before,
+  & li:last-child::after {
+    border: 0 none;
+  }
+  & li:last-child::before {
+    border-right: 1px solid var(--color-line-4);
+    border-top-right-radius: 4px;
+  }
+  & li:first-child::after {
+    border-top-left-radius: 4px;
+  }
+  & li:only-child {
+    padding-top: 0;
+  }
+  & li:only-child::before,
+  & li:only-child::after {
+    display: none;
+  }
+  /* Đoạn dọc từ thẻ cha xuống thanh ngang của các con */
+  & ul ul::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: 24px;
+    border-left: 1px solid var(--color-line-4);
+  }
+  /* Gốc (có thể nhiều gốc): không có đường nào phía trên */
+  & > ul,
+  & > ul > li {
+    padding-top: 0;
+  }
+  & > ul > li::before,
+  & > ul > li::after {
+    display: none;
+  }
+}
+
+/** Bố cục ngang: cha bên trái, các con xếp dọc bên phải — gọn hơn khi cây sâu */
+@utility org-tree-h {
+  & ul {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-left: 24px;
+  }
+  & li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 6px 0 6px 24px;
+  }
+  & li::before,
+  & li::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 24px;
+    height: 50%;
+    border-left: 1px solid var(--color-line-4);
+  }
+  & li::before {
+    top: 0;
+    border-bottom: 1px solid var(--color-line-4);
+  }
+  & li::after {
+    bottom: 0;
+  }
+  & li:first-child::before,
+  & li:last-child::after,
+  & li:only-child::before {
+    border-left: 0 none;
+  }
+  & li:only-child::after {
+    display: none;
+  }
+  & ul ul::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 24px;
+    border-top: 1px solid var(--color-line-4);
+  }
+  & > ul,
+  & > ul > li {
+    padding-left: 0;
+  }
+  & > ul > li::before,
+  & > ul > li::after {
+    display: none;
+  }
+}
+
+/* In sơ đồ: A3 ngang — khổ đủ cho một chi nhánh mở hai tầng mà không cắt thẻ.
+   Trang in có tên, gắn bằng `page: org-chart` ở vùng sơ đồ: màn khác in vẫn A4. */
+@page org-chart {
+  size: A3 landscape;
+  margin: 10mm;
+}
+@utility page-org-chart {
+  page: org-chart;
+}

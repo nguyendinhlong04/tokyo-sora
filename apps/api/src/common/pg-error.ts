@@ -31,3 +31,10 @@ export function isCheckViolation(err: unknown, constraint?: string): boolean {
     (e) => e.code === '23514' && (!constraint || e.constraint === constraint),
   )
 }
+
+/** Mã 23001 = restrict_violation — trigger canh dữ liệu bất biến ném mã này */
+export function isRestrictViolation(err: unknown, constraint?: string): boolean {
+  return walkCauses(err).some(
+    (e) => e.code === '23001' && (!constraint || e.constraint === constraint),
+  )
+}

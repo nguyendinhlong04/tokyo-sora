@@ -1,7 +1,7 @@
 import { Button, ErrorState, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { api, type DayKind, type ScheduleCell, type ScheduleWeek } from '../api'
+import { api, type DayKind, type ScheduleCell, type ScheduleWeek, type ShiftTemplate } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { DateInput, formatDay } from '../components/report'
 import { useSession } from '../session-context'
@@ -29,6 +29,11 @@ const DAY_KIND_LABELS: Record<DayKind, string> = {
 
 const hhmm = (minute: number) =>
   `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
+
+const toMinutes = (value: string) => {
+  const [h, m] = value.split(':').map(Number)
+  return (h ?? 0) * 60 + (m ?? 0)
+}
 
 const formatMinutes = (minutes: number) => {
   const h = Math.floor(minutes / 60)
@@ -213,6 +218,11 @@ export function Schedule() {
                           >
                             {cell ? (
                               <>
+                                {cell.templateId !== null ? (
+                                  <span className="block truncate text-[length:var(--fs-c2)] text-ink-mute">
+                                    {data.templates.find((t) => t.id === cell.templateId)?.name}
+                                  </span>
+                                ) : null}
                                 <span className="block font-mono">
                                   {hhmm(cell.startMinute)}–{hhmm(cell.endMinute)}
                                 </span>
@@ -262,6 +272,8 @@ export function Schedule() {
               />
             ) : null}
 
+            <ShiftTemplates branchId={branchId!} templates={data.templates} onChange={refresh} />
+
             <p className="mt-4 max-w-[820px] text-[length:var(--fs-c1)] leading-relaxed text-ink-mute">
               Chưa có trong bản dựng này: tô đỏ khung thiếu người so với dự báo lượt khách (cần
               B6), đẩy lịch sang Kênh nhân viên và Zalo khi công bố (cần H8), và hàng đợi duyệt
@@ -297,10 +309,21 @@ function CellEditor({
   const [end, setEnd] = useState(existing ? hhmm(existing.endMinute) : '16:00')
   const [breakMinutes, setBreakMinutes] = useState(existing?.breakMinutes ?? 0)
   const [dayKind, setDayKind] = useState<DayKind>(existing?.dayKind ?? 'thuong')
+  const [templateId, setTemplateId] = useState<number | null>(existing?.templateId ?? null)
 
-  const toMinutes = (value: string) => {
-    const [h, m] = value.split(':').map(Number)
-    return (h ?? 0) * 60 + (m ?? 0)
+  /**
+   * Ô lịch nhớ CA MẪU nó đến từ: việc định kỳ theo ca (SOP mở/đóng ca) tìm người
+   * đứng ca bằng chính khoá này. Sửa tay giờ vào/ra khác ca mẫu thì ô thành "ca
+   * riêng" — không còn là ca mẫu đó nữa.
+   */
+  const chosen = week.templates.find((t) => t.id === templateId)
+  const pickTemplate = (id: string) => {
+    const t = week.templates.find((x) => String(x.id) === id)
+    setTemplateId(t ? t.id : null)
+    if (!t) return
+    setStart(hhmm(t.startMinute))
+    setEnd(hhmm(t.endMinute))
+    setBreakMinutes(t.breakMinutes)
   }
 
   /** Giữ nguyên các ngày khác, chỉ thay ngày đang sửa — API nhận cả tuần */
@@ -320,6 +343,21 @@ function CellEditor({
       </p>
 
       <div className="mt-4 flex flex-wrap items-end gap-4">
+        <label className="block">
+          <span className="mb-1.5 block text-[length:var(--fs-c1)] text-ink-mute">Ca mẫu</span>
+          <select
+            value={templateId === null ? '' : String(templateId)}
+            onChange={(e) => pickTemplate(e.target.value)}
+            className="h-9 rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
+          >
+            <option value="">Ca riêng (tự nhập giờ)</option>
+            {week.templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} {hhmm(t.startMinute)}–{hhmm(t.endMinute)}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="block">
           <span className="mb-1.5 block text-[length:var(--fs-c1)] text-ink-mute">Bắt đầu</span>
           <input
@@ -377,7 +415,13 @@ function CellEditor({
               onSave(
                 withChange({
                   workDate,
-                  templateId: null,
+                  templateId:
+                    chosen &&
+                    chosen.startMinute === toMinutes(start) &&
+                    chosen.endMinute === toMinutes(end) &&
+                    chosen.breakMinutes === breakMinutes
+                      ? chosen.id
+                      : null,
                   startMinute: toMinutes(start),
                   endMinute: toMinutes(end),
                   breakMinutes,
@@ -404,6 +448,134 @@ function CellEditor({
           <span className="text-danger">Ca phải kết thúc sau khi bắt đầu, và nghỉ ngắn hơn ca.</span>
         )}
       </p>
+    </section>
+  )
+}
+
+/**
+ * Ca mẫu của chi nhánh — tên + giờ vào/ra + nghỉ. Ô lịch xếp từ ca mẫu mang khoá
+ * của nó, và SOP theo ca (N6) dựa vào khoá đó để biết ai đứng ca mở cửa, ai
+ * đứng ca đóng cửa. Dải bên phải mỗi ca liệt kê SOP đang gắn vào ca đó.
+ */
+function ShiftTemplates({
+  branchId,
+  templates,
+  onChange,
+}: {
+  branchId: string
+  templates: ShiftTemplate[]
+  onChange: () => void
+}) {
+  const { can } = useSession()
+  const toast = useToast()
+  const [name, setName] = useState('')
+  const [start, setStart] = useState('07:00')
+  const [end, setEnd] = useState('15:00')
+  const [breakMinutes, setBreakMinutes] = useState(0)
+  const sops = useQuery({
+    queryKey: ['task-templates', branchId],
+    queryFn: () => api.taskTemplates(branchId),
+    enabled: can('task.assign'),
+  })
+
+  const create = useMutation({
+    mutationFn: () =>
+      api.createShiftTemplate({
+        branchId,
+        name: name.trim(),
+        startMinute: toMinutes(start),
+        endMinute: toMinutes(end),
+        breakMinutes,
+      }),
+    onSuccess: () => {
+      toast('Đã thêm ca mẫu', 'ok')
+      setName('')
+      onChange()
+    },
+    onError: (err: Error) => toast(err.message, 'danger'),
+  })
+
+  const net = toMinutes(end) - toMinutes(start) - breakMinutes
+
+  return (
+    <section className="mt-6 max-w-[980px] rounded-md border border-line-1 bg-surface-1 p-5">
+      <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+        Ca mẫu của chi nhánh
+      </p>
+      <div className="mt-3 grid gap-1">
+        {templates.map((t) => {
+          const bound = (sops.data ?? []).filter((s) => s.active && s.shiftTemplateId === t.id)
+          return (
+            <div
+              key={t.id}
+              className="grid grid-cols-[180px_140px_90px_minmax(0,1fr)] items-baseline gap-4 border-b border-line-1 py-2 text-[length:var(--fs-b2)] last:border-b-0"
+            >
+              <span className="text-ink-hi">{t.name}</span>
+              <span className="font-mono text-ink-body">
+                {hhmm(t.startMinute)}–{hhmm(t.endMinute)}
+              </span>
+              <span className="font-mono text-[length:var(--fs-c1)] text-ink-mute">
+                nghỉ {t.breakMinutes}′
+              </span>
+              <span className="truncate text-[length:var(--fs-c1)] text-ink-mute">
+                {bound.length > 0 ? `SOP: ${bound.map((s) => s.title).join(' · ')}` : ''}
+              </span>
+            </div>
+          )
+        })}
+        {templates.length === 0 ? (
+          <p className="text-[length:var(--fs-c1)] text-ink-mute">
+            Chưa có ca mẫu. Thêm ca sáng, ca tối… để xếp lịch nhanh và để SOP mở/đóng ca biết ai
+            đứng ca.
+          </p>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-end gap-4">
+        <label className="block">
+          <span className="mb-1.5 block text-[length:var(--fs-c1)] text-ink-mute">Tên ca</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ca sáng"
+            className="h-9 w-[180px] rounded-sm border border-line-1 bg-canvas px-2.5 text-[length:var(--fs-b2)] text-ink-hi"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[length:var(--fs-c1)] text-ink-mute">Vào</span>
+          <input
+            type="time"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+            className="h-9 rounded-sm border border-line-1 bg-canvas px-2.5 font-mono text-[length:var(--fs-b2)] text-ink-hi"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[length:var(--fs-c1)] text-ink-mute">Ra</span>
+          <input
+            type="time"
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
+            className="h-9 rounded-sm border border-line-1 bg-canvas px-2.5 font-mono text-[length:var(--fs-b2)] text-ink-hi"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[length:var(--fs-c1)] text-ink-mute">Nghỉ (phút)</span>
+          <input
+            type="number"
+            min={0}
+            value={breakMinutes}
+            onChange={(e) => setBreakMinutes(Number(e.target.value) || 0)}
+            className="h-9 w-[90px] rounded-sm border border-line-1 bg-canvas px-2.5 text-right font-mono text-[length:var(--fs-b2)] text-ink-hi"
+          />
+        </label>
+        <Button
+          disabled={!name.trim() || net <= 0 || create.isPending}
+          onClick={() => create.mutate()}
+        >
+          Thêm ca mẫu
+        </Button>
+      </div>
     </section>
   )
 }

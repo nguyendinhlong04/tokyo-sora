@@ -489,7 +489,13 @@ export class IdentityService {
   }
 
   /**
-   * Xác minh PIN của NGƯỜI DUYỆT trong luồng △ — không tạo phiên.
+   * Xác minh PIN mà không tạo phiên — người duyệt △, người ký văn bản.
+   *
+   * Cùng bộ đếm thử sai với cửa đăng nhập: không có nó thì ai đứng ở một máy POS
+   * cũng dò được PIN 4 số của chủ quán qua ô "PIN người duyệt", mỗi lần một số.
+   * `throttleKey` do nơi gọi đặt: luồng duyệt khoá theo CẶP người xin–người duyệt,
+   * để người xin chỉ tự khoá được chính mình chứ không khoá PIN của quản lý cho
+   * cả ca; luồng ký khoá theo người ký.
    *
    * Luồng duyệt gọi hàm này TỪ TRONG transaction (`ApprovalService.authorize`) nên
    * phải truyền `tx`: trên Vercel pool chỉ có một kết nối và transaction đang giữ
@@ -499,15 +505,23 @@ export class IdentityService {
     staffId: number,
     pin: string,
     branchId: string,
+    throttleKey: string,
     db: DbOrTx = this.db,
   ): Promise<Role[] | null> {
+    const max = await this.params.getNumber('auth.pinMaxAttemptsPerMinute', 5, branchId)
+    const lockout = await this.params.getNumber('auth.pinLockoutMinutes', 5, branchId)
+    this.throttle.check(throttleKey, max, lockout)
+
     const [person] = await db
       .select()
       .from(staff)
       .where(and(eq(staff.id, staffId), eq(staff.active, true)))
-    if (!person?.pinHash) return null
-    const ok = await argonVerify(person.pinHash, pin).catch(() => false)
-    if (!ok) return null
+    const ok = person?.pinHash ? await argonVerify(person.pinHash, pin).catch(() => false) : false
+    if (!person || !ok) {
+      this.throttle.fail(throttleKey)
+      return null
+    }
+    this.throttle.succeed(throttleKey)
     return this.rolesOf(person.id, branchId, db)
   }
 

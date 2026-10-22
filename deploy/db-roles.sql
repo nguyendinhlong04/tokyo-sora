@@ -34,8 +34,22 @@ REVOKE UPDATE, DELETE ON
   audit_log,
   approvals,
   journal_entries,
-  parameter_history
+  parameter_history,
+  stock_moves
 FROM sora_app;
+
+-- Lịch sử giữ chức danh (sơ đồ tổ chức): chỉ được ĐÓNG, không xoá. Trigger 9007
+-- canh nội dung; GRANT ... ON ALL TABLES ở trên cấp lại DELETE mỗi lần chạy file
+-- này, nên dòng thu hồi phải nằm ở đây chứ không chỉ trong migration.
+REVOKE DELETE ON position_assignments FROM sora_app;
+-- Biên nhận văn bản (đã đọc / đã xác nhận) là bằng chứng phổ biến quy định
+REVOKE DELETE ON org_document_receipts FROM sora_app;
+-- Việc không giao nữa thì HUỶ kèm lý do; việc đã đóng là hồ sơ của KPI (trigger 9009)
+REVOKE DELETE ON tasks, task_check_items FROM sora_app;
+-- Bổ sung báo cáo chỉ thêm; sự cố không xoá — báo nhầm thì đóng kèm ghi chú (9011)
+REVOKE DELETE ON work_report_addenda, incidents FROM sora_app;
+-- Phiếu kiểm tra (KPI) huỷ kèm lý do, không xoá (9012)
+REVOKE DELETE ON kpi_observations FROM sora_app;
 
 -- outbox_events: được đánh dấu đã phát và dọn retention, nội dung bất biến do
 -- trigger sora_outbox_guard canh.

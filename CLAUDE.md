@@ -49,7 +49,7 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
 | `apps/pos` | `@sora/pos` | Sora POS (PWA) | Phục vụ, thu ngân · tablet 11″ ngang + máy thu ngân 22″ → **sắp tới thêm iPad & điện thoại** | `:5174` | `pos.tokyo-sora.vn` |
 | `apps/kitchen` | `@sora/kitchen` | Sora Kitchen / KDS (PWA) | Bếp từng trạm, ra món · TV 32–43″ 1920×1080, Android box | `:5175` | `kds.tokyo-sora.vn` |
 | `apps/office` | `@sora/office` | Sora Office | Chủ, quản lý, kế toán, HR, marketing · desktop 1440+, **nền sáng** | `:5176` | `admin.tokyo-sora.vn` |
-| `apps/staff` | `@sora/staff` | Kênh nhân viên (H8 lịch/công · H9 phiếu lương) — **không phải app gọi món** | `:5178` | `nv.tokyo-sora.vn` |
+| `apps/staff` | `@sora/staff` | Kênh nhân viên (H8 lịch/công · H9 phiếu lương · N12 việc · N13 thông báo · N14 KPI của tôi · N15 báo cáo ca, sự cố) — **không phải app gọi món** | `:5178` | `nv.tokyo-sora.vn` |
 | `apps/kiosk` | `@sora/kiosk` | Kiosk chấm công (H10) · tablet 10″ gắn cố định | `:5179` | `chamcong.tokyo-sora.vn` |
 
 Tên miền thật có gạch nối (`tokyo-sora.vn`). Nhiều tài liệu và `SITE_URL` mặc định
@@ -63,8 +63,10 @@ còn ghi `tokyosora.vn` — đó là chỗ lệch, không phải tên miền th�
   typecheck/build API và app. Import nội bộ trong gói bắt buộc có đuôi `.js`.
 - `core` — runtime trình duyệt cho các SPA: `apiFetch` (gắn `x-sora-device`,
   `idempotency-key`), `session` (localStorage `sora.device.token`), **outbox** Dexie/IndexedDB
-  gửi lại khi có mạng, `ember` (thang than hồng), `server-clock`. API không dùng gói này.
-- `ui` — 16 thành phần dùng chung + `useToast` (§4.6). Ship TS thô, không build.
+  gửi lại khi có mạng, `ember` (thang than hồng), `server-clock`, `safeHref` (chỉ cho link
+  `https:` do người dùng dán ra thẻ `<a>`), `dueLabel` (nhãn hạn việc theo giờ VN). API không
+  dùng gói này.
+- `ui` — 19 thành phần dùng chung + `useToast` (§4.6). Ship TS thô, không build.
 - `tokens` — `tokens.css` là **nguồn duy nhất** của màu, cỡ chữ, bo góc, chuyển động;
   `fonts.css` + `fonts/*.woff2` self-host, sinh bằng `scripts/fetch-fonts` (không sửa tay).
 - `config` — `tsconfig.base.json` (strict, `noUncheckedIndexedAccess`, bundler resolution).
@@ -228,7 +230,12 @@ mãi §9.6, entry riêng `@sora/ui/PromoTag`; web khai `@source` đúng file đ�
 `@sora/ui/image`: ảnh Office cho app Vite qua bộ tối ưu của web, bị từ chối thì rơi về ảnh
 gốc — §8.1) · `useInvoiceBuyerForm`/`InvoiceBuyerFields` (entry `@sora/ui/InvoiceBuyer`:
 người mua trên hoá đơn + tra MST, kiểm bằng chính `InvoiceBuyerSchema`; cỡ `sm` Office,
-`md` POS/iPad, `lg` web 52px như ô nhập O5 — §9.7).
+`md` POS/iPad, `lg` web 52px như ô nhập O5 — §9.7) · `EmberBar` (thanh than hồng: độ dài =
+tỉ lệ, màu = độ "nóng"; nơi gọi luôn in chữ đi kèm) · `CountBadge` (chấm đếm của chuông
+Office và thanh tab Kênh NV; màu trung tính, chỉ đỏ khi `urgent`) · `Sheet` (tấm trượt từ
+đáy cho điện thoại một tay — Kênh NV, sắp tới POS điện thoại §9.3; không dùng Modal giữa màn
+ở đó) · `GradeChip` + `kpiHeat` (hạng KPI A–D trên thang than hồng, A tro → D lửa, luôn kèm
+chữ; `kpiHeat` tô thanh % đạt theo đúng ngưỡng hạng của kỳ).
 
 Quy tắc: mọi `<button>` có `type="button"`; variant là `Record<Union,string>` UPPER_CASE;
 không responsive prefix trong gói; app Vite **phải** có `@source '../../../packages/ui/src'`
@@ -271,18 +278,31 @@ Không global prefix — mỗi controller tự viết `@Controller('api/…')`.
 
 Thư mục `src/`: `common/` (DbModule, `tx.ts`, `outbox.ts`, `idempotency.interceptor.ts`,
 `zod-exception.filter.ts`, `pg-error.ts`, `params.service.ts`, `period-lock.service.ts`,
-`business-date.ts`, `display-code.ts`) · `db/` (schema 15 file, 95 bảng; `migrate.ts`;
+`business-date.ts`, `display-code.ts`) · `db/` (schema 20 file, 116 bảng; `migrate.ts`;
 seed; bootstrap) · `modules/<domain>/` (`*.module.ts`, `*.controller.ts`, `*.service.ts`,
 `domain/*.ts` **thuần**, không import Nest/Drizzle) · `test/` (harness + e2e).
 
 Module: identity (global) · realtime · config-bundle · ordering (bàn, phiên, dòng, đợt,
 chuyển/ghép/tách, thiết bị bàn, yêu cầu từ bàn) · catalog · kitchen · payments · online ·
-reservations · site · admin · inventory · expenses · hr · accounting · crm · reports.
+reservations · site · admin · inventory · expenses · hr · accounting · crm · reports ·
+einvoice (hoá đơn điện tử §9.7) · org (sơ đồ tổ chức — `OrgService.snapshot()` + hàm thuần
+`domain/org.ts` trả lời "ai quản ai" cho mọi module: `scopeOf`, `inScope`, `managersOf`; văn
+bản nội bộ `DocumentsService`:
+trình → ký bằng PIN người ký → ban hành, quyết định nhân sự áp vào sơ đồ cùng transaction;
+giao việc + SOP theo ca `TasksService` — việc định kỳ **sinh lười** lúc có người đọc, không
+cron) · work-reports (báo cáo công việc theo suất ngày/ca/tuần/tháng — suất phải nộp tính lúc
+đọc, số tự điền dùng `reports/sql.ts` và đóng băng lúc nộp; sự cố `SC-yyMM-NNNN`) ·
+performance (KPI: danh mục chỉ số trong `contracts/kpi.ts`, nguồn số `MetricsService` đọc
+đúng định nghĩa B2/B4/B5, kỳ theo chi nhánh, thưởng gợi ý cho H7) ·
+inbox (`GET /api/me/inbox` — chỉ **đếm** việc cần xử lý của người đang đăng nhập; module
+riêng để các module nghiệp vụ không import lẫn nhau).
 
 **Controller mỏng:** zod schema ở đầu file; `@Body() body: unknown` → `Schema.parse(body)`;
-PATCH qua `parsePatch(Schema, body)` (`common/patch.ts`) — `.partial()` của zod 4 vẫn điền
-`.default()` cho trường vắng mặt và ghi đè dữ liệu (§11); query qua `z.coerce`;
-`ParseIntPipe` cho id; truyền `req.actor!` vào service. Decorator:
+thân sửa một phần (PATCH, và PUT chức danh N2 · N3) qua `parsePatch(Schema, body)`
+(`common/patch.ts`) — `.partial()` của zod 4 vẫn điền `.default()` cho trường vắng mặt và
+ghi đè dữ liệu (§11); `parsePatch` chỉ gỡ `.default()` đứng ngoài cùng, nên viết
+`.nullable().default(x)`, không viết `.default(x).nullable()`/`.optional()` (vẫn bị điền);
+query qua `z.coerce`; `ParseIntPipe` cho id; truyền `req.actor!` vào service. Decorator:
 `@RequirePermission('<domain.verb>')`, `@Public()`, `@UseInterceptors(IdempotencyInterceptor)`
 cho mọi route ghi mà client có thể gửi lại. Không DTO class, không class-validator.
 
@@ -320,11 +340,16 @@ bridge`); (4) 401 trừ `@Public`. Route khách chạm được **phải** gọi
 `assertOwnTableSession(actor, sessionId)` (chặn cả iPad bàn chưa mở); việc của nhân viên —
 mở bàn bất kỳ, nhả đợt, huỷ dòng, sơ đồ P2, hàng đợi P12, Expo — chặn `customer` và iPad.
 
-Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 59 action
+Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 74 action
 `domain.verb`, mỗi ô `allow | approve | deny`. `PermissionGuard` chỉ chặn `deny`; ô
 `approve` (△) thì service phải `ApprovalService.authorize(tx, …)` với body
 `approval: {approverStaffId, approverPin, reason}` — người duyệt phải khác người làm
-(DB check `approvals_separation_of_duties`). Phiên mở bằng link cá nhân có `scope:'self'`.
+(DB check `approvals_separation_of_duties`). PIN người duyệt có chặn thử sai như cửa đăng
+nhập, khoá theo **cặp** người xin–người duyệt. Phiên mở bằng link cá nhân có `scope:'self'`:
+chỉ qua được route gắn `staff.view-own-record` hoặc `@SelfOpen()` (đăng xuất, `/api/auth/me`)
+— route **không gắn quyền** cũng đóng với phiên này. Ở Office, `can()` trả true cho cả ✓
+lẫn △ (để ẩn/hiện); hỏi PIN hay không thì dùng `mustApprove()`, đừng viết `!can()` —
+dải xin duyệt dùng chung là `components/approval.tsx`.
 Đăng nhập: POS/KDS = PIN **trên thiết bị đã ghép**; Office = email + mật khẩu; Kênh nhân
 viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tài khoản dev: `DEV.md`.
 
@@ -345,17 +370,49 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   bán lại. Cửa gọi món `addOneLine` chặn mọi kênh (409 `dish_inactive`); thực đơn O2, bundle
   và Office cùng gọi. Chỉ soi thứ được gọi (món lẻ hoặc cả set), không soi món trong set.
 - `business_date` theo múi giờ chi nhánh (`businessDateOf`); mã hiển thị `ON-yyMM-NNNN`
-  / `DB-yyMM-NNNN` (`nextDisplayCode`), khách đọc mã này, không đọc id.
+  / `DB-yyMM-NNNN` / sự cố `SC-yyMM-NNNN` (`nextDisplayCode`), khách đọc mã này, không đọc id.
 - **Sổ bất biến** (append-only, trigger `sora_append_only` + revoke quyền role `sora_app`
   trong `deploy/db-roles.sql`): `audit_log`, `approvals`, `journal_entries`,
   `parameter_history`, `stock_moves`. Sửa sai = bút toán đảo, không UPDATE.
-  **Hoá đơn đã phát hành** cũng bất biến (trigger `invoices_guard`, `9008`): không xoá, chỉ
+  **Hoá đơn đã phát hành** cũng bất biến (trigger `invoices_guard`, `9008_hoa_don_dien_tu`): không xoá, chỉ
   được chuyển sang `replaced` kèm lý do; số đã cấp không đổi, không huỷ.
+- **Lịch sử chức danh** `position_assignments`: khoảng nửa mở `[from_date, to_date)`, mỗi dòng
+  chỉ được ĐÓNG một lần, không xoá (trigger `9007_org_guards` + REVOKE DELETE). Cây `org_units` không
+  vòng (trigger + `pg_advisory_xact_lock`), một gốc, một đơn vị mỗi chi nhánh, một trưởng
+  mỗi đơn vị (partial unique index).
+- **Văn bản nội bộ** `org_documents` (trigger `9008_document_guards`): ngoài nháp chỉ được đi
+  `pending → draft | issued` và `issued → revoked`, nội dung khoá từ lúc trình, không xoá
+  văn bản đã trình. `org_document_receipts` = ai nhận, mốc đọc/xác nhận ghi **đúng một lần**,
+  không xoá. Số hiệu cấp lúc ký qua `org_document_counters` (UPSERT…RETURNING).
+- **Việc** `tasks` (trigger `9009`): việc `done`/`cancelled` là hồ sơ — không sửa, không xoá
+  (KPI "việc đúng hạn" đếm trên đó); checklist chỉ tích khi việc `open`. Việc định kỳ sinh
+  bằng `INSERT … ON CONFLICT DO NOTHING` trên `tasks_one_per_occurrence` (mẫu, ngày). Không ai
+  tự nghiệm thu: CHECK `tasks_review_not_self`.
+- **Điểm khách chấm** đọc từ view `customer_ratings` (`9010`): gộp `feedback` (B13) và
+  `table_feedback` (T15), một phiếu mỗi bữa — đừng đếm hai bảng riêng.
+- **Báo cáo công việc** (trigger `9011`): bản đã nộp chỉ còn đi `submitted → reviewed`, sai
+  thì viết `work_report_addenda` (chỉ thêm). Một suất một bản (`work_reports_one_per_slot`).
+  **Sự cố** không xoá, đã đóng không sửa; CHECK ép khai báo ra ngoài (TNLĐ/ATTP/cháy nổ mức
+  nghiêm trọng) và người báo không tự đóng sự cố nghiêm trọng.
+- **KPI** (trigger `9012`): kỳ đã mở thì `rules` (thang chấm, mức thưởng chụp từ A6) không
+  đổi; kỳ chỉ đi tới `draft → open → review → closed`; kỳ chốt thì phiếu đóng băng, chỉ còn
+  `employee_ack_at`/`employee_feedback` ghi được một lần. Tham số thang chấm và mức thưởng
+  `overridable = false` — `setParameter` từ chối ghi đè chi nhánh (409
+  `param_not_overridable`). Không ai tự chấm / tự chốt KPI của mình (CHECK).
 - **Migration:** `db:generate` sinh `migrations/00NN_*.sql`; SQL viết tay đánh số từ
   `9000_` để luôn chạy sau cùng (`9000_guards`, `9001_kitchen_money_guard`,
-  `9002_realtime_broadcast`, `9003_realtime_rls`, `9004_stock_moves_guard`, …). Runner
+  `9002_realtime_broadcast`, `9003_realtime_rls`, `9004_stock_moves_guard`, …,
+  `9007_ipad_ban`, `9007_org_guards`, `9008_document_guards`, `9008_hoa_don_dien_tu`,
+  `9009_task_guards`, `9010_customer_ratings`, `9011_work_report_guards`, `9012_kpi_guards`,
+  `9013_promo_max_discount_rate`). Runner
   riêng `src/db/migrate.ts` chạy mọi file một lần theo tên, ghi `_sora_migrations`.
   **Không có down**; file đã chạy thì sửa không có tác dụng → luôn thêm file mới.
+  **Số trùng 0030–0033 và 9007–9008** là dấu gộp hai nhánh (22/10/2026): mỗi số một file
+  khuyến mãi/iPad/hoá đơn và một file tổ chức. Runner xét tên file nên không sao — đừng đổi
+  tên file đã chạy ở đâu đó (sẽ chạy lại). Chuỗi snapshot của drizzle-kit chỉ đi một đường:
+  `0030_khuyen_mai…` → `0033_hoa_don_dien_tu` → `0034_kpi` (snapshot 0034 = lược đồ gộp đủ
+  116 bảng); bốn file `00NN_org_*`/`work_reports` không có trong `_journal.json`. Số kế tiếp:
+  `db:generate` ra `0035_`, SQL viết tay `9014_`.
   Vercel build **không** chạy migration — chạy tay trước khi deploy API. Dữ liệu nền
   mới cho CSDL đang chạy (khoá tham số A6…) cũng đi bằng migration `9xxx` (mẫu `9013`):
   `db:seed` từ chối CSDL đã có dữ liệu.
@@ -419,9 +476,10 @@ migration `0031` xoá bảng `table_devices` và cột `qr_token_hash`.
   `GET /api/realtime/events?after=<seq>` — quy tắc client "**refetch rồi mới stream**".
 - **Nghe: chưa app nào.** Không có `supabase-js`, không gọi `/api/realtime/*`. Tất cả
   đang **polling** TanStack Query: KDS 5 s · POS 10–30 s · Table 2–20 s (bàn của iPad:
-  2 s khi chờ dọn · 10 s đang mở · 15 s bàn trống) · Web 10 s.
-  Comment trong `apps/kitchen/src/App.tsx`, `apps/pos/src/App.tsx`, `Floorplan.tsx` nói
-  realtime là đường chính — **sai**, đừng tin.
+  2 s khi chờ dọn · 10 s đang mở · 15 s bàn trống) · Web 10 s · hộp việc `/api/me/inbox`
+  (chuông Office, huy hiệu Kênh NV) 60 s — lần hỏi này cũng là điểm sinh việc định kỳ và
+  đồng bộ nhãn chức danh H1. Comment trong `apps/kitchen/src/App.tsx`, `apps/pos/src/App.tsx`,
+  `Floorplan.tsx` nói realtime là đường chính — **sai**, đừng tin.
 - **Ghi offline:** `enqueue` của `@sora/core` (Dexie `sora-outbox`, FIFO, header
   `idempotency-key`); server `IdempotencyInterceptor` so hash body (khác → 409
   `idempotency_key_reused`). Chỉ đơn và trạng thái; **không** cache kết quả đọc.
@@ -477,7 +535,12 @@ ra log hay chat.
 - Trạng thái máy chủ: TanStack Query (`staleTime` 5 s, `refetchInterval` theo màn). Trạng
   thái cục bộ: React Context + sessionStorage (giỏ `sora.table.cart`, nháp đơn web
   `sora.web.order`). Không thêm store toàn cục.
-- Màn hình theo mã thiết kế (T/P/K/O/R/W/M/S/B/H/C/F/A) — ghi mã ở đầu file.
+- Màn hình theo mã thiết kế (T/P/K/O/R/W/M/S/B/H/C/F/A, và N cho Tổ chức & điều hành —
+  `tokyo-sora-ke-hoach-thiet-ke.md` §26b) — ghi mã ở đầu file. Màn nhóm N tải theo yêu cầu
+  (`React.lazy` trong `App.tsx`), H7 cũng vậy: bản dựng Office đã vượt ngân sách JS của §8
+  từ trước — màn mới đừng làm gói chính nặng thêm. Số KPI định dạng bằng `formatKpiValue` /
+  `formatKpiScore` của `@sora/contracts` (milli → "8,5%", "103,6"), không tự chia 1000.
+  Trang mở đầu của Office là **N1 · Bàn làm việc** (`/ban-lam-viec`), không còn là M1.
 - Thiết bị đích theo app (§1) quyết định bố cục; không có media query theo hướng xoay.
   Khi một thành phần phải chạy ở nhiều khổ (POS iPad/điện thoại — §9.3) ưu tiên
   **container query** hơn `lg:` toàn trang.
@@ -489,24 +552,23 @@ ra log hay chat.
 ## 7. Kiểm thử
 
 **Hiện có** (vitest; chỉ `@sora/api`, `@sora/contracts`, `@sora/core` có script `test`):
-- **Test domain thuần** `src/modules/*/domain/*.test.ts` cạnh file nguồn (19 file) —
+- **Test domain thuần** `src/modules/*/domain/*.test.ts` cạnh file nguồn (29 file) —
   không DB, chạy ở mọi máy. Fixture ở `kitchen/domain/__fixtures__/`.
 - **Test PGlite** (`new PGlite()` + `runMigrations`) — 3 file, kiểm schema/trigger.
-- **Test tích hợp** `src/test/*.e2e.test.ts` (23 file, ~675 case): `bootTestApp()` trong
+- **Test tích hợp** `src/test/*.e2e.test.ts` (32 file, ~825 case): `bootTestApp()` trong
   `src/test/harness.ts` **DROP SCHEMA** trên `TEST_DATABASE_URL`, chạy migration, seed
   fixture (chi nhánh `cg`, 6 trạm, bàn A4 có bếp / 05 không bếp, 4 nhân viên có PIN), boot
   cả `AppModule`, gọi bằng `app.inject` với `Authorization: Bearer` + `x-sora-device`.
   Không mock, không factory. `fileParallelism: false`, timeout 30 s. Riêng
   `pool-one-connection.e2e.test.ts` dựng app với pool **1 kết nối** như Vercel và đi qua các
-  luồng từng tự kẹt (§11 mục 8); file khác giữ pool mặc định — ca đua thật giữa hai request
-  cần hai kết nối.
+  luồng từng tự kẹt (§11 mục 7); file khác giữ pool mặc định vì org-tasks có ca đua thật.
 - **Front-end: 0 test tự động.** Kiểm bằng typecheck + lint + build + mở app đúng viewport.
-- Trên máy chưa có Postgres: `pnpm -r test` → domain xanh (519 case), 23 file e2e ném
+- Trên máy chưa có Postgres: `pnpm -r test` → domain + PGlite xanh, 32 file e2e ném
   "Thiếu TEST_DATABASE_URL" — đó là thiếu môi trường, không phải lỗi code.
-- 22/10/2026 cả bộ chạy trên Postgres 16 thật (`embedded-postgres` từ npm) với pool mặc định
-  và với `DATABASE_POOL_MAX=1`: cùng 13 ca đỏ có sẵn — 12 ca hr.e2e (tuần cố định
-  `2026-08-03` đã qua) và sổ COD của online-order. Trước khi sửa §11 mục 8, pool 1 đỏ thêm 20
-  ca vì kẹt kết nối (B11, P8, C1/C2, H3, H7, F7, M10, S8).
+- 22/10/2026, sau khi gộp hai nhánh (gd1 + hoá đơn điện tử + tổ chức điều hành): cả bộ
+  `@sora/api` chạy trên Postgres 16 thật (`embedded-postgres` từ npm), pool mặc định và
+  `DATABASE_POOL_MAX=1` cho cùng kết quả — 1477 ca, 1468 xanh, 9 bỏ qua (`vong-doi-mon`),
+  0 đỏ.
 
 **Quy tắc khi làm việc**
 - Sửa bug nghiệp vụ → viết test tái hiện trước (domain nếu được, e2e nếu đụng DB/quyền),
@@ -774,9 +836,8 @@ chọn im lặng.
   - **600–1023** (iPad dọc 810): hai cột — nhóm món thành thanh ngang cuộn trên lưới, phiếu
     order là **bottom sheet** kéo lên, nút Gửi bếp dính đáy.
   - **< 600** (điện thoại 390): một cột, lưới 2 ô/hàng, thanh nhóm ngang, giỏ là sheet,
-    phím chính ở nửa dưới, thao tác một tay. Modal giữa màn → thay bằng bottom sheet
-    `Sheet` dựng trong `@sora/ui` (bản của table đã gỡ cùng bố cục điện thoại — lấy lại
-    từ git: `apps/table/src/components/Sheet.tsx`).
+    phím chính ở nửa dưới, thao tác một tay. Modal giữa màn → thay bằng `Sheet` của
+    `@sora/ui`.
 - Thành phần dùng ở nhiều khổ → container query; không nhân đôi màn.
 - Điện thoại nhân viên vẫn là **thiết bị ghép** (mã 6 số, kind `pos`), đăng nhập PIN như
   tablet; cookie `sora_staff` và `x-sora-device` không đổi.
@@ -1039,19 +1100,32 @@ chỉ ghi khi khách yêu cầu, không thì "Bán cho người tiêu dùng". Mo
 5. Kiosk ghép máy: một `catch` chung (`apps/kiosk/src/screens/Pair.tsx:21-38`) — ghép
    thành công nhưng `me()` lỗi vẫn báo "Mã không đúng" (KDS đã sửa ở `04ffd9b`).
 6. CI không chạy trên nhánh làm việc và không có Postgres (§7).
-7. **Dữ liệu production có thể đã bị PATCH cũ ghi đè** — code đã sửa 22/10/2026: mọi cửa
-   PATCH có `.default()` (A8, M1 món/set, M10, A3, A5, A1, nguyên liệu kho) đi qua
-   `parsePatch` (§5.2), mỗi cửa một e2e "thân một trường không đổi trường khác". Còn chờ chủ
-   dự án kiểm dữ liệu: hộp "Lịch bán" M11 (`Sets.tsx`) đã đưa ảnh và giá online của set về
-   null — tra `audit_log` `dish.updated` có `saleDays` và `imageUrl` mà không có `nameVi`; nút
-   Bật/Tắt A8 đã đưa số vị trí tuyển về 1, tâm ảnh hero về 50/50 và thứ tự về 0.
-8. **Pool 1 kết nối** (Vercel, `DATABASE_POOL_MAX` không đặt) — các chỗ tự kẹt đã biết **đã
+7. **Pool 1 kết nối** (Vercel, `DATABASE_POOL_MAX` không đặt) — các chỗ tự kẹt đã biết **đã
    sửa 22/10/2026**: `verifyPinOnly`/`rolesOf` (mọi luồng duyệt PIN △), `workedSplits` +
    `openAdvances` (H7 Tính nháp), `assertOpen` lúc duyệt phiếu chi, `announceCategories` (M10)
    giờ đọc bằng `tx` (§5.2); `ParamsService` nạp cache lúc khởi động vì tham số được đọc trong
-   ~25 transaction (tính tiền, vé bếp, thanh toán, webhook…). Còn hở: nạp lúc khởi động
-   mà hỏng thì quay về nạp lười — lần đọc đầu nằm trong transaction vẫn kẹt; và chỉ
-   `pool-one-connection.e2e` chạy pool 1, chỗ kẹt mới ở luồng khác không tự lộ (§7).
+   transaction ở hàng chục chỗ (tính tiền, vé bếp, thanh toán, webhook, hoá đơn…), rồi tự nạp
+   lại **nền** sau 60 s (§9.7). Còn hở: nạp lúc khởi động mà hỏng thì lần đọc đầu vẫn phải chờ
+   nạp — nằm trong transaction là kẹt; và chỉ `pool-one-connection.e2e` chạy pool 1, chỗ kẹt
+   mới ở luồng khác không tự lộ (§7).
+8. **Ngày cứng trong e2e — đã sửa 22/10/2026.** `hr.e2e` dùng tuần cố định `2026-08-03`;
+   qua ngày đó, xếp lịch thành "sửa lịch tuần đã qua" (`timesheet.edit-manual`, △ với R7) và
+   H2–H7 đỏ dây chuyền. Nay tuần = thứ Hai đầu tháng sau (giờ VN lúc chạy), kỳ lương = cả
+   tháng đó. Cùng nguyên nhân: `crm.e2e` B15 (khung bảng kê cứng tới 31/08/2026, dòng nợ mang
+   ngày chạy thật) và `access.e2e` A9 (hạn chứng thư `2027-01-01`). Luật nào so với HÔM NAY
+   thì test tính ngày từ `businessDateOf(new Date(), 'Asia/Ho_Chi_Minh')`, không viết cứng.
+   Còn lệch, chưa sửa: `inventory.e2e` "F7: đủ cả giá vốn lẫn nhân sự" lấy hôm nay theo UTC
+   còn F7 neo giờ VN → đỏ nếu chạy 00:00–07:00; `HrService` xét "tuần đã qua" bằng ngày UTC
+   (`todayIso`).
+9. **Thân sửa một phần ghi đè trường không gửi — đã sửa 22/10/2026.** zod 4 `.partial()` vẫn
+   điền `.default()` cho trường vắng mặt. Mọi cửa có `.default()` (A8 bài/tin tuyển/hero, M1
+   món/set, M10, A3, A5, A1, nguyên liệu kho, chức danh N2 · N3) đi qua `parsePatch` (§5.2),
+   mỗi cửa một e2e "thân một trường không đổi trường khác". Còn chờ chủ dự án kiểm dữ liệu đã
+   ghi bằng code cũ: hộp "Lịch bán" M11 (`Sets.tsx`) đưa ảnh và giá online của set về null —
+   tra `audit_log` `dish.updated` có `saleDays` và `imageUrl` mà không có `nameVi`; nút Bật/Tắt
+   A8 đưa số vị trí tuyển về 1, tâm ảnh hero về 50/50, thứ tự về 0; tab "Mô tả công việc" (N2 ·
+   N3) không gửi `sort` nên chức danh nào đã lưu ở đó có `sort` = 0 và đổi chỗ trong đơn vị
+   (`org.position.updated`; Office chưa có chỗ sửa thứ tự chức danh).
 
 Thấp hơn:
 - `var(--sora-accent)` không tồn tại (`apps/office/src/routes/Cms.tsx:1035`).
