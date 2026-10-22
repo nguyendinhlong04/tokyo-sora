@@ -5,6 +5,7 @@ import { QrCode } from '@sora/ui/QrCode'
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { apiGet, apiPost, type PaymentTicket, type TrackedOrder } from '../../../../lib/api'
+import { InvoiceBlock } from './InvoiceBlock'
 
 /** Năm bước khách nhìn thấy, đúng thang than hồng của §23.2 */
 const STEPS: { status: TrackedOrder['status']; label: string }[] = [
@@ -97,6 +98,18 @@ export function TrackOrder({ token }: { token: string }) {
   const prepaid = order.money.paid >= order.money.prepay
   const shipDue = prepaid && order.money.paid < order.money.total ? order.money.ship : 0
   const current = ORDER.indexOf(order.status)
+  // Một dòng VAT cho mỗi thuế suất, đúng như hoá đơn sẽ in; đơn chưa có bảng tách thì một dòng
+  const vatRows = order.money.vatBreakdown?.some((r) => r.vat > 0)
+    ? order.money.vatBreakdown
+        .filter((r) => r.vat > 0)
+        .map((r) => ({
+          key: r.rateBp,
+          label: `Thuế VAT ${(r.rateBp / 100).toLocaleString('vi-VN')}%`,
+          amount: r.vat,
+        }))
+    : order.money.vat > 0
+      ? [{ key: 0, label: 'Thuế VAT', amount: order.money.vat }]
+      : []
 
   return (
     <main className="mx-auto max-w-2xl px-4 pt-10 pb-24">
@@ -265,6 +278,14 @@ export function TrackOrder({ token }: { token: string }) {
               </span>
             </div>
           ) : null}
+          {vatRows.map((row) => (
+            <div key={row.key} className="flex justify-between py-1">
+              <span className="text-[length:var(--fs-b2)] text-ink-mute">{row.label}</span>
+              <span className="font-mono text-[length:var(--fs-b2)] text-ink-body">
+                {formatVnd(row.amount)}
+              </span>
+            </div>
+          ))}
           {order.money.round !== 0 ? (
             <div className="flex justify-between py-1">
               <span className="text-[length:var(--fs-b2)] text-ink-mute">Làm tròn</span>
@@ -289,6 +310,14 @@ export function TrackOrder({ token }: { token: string }) {
           </div>
         </div>
       </section>
+
+      {order.status !== 'cancelled' && order.invoice?.enabled ? (
+        <InvoiceBlock
+          token={token}
+          status={order.invoice}
+          onChange={(invoice) => setOrder((o) => (o ? { ...o, invoice } : o))}
+        />
+      ) : null}
 
       <p className="mt-6 text-center text-[length:var(--fs-b2)] text-ink-mute">
         Lưu đường dẫn này để xem lại đơn bất cứ lúc nào.

@@ -225,23 +225,26 @@ const KIND_LABELS: Record<BuyerChoice, string> = {
 
 /**
  * Các ô nhập người mua. `sm` 36px cho Office (chuột), `md` theo vùng chạm của app
- * (`--hit-target`: 44 khách · 52 POS).
+ * (`--hit-target`: 44 khách · 52 POS), `lg` 52px cho form web (khớp ô nhập O5).
  */
+const HEIGHTS = {
+  sm: 'h-9 text-[length:var(--fs-b2)]',
+  md: 'h-[var(--hit-target)] text-[length:var(--fs-b1)]',
+  lg: 'h-13 text-[length:var(--fs-b1)]',
+} as const
+
 export function InvoiceBuyerFields({
   form,
   size = 'md',
   kinds = ['consumer', 'company', 'person'],
 }: {
   form: InvoiceBuyerForm
-  size?: 'sm' | 'md'
+  size?: keyof typeof HEIGHTS
   /** Thứ tự và loại được chọn — iPad và web có thể bỏ "Cá nhân" khi chưa cần */
   kinds?: BuyerChoice[]
 }) {
   const { draft, errors, lookupState } = form
-  const height =
-    size === 'sm'
-      ? 'h-9 text-[length:var(--fs-b2)]'
-      : 'h-[var(--hit-target)] text-[length:var(--fs-b1)]'
+  const height = HEIGHTS[size]
 
   const lookupNote = (() => {
     if (draft.kind !== 'company') return null

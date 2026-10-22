@@ -224,7 +224,7 @@ mãi §9.6, entry riêng `@sora/ui/PromoTag`; web khai `@source` đúng file đ�
 `@sora/ui/image`: ảnh Office cho app Vite qua bộ tối ưu của web, bị từ chối thì rơi về ảnh
 gốc — §8.1) · `useInvoiceBuyerForm`/`InvoiceBuyerFields` (entry `@sora/ui/InvoiceBuyer`:
 người mua trên hoá đơn + tra MST, kiểm bằng chính `InvoiceBuyerSchema`; cỡ `sm` Office,
-`md` POS/iPad/web — §9.7).
+`md` POS/iPad, `lg` web 52px như ô nhập O5 — §9.7).
 
 Quy tắc: mọi `<button>` có `type="button"`; variant là `Record<Union,string>` UPPER_CASE;
 không responsive prefix trong gói; app Vite **phải** có `@source '../../../packages/ui/src'`
@@ -687,8 +687,8 @@ Mục tiêu bản dựng lại (giữ nguyên API; đổi client):
 6. POS ba khổ (§9.3).
 Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
 Chen ngay sau giao diện iPad, theo yêu cầu 22/10/2026: **khuyến mãi áp dụng chung** (§9.6) —
-xong cùng ngày: API, B11, iPad, web và ô voucher ở POS. Rồi **hoá đơn điện tử** (§9.7): API
-xong 22/10/2026 trên nhánh `hoa-don-dien-tu`, giao diện từng app theo sau.
+xong cùng ngày: API, B11, iPad, web và ô voucher ở POS. Rồi **hoá đơn điện tử** (§9.7): API,
+POS, iPad bàn và web xong 22/10/2026 trên nhánh `hoa-don-dien-tu`, Office theo sau.
 
 ### 9.6 Khuyến mãi áp dụng chung (chốt và làm 22/10/2026)
 Một bộ chấm cho mọi kênh: `packages/contracts/src/promotions.ts` (test `promotions.test.ts`),
@@ -822,13 +822,20 @@ chỉ ghi khi khách yêu cầu, không thì "Bán cho người tiêu dùng". Mo
   `visualViewport` — đã thử trên Safari iPadOS ở Simulator). T10/T15 VAT từng thuế suất
   (`VatRows`); T15 có MST người bán, người mua, QR tra cứu khi đã phát hành, thẻ trạng
   thái không dùng màu đỏ, "Gọi thu ngân sửa" gửi yêu cầu `khac` kèm số hoá đơn.
+- **Web** (`apps/web/app/dat-mon/`): O5 mục mở/đóng "Xuất hoá đơn công ty (VAT)"
+  (`nguoi-nhan/InvoiceSection.tsx`, chỉ hiện khi thực đơn online báo `einvoiceEnabled`);
+  nháp người mua nằm trong `OrderDraft` (`sessionStorage`) và kiểm ngay ở O5 — sai MST thì
+  chưa sang O6. O6 gửi `customer.invoiceBuyer`, nhắc lại người mua kèm nút Sửa. Giỏ và trang
+  theo dõi VAT từng thuế suất. Trang theo dõi có khối hoá đơn (`don/[token]/InvoiceBlock.tsx`):
+  bổ sung, sửa, bỏ người mua khi `editable`; đã phát hành thì ký hiệu · số, mã tra cứu, nút
+  tra cứu (chỉ địa chỉ `https`; bản giả lập không có nút).
 - **Nhà cung cấp:** `einvoice-provider.ts`, `EINVOICE_PROVIDER` (`mock` ở dev và test · `off`
   mặc định ở production — A9 không cho bật). Bản giả lập trả `test: true` → bill và màn
   khách in "HOÁ ĐƠN THỬ". Chưa ký hợp đồng: adapter thật thêm ở file này, thông tin đăng
   nhập để trong env, không trong `parameters`.
 - **Chưa làm / biết trước:**
-  - Giao diện còn lại: web O5/O6/theo dõi đơn, Office F3/B15/A9/M2/A6/F4 — mỗi app một
-    PR. Office B15 còn ô chọn chế độ hoá đơn (vô tác dụng).
+  - Giao diện còn lại: Office F3/B15/A9/M2/A6/F4 — một PR. Office B15 còn ô chọn chế độ
+    hoá đơn (vô tác dụng).
   - Hoá đơn điều chỉnh, hoàn tiền sau khi xuất, thông báo sai sót 04/SS; người mua nước ngoài
     (hộ chiếu); một bill nhiều người mua (tách ở P9 trước khi trả).
   - Chờ kế toán xác nhận: phí giao có chịu VAT không; làm tròn 1.000đ sinh phần thu ngoài hoá

@@ -1,6 +1,7 @@
 'use client'
 
 import { formatVnd } from '@sora/contracts'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ApiError, apiGet, apiPost, type CreatedOrder, type Quote } from '../../../../lib/api'
@@ -54,6 +55,7 @@ export function PayStep({ branchId }: { branchId: string }) {
           address: draft.mode === 'delivery' ? draft.address.trim() : null,
           ward: draft.mode === 'delivery' ? draft.ward : null,
           note: draft.customer.note.trim() || null,
+          invoiceBuyer: draft.invoiceBuyer,
         },
         lines: draft.lines.map((l) => ({
           dishId: l.dishId,
@@ -113,6 +115,35 @@ export function PayStep({ branchId }: { branchId: string }) {
           nhận được tiền thì đơn tự huỷ.
         </p>
       </section>
+
+      {draft.invoiceBuyer ? (
+        <section className="mt-4 flex items-start justify-between gap-4 rounded-md border border-line-2 bg-surface-1 p-5">
+          <div className="min-w-0">
+            <p className="text-[length:var(--fs-c2)] font-semibold tracking-[0.12em] text-ink-mute uppercase">
+              Xuất hoá đơn VAT cho
+            </p>
+            <p className="mt-2 text-[length:var(--fs-b1)] font-semibold text-ink-hi">
+              {draft.invoiceBuyer.name}
+            </p>
+            {draft.invoiceBuyer.taxCode ? (
+              <p className="mt-1 font-mono text-[length:var(--fs-b2)] text-ink-body">
+                MST {draft.invoiceBuyer.taxCode}
+              </p>
+            ) : null}
+            <p className="mt-1 text-[length:var(--fs-b2)] text-ink-mute">
+              {draft.invoiceBuyer.email
+                ? `Gửi về ${draft.invoiceBuyer.email}`
+                : 'Xem và tải ở trang theo dõi đơn'}
+            </p>
+          </div>
+          <Link
+            href={`/dat-mon/${branchId}/nguoi-nhan`}
+            className="flex h-11 flex-none items-center px-1 text-[length:var(--fs-b2)] text-accent-ink underline underline-offset-4"
+          >
+            Sửa
+          </Link>
+        </section>
+      ) : null}
 
       {error ? (
         <p className="mt-5 rounded-md border border-danger bg-danger/8 p-4 text-[length:var(--fs-b1)] text-ink-hi">

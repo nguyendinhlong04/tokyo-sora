@@ -596,9 +596,9 @@ Ba quyết định cũ giữ nguyên: không bán cả 78 món online (~40–45 
 | O2 | `/dat-mon/{chi-nhánh}` — Thực đơn online (**index**) | Chỉ món bật `bán online` của chi nhánh, giá kênh online |
 | O3 | Chi tiết món | Như T3 + cảnh báo món dễ nguội |
 | O4 | Giỏ & chọn giờ (noindex) | Nhận ngay / hẹn giờ; chặn khung bếp quá tải theo trần công suất |
-| O5 | Người nhận | Tên, SĐT, địa chỉ, ghi chú |
-| O6 | Thanh toán (noindex) | VietQR qua VA (cùng cơ chế tại bàn) hoặc trả khi nhận |
-| O7 | Thành công & theo dõi | Mã đơn + thanh than hồng: Đã nhận → Bếp đang làm → Đóng gói xong → Đang giao → Hoàn tất. **Nút chính: *Theo dõi đơn qua Messenger*** → mở Page chi nhánh kèm mã đơn (Mục 30.3); phụ: link theo dõi web + SMS/Zalo; khi Hoàn tất: khối đánh giá 1 chạm (→ B13) |
+| O5 | Người nhận | Tên, SĐT, địa chỉ, ghi chú; mục **Xuất hoá đơn công ty (VAT)** không bắt buộc — gõ MST tự điền tên, địa chỉ (chỉ hiện khi chi nhánh bật HĐĐT) |
+| O6 | Thanh toán (noindex) | VietQR qua VA (cùng cơ chế tại bàn) hoặc trả khi nhận; nhắc lại người mua trên hoá đơn kèm *Sửa* |
+| O7 | Thành công & theo dõi | Mã đơn + thanh than hồng: Đã nhận → Bếp đang làm → Đóng gói xong → Đang giao → Hoàn tất. **Nút chính: *Theo dõi đơn qua Messenger*** → mở Page chi nhánh kèm mã đơn (Mục 30.3); phụ: link theo dõi web + SMS/Zalo; khi Hoàn tất: khối đánh giá 1 chạm (→ B13); khối **Hoá đơn VAT** — bổ sung/sửa người mua tới lúc lập, lập xong hiện ký hiệu · số + mã tra cứu |
 
 ### 23.3 Điều phối trong Sora POS (O8 · O9 · O12) — nền tối
 

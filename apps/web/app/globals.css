@@ -3,6 +3,7 @@
 @import '@sora/tokens/fonts.css';
 /* Nhãn khuyến mãi của @sora/ui — chỉ quét đúng file web dùng, không kéo class của cả gói */
 @source '../../../packages/ui/src/PromoTag.tsx';
+@source '../../../packages/ui/src/InvoiceBuyer.tsx';
 
 /**
  * Điểm gãy riêng của ô món, 480.

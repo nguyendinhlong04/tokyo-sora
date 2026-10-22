@@ -5,7 +5,14 @@
  * của Next. Trên máy chủ Next (server component): phải là địa chỉ tuyệt đối vì
  * `fetch` của Node không có khái niệm "trang hiện tại".
  */
-import type { PromoClock, PromotionRule, VatCode } from '@sora/contracts'
+import type {
+  InvoiceStatus,
+  PromoClock,
+  PromotionRule,
+  TaxCodeLookupView,
+  VatCode,
+  VatRateTotals,
+} from '@sora/contracts'
 
 const SERVER_ORIGIN = process.env.SORA_API_URL ?? 'http://localhost:3000'
 
@@ -39,6 +46,20 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   if (!res.ok) throw await toError(res)
   return (await res.json()) as T
 }
+
+export async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(apiUrl(path), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw await toError(res)
+  return (await res.json()) as T
+}
+
+/** Tra MST qua cửa công khai của web — chỉ nhận tên, địa chỉ, tình trạng (§9.7) */
+export const lookupTaxCode = (code: string) =>
+  apiGet<TaxCodeLookupView>(`/api/online/tax-codes/${encodeURIComponent(code)}`)
 
 async function toError(res: Response): Promise<ApiError> {
   const body = (await res.json().catch(() => null)) as {
@@ -92,6 +113,8 @@ export interface OnlineMenu {
   categories: { id: string; nameVi: string; kanji: string | null }[]
   dishes: OnlineDish[]
   pricing: MenuPricing
+  /** Chi nhánh đang xuất hoá đơn điện tử — O5 mới hỏi thông tin xuất hoá đơn */
+  einvoiceEnabled?: boolean
 }
 
 /** Khuyến mãi đang chạy của chi nhánh, kèm giờ chi nhánh do máy chủ tính (§9.6) */
@@ -150,9 +173,13 @@ export interface TrackedOrder {
     total: number
     prepay: number
     paid: number
+    /** Một dòng cho mỗi thuế suất — món ăn 8%, bia rượu 10% */
+    vatBreakdown?: VatRateTotals[]
   }
   lines: { nameSnapshot: string; qty: number; priceTotal: number; state: string }[]
   cancelReason: string | null
+  /** Người mua và hoá đơn điện tử của đơn (§9.7) */
+  invoice?: InvoiceStatus
 }
 
 export interface PaymentTicket {

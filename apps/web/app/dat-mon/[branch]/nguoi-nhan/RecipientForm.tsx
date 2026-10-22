@@ -1,16 +1,58 @@
 'use client'
 
-import Link from 'next/link'
-import type { ReactNode } from 'react'
+import { useInvoiceBuyerForm } from '@sora/ui/InvoiceBuyer'
+import { useRouter } from 'next/navigation'
+import { useState, type ReactNode } from 'react'
+import { lookupTaxCode } from '../../../../lib/api'
 import { useOrder } from '../../order-context'
+import { InvoiceSection } from './InvoiceSection'
 
 /** Số điện thoại Việt Nam: 10 số, bắt đầu bằng 0 */
 const PHONE = /^0\d{9}$/
 
 /** O5 — người nhận */
-export function RecipientForm({ branchId }: { branchId: string }) {
+export function RecipientForm({
+  branchId,
+  einvoiceEnabled,
+}: {
+  branchId: string
+  /** Chi nhánh chưa bật hoá đơn điện tử thì không hỏi thông tin xuất hoá đơn */
+  einvoiceEnabled: boolean
+}) {
+  const { loaded } = useOrder()
+  // Form người mua khởi tạo một lần từ bản nháp — đợi đọc xong `sessionStorage`
+  if (!loaded) return <main className="min-h-[60dvh]" />
+  return <RecipientBody branchId={branchId} einvoiceEnabled={einvoiceEnabled} />
+}
+
+function RecipientBody({
+  branchId,
+  einvoiceEnabled,
+}: {
+  branchId: string
+  einvoiceEnabled: boolean
+}) {
   const { draft, set } = useOrder()
+  const router = useRouter()
   const { customer } = draft
+  const [invoiceOpen, setInvoiceOpen] = useState(draft.invoiceBuyer !== null)
+  const invoice = useInvoiceBuyerForm({
+    initial: draft.invoiceBuyer,
+    lookup: lookupTaxCode,
+    defaultKind: 'company',
+  })
+
+  /** Người mua kiểm ngay ở đây — sang bước trả tiền rồi mới báo sai MST là muộn */
+  const next = () => {
+    if (einvoiceEnabled && invoiceOpen) {
+      const buyer = invoice.validate()
+      if (buyer === undefined) return
+      set({ invoiceBuyer: buyer })
+    } else {
+      set({ invoiceBuyer: null })
+    }
+    router.push(`/dat-mon/${branchId}/thanh-toan`)
+  }
 
   const phoneOk = PHONE.test(customer.phone.replace(/\s/g, ''))
   const ready =
@@ -79,22 +121,25 @@ export function RecipientForm({ branchId }: { branchId: string }) {
             className="w-full resize-y rounded-sm border border-line-3 bg-surface-4 px-3.5 py-3 text-[length:var(--fs-b1)] leading-relaxed text-ink-hi"
           />
         </Field>
+
+        {einvoiceEnabled ? (
+          <InvoiceSection open={invoiceOpen} onToggle={setInvoiceOpen} form={invoice} />
+        ) : null}
       </div>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-line-1 bg-surface-4 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-2xl">
-          <Link
-            href={`/dat-mon/${branchId}/thanh-toan`}
-            aria-disabled={!ready}
+          <button
+            type="button"
+            disabled={!ready}
+            onClick={next}
             className={[
-              'flex h-14 items-center justify-center rounded-sm text-[length:var(--fs-b1)] font-semibold',
-              ready
-                ? 'bg-accent-strong text-on-accent'
-                : 'pointer-events-none border border-line-4 text-ink-mute',
+              'flex h-14 w-full items-center justify-center rounded-sm text-[length:var(--fs-b1)] font-semibold',
+              ready ? 'bg-accent-strong text-on-accent' : 'border border-line-4 text-ink-mute',
             ].join(' ')}
           >
             Tới bước thanh toán
-          </Link>
+          </button>
         </div>
       </div>
     </main>
