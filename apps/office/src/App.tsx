@@ -70,6 +70,11 @@ const Documents = lazy(() => import('./routes/Documents').then((m) => ({ default
 const DocumentPage = lazy(() =>
   import('./routes/DocumentPage').then((m) => ({ default: m.DocumentPage })),
 )
+const MyDesk = lazy(() => import('./routes/MyDesk').then((m) => ({ default: m.MyDesk })))
+const Tasks = lazy(() => import('./routes/Tasks').then((m) => ({ default: m.Tasks })))
+const TaskTemplates = lazy(() =>
+  import('./routes/TaskTemplates').then((m) => ({ default: m.TaskTemplates })),
+)
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5_000, refetchOnWindowFocus: true } },
@@ -135,9 +140,12 @@ const NAV: { group: string; items: { to: string; label: string; need?: ActionKey
   {
     group: 'Tổ chức & điều hành',
     items: [
+      { to: '/ban-lam-viec', label: 'N1 · Bàn làm việc' },
       { to: '/so-do-to-chuc', label: 'N2 · Sơ đồ tổ chức', need: 'org.view' },
       { to: '/chuc-danh', label: 'N3 · Chức danh & định biên', need: 'org.view' },
       { to: '/van-ban', label: 'N4 · Văn bản & thông báo', need: 'doc.compose' },
+      { to: '/giao-viec', label: 'N5 · Giao việc', need: 'task.assign' },
+      { to: '/viec-dinh-ky', label: 'N6 · Việc định kỳ & SOP', need: 'task.assign' },
     ],
   },
   {
@@ -280,6 +288,9 @@ export function App() {
                 <Route path="/van-ban" element={<Documents />} />
                 <Route path="/van-ban/moi" element={<DocumentPage />} />
                 <Route path="/van-ban/:id" element={<DocumentPage />} />
+                <Route path="/ban-lam-viec" element={<MyDesk />} />
+                <Route path="/giao-viec" element={<Tasks />} />
+                <Route path="/viec-dinh-ky" element={<TaskTemplates />} />
                 <Route path="/chi-phi-tong-quan" element={<ExpenseOverview />} />
                 <Route path="/chi-phi" element={<Expenses />} />
                 <Route path="/dinh-ky" element={<RecurringExpenses />} />
@@ -304,7 +315,7 @@ export function App() {
                 <Route path="/menu-online" element={<OnlineMenu />} />
                 <Route path="/nhan-dat" element={<ReservationConfig />} />
               </Route>
-              <Route path="*" element={<Navigate to="/mon" replace />} />
+              <Route path="*" element={<Navigate to="/ban-lam-viec" replace />} />
             </Routes>
           </SessionProvider>
         </BrowserRouter>

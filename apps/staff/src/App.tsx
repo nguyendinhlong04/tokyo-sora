@@ -8,6 +8,7 @@ import { NoticeDetail } from './routes/NoticeDetail'
 import { Notices } from './routes/Notices'
 import { Payslips } from './routes/Payslips'
 import { Schedule } from './routes/Schedule'
+import { Tasks } from './routes/Tasks'
 import { TabBar } from './TabBar'
 
 const queryClient = new QueryClient({
@@ -22,7 +23,7 @@ const queryClient = new QueryClient({
 })
 
 /**
- * H8 · H9 — Kênh nhân viên.
+ * H8 · H9 · N12 · N13 — Kênh nhân viên.
  *
  * Nền tối, một cột, mọi thứ trong tầm ngón cái: đây là màn xem trên điện thoại
  * riêng giữa lúc đứng chờ xe, không phải màn làm việc.
@@ -40,6 +41,7 @@ export function App() {
             <Route path="/nv/:token" element={<LinkEntry />} />
             <Route element={<Shell />}>
               <Route path="/" element={<Schedule />} />
+              <Route path="/viec" element={<Tasks />} />
               <Route path="/thong-bao" element={<Notices />} />
               <Route path="/thong-bao/:id" element={<NoticeDetail />} />
               <Route path="/phieu-luong" element={<Payslips />} />

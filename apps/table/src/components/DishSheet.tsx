@@ -1,11 +1,10 @@
-import { Badge, Button, Money, SectionLabel } from '@sora/ui'
+import { Badge, Button, Money, SectionLabel, Sheet } from '@sora/ui'
 import { useState } from 'react'
 import type { Dish, ModifierGroup } from '../api'
 import type { SetCourse, SetExtra } from '../menu'
 import { useCart } from '../cart-context'
 import { DishCounter } from './DishCounter'
 import { Plate } from './Plate'
-import { Sheet } from './Sheet'
 
 /**
  * T3 Chi tiết món.

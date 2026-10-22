@@ -12,10 +12,12 @@ nhân sự (R13), marketing (R9), bếp trưởng (R5), thủ kho (R6).
 - Cột trái là menu 10 nhóm dạng accordion (một nhóm mở tại một thời điểm; nhóm
   chứa trang đang xem tự mở). Ô **"Lọc menu…"** gõ là trải phẳng kết quả — gõ
   "kho" hay "S5" đều ra. Menu chỉ hiện màn mà vai trò của bạn dùng được.
-- Route mặc định là **M1 · Món và set**.
+- Trang mở đầu là **N1 · Bàn làm việc** — việc của chính bạn hôm nay (§6.4b).
 - **Chuông "Việc cần xử lý"** cạnh logo: số trên chuông là tổng việc đang chờ bạn
-  (văn bản chưa đọc, cần xác nhận, chờ bạn ký). Bấm để xem từng nhóm và đi thẳng tới
-  màn xử lý. Số tự cập nhật mỗi phút — chưa có thông báo đẩy.
+  (việc được giao, việc chờ bạn nghiệm thu, khiếu nại bạn đang xử lý, văn bản chưa
+  đọc, văn bản chờ bạn ký). Có việc hoặc khiếu nại **quá hạn** thì chấm số chuyển đỏ
+  và dòng tương ứng ghi rõ "quá hạn". Bấm để xem từng nhóm và đi thẳng tới màn xử lý.
+  Số tự cập nhật mỗi phút — chưa có thông báo đẩy.
 
 **Ba cách nói "chi nhánh nào"** — nhầm lẫn phổ biến nhất khi mới dùng:
 
@@ -60,7 +62,9 @@ riêng lát "theo cách trả tiền" cộng cả hai vì để đối soát v�
   buộc lý do, luôn ghi nhật ký A7.
 - **B13 · Phản hồi khách** — hàng đợi từ thẻ chấm sao sau thanh toán; nhận việc
   (**Tôi nhận việc này**), đóng khiếu nại phải ghi "đã xử lý thế nào"; quá hạn
-  viền đỏ. Bảng "món hay xuất hiện trong bill bị chấm thấp" dùng để đi hỏi,
+  viền đỏ. **Giao việc…** tạo việc khắc phục (N5) cho bếp hoặc sảnh, gắn với khiếu
+  nại — việc làm xong KHÔNG tự đóng khiếu nại: câu trả lời khách vẫn do người phụ
+  trách tự viết. Bảng "món hay xuất hiện trong bill bị chấm thấp" dùng để đi hỏi,
   không phải để cắt món.
 - **B14 · Tích điểm & hạng** — cửa sửa tham số tích/đổi điểm và 3 hạng (chi
   tiêu 12 tháng trượt). Chỉ chủ sửa được; không có nút cộng điểm ở đây.
@@ -79,7 +83,10 @@ Dòng chảy chuẩn **Lịch → Công → Lương**, mỗi bước khoá bư�
 - **H2 · Xếp lịch tuần** — kéo ca vào lưới ngày × người, **Sao chép tuần
   trước**, rồi **Công bố lịch**. Quy tắc quyết định mọi thứ: **ca nháp thì nhân
   viên không thấy và giờ công chưa tính** — chỉ ca đã công bố mới được kỳ lương
-  đọc.
+  đọc. Khi sửa một ô, chọn **Ca mẫu** (ca sáng, ca tối…) thay vì gõ giờ: ô nhớ ca
+  mẫu của nó, và SOP theo ca (N6) dựa vào đó để biết ai đứng ca mở cửa, ai đứng ca
+  đóng cửa. Khối **Ca mẫu của chi nhánh** dưới lưới để thêm ca mẫu và xem SOP nào
+  đang gắn vào ca nào.
 - **H3 · Chấm công hôm nay** — bảng lệch **ba nguồn**: lịch xếp · công đã chấm
   (kiosk) · phiên đăng nhập POS/KDS. Khối "Cần đối chiếu" chỉ ra người có làm
   mà chưa chấm (sẽ bị trả thiếu) hoặc có chấm mà không thấy hoạt động.
@@ -107,16 +114,19 @@ flowchart LR
   kiểm, chủ duyệt và phát. Quản lý ca thấy *công* nhưng không bao giờ thấy
   *lương*.
 
-## 6.4b Tổ chức & điều hành (N2 · N3 · N4)
+## 6.4b Tổ chức & điều hành (N1 – N6)
 
 Sơ đồ tổ chức là trục của giao việc, văn bản, báo cáo và KPI: **cấp trên trực
 tiếp** của một người là người ngồi ghế **trưởng** của đơn vị gần nhất phía trên.
 
 | Màn | Dùng để |
 |---|---|
+| **N1 · Bàn làm việc** | Trang mở đầu: việc của tôi (quá hạn → hôm nay → sắp tới), việc chờ tôi nghiệm thu, văn bản cần đọc/ký, khiếu nại tôi đang xử lý. Bấm một việc để tích checklist, nộp, nghiệm thu |
 | **N2 · Sơ đồ tổ chức** | Cây đơn vị (công ty → khối/phòng → chi nhánh → bộ phận → tổ). Mỗi thẻ đơn vị liệt kê chức danh: người đang giữ, **thực có/định biên**, thanh than hồng (càng nóng càng thiếu người — đỏ là ghế trưởng trống). Bố cục **Dọc/Ngang**, thu phóng, **tìm người** (mở nhánh và đưa thẻ ra giữa), lọc chi nhánh, **In sơ đồ** (A3 ngang) |
 | **N3 · Chức danh & định biên** | Cùng dữ liệu dạng bảng: lọc "chỉ ghế còn trống", cột vai trò gợi ý báo người giữ ghế chưa có quyền ở A1 |
 | **N4 · Văn bản & thông báo** | Sổ thông báo, quyết định, quy định nội bộ. Tab **Gửi tôi · Chờ tôi ký · Tôi soạn · Tất cả**. Soạn, trình ký, ký bằng PIN, thu hồi; theo dõi ai đã đọc/xác nhận |
+| **N5 · Giao việc** | Tab **Tôi giao · Đơn vị tôi · Chờ tôi nghiệm thu**. Giao cho người trong phạm vi, theo dõi đã nhận / checklist / quá hạn, nghiệm thu hoặc trả lại, huỷ kèm lý do |
+| **N6 · Việc định kỳ & SOP** | Tab **Hôm nay** (checklist từng ca: ai làm, ai nghiệm thu, còn gì trễ) · **Mẫu việc** (SOP giao cho chức danh, lặp theo ca / ngày / tuần / tháng). Nút **Dùng bộ SOP chuẩn** |
 
 **Bắt đầu nhanh — dựng theo mẫu chuẩn:** nút **Dựng khung chuỗi theo mẫu** tạo Ban
 điều hành, Khối văn phòng (Kế toán, Nhân sự, Marketing), Khối vận hành; dải
@@ -140,6 +150,43 @@ trước khi dùng làm căn cứ tuyển dụng.
   lương nào ở đây); chỉ R10 · R11 · R13 **sửa** được và thấy danh sách "chưa xếp vào
   sơ đồ". Phạm vi theo cây áp cho **thao tác** — giao việc, ký văn bản, chấm KPI —
   không áp cho việc xem. R1–R4 không mở Office.
+
+**Giao việc (N5):**
+
+- **Giao việc** → việc cần làm, **người nhận** (chỉ hiện người trong phạm vi bạn quản
+  lý theo sơ đồ; ô **Chọn cả ghế…** tick sẵn mọi người đang giữ một chức danh), hạn
+  ngày + giờ, **nghiệm thu** (mặc định là bạn; chọn người khác hoặc "Không cần — nộp
+  là xong"), ưu tiên Thường/Gấp, ghi chú, checklist tuỳ chọn, đính kèm link https.
+  Mỗi người nhận ra **một việc riêng**. Không tự giao cho mình; người làm không là
+  người nghiệm thu.
+- Người nhận thấy việc trên **Kênh nhân viên** (tab Việc) hoặc **N1** nếu dùng Office.
+  Cột **Đã nhận** cho biết việc đã tới tay chưa.
+- **Nghiệm thu đạt** hoặc **Trả lại…** kèm lý do — việc về "đang làm", người làm thấy
+  lý do và nộp lại. **Huỷ việc…** khi không cần làm nữa (bắt buộc lý do); việc đã xong
+  hoặc đã huỷ là hồ sơ, không sửa được.
+- **Quá hạn** = còn đang làm mà đã qua hạn: chữ đỏ ghi "Quá hạn N giờ". Việc đã quá
+  hạn **không dời hạn được** — muốn làm lại thì huỷ kèm lý do rồi giao việc mới.
+- Ai giao được cho ai: trưởng một đơn vị giao trong cây con của đơn vị đó; quản lý ca
+  (R7) cả chi nhánh; quản lý chuỗi, chủ cả chuỗi. Nhân sự (R13) giao việc trong phòng
+  nhân sự, không giao việc vận hành.
+
+**Việc định kỳ & SOP (N6):**
+
+1. Ở **H2**, tạo ca mẫu (ca sáng, ca tối…) và xếp lịch bằng ca mẫu, rồi **Công bố**.
+2. Ở N6 tab **Mẫu việc**, bấm **Dùng bộ SOP chuẩn**: mở ca sảnh/bếp gắn vào ca bắt đầu
+   sớm nhất, đóng ca sảnh/bếp (gas, điện, nước, khoá) và vệ sinh ATTP gắn vào ca kết
+   thúc muộn nhất; kiểm hạn dùng hằng ngày, tổng vệ sinh bếp thứ Hai, kiểm PCCC và tủ
+   sơ cứu ngày 1 hằng tháng. Chi nhánh chưa có ca mẫu thì SOP mở/đóng ca chạy theo giờ
+   cố định — tạo ca mẫu rồi sửa mẫu để gắn theo ca. Sơ đồ chi nhánh phải dựng trước
+   (SOP giao cho chức danh). Nội dung checklist là bản nháp — duyệt lại trước khi dùng.
+3. **Thêm mẫu** / bấm một mẫu để sửa: ghế làm, ghế nghiệm thu, lặp (theo ca · hằng
+   ngày · hằng tuần · hằng tháng), hạn (theo ca để trống = giờ kết ca), checklist, văn
+   bản hướng dẫn (N4). Sửa mẫu chỉ áp cho việc sinh từ nay; **Đã tắt** thì ngừng sinh.
+4. Việc **tự sinh** mỗi ngày (không cần ai bấm). Việc theo ca chỉ tới người giữ đúng
+   ghế VÀ đứng ca **đã công bố** — người nghỉ không bị đòi checklist. Cả ca làm chung
+   một checklist, mỗi mục ghi tên người tích; ai trong ca cũng nộp được.
+5. Tab **Hôm nay**: từng ca, việc nào xong / chờ nghiệm thu / quá hạn (viền đỏ), ai
+   nộp. Bấm vào để xem từng mục và nghiệm thu.
 
 **Văn bản (N4) — soạn, trình, ký:**
 

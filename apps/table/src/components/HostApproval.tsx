@@ -1,8 +1,7 @@
-import { Button, useToast } from '@sora/ui'
+import { Button, Sheet, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../api'
-import { Sheet } from './Sheet'
 
 /**
  * Lời hỏi duyệt hiện trên máy CHỦ BÀN khi có người xin vào.

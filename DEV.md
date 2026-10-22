@@ -207,6 +207,17 @@ ghép — Office chạy trên máy tính của quản lý, không phải máy c�
 > bản sẽ báo "PIN không đúng". `lan@` dùng để thử phạm vi của R7 — chỉ thấy chi nhánh
 > của mình, không sửa được những gì R7 không được sửa.
 
+**Thử SOP theo ca từ đầu tới cuối** (việc định kỳ sinh khi có người mở hộp việc, không
+có cron — tải lại trang là thấy):
+
+1. `nhansu@` → **N2**: xếp một phục vụ vào ghế _Sảnh · Phục vụ_ và Lan vào _Sảnh · Quản lý
+   ca_ (SOP giao cho chức danh — người chưa có ghế không nhận được).
+2. `lan@` → **H2**: thêm ca mẫu (vd. Ca sáng 07:00–15:00, Ca tối 15:00–23:00), xếp người
+   phục vụ đó vào ca sáng hôm nay **bằng ca mẫu**, rồi **Công bố**.
+3. `lan@` → **N6 · Mẫu việc** → **Dùng bộ SOP chuẩn**.
+4. **H1** → **Link** của người phục vụ → mở link ở cửa sổ ẩn danh, nhập PIN → tab **Việc**
+   có "Mở ca – Sảnh". Tích, nộp → Lan thấy ở chuông và **N1 · Chờ tôi nghiệm thu**.
+
 > Cả nhóm quản trị (A1–A6, A9, A10) và R3 gắn quyền `admin.manage-accounts-roles` — theo
 > ma trận §4.2 chỉ R10 có. Đăng nhập bằng `chuoi@` sẽ vào được Office nhưng cột trái không
 > hiện những màn đó. Hai ngoại lệ: **A7 nhật ký** mở cho R7 · R8 · R11 · R10 (`audit.view-log`),

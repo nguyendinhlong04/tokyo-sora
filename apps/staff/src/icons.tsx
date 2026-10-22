@@ -26,6 +26,13 @@ export const IconCalendar = () => (
   </Icon>
 )
 
+export const IconTasks = () => (
+  <Icon>
+    <rect x="5" y="4" width="14" height="17" rx="1.5" />
+    <path d="M9 4V3h6v1M8.5 10.5l1.5 1.5 3-3M8.5 16h7" />
+  </Icon>
+)
+
 export const IconBell = () => (
   <Icon>
     <path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z" />

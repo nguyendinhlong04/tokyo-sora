@@ -7,14 +7,13 @@ import {
   PERSONNEL_DECISIONS,
   type AssignmentKind,
   type DecisionType,
-  type DocAttachment,
   type DocKind,
   type DocumentDetail,
   type MyDocumentDetail,
   type OrgChart,
   type PersonnelChange,
 } from '@sora/contracts'
-import { ApiError, safeHref } from '@sora/core'
+import { ApiError } from '@sora/core'
 import { Badge, Button, ErrorState, Skeleton, useToast } from '@sora/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -30,6 +29,8 @@ import {
   TextInput,
   Toggle,
 } from '../components/form'
+import { ReasonPrompt } from '../components/approval'
+import { AttachmentEditor, AttachmentLinks } from '../components/attachments'
 import { PageHeader } from '../components/PageHeader'
 import { buildForest } from '../components/org/model'
 import { describeTarget, RecipientPicker } from '../components/org/RecipientPicker'
@@ -512,55 +513,6 @@ function ChangesEditor({
   )
 }
 
-function AttachmentEditor({
-  value,
-  onChange,
-}: {
-  value: DocAttachment[]
-  onChange: (next: DocAttachment[]) => void
-}) {
-  return (
-    <div>
-      <ListHead
-        label="Đính kèm"
-        hint="Chưa có kho tệp: quét bản ký tay lên kho của quán rồi dán đường dẫn https."
-      >
-        <Button
-          size="sm"
-          disabled={value.length >= 10}
-          onClick={() => onChange([...value, { name: '', url: '' }])}
-        >
-          + Thêm đính kèm
-        </Button>
-      </ListHead>
-      <div className="grid gap-2">
-        {value.map((a, i) => (
-          <div key={i} className="grid grid-cols-[200px_1fr_auto] items-center gap-2">
-            <TextInput
-              value={a.name}
-              placeholder="Tên hiển thị"
-              onChange={(name) => onChange(value.map((x, j) => (j === i ? { ...x, name } : x)))}
-            />
-            <TextInput
-              value={a.url}
-              placeholder="https://…"
-              mono
-              onChange={(url) => onChange(value.map((x, j) => (j === i ? { ...x, url } : x)))}
-            />
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onChange(value.filter((_, j) => j !== i))}
-            >
-              Bỏ
-            </Button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ==================================================================== Xem — ký — thu hồi
 
 function DocumentView({ doc, chart }: { doc: DocumentDetail; chart: OrgChart | undefined }) {
@@ -813,35 +765,6 @@ function ChangesSummary({
   )
 }
 
-export function AttachmentLinks({ attachments }: { attachments: DocAttachment[] }) {
-  if (attachments.length === 0) return null
-  return (
-    <div>
-      <ListHead label="Đính kèm" />
-      <div className="grid gap-1">
-        {attachments.map((a, i) => {
-          const href = safeHref(a.url)
-          return href ? (
-            <a
-              key={i}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[length:var(--fs-b2)] text-accent-ink hover:underline"
-            >
-              {a.name}
-            </a>
-          ) : (
-            <span key={i} className="text-[length:var(--fs-b2)] text-ink-mute">
-              {a.name} (đường dẫn không hợp lệ)
-            </span>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 // ==================================================================== Người nhận
 
 function ReceiptView({ doc }: { doc: MyDocumentDetail }) {
@@ -936,42 +859,6 @@ function PinPrompt({
           variant="primary"
           disabled={!ready || busy}
           onClick={() => onConfirm(pin)}
-        >
-          {label}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-function ReasonPrompt({
-  label,
-  placeholder,
-  busy,
-  onCancel,
-  onConfirm,
-}: {
-  label: string
-  placeholder: string
-  busy: boolean
-  onCancel: () => void
-  onConfirm: (reason: string) => void
-}) {
-  const [reason, setReason] = useState('')
-  return (
-    <div className="grid gap-2 rounded-sm border border-line-2 p-3">
-      <Field label="Lý do">
-        <TextInput value={reason} placeholder={placeholder} onChange={setReason} />
-      </Field>
-      <div className="flex justify-end gap-2">
-        <Button size="sm" onClick={onCancel}>
-          Thôi
-        </Button>
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={!reason.trim() || busy}
-          onClick={() => onConfirm(reason.trim())}
         >
           {label}
         </Button>

@@ -1,4 +1,12 @@
-import type { InboxCounts, MyDocument, MyDocumentDetail } from '@sora/contracts'
+import type {
+  DocAttachment,
+  InboxCounts,
+  MyDocument,
+  MyDocumentDetail,
+  MyTasks,
+  TaskDetail,
+  TaskState,
+} from '@sora/contracts'
 import { apiFetch } from '@sora/core'
 
 /**
@@ -190,4 +198,31 @@ export const api = {
       `/api/org/me/documents/${id}/receipt`,
       { method: 'POST', body: { ack } },
     ),
+
+  // ---- N12 Việc của tôi — nhận, tích checklist, nộp, nghiệm thu khi được chỉ định
+
+  myTasks: () => apiFetch<MyTasks>('/api/org/me/tasks'),
+
+  myTask: (id: number) => apiFetch<TaskDetail>(`/api/org/me/tasks/${id}`),
+
+  acceptTask: (id: number) =>
+    apiFetch<{ id: number }>(`/api/org/me/tasks/${id}/accept`, { method: 'POST' }),
+
+  checkTask: (id: number, idx: number, checked: boolean) =>
+    apiFetch<{ idx: number }>(`/api/org/me/tasks/${id}/check`, {
+      method: 'POST',
+      body: { idx, checked },
+    }),
+
+  submitTask: (id: number, note: string | null, attachments: DocAttachment[] | null) =>
+    apiFetch<{ id: number; state: TaskState }>(`/api/org/me/tasks/${id}/submit`, {
+      method: 'POST',
+      body: { note, attachments },
+    }),
+
+  reviewTask: (id: number, accept: boolean, note: string | null) =>
+    apiFetch<{ id: number; state: TaskState }>(`/api/org/me/tasks/${id}/review`, {
+      method: 'POST',
+      body: { accept, note },
+    }),
 }

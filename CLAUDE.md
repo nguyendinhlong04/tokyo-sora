@@ -48,7 +48,7 @@ Tài liệu đi kèm — file này không lặp lại nội dung của chúng:
 | `apps/pos` | `@sora/pos` | Sora POS (PWA) | Phục vụ, thu ngân · tablet 11″ ngang + máy thu ngân 22″ → **sắp tới thêm iPad & điện thoại** | `:5174` | `pos.tokyo-sora.vn` |
 | `apps/kitchen` | `@sora/kitchen` | Sora Kitchen / KDS (PWA) | Bếp từng trạm, ra món · TV 32–43″ 1920×1080, Android box | `:5175` | `kds.tokyo-sora.vn` |
 | `apps/office` | `@sora/office` | Sora Office | Chủ, quản lý, kế toán, HR, marketing · desktop 1440+, **nền sáng** | `:5176` | `admin.tokyo-sora.vn` |
-| `apps/staff` | `@sora/staff` | Kênh nhân viên (H8 lịch/công · H9 phiếu lương · N13 thông báo) — **không phải app gọi món** | `:5178` | `nv.tokyo-sora.vn` |
+| `apps/staff` | `@sora/staff` | Kênh nhân viên (H8 lịch/công · H9 phiếu lương · N12 việc · N13 thông báo) — **không phải app gọi món** | `:5178` | `nv.tokyo-sora.vn` |
 | `apps/kiosk` | `@sora/kiosk` | Kiosk chấm công (H10) · tablet 10″ gắn cố định | `:5179` | `chamcong.tokyo-sora.vn` |
 
 Tên miền thật có gạch nối (`tokyo-sora.vn`). Nhiều tài liệu và `SITE_URL` mặc định
@@ -63,8 +63,9 @@ còn ghi `tokyosora.vn` — đó là chỗ lệch, không phải tên miền th�
 - `core` — runtime trình duyệt cho các SPA: `apiFetch` (gắn `x-sora-device`,
   `idempotency-key`), `session` (localStorage `sora.device.token`), **outbox** Dexie/IndexedDB
   gửi lại khi có mạng, `ember` (thang than hồng), `server-clock`, `safeHref` (chỉ cho link
-  `https:` do người dùng dán ra thẻ `<a>`). API không dùng gói này.
-- `ui` — 18 thành phần dùng chung + `useToast` (§4.6). Ship TS thô, không build.
+  `https:` do người dùng dán ra thẻ `<a>`), `dueLabel` (nhãn hạn việc theo giờ VN). API không
+  dùng gói này.
+- `ui` — 19 thành phần dùng chung + `useToast` (§4.6). Ship TS thô, không build.
 - `tokens` — `tokens.css` là **nguồn duy nhất** của màu, cỡ chữ, bo góc, chuyển động;
   `fonts.css` + `fonts/*.woff2` self-host, sinh bằng `scripts/fetch-fonts` (không sửa tay).
 - `config` — `tsconfig.base.json` (strict, `noUncheckedIndexedAccess`, bundler resolution).
@@ -217,14 +218,14 @@ mất mạng = dải báo + hàng đợi cục bộ, màn thanh toán bị chặ
 `OrderTicket` (K2) · `MenuItemCard` (P4 — cố ý **không ảnh**) · `OutboxBanner` ·
 `QrCode` (entry riêng `@sora/ui/QrCode` để web không kéo Dexie) · `EmberBar` (thanh than
 hồng: độ dài = tỉ lệ, màu = độ "nóng"; nơi gọi luôn in chữ đi kèm) · `CountBadge` (chấm
-đếm của chuông Office và thanh tab Kênh NV; màu trung tính, chỉ đỏ khi `urgent`).
+đếm của chuông Office và thanh tab Kênh NV; màu trung tính, chỉ đỏ khi `urgent`) · `Sheet`
+(tấm trượt từ đáy cho điện thoại một tay — Table, Kênh NV; không dùng Modal giữa màn ở đó).
 
 Quy tắc: mọi `<button>` có `type="button"`; variant là `Record<Union,string>` UPPER_CASE;
 không responsive prefix trong gói; app Vite **phải** có `@source '../../../packages/ui/src'`
 trong `index.css` nếu không class của gói không được sinh. Thành phần mới dùng ≥ 2 app →
 đặt trong `@sora/ui`, không copy sang app thứ hai. Bản sao có chủ ý hiện có (sửa cả hai
-bên): `MenuIndex`, `DishCounter` (web ↔ table), `Sheet` (table — bottom sheet một tay,
-không dùng Modal giữa màn trên điện thoại).
+bên): `MenuIndex`, `DishCounter` (web ↔ table).
 
 ### 4.7 Icon và ảnh
 Icon: inline SVG `viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}`,
@@ -435,6 +436,7 @@ ra log hay chat.
 - Màn hình theo mã thiết kế (T/P/K/O/R/W/M/S/B/H/C/F/A, và N cho Tổ chức & điều hành —
   `tokyo-sora-ke-hoach-thiet-ke.md` §26b) — ghi mã ở đầu file. Màn nhóm N tải theo yêu cầu
   (`React.lazy` trong `App.tsx`): bản dựng Office đã vượt ngân sách JS của §8 từ trước.
+  Trang mở đầu của Office là **N1 · Bàn làm việc** (`/ban-lam-viec`), không còn là M1.
 - Thiết bị đích theo app (§1) quyết định bố cục; không có media query theo hướng xoay.
   Khi một thành phần phải chạy ở nhiều khổ (POS iPad/điện thoại — §9.3) ưu tiên
   **container query** hơn `lg:` toàn trang.
@@ -603,8 +605,8 @@ trước khi làm — hỏi, đừng tự chọn im lặng.
   - **600–1023** (iPad dọc 810): hai cột — nhóm món thành thanh ngang cuộn trên lưới, phiếu
     order là **bottom sheet** kéo lên, nút Gửi bếp dính đáy.
   - **< 600** (điện thoại 390): một cột, lưới 2 ô/hàng, thanh nhóm ngang, giỏ là sheet,
-    phím chính ở nửa dưới, thao tác một tay. Modal giữa màn → thay bằng `Sheet` (đưa
-    `Sheet` của table vào `@sora/ui`).
+    phím chính ở nửa dưới, thao tác một tay. Modal giữa màn → thay bằng `Sheet` của
+    `@sora/ui`.
 - Thành phần dùng ở nhiều khổ → container query; không nhân đôi màn.
 - Điện thoại nhân viên vẫn là **thiết bị ghép** (mã 6 số, kind `pos`), đăng nhập PIN như
   tablet; cookie `sora_staff` và `x-sora-device` không đổi.

@@ -1,8 +1,8 @@
 # 7 · Kênh nhân viên & kiosk chấm công
 
 Hai bề mặt dành cho **mọi nhân viên** (phục vụ, bếp, thu ngân…): xem lịch —
-công — phiếu lương — thông báo của chính mình trên điện thoại, và chấm công
-vào/ra ca tại quán. Chúng là hai app tách biệt vì hai vùng tin cậy khác nhau: điện thoại cá
+công — phiếu lương — việc — thông báo của chính mình trên điện thoại, và chấm
+công vào/ra ca tại quán. Chúng là hai app tách biệt vì hai vùng tin cậy khác nhau: điện thoại cá
 nhân mang đi khắp nơi, kiosk gắn cứng ở chi nhánh.
 
 ## 7.1 Kênh nhân viên (`nv.tokyosora.vn`)
@@ -32,9 +32,10 @@ cấp, xin lại là xong.
 
 ### Thanh tab ở đáy màn
 
-Ba tab trong tầm ngón cái: **Lịch** (mở đầu) · **Thông báo** · **Lương**. Chấm số
-trên tab Thông báo là số văn bản chưa đọc — tự cập nhật mỗi phút khi app đang mở;
-chưa có thông báo đẩy, nên quán vẫn dán link văn bản vào nhóm Zalo.
+Bốn tab trong tầm ngón cái: **Lịch** (mở đầu) · **Việc** · **Thông báo** · **Lương**.
+Chấm số trên tab Việc là số việc đang chờ bạn (đỏ khi có việc quá hạn), trên tab
+Thông báo là số văn bản chưa đọc — tự cập nhật mỗi phút khi app đang mở; chưa có
+thông báo đẩy, nên quán vẫn dán link văn bản vào nhóm Zalo.
 
 **Lịch & công (H8):**
 
@@ -58,6 +59,23 @@ chưa có thông báo đẩy, nên quán vẫn dán link văn bản vào nhóm Z
 tạm ứng) → **Thực lãnh**. Phiếu chỉ hiện **sau khi kỳ lương được duyệt**. Màn
 hoàn toàn chỉ đọc — *"Thấy số chưa đúng thì nhắn quản lý nhân sự — kỳ đã chốt
 không sửa ngược, sai sẽ được cộng/trừ ở kỳ sau."*
+
+**Việc (N12):** dòng đầu là ca hôm nay của bạn (ca đã công bố). Bên dưới:
+
+- **Chờ bạn nghiệm thu** — chỉ có khi bạn giữ ghế được chỉ định nghiệm thu (vd. quản
+  lý ca nghiệm thu checklist mở ca). Mở việc, xem ai tích mục nào, bấm **Đạt** hoặc
+  **Trả lại…** kèm lý do.
+- **Cần làm** — quá hạn trước (chữ đỏ "Quá hạn N giờ"), rồi hôm nay, rồi sắp tới.
+  Checklist mở ca, đóng ca, vệ sinh ATTP **chỉ hiện khi bạn đứng đúng ca đã công bố**:
+  nghỉ được duyệt thì việc của ca đó không tới bạn. Việc quản lý giao tận tay ghi
+  "Giao bởi …".
+- Mở một việc: bấm **Nhận việc** để người giao biết việc đã tới tay; chạm từng mục
+  checklist để tích — lưu ngay, mất sóng thì mục tự bỏ tích và báo lỗi. Cả ca làm
+  chung một checklist, mỗi mục ghi tên người tích.
+- **Nộp nghiệm thu** (hoặc **Báo xong** nếu việc không cần nghiệm thu). Còn mục chưa
+  tích thì phải ghi lý do mới nộp được. Bị trả lại thì việc quay về "Cần làm" kèm
+  lý do ở đầu việc.
+- **Đã nộp gần đây** — việc 7 ngày qua: chờ nghiệm thu hay đã xong.
 
 **Thông báo (N13):** thông báo, quyết định, quy định đã ký ban hành gửi tới bạn.
 

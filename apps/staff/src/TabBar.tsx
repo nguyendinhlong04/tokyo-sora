@@ -3,14 +3,15 @@ import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router'
 import { api } from './api'
-import { IconBell, IconCalendar, IconWallet } from './icons'
+import { IconBell, IconCalendar, IconTasks, IconWallet } from './icons'
 
 /**
  * Thanh tab dính đáy — trong tầm ngón cái khi cầm máy một tay. Thay cho hai nút
- * ở đầu màn của bản H8 · H9: thêm Thông báo (và sau này Việc, KPI) thì đầu màn
+ * ở đầu màn của bản H8 · H9: thêm Việc, Thông báo (và sau này KPI) thì đầu màn
  * không còn chỗ, mà nút ở đầu màn là nút xa tay nhất.
  *
- * Huy hiệu hỏi máy chủ mỗi 60 giây — chưa có thông báo đẩy.
+ * Huy hiệu hỏi máy chủ mỗi 60 giây — chưa có thông báo đẩy. Có việc quá hạn thì
+ * chấm đếm của tab Việc chuyển đỏ, nhãn đọc màn hình nói rõ "quá hạn".
  */
 export function TabBar() {
   const inbox = useQuery({
@@ -19,11 +20,26 @@ export function TabBar() {
     refetchInterval: 60_000,
   })
   const unread = inbox.data?.documents.unread ?? 0
+  const tasks = inbox.data?.tasks
+  const pending = (tasks?.open ?? 0) + (tasks?.toReview ?? 0)
+  const overdue = tasks?.overdue ?? 0
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line-2 bg-surface-1 pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto flex max-w-lg">
         <Tab to="/" icon={<IconCalendar />} label="Lịch" />
+        <Tab
+          to="/viec"
+          icon={<IconTasks />}
+          label="Việc"
+          badge={
+            <CountBadge
+              count={pending}
+              urgent={overdue > 0}
+              label={`${pending} việc đang chờ${overdue > 0 ? `, ${overdue} quá hạn` : ''}`}
+            />
+          }
+        />
         <Tab
           to="/thong-bao"
           icon={<IconBell />}

@@ -1,6 +1,7 @@
 export { Button, type ButtonSize, type ButtonVariant } from './Button'
 export { PinPad } from './PinPad'
 export { Modal } from './Modal'
+export { Sheet } from './Sheet'
 export { ToastProvider, useToast, type ToastTone } from './Toast'
 export { Badge, Card, EmptyState, ErrorState, Money, SectionLabel, Skeleton } from './primitives'
 export { TableTile, type TableState, type TableTileProps } from './TableTile'

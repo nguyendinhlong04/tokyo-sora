@@ -67,3 +67,40 @@ export function ApprovalPrompt({
     </div>
   )
 }
+
+/** Hỏi lý do trước một thao tác không làm lại được — trả lại, thu hồi, huỷ việc */
+export function ReasonPrompt({
+  label,
+  placeholder,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  label: string
+  placeholder: string
+  busy: boolean
+  onCancel: () => void
+  onConfirm: (reason: string) => void
+}) {
+  const [reason, setReason] = useState('')
+  return (
+    <div className="grid gap-2 rounded-sm border border-line-2 p-3">
+      <Field label="Lý do">
+        <Input value={reason} placeholder={placeholder} onChange={setReason} />
+      </Field>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" onClick={onCancel}>
+          Thôi
+        </Button>
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={!reason.trim() || busy}
+          onClick={() => onConfirm(reason.trim())}
+        >
+          {label}
+        </Button>
+      </div>
+    </div>
+  )
+}

@@ -1,6 +1,5 @@
-import { Button } from '@sora/ui'
+import { Button, Sheet } from '@sora/ui'
 import { FILTER_LABELS, NO_FILTERS, countActive, type Filters } from '../menu'
-import { Sheet } from './Sheet'
 
 /**
  * T5 Bộ lọc.

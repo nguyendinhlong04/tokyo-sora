@@ -1,9 +1,8 @@
-import { Button, useToast } from '@sora/ui'
+import { Button, Sheet, useToast } from '@sora/ui'
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type RequestKind } from '../api'
 import { useTable } from '../table-context'
-import { Sheet } from './Sheet'
 
 const KINDS: { kind: RequestKind; label: string }[] = [
   { kind: 'phuc-vu', label: 'Gọi phục vụ' },

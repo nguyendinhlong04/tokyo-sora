@@ -3,8 +3,10 @@ import { useEffect, type ReactNode } from 'react'
 /**
  * Tấm trượt lên từ đáy màn.
  *
- * Trên điện thoại một tay, nội dung phải bám cạnh dưới — hộp thoại giữa màn của
- * @sora/ui là dạng dành cho POS và Office, ngón cái không với tới nút của nó.
+ * Trên điện thoại một tay, nội dung phải bám cạnh dưới — `Modal` giữa màn là dạng
+ * dành cho POS và Office, ngón cái không với tới nút của nó. Dùng ở Sora Table
+ * (chi tiết món, gọi nhân viên) và Kênh nhân viên (checklist ca, nộp việc); POS
+ * điện thoại (§9.3) sẽ dùng tiếp.
  */
 export function Sheet({
   open,

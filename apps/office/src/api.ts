@@ -1,4 +1,5 @@
 import type {
+  AssignableStaff,
   AssignmentKind,
   DecisionType,
   DocAttachment,
@@ -9,12 +10,20 @@ import type {
   InboxCounts,
   MyDocument,
   MyDocumentDetail,
+  MyTasks,
   OrgAssignmentRow,
   OrgChart,
   OrgUnitKind,
   PersonnelChange,
   Role,
   SignerOption,
+  TaskDetail,
+  TaskEntity,
+  TaskPriority,
+  TaskRecurrence,
+  TaskRow,
+  TaskState,
+  TaskTemplateView,
 } from '@sora/contracts'
 import { apiFetch } from '@sora/core'
 
@@ -3282,6 +3291,118 @@ export const api = {
       `/api/org/me/documents/${id}/receipt`,
       { method: 'POST', body: { ack } },
     ),
+
+  // ---- N1 · N5 · N6 Việc và SOP — kiểu lấy từ @sora/contracts
+
+  tasks: (q: { view: TaskView; from?: string; to?: string; branch?: string; date?: string }) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(q)) if (value) params.set(key, value)
+    return apiFetch<TaskRow[]>(`/api/org/tasks?${params.toString()}`)
+  },
+
+  task: (id: number) => apiFetch<TaskDetail>(`/api/org/tasks/${id}`),
+
+  assignees: () => apiFetch<AssignableStaff[]>('/api/org/tasks/assignees'),
+
+  createTask: (input: TaskInput) =>
+    apiFetch<{ ids: number[] }>('/api/org/tasks', { method: 'POST', body: input }),
+
+  updateTask: (
+    id: number,
+    patch: Partial<Pick<TaskInput, 'title' | 'note' | 'priority' | 'dueAt'>>,
+  ) => apiFetch<{ id: number }>(`/api/org/tasks/${id}`, { method: 'PUT', body: patch }),
+
+  reviewTask: (id: number, accept: boolean, note: string | null) =>
+    apiFetch<{ id: number; state: TaskState }>(`/api/org/tasks/${id}/review`, {
+      method: 'POST',
+      body: { accept, note },
+    }),
+
+  cancelTask: (id: number, reason: string) =>
+    apiFetch<{ id: number }>(`/api/org/tasks/${id}/cancel`, { method: 'POST', body: { reason } }),
+
+  /** `branch`: mã chi nhánh, `van-phong` = mẫu của văn phòng, bỏ trống = tất cả */
+  taskTemplates: (branch?: string) =>
+    apiFetch<TaskTemplateView[]>(
+      `/api/org/task-templates${branch ? `?branch=${encodeURIComponent(branch)}` : ''}`,
+    ),
+
+  taskShifts: (branchId: string) =>
+    apiFetch<ShiftTemplate[]>(
+      `/api/org/task-templates/shifts?branch=${encodeURIComponent(branchId)}`,
+    ),
+
+  createTaskTemplate: (input: TaskTemplateInput) =>
+    apiFetch<TaskTemplateView>('/api/org/task-templates', { method: 'POST', body: input }),
+
+  updateTaskTemplate: (id: number, input: TaskTemplateInput) =>
+    apiFetch<TaskTemplateView>(`/api/org/task-templates/${id}`, { method: 'PUT', body: input }),
+
+  applyStandardSops: (branchId: string) =>
+    apiFetch<{
+      created: number
+      skipped: { title: string; reason: string }[]
+      withoutShifts: boolean
+    }>('/api/org/task-templates/apply-standard', { method: 'POST', body: { branchId } }),
+
+  myTasks: () => apiFetch<MyTasks>('/api/org/me/tasks'),
+
+  myTask: (id: number) => apiFetch<TaskDetail>(`/api/org/me/tasks/${id}`),
+
+  acceptMyTask: (id: number) =>
+    apiFetch<{ id: number }>(`/api/org/me/tasks/${id}/accept`, { method: 'POST' }),
+
+  checkMyTask: (id: number, idx: number, checked: boolean) =>
+    apiFetch<{ idx: number }>(`/api/org/me/tasks/${id}/check`, {
+      method: 'POST',
+      body: { idx, checked },
+    }),
+
+  submitMyTask: (id: number, note: string | null, attachments: DocAttachment[] | null) =>
+    apiFetch<{ id: number; state: TaskState }>(`/api/org/me/tasks/${id}/submit`, {
+      method: 'POST',
+      body: { note, attachments },
+    }),
+
+  reviewMyTask: (id: number, accept: boolean, note: string | null) =>
+    apiFetch<{ id: number; state: TaskState }>(`/api/org/me/tasks/${id}/review`, {
+      method: 'POST',
+      body: { accept, note },
+    }),
+}
+
+export type TaskView = 'assigned' | 'unit' | 'to-review' | 'sop'
+
+export interface TaskInput {
+  title: string
+  note: string | null
+  priority: TaskPriority
+  assigneeStaffIds: number[]
+  /** Bỏ trống = người giao tự nghiệm thu; null = nộp là xong */
+  reviewerStaffId?: number | null
+  /** ISO có múi giờ */
+  dueAt: string
+  checklist: string[]
+  attachments: DocAttachment[]
+  entity: TaskEntity | null
+  entityId: number | null
+}
+
+export interface TaskTemplateInput {
+  title: string
+  note: string | null
+  checklist: string[]
+  assigneePositionId: number
+  reviewerPositionId: number | null
+  recurrence: TaskRecurrence
+  weekday: number | null
+  monthDay: number | null
+  shiftTemplateId: number | null
+  dueMinute: number | null
+  priority: TaskPriority
+  documentId: number | null
+  startsOn: string | null
+  active: boolean
 }
 
 export interface DocumentInput {
