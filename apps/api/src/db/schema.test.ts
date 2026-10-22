@@ -808,3 +808,76 @@ describe('Việc — không tự nghiệm thu, việc đã đóng là hồ sơ, 
     ).rejects.toThrow(/tasks_cancel_check/)
   })
 })
+
+describe('Báo cáo công việc và sự cố — đã nộp là hồ sơ', () => {
+  const hoa = `(SELECT id FROM staff WHERE code = 'NV01')`
+  const minh = `(SELECT id FROM staff WHERE code = 'NV09')`
+
+  it('báo cáo đã nộp không sửa giá trị; chỉ xác nhận được, và người viết không tự xác nhận', async () => {
+    await db.exec(`
+      INSERT INTO report_templates (code, name, cadence, branch_id, fields, due_offset_minutes,
+                                    review_mode, created_by)
+        VALUES ('cuoi-ngay', 'Cuối ngày', 'ngay', 'cg', '[]', 1980, 'cap-tren', ${hoa});
+      INSERT INTO work_reports (template_id, template_version, fields_snapshot, branch_id,
+                                business_date, period_key, author_id, due_at)
+        SELECT id, 1, '[]', 'cg', '2026-10-21', '2026-10-21', ${minh}, now()
+          FROM report_templates WHERE code = 'cuoi-ngay';
+    `)
+    await db.exec(`
+      UPDATE work_reports SET state = 'submitted', auto_values = '{}', channel = 'office',
+                              submitted_at = now(), on_time = true
+    `)
+    await expect(
+      db.exec(`UPDATE work_reports SET values = '{"nhan-xet":"sửa lén"}'`),
+    ).rejects.toThrow(/đã nộp/)
+    await expect(
+      db.exec(
+        `UPDATE work_reports SET state = 'reviewed', reviewed_by = ${minh}, reviewed_at = now()`,
+      ),
+    ).rejects.toThrow(/work_reports_review_not_self/)
+    await db.exec(
+      `UPDATE work_reports SET state = 'reviewed', reviewed_by = ${hoa}, reviewed_at = now()`,
+    )
+    await expect(db.exec(`DELETE FROM work_reports`)).rejects.toThrow(/không xoá được/)
+  })
+
+  it('mỗi suất một bản: cùng mẫu, cùng kỳ, cùng ca thì không có bản thứ hai', async () => {
+    await expect(
+      db.exec(`
+        INSERT INTO work_reports (template_id, template_version, fields_snapshot, branch_id,
+                                  business_date, period_key, author_id, due_at)
+          SELECT id, 1, '[]', 'cg', '2026-10-21', '2026-10-21', ${hoa}, now()
+            FROM report_templates WHERE code = 'cuoi-ngay'
+      `),
+    ).rejects.toThrow(/work_reports_one_per_slot/)
+  })
+
+  it('sự cố ATTP nghiêm trọng bắt buộc khai báo ra ngoài; đóng phải đủ nguyên nhân và mốc khai báo', async () => {
+    const insert = (required: boolean) => `
+      INSERT INTO incidents (code, branch_id, category, severity, occurred_at, business_date,
+                             title, description, reported_by, external_report_required)
+        VALUES ('SC-2610-0001', 'cg', 'an-toan-thuc-pham', 'nghiem-trong', now(), '2026-10-22',
+                'Khách đau bụng', 'Hai khách', ${minh}, ${required})`
+    await expect(db.exec(insert(false))).rejects.toThrow(/incidents_external_check/)
+    await db.exec(insert(true))
+    await expect(
+      db.exec(`
+        UPDATE incidents SET state = 'closed', closed_by = ${hoa}, closed_at = now(),
+                             root_cause = 'Hàu không đạt', corrective_action = 'Đổi nhà cung cấp'
+      `),
+    ).rejects.toThrow(/incidents_closed_check/)
+    // Người báo không tự đóng sự cố nghiêm trọng
+    await expect(
+      db.exec(`
+        UPDATE incidents SET state = 'closed', closed_by = ${minh}, closed_at = now(),
+                             root_cause = 'x', corrective_action = 'y', external_reported_at = now()
+      `),
+    ).rejects.toThrow(/incidents_close_not_self/)
+    await db.exec(`
+      UPDATE incidents SET state = 'closed', closed_by = ${hoa}, closed_at = now(),
+                           root_cause = 'x', corrective_action = 'y', external_reported_at = now()
+    `)
+    await expect(db.exec(`UPDATE incidents SET title = 'Sửa'`)).rejects.toThrow(/đã đóng/)
+    await expect(db.exec(`DELETE FROM incidents`)).rejects.toThrow(/không xoá được/)
+  })
+})

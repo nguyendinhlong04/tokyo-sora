@@ -19,6 +19,7 @@ import { RealtimeModule } from './modules/realtime/realtime.module'
 import { ReportsModule } from './modules/reports/reports.module'
 import { ReservationsModule } from './modules/reservations/reservations.module'
 import { SiteModule } from './modules/site/site.module'
+import { WorkReportsModule } from './modules/work-reports/work-reports.module'
 
 @Controller()
 class HealthController {
@@ -46,6 +47,7 @@ class HealthController {
     ExpensesModule,
     HrModule,
     OrgModule,
+    WorkReportsModule,
     InboxModule,
     AccountingModule,
     CrmModule,

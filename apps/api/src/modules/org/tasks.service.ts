@@ -29,6 +29,7 @@ import {
   branches,
   employees,
   feedback,
+  incidents,
   orgDocuments,
   orgUnits,
   positions,
@@ -38,6 +39,7 @@ import {
   taskCheckItems,
   taskTemplates,
   tasks,
+  workReports,
 } from '../../db/schema'
 import type { Actor, StaffActor } from '../identity/actor'
 import { AuditService } from '../identity/audit.service'
@@ -1016,6 +1018,17 @@ export class TasksService {
     })
   }
 
+  /** Dòng việc theo id — cho màn khác hiện việc gắn với nguồn của nó (sự cố, khiếu nại) */
+  async rowsOf(ids: number[]): Promise<TaskRow[]> {
+    if (ids.length === 0) return []
+    const rows = await this.db
+      .select()
+      .from(tasks)
+      .where(inArray(tasks.id, ids))
+      .orderBy(asc(tasks.dueAt))
+    return this.toRows(rows)
+  }
+
   /** Số đếm cho hộp việc */
   async counts(staffId: number) {
     await this.materialize()
@@ -1129,12 +1142,16 @@ export class TasksService {
         .select({ id: orgDocuments.id })
         .from(orgDocuments)
         .where(eq(orgDocuments.id, entityId))
+    } else if (entity === 'incident') {
+      found = await this.db
+        .select({ id: incidents.id })
+        .from(incidents)
+        .where(eq(incidents.id, entityId))
     } else {
-      // Sự cố và báo cáo công việc có bảng ở giai đoạn sau
-      throw new BadRequestException({
-        code: 'entity_not_supported',
-        message: 'Chưa giao việc được từ nguồn này',
-      })
+      found = await this.db
+        .select({ id: workReports.id })
+        .from(workReports)
+        .where(eq(workReports.id, entityId))
     }
     if (found.length === 0) {
       throw new BadRequestException({

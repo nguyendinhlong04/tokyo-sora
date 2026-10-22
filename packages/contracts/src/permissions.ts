@@ -412,6 +412,25 @@ export const ACTIONS = {
     grants: { R5: A, R6: A, R7: A, R8: A, R9: A, R11: A, R12: A, R13: A, R10: A },
     note: 'Giao cho ai do sơ đồ quyết: người trong cây con mình làm trưởng. Nhận việc, tích checklist, nộp việc thì mọi người làm qua khoá "của mình"',
   },
+  'workreport.configure': {
+    label: 'Cấu hình mẫu báo cáo công việc',
+    grants: { R11: A, R10: A },
+  },
+  'workreport.review': {
+    label: 'Xem, xác nhận báo cáo của cấp dưới',
+    grants: { R5: A, R6: A, R7: A, R8: A, R11: A, R13: A, R10: A },
+    note: 'Nộp báo cáo thì ai được giao chức danh nộp cũng làm qua khoá "của mình"',
+  },
+  'incident.manage': {
+    label: 'Xử lý sự cố: giao việc khắc phục, khai báo ra ngoài, đóng sự cố thường',
+    grants: { R5: A, R7: A, R11: A, R13: A, R10: A },
+    note: 'Báo sự cố thì mọi người làm được, qua khoá "của mình"',
+  },
+  'incident.close-severe': {
+    label: 'Đóng sự cố nghiêm trọng trở lên',
+    grants: { R11: A, R10: A },
+    note: 'Người đóng phải khác người báo',
+  },
 } as const satisfies Record<string, ActionDef>
 
 export type ActionKey = keyof typeof ACTIONS

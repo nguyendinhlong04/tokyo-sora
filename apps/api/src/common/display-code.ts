@@ -2,8 +2,8 @@ import { sql } from 'drizzle-orm'
 import { displayCounters } from '../db/schema'
 import type { Tx } from './tx'
 
-/** Đơn online đọc là ON, đặt chỗ đọc là ĐB — hai sổ số đếm riêng */
-const PREFIX = { order: 'ON', reservation: 'DB' } as const
+/** Đơn online đọc là ON, đặt chỗ đọc là ĐB, sự cố là SC — mỗi loại một sổ số đếm */
+const PREFIX = { order: 'ON', reservation: 'DB', incident: 'SC' } as const
 export type DisplayCodeKind = keyof typeof PREFIX
 
 /**

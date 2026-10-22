@@ -1,5 +1,6 @@
 import type { OrgUnitKind } from './org.js'
 import type { Role } from './permissions.js'
+import type { ReportField } from './work-reports.js'
 
 /**
  * Mẫu chuẩn bộ máy của một chuỗi nhà hàng nướng than — điểm xuất phát để bấm
@@ -581,6 +582,114 @@ export const STANDARD_SOPS: StandardSop[] = [
       'Lối thoát hiểm không bị chắn',
       'Tủ sơ cứu đủ thuốc, băng gạc còn hạn',
       'Số điện thoại khẩn cấp dán đúng chỗ',
+    ],
+  },
+]
+
+// ------------------------------------------------------------------ Báo cáo công việc
+
+/**
+ * Ba mẫu báo cáo chuẩn của một chi nhánh. Trường tiền (doanh thu, két) chỉ nằm ở
+ * mẫu nộp tại Office; mẫu ca bếp không có tiền nên nộp được trên điện thoại.
+ */
+export interface StandardReportTemplate {
+  code: string
+  name: string
+  cadence: 'ca' | 'ngay'
+  /**
+   * Theo ca: phút sau giờ kết ca. Theo ngày: phút kể từ 00:00 của ngày báo cáo
+   * (1980 = 09:00 sáng hôm sau).
+   */
+  dueOffsetMinutes: number
+  /** Chi nhánh chưa có ca mẫu: báo cáo theo ca thành báo cáo ngày, hạn lúc này */
+  fallbackDueMinute?: number
+  reviewMode: 'cap-tren' | 'ca-sau' | 'khong'
+  kenhNv: boolean
+  positions: { seat: StandardSeat; role: 'nop' | 'du-phong' }[]
+  fields: ReportField[]
+}
+
+export const STANDARD_REPORT_TEMPLATES: StandardReportTemplate[] = [
+  {
+    code: 'cuoi-ngay',
+    name: 'Báo cáo cuối ngày',
+    cadence: 'ngay',
+    dueOffsetMinutes: 33 * 60,
+    reviewMode: 'cap-tren',
+    kenhNv: false,
+    positions: [
+      { seat: { unit: null, title: 'Quản lý chi nhánh' }, role: 'nop' },
+      { seat: { unit: 'Sảnh', title: 'Quản lý ca' }, role: 'du-phong' },
+    ],
+    fields: [
+      { key: 'doanh-thu', label: 'Doanh thu thuần', type: 'tien', auto: 'doanh-thu-thuan' },
+      { key: 'so-don', label: 'Số đơn', type: 'so', auto: 'so-don' },
+      { key: 'so-khach', label: 'Số khách', type: 'so', auto: 'so-khach' },
+      { key: 'don-huy', label: 'Đơn huỷ', type: 'so', auto: 'don-huy' },
+      { key: 'mon-huy', label: 'Món huỷ sau gửi bếp', type: 'so', auto: 'mon-huy-sau-gui-bep' },
+      { key: 've-tre', label: 'Vé bếp trễ', type: 'chu', auto: 've-tre' },
+      { key: 'khieu-nai', label: 'Khách chấm 1–2 sao', type: 'so', auto: 'khieu-nai' },
+      { key: 'hai-long', label: 'Điểm khách chấm', type: 'so', auto: 'diem-hai-long' },
+      { key: 'chenh-lech-ket', label: 'Chênh lệch két', type: 'tien', auto: 'chenh-lech-ket' },
+      { key: 'qr-treo', label: 'QR chưa về', type: 'so', auto: 'qr-treo' },
+      { key: 'checklist', label: 'Checklist SOP', type: 'chu', auto: 'checklist-ca' },
+      {
+        key: 'giai-trinh-ket',
+        label: 'Giải trình chênh lệch két',
+        type: 'doan',
+        requiredIf: { field: 'chenh-lech-ket', absGreaterThan: 20_000 },
+        hint: 'Bắt buộc khi két lệch quá 20.000₫ — không tự trừ lương ai.',
+      },
+      { key: 'su-co', label: 'Sự cố trong ngày', type: 'doan' },
+      { key: 'thiet-bi', label: 'Thiết bị cần sửa', type: 'doan' },
+      { key: 'nhan-xet', label: 'Nhận xét của quản lý', type: 'doan', required: true },
+      {
+        key: 'da-kiem-dong-cua',
+        label: 'Đã kiểm gas, điện, nước, khoá cửa',
+        type: 'co-khong',
+        required: true,
+      },
+    ],
+  },
+  {
+    code: 'giao-ca',
+    name: 'Sổ giao ca',
+    cadence: 'ca',
+    dueOffsetMinutes: 30,
+    fallbackDueMinute: 23 * 60 + 30,
+    reviewMode: 'ca-sau',
+    kenhNv: false,
+    positions: [{ seat: { unit: 'Sảnh', title: 'Quản lý ca' }, role: 'nop' }],
+    fields: [
+      { key: 'nhan-su', label: 'Người đứng ca', type: 'so', auto: 'nhan-su-ca' },
+      { key: 'checklist', label: 'Checklist SOP của ca', type: 'chu', auto: 'checklist-ca' },
+      { key: 'ban-giao', label: 'Việc bàn giao cho ca sau', type: 'doan', required: true },
+      { key: 'khach-luu-y', label: 'Khách cần lưu ý', type: 'doan' },
+      { key: 'hang-sap-het', label: 'Hàng sắp hết', type: 'doan' },
+      { key: 'su-co', label: 'Sự cố trong ca', type: 'doan' },
+      { key: 've-sinh', label: 'Sảnh sạch, đủ đồ cho ca sau', type: 'co-khong', required: true },
+    ],
+  },
+  {
+    code: 'ca-bep',
+    name: 'Báo cáo ca bếp',
+    cadence: 'ca',
+    dueOffsetMinutes: 30,
+    fallbackDueMinute: 23 * 60 + 30,
+    reviewMode: 'cap-tren',
+    kenhNv: true,
+    positions: [
+      { seat: { unit: 'Bếp', title: 'Bếp trưởng' }, role: 'nop' },
+      { seat: { unit: 'Bếp', title: 'Bếp phó' }, role: 'du-phong' },
+    ],
+    fields: [
+      { key: 've-tre', label: 'Vé bếp trễ', type: 'chu', auto: 've-tre' },
+      { key: 'mon-huy', label: 'Món huỷ sau gửi bếp', type: 'so', auto: 'mon-huy-sau-gui-bep' },
+      { key: 'so-che', label: 'Sơ chế cho ca sau', type: 'doan', required: true },
+      { key: 'hang-sap-het', label: 'Nguyên liệu sắp hết', type: 'doan' },
+      { key: 'thiet-bi', label: 'Thiết bị cần sửa', type: 'doan' },
+      { key: 've-sinh', label: 'Bếp đã vệ sinh theo checklist', type: 'co-khong', required: true },
+      { key: 'nhan-xet', label: 'Ghi chú', type: 'doan' },
     ],
   },
 ]

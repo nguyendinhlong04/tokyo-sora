@@ -122,6 +122,10 @@ const ORG_ROWS: [ActionKey, string][] = [
   ['doc.sign-notice', '......x..x.xx'],
   ['doc.sign-decision', '.........x..x'],
   ['task.assign', '....xxxxxxxxx'],
+  ['workreport.configure', '.........x..x'],
+  ['workreport.review', '....xxxx.x.xx'],
+  ['incident.manage', '....x.x..x.xx'],
+  ['incident.close-severe', '.........x..x'],
 ]
 
 const SYMBOL: Record<string, Permission> = { '.': 'deny', x: 'allow', a: 'approve' }

@@ -272,7 +272,8 @@ org (sơ đồ tổ chức — `OrgService.snapshot()` + hàm thuần `domain/or
 ai" cho mọi module: `scopeOf`, `inScope`, `managersOf`; văn bản nội bộ `DocumentsService`:
 trình → ký bằng PIN người ký → ban hành, quyết định nhân sự áp vào sơ đồ cùng transaction;
 giao việc + SOP theo ca `TasksService` — việc định kỳ **sinh lười** lúc có người đọc, không
-cron) ·
+cron) · work-reports (báo cáo công việc theo suất ngày/ca/tuần/tháng — suất phải nộp tính lúc
+đọc, số tự điền dùng `reports/sql.ts` và đóng băng lúc nộp; sự cố `SC-yyMM-NNNN`) ·
 inbox (`GET /api/me/inbox` — chỉ **đếm** việc cần xử lý của người đang đăng nhập; module
 riêng để các module nghiệp vụ không import lẫn nhau).
 
@@ -307,7 +308,7 @@ thoại bàn** cookie `sora_table` (`table_devices.state='admitted'`, phiên ch�
 | kds | kiosk | bridge`); (4) 401 trừ `@Public`. Route khách chạm được **phải** gọi
 `assertOwnTableSession(actor, sessionId)`.
 
-Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 64 action
+Ma trận quyền ở `packages/contracts/src/permissions.ts`: 13 vai trò R0–R13, 68 action
 `domain.verb`, mỗi ô `allow | approve | deny`. `PermissionGuard` chỉ chặn `deny`; ô
 `approve` (△) thì service phải `ApprovalService.authorize(tx, …)` với body
 `approval: {approverStaffId, approverPin, reason}` — người duyệt phải khác người làm
@@ -328,7 +329,7 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   đồng `*_milli`). Tổng tiền chỉ tính bằng `computeOrderTotals` **trên server**; giá và tên
   **đóng băng** vào dòng đơn lúc tạo.
 - `business_date` theo múi giờ chi nhánh (`businessDateOf`); mã hiển thị `ON-yyMM-NNNN`
-  / `DB-yyMM-NNNN` (`nextDisplayCode`), khách đọc mã này, không đọc id.
+  / `DB-yyMM-NNNN` / sự cố `SC-yyMM-NNNN` (`nextDisplayCode`), khách đọc mã này, không đọc id.
 - **Sổ bất biến** (append-only, trigger `sora_append_only` + revoke quyền role `sora_app`
   trong `deploy/db-roles.sql`): `audit_log`, `approvals`, `journal_entries`,
   `parameter_history`, `stock_moves`. Sửa sai = bút toán đảo, không UPDATE.
@@ -346,10 +347,15 @@ viên = link một lần + PIN; kiosk = thiết bị ghép + PIN. Chi tiết tà
   tự nghiệm thu: CHECK `tasks_review_not_self`.
 - **Điểm khách chấm** đọc từ view `customer_ratings` (`9010`): gộp `feedback` (B13) và
   `table_feedback` (T15), một phiếu mỗi bữa — đừng đếm hai bảng riêng.
+- **Báo cáo công việc** (trigger `9011`): bản đã nộp chỉ còn đi `submitted → reviewed`, sai
+  thì viết `work_report_addenda` (chỉ thêm). Một suất một bản (`work_reports_one_per_slot`).
+  **Sự cố** không xoá, đã đóng không sửa; CHECK ép khai báo ra ngoài (TNLĐ/ATTP/cháy nổ mức
+  nghiêm trọng) và người báo không tự đóng sự cố nghiêm trọng.
 - **Migration:** `db:generate` sinh `migrations/00NN_*.sql`; SQL viết tay đánh số từ
   `9000_` để luôn chạy sau cùng (`9000_guards`, `9001_kitchen_money_guard`,
   `9002_realtime_broadcast`, `9003_realtime_rls`, `9004_stock_moves_guard`, …,
-  `9007_org_guards`, `9008_document_guards`, `9009_task_guards`, `9010_customer_ratings`). Runner
+  `9007_org_guards`, `9008_document_guards`, `9009_task_guards`, `9010_customer_ratings`,
+  `9011_work_report_guards`). Runner
   riêng `src/db/migrate.ts` chạy mọi file một lần theo tên, ghi `_sora_migrations`.
   **Không có down**; file đã chạy thì sửa không có tác dụng → luôn thêm file mới.
   Vercel build **không** chạy migration — chạy tay trước khi deploy API.

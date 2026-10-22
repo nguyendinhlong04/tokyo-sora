@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   STANDARD_BRANCH_HEAD,
   STANDARD_BRANCH_UNITS,
+  STANDARD_REPORT_TEMPLATES,
   STANDARD_SOPS,
   type StandardSeat,
 } from './org-standards.js'
 import { TASK_CHECKLIST_MAX, TASK_MONTH_DAY_MAX } from './tasks.js'
+import { REPORT_AUTO_FIELDS } from './work-reports.js'
 
 const key = (seat: StandardSeat) => `${seat.unit ?? ''}/${seat.title}`
 
@@ -49,5 +51,34 @@ describe('Bộ SOP chuẩn khớp với cơ cấu chi nhánh mẫu', () => {
   it('tên SOP không trùng — áp lại mẫu nhận ra cái đã có bằng tên', () => {
     const titles = STANDARD_SOPS.map((s) => s.title)
     expect(new Set(titles).size).toBe(titles.length)
+  })
+})
+
+describe('Mẫu báo cáo chuẩn', () => {
+  const known = new Set([
+    ...STANDARD_BRANCH_UNITS.flatMap((u) => u.positions.map((p) => `${u.name}/${p.title}`)),
+    `/${STANDARD_BRANCH_HEAD.title}`,
+  ])
+
+  it('ghế nộp có thật, khoá trường không trùng, trường tự điền có trong danh mục', () => {
+    for (const t of STANDARD_REPORT_TEMPLATES) {
+      for (const p of t.positions)
+        expect(known.has(key(p.seat)), `${t.code} → ${key(p.seat)}`).toBe(true)
+      const keys = t.fields.map((f) => f.key)
+      expect(new Set(keys).size, t.code).toBe(keys.length)
+      for (const f of t.fields) {
+        if (f.auto) expect(REPORT_AUTO_FIELDS[f.auto], `${t.code}.${f.key}`).toBeDefined()
+        if (f.requiredIf) expect(keys, `${t.code}.${f.key}`).toContain(f.requiredIf.field)
+      }
+    }
+  })
+
+  it('mẫu nộp trên điện thoại không có trường tiền — tiền chỉ ở máy của quán', () => {
+    for (const t of STANDARD_REPORT_TEMPLATES.filter((x) => x.kenhNv)) {
+      expect(
+        t.fields.some((f) => f.type === 'tien'),
+        t.code,
+      ).toBe(false)
+    }
   })
 })

@@ -10,6 +10,8 @@ import { RequirePermission } from '../identity/permission.guard'
 import { DocumentsService } from '../org/documents.service'
 import { OrgService, requireStaff } from '../org/org.service'
 import { TasksService } from '../org/tasks.service'
+import { IncidentsService } from '../work-reports/incidents.service'
+import { WorkReportsService } from '../work-reports/work-reports.service'
 
 /**
  * Hộp "Việc cần xử lý" — chỉ ĐẾM, không danh sách. Chuông ở Office và huy hiệu
@@ -28,6 +30,8 @@ export class InboxController {
     private readonly org: OrgService,
     private readonly docs: DocumentsService,
     private readonly tasks: TasksService,
+    private readonly reports: WorkReportsService,
+    private readonly incidents: IncidentsService,
   ) {}
 
   @Get('inbox')
@@ -38,6 +42,10 @@ export class InboxController {
     const counts: InboxCounts = {
       documents: await this.docs.counts(me.staffId),
       tasks: await this.tasks.counts(me.staffId),
+      reports: await this.reports.counts(me),
+    }
+    if (checkPermission('incident.manage', actorRoles(me)) !== 'deny') {
+      counts.incidents = await this.incidents.counts(me)
     }
     // Khiếu nại B13 đã nhận xử lý — hạn phản hồi đỏ trên hàng đợi thì chuông cũng phải đỏ
     if (checkPermission('feedback.respond', actorRoles(me)) !== 'deny') {

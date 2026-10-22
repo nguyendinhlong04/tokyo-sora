@@ -262,6 +262,10 @@ export interface InboxCounts {
   tasks: { open: number; overdue: number; toReview: number }
   /** Chỉ có với người xử lý khiếu nại (`feedback.respond`) */
   feedback?: { assigned: number; overdue: number }
+  /** Báo cáo tôi phải nộp (đến hạn hoặc quá hạn) · báo cáo chờ tôi xem */
+  reports: { due: number; overdue: number; toReview: number }
+  /** Chỉ có với người xử lý sự cố (`incident.manage`) */
+  incidents?: { open: number; severeOpen: number }
 }
 
 export interface MyOrgProfile {
