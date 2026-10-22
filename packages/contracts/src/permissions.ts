@@ -393,6 +393,20 @@ export const ACTIONS = {
     label: 'Sửa cơ cấu, chức danh, định biên; gán chức danh',
     grants: { R11: A, R13: A, R10: A },
   },
+  'doc.compose': {
+    label: 'Soạn văn bản nội bộ (thông báo, quyết định, quy định)',
+    grants: { R5: A, R6: A, R7: A, R8: A, R9: A, R11: A, R12: A, R13: A, R10: A },
+    note: 'Ai có tài khoản Office cũng soạn được — CHỮ KÝ mới là chốt chặn',
+  },
+  'doc.sign-notice': {
+    label: 'Ký ban hành thông báo (trong phạm vi)',
+    grants: { R7: A, R11: A, R13: A, R10: A },
+  },
+  'doc.sign-decision': {
+    label: 'Ký ban hành quyết định, quy định',
+    grants: { R11: A, R10: A },
+    note: 'Người đại diện chuỗi. Nhân sự (R13) soạn và trình quyết định nhân sự, không tự ký',
+  },
 } as const satisfies Record<string, ActionDef>
 
 export type ActionKey = keyof typeof ACTIONS

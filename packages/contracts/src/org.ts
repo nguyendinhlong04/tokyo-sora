@@ -119,6 +119,148 @@ export interface OrgAssignmentRow {
   createdAt: string
 }
 
+// ======================================================================= Văn bản
+
+export const DOC_KINDS = ['thong-bao', 'quyet-dinh', 'quy-dinh'] as const
+export type DocKind = (typeof DOC_KINDS)[number]
+
+export const DOC_KIND_LABELS: Record<DocKind, string> = {
+  'thong-bao': 'Thông báo',
+  'quyet-dinh': 'Quyết định',
+  'quy-dinh': 'Quy định',
+}
+
+export const DECISION_TYPES = [
+  'bo-nhiem',
+  'dieu-chuyen',
+  'mien-nhiem',
+  'khen-thuong',
+  'ky-luat',
+  'khac',
+] as const
+export type DecisionType = (typeof DECISION_TYPES)[number]
+
+export const DECISION_TYPE_LABELS: Record<DecisionType, string> = {
+  'bo-nhiem': 'Bổ nhiệm',
+  'dieu-chuyen': 'Điều chuyển',
+  'mien-nhiem': 'Miễn nhiệm',
+  'khen-thuong': 'Khen thưởng',
+  'ky-luat': 'Kỷ luật',
+  khac: 'Khác',
+}
+
+/** Quyết định đổi chức danh trên sơ đồ — áp vào cây đúng lúc ký, không thu hồi được */
+export const PERSONNEL_DECISIONS: readonly DecisionType[] = [
+  'bo-nhiem',
+  'dieu-chuyen',
+  'mien-nhiem',
+]
+
+export const DOC_STATES = ['draft', 'pending', 'issued', 'revoked'] as const
+export type DocState = (typeof DOC_STATES)[number]
+
+export const DOC_STATE_LABELS: Record<DocState, string> = {
+  draft: 'Nháp',
+  pending: 'Chờ ký',
+  issued: 'Đã ban hành',
+  revoked: 'Đã thu hồi',
+}
+
+/** Người nhận khai bằng QUY TẮC; danh sách người cụ thể chụp lại lúc ký */
+export type DocTarget =
+  | { kind: 'toan-chuoi' }
+  | { kind: 'chi-nhanh'; branchId: string }
+  | { kind: 'don-vi'; unitId: number; includeChildren: boolean }
+  | { kind: 'chuc-danh'; positionId: number }
+  | { kind: 'vai-tro'; role: Role; branchId: string | null }
+  | { kind: 'ca-nhan'; staffId: number }
+
+export interface DocAttachment {
+  name: string
+  /** Chỉ https — chưa có kho tệp, văn bản ký tay quét lên kho ngoài rồi dán link */
+  url: string
+}
+
+/** Một dòng của quyết định nhân sự: ai, vào/rời ghế nào, chính hay kiêm nhiệm */
+export interface PersonnelChange {
+  staffId: number
+  positionId: number
+  assignmentKind: AssignmentKind
+}
+
+export interface DocumentRow {
+  id: number
+  kind: DocKind
+  decisionType: DecisionType | null
+  /** Số hiệu cấp lúc ký: TB-2610-0001 · QD-… · QYD-… */
+  number: string | null
+  title: string
+  state: DocState
+  requiresAck: boolean
+  effectiveFrom: string
+  effectiveTo: string | null
+  authorId: number
+  authorName: string
+  signerId: number | null
+  signerName: string | null
+  signedAt: string | null
+  createdAt: string
+  /** Biên nhận: số người nhận, đã đọc, đã xác nhận (0 khi chưa ký) */
+  recipients: number
+  read: number
+  acked: number
+}
+
+export interface DocumentDetail extends DocumentRow {
+  body: string
+  attachments: DocAttachment[]
+  targets: DocTarget[]
+  changes: PersonnelChange[] | null
+  returnNote: string | null
+  revokedAt: string | null
+  revokeReason: string | null
+  /** Người chưa đọc / chưa xác nhận — chỉ tác giả, người ký, R10 · R11 · R13 thấy */
+  pending: { staffId: number; fullName: string; read: boolean }[] | null
+  /** Người xem này làm được gì với văn bản */
+  canEdit: boolean
+  canSign: boolean
+  canRevoke: boolean
+}
+
+export interface MyDocument {
+  id: number
+  kind: DocKind
+  decisionType: DecisionType | null
+  number: string | null
+  title: string
+  signerName: string | null
+  signedAt: string | null
+  effectiveFrom: string
+  requiresAck: boolean
+  readAt: string | null
+  ackedAt: string | null
+}
+
+export interface MyDocumentDetail extends MyDocument {
+  body: string
+  attachments: DocAttachment[]
+}
+
+/** Người ký hợp lệ cho một loại văn bản — có quyền ký VÀ đã có PIN */
+export interface SignerOption {
+  staffId: number
+  fullName: string
+  title: string | null
+}
+
+/**
+ * Hộp "Việc cần xử lý" — chỉ đếm. Mỗi giai đoạn thêm nhóm của mình; nhóm vắng
+ * mặt là chưa có, không phải bằng 0.
+ */
+export interface InboxCounts {
+  documents: { unread: number; toAck: number; toSign: number }
+}
+
 export interface MyOrgProfile {
   positions: {
     positionId: number

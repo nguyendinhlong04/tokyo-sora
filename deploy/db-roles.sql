@@ -42,6 +42,8 @@ FROM sora_app;
 -- canh nội dung; GRANT ... ON ALL TABLES ở trên cấp lại DELETE mỗi lần chạy file
 -- này, nên dòng thu hồi phải nằm ở đây chứ không chỉ trong migration.
 REVOKE DELETE ON position_assignments FROM sora_app;
+-- Biên nhận văn bản (đã đọc / đã xác nhận) là bằng chứng phổ biến quy định
+REVOKE DELETE ON org_document_receipts FROM sora_app;
 
 -- outbox_events: được đánh dấu đã phát và dọn retention, nội dung bất biến do
 -- trigger sora_outbox_guard canh.

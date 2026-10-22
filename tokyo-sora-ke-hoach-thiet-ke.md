@@ -181,8 +181,13 @@ Ma trận chỉ nói vai trò nào được đụng tới việc đó. Được 
 |---|---|---|---|---|---|---|---|---|---|---|
 | Xem sơ đồ tổ chức | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Sửa cơ cấu, chức danh, định biên; gán chức danh | – | – | – | – | – | – | ✓ | – | ✓ | ✓ |
+| Soạn văn bản nội bộ (thông báo, quyết định, quy định) | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Ký ban hành thông báo | – | – | – | ✓ | – | – | ✓ | – | ✓ | ✓ |
+| Ký ban hành quyết định, quy định | – | – | – | – | – | – | ✓ | – | – | ✓ |
 
 R1–R4 không mở Office: chức danh và cấp trên của họ hiện ở Kênh nhân viên. Không ai tự gán chức danh cho chính mình.
+
+**Văn bản** đi theo luồng ký: nháp → trình (chọn người ký) → người ký **nhập PIN của chính mình** → ban hành, có số hiệu `TB|QD|QYD-yyMM-NNNN` → thu hồi kèm lý do. Từ lúc trình, nội dung bị khoá ở tầng CSDL; người ký trả lại thì về nháp. Người ký chỉ ký được văn bản mà mọi người nhận nằm trong phạm vi của mình. Quyết định **bổ nhiệm / điều chuyển / miễn nhiệm** đổi sơ đồ ngay lúc ký và **không thu hồi được** — sai thì ban hành quyết định khác; người có tên trong quyết định không ký chính quyết định đó. Danh sách người nhận chụp lại lúc ký (không gồm người soạn và người ký); quy định còn hiệu lực tự đến tay người mới vào làm.
 
 ### 4.3 Ba quy tắc cứng
 

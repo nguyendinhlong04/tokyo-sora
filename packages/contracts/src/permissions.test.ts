@@ -118,6 +118,9 @@ const ORG_COLUMN_ORDER: Role[] = [
 const ORG_ROWS: [ActionKey, string][] = [
   ['org.view', '....xxxxxxxxx'],
   ['org.manage', '.........x.xx'],
+  ['doc.compose', '....xxxxxxxxx'],
+  ['doc.sign-notice', '......x..x.xx'],
+  ['doc.sign-decision', '.........x..x'],
 ]
 
 const SYMBOL: Record<string, Permission> = { '.': 'deny', x: 'allow', a: 'approve' }
@@ -177,6 +180,15 @@ describe('Ma trận khớp 1:1 với bảng §4.2c — Tổ chức & điều hà
   it('chỉ người nhìn toàn chuỗi mới sửa được sơ đồ — quản lý ca thì không', () => {
     const editors = ROLES.filter((r) => can('org.manage', [r]))
     expect(editors).toEqual(['R10', 'R11', 'R13'])
+  })
+
+  it('chỉ người đại diện chuỗi ký quyết định; quản lý ca chỉ ký thông báo', () => {
+    expect(ROLES.filter((r) => can('doc.sign-decision', [r]))).toEqual(['R10', 'R11'])
+    expect(can('doc.sign-notice', ['R7'])).toBe(true)
+    expect(isPermitted('doc.sign-decision', ['R7'])).toBe(false)
+    // Nhân sự soạn và trình quyết định bổ nhiệm, nhưng không tự ký
+    expect(can('doc.compose', ['R13'])).toBe(true)
+    expect(isPermitted('doc.sign-decision', ['R13'])).toBe(false)
   })
 
   it('marketing và điều phối có cửa "của tôi" — nhận việc, đọc văn bản như mọi người', () => {
@@ -329,6 +341,7 @@ describe('Bất biến của mô hình quyền', () => {
       'feedback.respond',
       'customer.view-book',
       'org.view',
+      'doc.compose',
     ])
     // Không một đồng nào, không một dòng tồn kho nào đi qua tay marketing
     expect(isPermitted('bill.discount-upto-10', ['R9'])).toBe(false)

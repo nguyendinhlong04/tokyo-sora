@@ -617,3 +617,71 @@ describe('Sơ đồ tổ chức — cây, chức danh, lịch sử giữ chức 
     await expect(db.exec(`DELETE FROM position_assignments`)).rejects.toThrow(/không xoá được/)
   })
 })
+
+describe('Văn bản — đóng băng từ lúc trình ký, biên nhận ghi một lần', () => {
+  const hoa = `(SELECT id FROM staff WHERE code = 'NV01')`
+  const minh = `(SELECT id FROM staff WHERE code = 'NV09')`
+
+  it('nháp sửa và xoá thoải mái', async () => {
+    await db.exec(`
+      INSERT INTO org_documents (kind, title, body, targets, effective_from, author_id)
+        VALUES ('thong-bao', 'Nháp', 'Nội dung', '[{"kind":"toan-chuoi"}]', '2026-10-22', ${hoa})
+    `)
+    await db.exec(`UPDATE org_documents SET body = 'Sửa nháp' WHERE title = 'Nháp'`)
+    await db.exec(`DELETE FROM org_documents WHERE title = 'Nháp'`)
+  })
+
+  it('đã ban hành thì không sửa nội dung, không xoá — chỉ thu hồi được, và phải đủ lý do', async () => {
+    await db.exec(`
+      INSERT INTO org_documents (kind, title, body, targets, effective_from, author_id, signer_id,
+                                 state, number, signed_at)
+        VALUES ('thong-bao', 'Đã ký', 'Nội dung', '[{"kind":"toan-chuoi"}]', '2026-10-22', ${hoa},
+                ${hoa}, 'issued', 'TB-2610-0001', now())
+    `)
+    await expect(
+      db.exec(`UPDATE org_documents SET body = 'Sửa lén' WHERE title = 'Đã ký'`),
+    ).rejects.toThrow(/không sửa được/)
+    await expect(db.exec(`DELETE FROM org_documents WHERE title = 'Đã ký'`)).rejects.toThrow(
+      /không xoá được/,
+    )
+    await expect(
+      db.exec(
+        `UPDATE org_documents SET state = 'revoked', revoked_at = now() WHERE title = 'Đã ký'`,
+      ),
+    ).rejects.toThrow(/org_documents_revoked_check/)
+    await db.exec(`
+      UPDATE org_documents SET state = 'revoked', revoked_at = now(), revoked_by = ${hoa},
+                               revoke_reason = 'Sai ngày áp dụng'
+       WHERE title = 'Đã ký'
+    `)
+  })
+
+  it('quyết định nhân sự phải kèm danh sách thay đổi; khen thưởng thì không', async () => {
+    await expect(
+      db.exec(`
+        INSERT INTO org_documents (kind, decision_type, title, body, targets, effective_from, author_id)
+          VALUES ('quyet-dinh', 'bo-nhiem', 'Bổ nhiệm', 'x', '[]', '2026-10-22', ${hoa})
+      `),
+    ).rejects.toThrow(/org_documents_changes_check/)
+    await expect(
+      db.exec(`
+        INSERT INTO org_documents (kind, decision_type, title, body, targets, effective_from, author_id)
+          VALUES ('thong-bao', 'khen-thuong', 'Lẫn loại', 'x', '[]', '2026-10-22', ${hoa})
+      `),
+    ).rejects.toThrow(/org_documents_decision_type_check/)
+  })
+
+  it('biên nhận: mốc đọc ghi đúng một lần, không xoá', async () => {
+    const doc = `(SELECT id FROM org_documents WHERE title = 'Đã ký')`
+    await db.exec(
+      `INSERT INTO org_document_receipts (document_id, staff_id) VALUES (${doc}, ${minh})`,
+    )
+    await db.exec(`UPDATE org_document_receipts SET read_at = '2026-10-22T09:00:00Z'`)
+    // Ghi lại đúng giá trị cũ (coalesce ở service) là được, đổi giá trị thì không
+    await db.exec(`UPDATE org_document_receipts SET read_at = '2026-10-22T09:00:00Z'`)
+    await expect(
+      db.exec(`UPDATE org_document_receipts SET read_at = '2026-10-23T09:00:00Z'`),
+    ).rejects.toThrow(/chỉ được ghi thêm/)
+    await expect(db.exec(`DELETE FROM org_document_receipts`)).rejects.toThrow(/không xoá được/)
+  })
+})

@@ -6,6 +6,7 @@ import { AccountingModule } from './modules/accounting/accounting.module'
 import { CrmModule } from './modules/crm/crm.module'
 import { ExpensesModule } from './modules/expenses/expenses.module'
 import { HrModule } from './modules/hr/hr.module'
+import { InboxModule } from './modules/inbox/inbox.module'
 import { Public } from './modules/identity/auth.guard'
 import { IdentityModule } from './modules/identity/identity.module'
 import { InventoryModule } from './modules/inventory/inventory.module'
@@ -45,6 +46,7 @@ class HealthController {
     ExpensesModule,
     HrModule,
     OrgModule,
+    InboxModule,
     AccountingModule,
     CrmModule,
     ReportsModule,
