@@ -850,3 +850,62 @@ describe('Kỳ lương đã duyệt chảy vào dòng Nhân sự của F7', () =
     expect(body.primeCost.blockedBy).toContain('doanh thu')
   })
 })
+
+// Đặt cuối file: hồ sơ của quản lý ca tạo ở đây sẽ làm lệch tổng lương mà các
+// khối H7/F7 bên trên đã chốt con số
+describe('H5 — không ai tự duyệt yêu cầu của chính mình', () => {
+  it('quản lý ca xin nghỉ thì người khác phải duyệt', async () => {
+    const profile = await inject({
+      method: 'POST',
+      url: '/api/hr/employees',
+      headers: bearer(hrManager),
+      payload: {
+        staffId: fx.managerId,
+        branchId: fx.branchId,
+        position: 'Quản lý ca',
+        payKind: 'monthly',
+        hourlyRateVnd: 0,
+        monthlySalaryVnd: 12_000_000,
+        fixedAllowanceVnd: 0,
+        startedOn: '2026-01-05',
+        endedOn: null,
+        bankAccount: null,
+        active: true,
+      },
+    })
+    expect(profile.statusCode, profile.payload).toBe(201)
+
+    const sent = await inject({
+      method: 'POST',
+      url: '/api/hr/leaves',
+      headers: bearer(shiftLead),
+      payload: {
+        branchId: fx.branchId,
+        employeeId: profile.json<{ id: number }>().id,
+        kind: 'nghi-phep',
+        fromDate: day(12),
+        toDate: day(12),
+        reason: 'Đi khám',
+      },
+    })
+    expect(sent.statusCode, sent.payload).toBe(201)
+    const id = sent.json<{ id: number }>().id
+
+    const self = await inject({
+      method: 'POST',
+      url: `/api/hr/leaves/${id}/decision`,
+      headers: bearer(shiftLead),
+      payload: { branchId: fx.branchId, approve: true, note: null },
+    })
+    expect(self.statusCode).toBe(403)
+    expect(self.json<{ code: string }>().code).toBe('self_decision')
+
+    const other = await inject({
+      method: 'POST',
+      url: `/api/hr/leaves/${id}/decision`,
+      headers: bearer(hrManager),
+      payload: { branchId: fx.branchId, approve: true, note: null },
+    })
+    expect(other.statusCode, other.payload).toBe(201)
+  })
+})
