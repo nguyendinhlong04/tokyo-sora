@@ -19,6 +19,8 @@
  * chọn chương trình soạn trước, để cùng một giỏ luôn ra cùng một kết quả.
  */
 
+import { allocateByWeight } from './money.js'
+
 export const PROMOTION_SCOPES = ['item', 'bill'] as const
 export type PromotionScope = (typeof PROMOTION_SCOPES)[number]
 
@@ -142,6 +144,15 @@ export interface LineDiscount {
 export interface BillDiscount {
   promotionId: number
   discountVnd: number
+  /**
+   * Phần giảm chia về từng dòng (khoá dòng → đồng), tổng đúng bằng `discountVnd`.
+   *
+   * Hoá đơn GTGT ghi tiền thuế theo từng thuế suất, nên phải biết phần giảm hoá
+   * đơn rơi vào món ăn (8%) bao nhiêu, bia rượu (10%) bao nhiêu. Giảm % và giảm
+   * tiền chia theo đúng phần tiền đã dùng để tính ra mức giảm — các phần chưa được
+   * giảm món; tặng món thì cả phần giảm nằm ở dòng được tặng.
+   */
+  shares: Record<string, number>
 }
 
 /** Chương trình có chạy cho đơn này vào lúc này không — chưa xét món hay số tiền */
@@ -332,20 +343,32 @@ export function priceBill(
   lines: readonly PricedLine[],
 ): BillDiscount | null {
   const net = lines.reduce((s, l) => s + lineGross(l) - l.discountVnd, 0)
-  const base = lines.reduce(
-    (s, l) => s + (l.qty - (l.promotionId === null ? 0 : l.promoQty)) * l.unitPrice,
-    0,
-  )
+  const base = lines.reduce((s, l) => s + billableOf(l), 0)
 
-  let best: BillDiscount | null = null
+  let best: { promotionId: number; off: number; giftKey: string | null } | null = null
   for (const rule of rules.filter((r) => r.scope === 'bill' && ruleRunsAt(r, ctx, at)).sort(byId)) {
-    const off = billDiscountOf(rule, lines, net, base, ctx.maxDiscountRate)
-    if (off > 0 && (best === null || off > best.discountVnd)) {
-      best = { promotionId: rule.id, discountVnd: off }
+    const { off, giftKey } = billDiscountOf(rule, lines, net, base, ctx.maxDiscountRate)
+    if (off > 0 && (best === null || off > best.off)) {
+      best = { promotionId: rule.id, off, giftKey }
     }
   }
-  return best
+  if (best === null) return null
+
+  const shares: Record<string, number> = {}
+  if (best.giftKey !== null) {
+    shares[best.giftKey] = best.off
+  } else {
+    const parts = allocateByWeight(best.off, lines.map(billableOf))
+    lines.forEach((l, i) => {
+      if (parts[i]! > 0) shares[l.key] = parts[i]!
+    })
+  }
+  return { promotionId: best.promotionId, discountVnd: best.off, shares }
 }
+
+/** Tiền các phần CHƯA được giảm món của một dòng — nền để tính giảm hoá đơn */
+const billableOf = (l: PricedLine) =>
+  (l.qty - (l.promotionId === null ? 0 : l.promoQty)) * l.unitPrice
 
 function billDiscountOf(
   rule: PromotionRule,
@@ -353,43 +376,47 @@ function billDiscountOf(
   net: number,
   base: number,
   maxRate: number,
-): number {
+): { off: number; giftKey: string | null } {
   const legal = (off: number, of: number) =>
     rule.concentrated ? off : Math.min(off, Math.floor(of * maxRate))
+  const none = { off: 0, giftKey: null }
   switch (rule.kind) {
     case 'percent': {
-      if (net < rule.minOrderVnd) return 0
+      if (net < rule.minOrderVnd) return none
       const raw = Math.floor((base * (rule.percentBp ?? 0)) / 10_000)
-      return legal(capped(raw, rule.maxDiscountVnd), base)
+      return { off: legal(capped(raw, rule.maxDiscountVnd), base), giftKey: null }
     }
     case 'amount': {
-      if (net < rule.minOrderVnd) return 0
+      if (net < rule.minOrderVnd) return none
       // Không giảm quá tiền món: đơn 30.000₫ gặp chương trình giảm 50.000₫ không thành bill âm
-      return legal(capped(Math.min(rule.amountVnd ?? 0, base), rule.maxDiscountVnd), base)
+      return {
+        off: legal(capped(Math.min(rule.amountVnd ?? 0, base), rule.maxDiscountVnd), base),
+        giftKey: null,
+      }
     }
     case 'free_dish': {
       const gifts = lines.filter(
         (l) => l.dishId === rule.giftDishId && l.promotionId === null && l.qty > 0,
       )
-      if (gifts.length === 0) return 0
+      if (gifts.length === 0) return none
       // Tặng MỘT phần, phần rẻ nhất — khách gọi ba phần thì được tặng một
       const gift = gifts.reduce((a, b) => (b.unitPrice < a.unitPrice ? b : a))
       const value = capped(gift.unitPrice, rule.maxDiscountVnd)
       // Đơn tối thiểu và trần luật tính trên phần khách MUA, không gồm món được tặng
       const paid = net - gift.unitPrice
-      if (paid < rule.minOrderVnd) return 0
+      if (paid < rule.minOrderVnd) return none
       if (rule.targetDishIds.length + rule.targetCategoryIds.length > 0) {
         const bought = lines.some(
           (l) => ruleTargets(rule, l.dishId, l.categoryId) && (l !== gift || l.qty > 1),
         )
-        if (!bought) return 0
+        if (!bought) return none
       }
       // Món tặng quá nửa giá trị phần mua thì không được tặng — tặng một phần món là vô nghĩa
-      if (!rule.concentrated && value > Math.floor(paid * maxRate)) return 0
-      return value
+      if (!rule.concentrated && value > Math.floor(paid * maxRate)) return none
+      return { off: value, giftKey: gift.key }
     }
     default:
-      return 0
+      return none
   }
 }
 
