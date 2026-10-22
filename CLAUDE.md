@@ -289,10 +289,14 @@ cho mọi route ghi mà client có thể gửi lại. Không DTO class, không c
 **Service:** `@Inject(DB) db: Db`; mọi ghi trong `db.transaction(async (tx) => …)`; hàm
 cần vào cùng transaction nhận `tx` **làm tham số đầu**: `emit(tx, {branchId, topic, rooms,
 payload})`, `audit.write(tx, …)`, `approvals.authorize(tx, …)`, `inventory.postSaleForTicket(tx, …)`.
+Trong transaction **mọi truy vấn** đi qua `tx`, kể cả hàm đọc của service khác: hàm gọi được
+cả ngoài lẫn trong transaction nhận `db: DbOrTx = this.db` ở **cuối** (`verifyPinOnly`,
+`assertOpen`, `workedSplits`…) và nơi gọi truyền `tx` — Vercel pool chỉ một kết nối, đọc bằng
+`this.db` lúc transaction đang giữ nó là tự chờ 10 s rồi 500.
 Đồng thời được **ép ở DB**, không read-then-write: partial unique index
 (`table_sessions_one_live_per_table`, `table_devices_one_host`), `UPDATE … WHERE remaining >= qty`,
-UPSERT…RETURNING. Tham số nghiệp vụ nằm trong bảng `parameters` (`ParamsService`), không
-phải env.
+UPSERT…RETURNING. Tham số nghiệp vụ nằm trong bảng `parameters` (`ParamsService` — cache nạp
+lúc khởi động, chèn thẳng bảng thì gọi `reload()`), không phải env.
 
 **Lỗi:** ném Nest exception với `{ code: 'snake_case', message: 'tiếng Việt', …extra }`
 (`reroute_confirm`, `table_reserved`, `requires_approval`, `dish_sold_out`, `bill_has_money`,
@@ -470,22 +474,29 @@ ra log hay chat.
 - **Test domain thuần** `src/modules/*/domain/*.test.ts` cạnh file nguồn (25 file) —
   không DB, chạy ở mọi máy. Fixture ở `kitchen/domain/__fixtures__/`.
 - **Test PGlite** (`new PGlite()` + `runMigrations`) — 3 file, kiểm schema/trigger.
-- **Test tích hợp** `src/test/*.e2e.test.ts` (27 file, ~720 case): `bootTestApp()` trong
+- **Test tích hợp** `src/test/*.e2e.test.ts` (28 file, ~725 case): `bootTestApp()` trong
   `src/test/harness.ts` **DROP SCHEMA** trên `TEST_DATABASE_URL`, chạy migration, seed
   fixture (chi nhánh `cg`, 6 trạm, bàn A4 có bếp / 05 không bếp, 4 nhân viên có PIN), boot
   cả `AppModule`, gọi bằng `app.inject` với `Authorization: Bearer` + `x-sora-device`.
-  Không mock, không factory. `fileParallelism: false`, timeout 30 s.
+  Không mock, không factory. `fileParallelism: false`, timeout 30 s. Riêng
+  `pool-one-connection.e2e.test.ts` dựng app với pool **1 kết nối** như Vercel và đi qua các
+  luồng từng tự kẹt (§11 mục 7); file khác giữ pool mặc định vì org-tasks có ca đua thật.
 - **Front-end: 0 test tự động.** Kiểm bằng typecheck + lint + build + mở app đúng viewport.
-- Trên máy chưa có Postgres: `pnpm -r test` → domain + PGlite xanh (605 case), 27 file e2e
+- Trên máy chưa có Postgres: `pnpm -r test` → domain + PGlite xanh (605 case), 28 file e2e
   ném "Thiếu TEST_DATABASE_URL" — đó là thiếu môi trường, không phải lỗi code.
-- 22/10/2026 cả bộ e2e đã chạy trên PGlite qua một lớp giả `pg` giữ nguyên ngữ nghĩa
-  node-postgres và pool **1 kết nối** như Vercel (lớp giả không nằm trong repo): 1287 xanh;
-  36 đỏ đều đỏ sẵn ở `074a7cf` — nguyên nhân ở §11 mục 7 và 8.
+- 22/10/2026 cả bộ e2e đã chạy với pool **1 kết nối** như Vercel: trên PGlite (lớp giả `pg`
+  ngoài repo, rồi `pg` thật + `DATABASE_POOL_MAX=1` qua `@electric-sql/pglite-socket`) 36 đỏ
+  trước khi sửa §11 mục 7; sau khi sửa còn 14, trên PGlite lẫn Postgres 16 thật
+  (`embedded-postgres` từ npm) — 12 ca hr.e2e (mục 8), B15 của crm.e2e (khung ngày cố định
+  05–08/2026, cùng bệnh mục 8), sổ COD của online-order; cả 14 đều đỏ sẵn ở `074a7cf`.
 
 **Quy tắc khi làm việc**
 - Sửa bug nghiệp vụ → viết test tái hiện trước (domain nếu được, e2e nếu đụng DB/quyền),
   rồi sửa cho xanh. Endpoint mới hoặc đổi quyền → có e2e đi qua `AuthGuard` thật.
 - Đổi `packages/contracts` (tiền, quyền, schema) → chạy test của gói + e2e liên quan.
+- Đụng transaction, hoặc hàm có thể bị gọi từ trong transaction → chạy e2e liên quan với
+  `DATABASE_POOL_MAX=1`; luồng mới đọc chéo service trong transaction thì thêm ca vào
+  `pool-one-connection.e2e.test.ts`.
 - Đổi UI → chạy `pnpm lint && pnpm -r typecheck && pnpm --filter <app> build`, mở app
   trong trình duyệt ở viewport đích, chụp màn trước/sau khi là thay đổi bố cục.
 - Đổi luồng tại quán → đi lại **bài kiểm 5 phút** trong `THIET-BI.md` (ghép máy, PIN,
@@ -719,13 +730,13 @@ Mỗi bước một nhánh, một PR, có test theo §7 và số đo theo §8.
 5. Kiosk ghép máy: một `catch` chung (`apps/kiosk/src/screens/Pair.tsx:21-38`) — ghép
    thành công nhưng `me()` lỗi vẫn báo "Mã không đúng" (KDS đã sửa ở `04ffd9b`).
 6. CI không chạy trên nhánh làm việc và không có Postgres (§7).
-7. **Pool 1 kết nối tự kẹt** (Vercel, `DATABASE_POOL_MAX` không đặt): truy vấn qua `this.db`
-   bên trong `db.transaction(...)` chờ đúng transaction đang giữ kết nối duy nhất → treo 10 s
-   rồi lỗi 500. Đã thấy ở `IdentityService.verifyPinOnly` gọi trong `ApprovalService.authorize(tx)`
-   — **mọi luồng duyệt PIN △** —, `HrService.computeDraft` → `TimesheetService.workedSplits`
-   (H7 Tính nháp), `PeriodLockService.assertOpen`, `CatalogAdminService.announceCategories`
-   (M10); cả `ParamsService` khi cache chưa nạp (instance vừa khởi động). Máy dev pool 10
-   không lộ. Hàm chạy trong transaction phải nhận `tx` (§5.2).
+7. **Pool 1 kết nối** (Vercel, `DATABASE_POOL_MAX` không đặt) — các chỗ tự kẹt đã biết **đã
+   sửa 22/10/2026**: `verifyPinOnly`/`rolesOf` (mọi luồng duyệt PIN △), `workedSplits` +
+   `openAdvances` (H7 Tính nháp), `assertOpen` lúc duyệt phiếu chi, `announceCategories` (M10)
+   giờ đọc bằng `tx` (§5.2); `ParamsService` nạp cache lúc khởi động vì tham số được đọc trong
+   transaction ở ~36 chỗ (tính tiền, vé bếp, thanh toán, webhook…). Còn hở: nạp lúc khởi động
+   mà hỏng thì quay về nạp lười — lần đọc đầu nằm trong transaction vẫn kẹt; và chỉ
+   `pool-one-connection.e2e` chạy pool 1, chỗ kẹt mới ở luồng khác không tự lộ (§7).
 8. `src/test/hr.e2e.test.ts` dùng tuần cố định `2026-08-03`, nay đã qua: sửa lịch tuần đã
    qua là `timesheet.edit-manual` (△ với R7) nên nhóm H2–H7 đỏ dây chuyền, cả trên Postgres
    thật. Tính tuần từ ngày chạy test.

@@ -1,6 +1,7 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common'
 import { and, eq, inArray } from 'drizzle-orm'
 import { DB } from './db.module'
+import type { DbOrTx } from './tx'
 import type { Db } from '../db/client'
 import { periodLocks } from '../db/schema'
 
@@ -45,12 +46,20 @@ export class PeriodLockService {
    * Nhận NHIỀU ngày vì một thao tác có thể trải qua nhiều tháng — tuần lịch vắt
    * qua mốc tháng là chuyện thường, và khoá một trong hai tháng đó là đủ để cả
    * tuần không sửa được.
+   *
+   * Gọi từ trong transaction thì truyền `tx`: trên Vercel pool chỉ có một kết nối
+   * và transaction đang giữ nó — đọc bằng `this.db` là chờ chính mình tới khi hết hạn.
    */
-  async assertOpen(branchId: string, businessDates: string[], what: string): Promise<void> {
+  async assertOpen(
+    branchId: string,
+    businessDates: string[],
+    what: string,
+    db: DbOrTx = this.db,
+  ): Promise<void> {
     const months = [...new Set(businessDates.map(monthOf))]
     if (months.length === 0) return
 
-    const rows = await this.db
+    const rows = await db
       .select({ month: periodLocks.month })
       .from(periodLocks)
       .where(and(eq(periodLocks.branchId, branchId), inArray(periodLocks.month, months)))

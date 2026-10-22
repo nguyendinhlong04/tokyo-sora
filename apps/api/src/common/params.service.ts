@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common'
 import { and, eq, isNull, or } from 'drizzle-orm'
 import { DB } from './db.module'
 import type { Db } from '../db/client'
@@ -11,12 +11,28 @@ import { parameterHistory, parameters } from '../db/schema'
  * nhưng đổi rất ít. Invalidate bằng `reload()` khi có sự kiện `param.updated`.
  */
 @Injectable()
-export class ParamsService {
+export class ParamsService implements OnModuleInit {
   /** key → (branchId | '*') → value */
   private cache = new Map<string, Map<string, unknown>>()
   private loaded = false
 
   constructor(@Inject(DB) private readonly db: Db) {}
+
+  /**
+   * Nạp cache ngay lúc khởi động, trước request đầu tiên.
+   *
+   * Nạp lười thì lần đọc đầu tiên của một instance thường nằm TRONG transaction
+   * (tính tiền, đổi trạng thái vé, duyệt PIN…). Trên Vercel pool chỉ có một kết
+   * nối và transaction đang giữ nó: câu nạp cache chờ chính transaction đó tới khi
+   * hết hạn kết nối rồi 500 — mỗi instance vừa khởi động dính một lần.
+   *
+   * Nạp hỏng (CSDL chưa sẵn sàng) thì KHÔNG chặn khởi động: Vercel giữ lại promise
+   * khởi tạo, chặn ở đây là instance chết hẳn. Lần đọc đầu sẽ nạp lại như trước.
+   * Hệ quả cho test: chèn thẳng bảng `parameters` sau khi app chạy thì gọi `reload()`.
+   */
+  async onModuleInit() {
+    await this.reload().catch(() => undefined)
+  }
 
   async reload(): Promise<void> {
     const rows = await this.db.select().from(parameters)

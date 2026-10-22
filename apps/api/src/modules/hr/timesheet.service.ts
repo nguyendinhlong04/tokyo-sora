@@ -10,6 +10,7 @@ import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { businessDateOf, startOfBusinessDay } from '../../common/business-date'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
+import type { DbOrTx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
   branches,
@@ -741,14 +742,17 @@ export class TimesheetService {
    *
    * `HrService.computeDraft` gọi hàm này thay vì tự đọc lịch. Loại ngày lấy từ ca
    * đã xếp — bản ghi chấm công không tự khai được nó là ngày lễ.
+   *
+   * Nơi gọi đang ở trong transaction thì truyền `tx` — xem `IdentityService.verifyPinOnly`.
    */
   async workedSplits(
     branchId: string,
     range: { from: string; to: string },
     rates: PayrollRates,
+    db: DbOrTx = this.db,
   ): Promise<Map<number, { worked: number; otNormal: number; otRest: number; otHoliday: number }>> {
     const [entries, shifts] = await Promise.all([
-      this.db
+      db
         .select()
         .from(timeEntries)
         .where(
@@ -758,7 +762,7 @@ export class TimesheetService {
             lte(timeEntries.workDate, range.to),
           ),
         ),
-      this.db
+      db
         .select()
         .from(scheduleEntries)
         .where(

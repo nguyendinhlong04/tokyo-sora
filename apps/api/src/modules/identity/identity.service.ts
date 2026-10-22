@@ -10,6 +10,7 @@ import type { Role } from '@sora/contracts'
 import { and, eq, gt, isNotNull, isNull, sql } from 'drizzle-orm'
 import { DB } from '../../common/db.module'
 import { ParamsService } from '../../common/params.service'
+import type { DbOrTx } from '../../common/tx'
 import type { Db } from '../../db/client'
 import {
   devices,
@@ -258,8 +259,8 @@ export class IdentityService {
   }
 
   /** Vai trò ở một chi nhánh = vai trò gán riêng chi nhánh + vai trò toàn chuỗi */
-  async rolesOf(staffId: number, branchId: string): Promise<Role[]> {
-    const rows = await this.db
+  async rolesOf(staffId: number, branchId: string, db: DbOrTx = this.db): Promise<Role[]> {
+    const rows = await db
       .select({ roleCode: staffRoles.roleCode })
       .from(staffRoles)
       .where(
@@ -455,18 +456,23 @@ export class IdentityService {
    * `throttleKey` do nơi gọi đặt: luồng duyệt khoá theo CẶP người xin–người duyệt,
    * để người xin chỉ tự khoá được chính mình chứ không khoá PIN của quản lý cho
    * cả ca; luồng ký khoá theo người ký.
+   *
+   * Luồng duyệt gọi hàm này TỪ TRONG transaction (`ApprovalService.authorize`) nên
+   * phải truyền `tx`: trên Vercel pool chỉ có một kết nối và transaction đang giữ
+   * nó — đọc bằng `this.db` là chờ chính mình tới khi hết hạn kết nối rồi 500.
    */
   async verifyPinOnly(
     staffId: number,
     pin: string,
     branchId: string,
     throttleKey: string,
+    db: DbOrTx = this.db,
   ): Promise<Role[] | null> {
     const max = await this.params.getNumber('auth.pinMaxAttemptsPerMinute', 5, branchId)
     const lockout = await this.params.getNumber('auth.pinLockoutMinutes', 5, branchId)
     this.throttle.check(throttleKey, max, lockout)
 
-    const [person] = await this.db
+    const [person] = await db
       .select()
       .from(staff)
       .where(and(eq(staff.id, staffId), eq(staff.active, true)))
@@ -476,7 +482,7 @@ export class IdentityService {
       return null
     }
     this.throttle.succeed(throttleKey)
-    return this.rolesOf(person.id, branchId)
+    return this.rolesOf(person.id, branchId, db)
   }
 
   // -------------------------------------------------------- Giải mã token

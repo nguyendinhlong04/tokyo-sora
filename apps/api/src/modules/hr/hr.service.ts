@@ -622,6 +622,7 @@ export class HrService {
         period.branchId,
         { from: period.periodStart, to: period.periodEnd },
         rates,
+        tx,
       )
 
       /**
@@ -654,6 +655,7 @@ export class HrService {
         period.branchId,
         period.periodStart,
         period.periodEnd,
+        tx,
       )
 
       const rows = people.map(({ employee, fullName }) => {
