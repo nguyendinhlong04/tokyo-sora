@@ -43,6 +43,9 @@ const EinvoiceBody = z.object({
   branchId: z.string().min(1),
   /** Cấp chuỗi — §30.2: một mã số thuế, một hợp đồng HĐĐT */
   taxCode: z.string().max(20).optional(),
+  /** Đúng như giấy đăng ký doanh nghiệp — in trên mọi hoá đơn */
+  sellerName: z.string().max(200).optional(),
+  sellerAddress: z.string().max(300).optional(),
   provider: z.string().max(120).optional(),
   certificateSerial: z.string().max(80).optional(),
   certificateExpiry: z.string().max(10).optional(),
