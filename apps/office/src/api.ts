@@ -2114,7 +2114,13 @@ export const api = {
     }),
 
   me: () =>
-    apiFetch<{ kind: string; branchId: string; fullName?: string; roles?: string[] }>('/api/auth/me'),
+    apiFetch<{
+      kind: string
+      branchId: string
+      staffId?: number
+      fullName?: string
+      roles?: string[]
+    }>('/api/auth/me'),
 
   logout: () => apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 

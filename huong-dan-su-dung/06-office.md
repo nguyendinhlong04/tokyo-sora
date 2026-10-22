@@ -265,7 +265,10 @@ gia vị… **Bỏ trống là hợp lệ ở mọi ô** — trang web tự lùi
   nhưng Office chưa dựng nút — hiện phát hành do kỹ thuật chạy lệnh
   (`db:dev-bootstrap` trên máy dev). Các màn cần phát hành lại sau khi sửa: A3
   sơ đồ bàn, A5 máy in, M1/M10/M11 phần cờ kênh.
-- **Luồng duyệt bằng PIN trên Office mới có ở B11 (bật khuyến mãi).** Các chỗ
+- **Luồng duyệt bằng PIN trên Office mới có ở B11 (bật khuyến mãi)** — marketing
+  bấm **Bật** thì hiện dải nhập mã nhân viên + PIN của quản lý chuỗi hoặc chủ quán.
+  Nhập sai PIN 5 lần trong một phút là khoá 5 phút (chỉ khoá đúng cặp người xin –
+  người duyệt, PIN của quản lý vẫn dùng được ở chỗ khác). Các chỗ
   khác vượt hạn mức (phiếu chi của quản lý ca, điều chỉnh tồn của thủ kho, huỷ
   hoá đơn) hiện báo *"cần người duyệt, mà luồng duyệt bằng PIN chưa có trên
   Office"* — tạm thời để người có quyền cao hơn tự thao tác.

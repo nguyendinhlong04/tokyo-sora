@@ -1,4 +1,4 @@
-import { checkPermission, type ActionKey, type Role } from '@sora/contracts'
+import { checkPermission, needsApproval, type ActionKey, type Role } from '@sora/contracts'
 import {
   createContext,
   useCallback,
@@ -11,6 +11,8 @@ import {
 import { api } from './api'
 
 interface OfficeSession {
+  /** Để lọc "của tôi" và loại chính mình khỏi danh sách người duyệt/người ký */
+  staffId: number
   fullName: string
   roles: Role[]
 }
@@ -20,6 +22,7 @@ interface SessionValue {
   staff: OfficeSession | null
   ready: boolean
   can: (action: ActionKey) => boolean
+  mustApprove: (action: ActionKey) => boolean
   signIn: (branchId: string, staff: OfficeSession) => void
   signOut: () => Promise<void>
 }
@@ -52,8 +55,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       .then((me) => {
         if (cancelled) return
         setBranchId(me.branchId)
-        if (me.kind === 'staff' && me.fullName) {
-          setStaff({ fullName: me.fullName, roles: (me.roles ?? []) as Role[] })
+        if (me.kind === 'staff' && me.fullName && me.staffId) {
+          setStaff({
+            staffId: me.staffId,
+            fullName: me.fullName,
+            roles: (me.roles ?? []) as Role[],
+          })
         }
       })
       .catch(() => undefined)
@@ -76,15 +83,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /**
    * Quyền tính ở máy trạm chỉ để làm mờ nút và ẩn màn không dùng được — guard ở
    * máy chủ mới là thứ cưỡng chế.
+   *
+   * `can` trả true cho CẢ ✓ lẫn △: người ở ô △ vẫn phải thấy nút, chỉ là bấm thì
+   * cần PIN người duyệt. Muốn biết có phải hỏi PIN không thì dùng `mustApprove`
+   * — viết `!can(...)` để suy ra △ là sai, vì nó luôn ra false với chính người
+   * cần duyệt.
    */
   const can = useCallback(
     (action: ActionKey) => checkPermission(action, staff?.roles ?? []) !== 'deny',
     [staff],
   )
 
+  const mustApprove = useCallback(
+    (action: ActionKey) => needsApproval(action, staff?.roles ?? []),
+    [staff],
+  )
+
   const value = useMemo(
-    () => ({ branchId, staff, ready, can, signIn, signOut }),
-    [branchId, staff, ready, can, signIn, signOut],
+    () => ({ branchId, staff, ready, can, mustApprove, signIn, signOut }),
+    [branchId, staff, ready, can, mustApprove, signIn, signOut],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
