@@ -12,6 +12,7 @@ cho một nhóm người dùng — in riêng chương cần thiết phát cho đ
 | [5 · Sora Web](05-website-dat-mon-dat-ban.md) | Quản lý · marketing | Website khách: đặt món online, đặt bàn, nội dung |
 | [6 · Sora Office](06-office.md) | Chủ · quản lý chuỗi · kế toán · thủ kho · nhân sự · marketing | Món & giá, kho, kinh doanh & CRM, nhân sự, chi phí, kế toán, quản trị |
 | [7 · Kênh nhân viên & kiosk chấm công](07-nhan-vien-cham-cong.md) | Mọi nhân viên · quản lý nhân sự | Xem lịch/công/phiếu lương, chấm công vào–ra |
+| [Sổ tay Tổ chức & điều hành](so-tay-to-chuc-dieu-hanh.html) | Chủ · quản lý · nhân sự · nhân viên | Từng bước N1–N15 có hình phác màn hình và ví dụ: sơ đồ, văn bản, việc & SOP theo ca, báo cáo, sự cố, KPI → thưởng H7. Mở bằng trình duyệt |
 
 Tài liệu kỹ thuật liên quan (ở thư mục gốc):
 

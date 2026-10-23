@@ -143,6 +143,10 @@ flowchart LR
 Sơ đồ tổ chức là trục của giao việc, văn bản, báo cáo và KPI: **cấp trên trực
 tiếp** của một người là người ngồi ghế **trưởng** của đơn vị gần nhất phía trên.
 
+> Hướng dẫn từng bước có hình phác màn hình và ví dụ cho cả nhóm này (Office và Kênh
+> nhân viên): [Sổ tay Tổ chức & điều hành](so-tay-to-chuc-dieu-hanh.html) — mở bằng
+> trình duyệt. Mục dưới đây là bản tóm tắt.
+
 | Màn | Dùng để |
 |---|---|
 | **N1 · Bàn làm việc** | Trang mở đầu: việc của tôi (quá hạn → hôm nay → sắp tới), báo cáo cần nộp, việc chờ tôi nghiệm thu, văn bản cần đọc/ký, phiếu KPI của tôi và phiếu chờ tôi chấm, khiếu nại tôi đang xử lý; nút **Báo sự cố**. Bấm một việc để tích checklist, nộp, nghiệm thu; bấm một báo cáo để điền và nộp |
@@ -193,8 +197,12 @@ trước khi dùng làm căn cứ tuyển dụng.
 - **Nghiệm thu đạt** hoặc **Trả lại…** kèm lý do — việc về "đang làm", người làm thấy
   lý do và nộp lại. **Huỷ việc…** khi không cần làm nữa (bắt buộc lý do); việc đã xong
   hoặc đã huỷ là hồ sơ, không sửa được.
-- **Quá hạn** = còn đang làm mà đã qua hạn: chữ đỏ ghi "Quá hạn N giờ". Việc đã quá
-  hạn **không dời hạn được** — muốn làm lại thì huỷ kèm lý do rồi giao việc mới.
+- **Quá hạn** = còn đang làm mà đã qua hạn: chữ đỏ ghi "Quá hạn N phút / giờ / ngày".
+  Việc đã quá hạn **không dời hạn được** — muốn làm lại thì huỷ kèm lý do rồi giao việc
+  mới. Bản hiện tại **chưa có nút sửa việc đã giao** (tên, hạn, ghi chú) — cũng huỷ rồi
+  giao lại.
+- Trên điện thoại chỉ người **được chỉ định** nghiệm thu mới nghiệm thu được; quản lý
+  theo sơ đồ mà không được chỉ định thì nghiệm thu ở N5 hoặc N6 trên Office.
 - Ai giao được cho ai: trưởng một đơn vị giao trong cây con của đơn vị đó; quản lý ca
   (R7) cả chi nhánh; quản lý chuỗi, chủ cả chuỗi. Nhân sự (R13) giao việc trong phòng
   nhân sự, không giao việc vận hành.
@@ -211,9 +219,11 @@ trước khi dùng làm căn cứ tuyển dụng.
 3. **Thêm mẫu** / bấm một mẫu để sửa: ghế làm, ghế nghiệm thu, lặp (theo ca · hằng
    ngày · hằng tuần · hằng tháng), hạn (theo ca để trống = giờ kết ca), checklist, văn
    bản hướng dẫn (N4). Sửa mẫu chỉ áp cho việc sinh từ nay; **Đã tắt** thì ngừng sinh.
-4. Việc **tự sinh** mỗi ngày (không cần ai bấm). Việc theo ca chỉ tới người giữ đúng
-   ghế VÀ đứng ca **đã công bố** — người nghỉ không bị đòi checklist. Cả ca làm chung
-   một checklist, mỗi mục ghi tên người tích; ai trong ca cũng nộp được.
+4. Việc **tự sinh** mỗi ngày (không cần ai bấm — sinh lúc có người mở danh sách việc
+   hoặc chuông, cho hôm qua và hôm nay). Việc theo ca chỉ tới người giữ đúng ghế VÀ
+   đứng ca **đã công bố** — người nghỉ không bị đòi checklist; ca nháp không sinh việc.
+   Cả ca làm chung một checklist, mỗi mục ghi tên người tích; ai trong ca cũng nộp được.
+   H2 có nút thêm ca mẫu nhưng **chưa sửa hay xoá được ca mẫu**.
 5. Tab **Hôm nay**: từng ca, việc nào xong / chờ nghiệm thu / quá hạn (viền đỏ), ai
    nộp. Bấm vào để xem từng mục và nghiệm thu.
 
@@ -221,8 +231,13 @@ trước khi dùng làm căn cứ tuyển dụng.
 
 - Ba mẫu chuẩn (**Dùng bộ mẫu chuẩn**, quản lý chuỗi / chủ): **Báo cáo cuối ngày** (quản
   lý chi nhánh nộp, quản lý ca nộp thay khi quá hạn; hạn 9 giờ sáng hôm sau), **Sổ giao
-  ca** (quản lý ca, mỗi ca, hạn 30 phút sau giờ kết ca; quản lý ca của ca sau bấm **Nhận
-  ca**), **Báo cáo ca bếp** (bếp trưởng / bếp phó, nộp được trên điện thoại).
+  ca** (quản lý ca, mỗi ca, hạn 30 phút sau giờ kết ca; người nhận ca bấm **Nhận ca**),
+  **Báo cáo ca bếp** (bếp trưởng nộp, bếp phó nộp thay khi quá hạn; nộp được trên điện
+  thoại).
+- **Ai xác nhận được:** cấp trên trực tiếp theo sơ đồ, trưởng của cây con chứa người viết
+  (gồm quản lý ca R7 của chi nhánh), quản lý chuỗi, chủ. Với sổ giao ca (**Ca sau nhận
+  ca**) thì thêm **bất kỳ ai đang giữ ghế của mẫu** (kể cả ghế nộp thay) — hệ thống không
+  kiểm người bấm có đứng ca sau hay không.
 - Báo cáo **tự xuất hiện** ở mục *Báo cáo cần nộp* của N1 khi tới kỳ — không ai phải
   tạo. Báo cáo theo ca chỉ tới người đứng đúng ca đã công bố.
 - **Trường tự điền** (doanh thu thuần, số đơn, khách, đơn huỷ, món huỷ sau gửi bếp, vé
@@ -234,7 +249,11 @@ trước khi dùng làm căn cứ tuyển dụng.
   `workreport.graceMinutes`) ghi "trễ hạn".
 - Tab **Còn thiếu**: suất đã quá hạn mà chưa nộp. Người viết không tự xác nhận báo cáo
   của mình.
-- Báo cáo có số tiền chỉ nộp ở Office; Kênh nhân viên nộp được mẫu không có tiền.
+- Kênh nhân viên chỉ nộp được mẫu bật **Nộp được trên Kênh nhân viên** — trong bộ mẫu
+  chuẩn chỉ có Báo cáo ca bếp. Mẫu có trường tiền không bật được ô này. Sổ giao ca
+  không có trường tiền nhưng mẫu chuẩn tắt ô này, nên vẫn chỉ nộp ở Office (thẻ trên
+  điện thoại vẫn ghi "có số tiền").
+- N1 không có danh sách báo cáo mình đã nộp: xem lại hay viết bổ sung thì vào N7.
 
 **Sự cố (N8):**
 
@@ -247,7 +266,8 @@ trước khi dùng làm căn cứ tuyển dụng.
 - Người xử lý (bếp trưởng, quản lý ca, quản lý chuỗi, nhân sự, chủ) ghi **nguyên nhân
   gốc**, **biện pháp**, thiệt hại ước tính, **giao việc khắc phục** (hạn mặc định 7
   ngày) rồi **Đóng sự cố…**. Chỉ đóng được khi đủ nguyên nhân, biện pháp, mốc khai báo
-  (nếu phải) và mọi việc khắc phục đã xong.
+  (nếu phải) và mọi việc khắc phục đã xong. Bấm **Lưu điều tra** trước khi đóng — hệ
+  thống chỉ đọc nguyên nhân và biện pháp đã lưu, chữ vừa gõ chưa lưu thì không tính.
 - Sự cố **nghiêm trọng** chỉ quản lý chuỗi hoặc chủ đóng, và người báo không tự đóng.
   Sự cố không xoá; đã đóng thì không sửa.
 
@@ -289,16 +309,24 @@ trước khi dùng làm căn cứ tuyển dụng.
 
 **Văn bản (N4) — soạn, trình, ký:**
 
-1. **Văn bản mới** → chọn loại: **Thông báo**, **Quyết định** (bổ nhiệm, điều
+1. **Soạn văn bản** → chọn loại: **Thông báo**, **Quyết định** (bổ nhiệm, điều
    chuyển, miễn nhiệm, khen thưởng, kỷ luật, khác) hoặc **Quy định**. Nội dung là
    chữ thường; tài liệu dài (PDF, ảnh) thì dán **đường dẫn https** ở mục Đính kèm.
 2. **Nơi nhận** ghép từ nhiều quy tắc: toàn chuỗi, chi nhánh, đơn vị (có hoặc không
-   gồm đơn vị con), chức danh, vai trò, từng người. Ô bên cạnh ước tính số người
-   nhận. Bật **Yêu cầu xác nhận đã đọc** cho nội quy, quy định ATTP — người nhận
-   phải bấm "Tôi đã đọc và hiểu".
-3. **Lưu nháp** bao nhiêu lần cũng được. Xong thì chọn **Trình người ký** → **Trình
-   ký**. Từ lúc trình, nội dung và nơi nhận **khoá lại** — người ký ký đúng thứ đã
-   đọc. Người ký **Trả lại người soạn** kèm lý do thì văn bản về nháp để sửa.
+   gồm đơn vị con), chức danh, vai trò, từng người. Dòng chữ **dưới** danh sách nơi
+   nhận ước tính số người nhận (ghi "không tính người soạn và người ký" nhưng thực tế
+   chỉ trừ người soạn — người ký thuộc nơi nhận thì số thật ít hơn một). Bật **Yêu
+   cầu xác nhận đã đọc** cho nội quy, quy định ATTP — người nhận phải bấm "Tôi đã đọc
+   và hiểu".
+3. **Lưu nháp** bao nhiêu lần cũng được, nhưng phải có trích yếu, nội dung và ít nhất
+   một nơi nhận mới lưu được (không lưu bản dở dang). **Xoá nháp** xoá ngay, không hỏi
+   lại. Xong thì chọn **Trình người ký** → **Trình ký**. Từ lúc trình, nội dung và nơi
+   nhận **khoá lại** — người ký ký đúng thứ đã đọc; người soạn **không rút lại được**.
+   Người ký **Trả lại người soạn** kèm lý do thì văn bản về nháp để sửa.
+   Danh sách người ký không lọc theo phạm vi: chọn người không đủ phạm vi thì lúc trình
+   báo "Nơi nhận vượt ra ngoài phạm vi của người ký". Ngày hết hiệu lực trước ngày bắt
+   đầu, đính kèm điền thiếu một nửa, dòng quyết định để trống: màn chỉ báo chung "Dữ
+   liệu gửi lên không hợp lệ".
 4. Người ký bấm **Ký ban hành** và nhập **PIN của chính mình**. Văn bản nhận số
    hiệu (`TB-…` thông báo · `QD-…` quyết định · `QYD-…` quy định) và tới tay người
    nhận ngay trên Kênh nhân viên. Bạn tự có quyền ký thì nút **Ký ban hành** hiện
@@ -309,9 +337,15 @@ trước khi dùng làm căn cứ tuyển dụng.
 
 | Ai ký được | Thông báo | Quyết định, quy định |
 |---|---|---|
-| Quản lý ca (R7) | ✓ trong chi nhánh của mình | – |
+| Quản lý ca (R7) | ✓ trong chi nhánh của mình và cây con đơn vị mình ngồi ghế trưởng | – |
 | Quản lý chuỗi (R11) · Chủ (R10) | ✓ | ✓ |
 | Quản lý nhân sự (R13) | ✓ | – |
+
+Ngồi ghế trưởng mà không có một trong bốn vai trò trên (ví dụ bếp trưởng R5) thì
+**không ký được**, kể cả thông báo cho bộ phận mình. Người ký không toàn chuỗi không
+ký được văn bản gửi "Toàn chuỗi" hay vai trò ở "mọi chi nhánh". **Thu hồi** không
+bắt buộc là người đã ký — ai có quyền ký loại đó và có phạm vi bao trùm nơi nhận đều
+thu hồi được.
 
 - **Quyết định bổ nhiệm / điều chuyển / miễn nhiệm** có thêm bảng _Thay đổi nhân
   sự_ (ai, ghế nào, chính hay kiêm nhiệm). Ký xong là sơ đồ N2 và chức danh ở H1
@@ -324,6 +358,10 @@ trước khi dùng làm căn cứ tuyển dụng.
   còn hiệu lực thì người vào làm sau vẫn nhận và phải xác nhận.
 - Bên phải màn chi tiết: **Đã đọc x/y · đã xác nhận x/y** và tên người chưa đọc
   (chỉ người soạn, người ký, R10 · R11 · R13 thấy tên).
+- **Người nhận dùng Office:** ai vừa là người nhận vừa xem được sổ văn bản (ví dụ R7
+  nhận thông báo của chi nhánh mình, R10 · R11 · R13) mà mở văn bản từ Office thì
+  **không được ghi "đã đọc"** và không có nút xác nhận — mở văn bản đó trên Kênh nhân
+  viên để được tính.
 - **Kỷ luật:** hệ thống chỉ lưu và phổ biến quyết định. Trình tự xử lý kỷ luật
   (họp, biên bản, có mặt người lao động) làm theo luật, ngoài hệ thống. Không dùng
   văn bản để phạt tiền hay trừ lương.
