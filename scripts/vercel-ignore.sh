@@ -33,7 +33,10 @@
 #     KHÔNG chọn "cứ dựng cho chắc": tám project nhân mỗi lần push sẽ ăn hết trần
 #     100 deployment/ngày.
 #   - Có SHA nhưng không nằm trong bản clone nông (Vercel clone `--depth=10`) →
-#     cũng lùi về HEAD^, vì `git diff` với một commit không có trong kho sẽ lỗi.
+#     DỰNG. Không biết giữa hai lần deploy có gì đổi thì không được đoán bằng
+#     HEAD^: 23/10/2026 đẩy một loạt hơn 100 commit, mốc 074a7cf nằm ngoài 10
+#     commit cuối, HEAD^ chỉ chạm Office nên 7/8 project báo "Canceled by
+#     Ignored Build Step" — API cũ chạy trên CSDL vừa migrate.
 #   - Không tra được cả HEAD^ (kho chỉ có một commit) → dựng.
 set -e
 
@@ -44,7 +47,11 @@ if [ -z "$APP" ]; then
 fi
 
 BASE="$VERCEL_GIT_PREVIOUS_SHA"
-if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+if [ -n "$BASE" ] && ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+  echo "vercel-ignore: $BASE nằm ngoài bản clone nông — dựng"
+  exit 1
+fi
+if [ -z "$BASE" ]; then
   BASE=$(git rev-parse --verify -q HEAD^) || exit 1
 fi
 

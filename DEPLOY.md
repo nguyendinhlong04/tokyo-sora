@@ -199,6 +199,14 @@ pathspec của git, nghĩa là "tính từ đỉnh cây làm việc", nên đún
 > cd apps/web && git diff --quiet HEAD^ HEAD -- ':/apps/web'; echo $?   # 1 = sẽ build
 > ```
 
+Logic thật nằm ở `scripts/vercel-ignore.sh` (so với commit của lần deploy **thành công**
+gần nhất của chính project, `VERCEL_GIT_PREVIOUS_SHA`). Mốc đó nằm ngoài bản clone nông
+(Vercel chỉ lấy 10 commit cuối) thì script **dựng** — 23/10/2026 bản cũ của script lùi về
+so `HEAD^` ở trường hợp này, một lần đẩy hơn 100 commit chỉ dựng đúng Office. Sau mỗi lần
+đẩy lớn, xem trạng thái từng project trên commit (GitHub → commit → dấu tích, hoặc
+`api.github.com/repos/<owner>/<repo>/commits/<sha>/status`): phải là "Deployment has
+completed", không phải "Canceled by Ignored Build Step".
+
 **Một giá trị bắt buộc phải sửa:** trong `vercel.json` của mọi SPA có dòng
 
 ```json
