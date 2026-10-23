@@ -33,10 +33,13 @@ cấp, xin lại là xong.
 ### Thanh tab ở đáy màn
 
 Năm tab trong tầm ngón cái: **Lịch** (mở đầu) · **Việc** · **Thông báo** · **Lương** ·
-**KPI**. Chấm số trên tab Việc là số việc đang chờ bạn (đỏ khi có việc quá hạn), trên
-tab Thông báo là số văn bản chưa đọc, trên tab KPI là số phiếu đang chờ bạn tự đánh
-giá — tự cập nhật mỗi phút khi app đang mở; chưa có thông báo đẩy, nên quán vẫn dán
-link văn bản vào nhóm Zalo.
+**KPI**. Chấm số trên tab Việc là số việc đang chờ bạn làm + việc chờ bạn nghiệm thu +
+báo cáo cần nộp (đỏ khi có việc hoặc báo cáo quá hạn), trên tab Thông báo là số văn
+bản chưa đọc, trên tab KPI là số phiếu đang chờ bạn tự đánh giá — tự cập nhật mỗi phút
+khi app đang mở; chưa có thông báo đẩy, nên quán vẫn dán link văn bản vào nhóm Zalo.
+
+> Hình phác từng màn điện thoại (Việc, Thông báo, KPI, báo cáo, báo sự cố) có trong
+> [Sổ tay Tổ chức & điều hành](so-tay-to-chuc-dieu-hanh.html).
 
 **Lịch & công (H8):**
 
@@ -61,27 +64,39 @@ tạm ứng) → **Thực lãnh**. Phiếu chỉ hiện **sau khi kỳ lương �
 hoàn toàn chỉ đọc — *"Thấy số chưa đúng thì nhắn quản lý nhân sự — kỳ đã chốt
 không sửa ngược, sai sẽ được cộng/trừ ở kỳ sau."*
 
-**Việc (N12):** dòng đầu là ca hôm nay của bạn (ca đã công bố). Bên dưới:
+**Việc (N12):** dòng đầu là ca hôm nay của bạn (ca đã công bố). Bên dưới, theo đúng
+thứ tự trên màn: **Báo cáo cần nộp** → **Chờ bạn nghiệm thu** → **Cần làm** → **Đã nộp
+gần đây** → nút **Báo sự cố**.
 
+- **Báo cáo cần nộp** — báo cáo của ghế bạn giữ (vd. báo cáo ca bếp của bếp trưởng);
+  báo cáo theo ca chỉ tới người đứng đúng ca đó. Người giữ ghế _nộp thay_ (vd. bếp phó)
+  chỉ thấy suất khi nó đã quá hạn. Chạm để mở: số tự điền (vé bếp trễ, món huỷ…) do máy
+  tính, ô có dấu * là bắt buộc, ô có/không bắt buộc phải chạm cho tới khi hiện "Đã xác
+  nhận". Chỉ có một nút **Nộp báo cáo** — **không có nút lưu nháp** trên điện thoại;
+  chữ đã gõ được giữ trong máy cho tới khi nộp xong. Mẫu không bật nộp trên điện thoại
+  (trong bộ chuẩn: báo cáo cuối ngày và sổ giao ca) hiện thẻ bị khoá, ghi "có số tiền
+  — nộp ở máy của quán" — kể cả sổ giao ca, dù sổ giao ca không có số tiền.
 - **Chờ bạn nghiệm thu** — chỉ có khi bạn giữ ghế được chỉ định nghiệm thu (vd. quản
-  lý ca nghiệm thu checklist mở ca). Mở việc, xem ai tích mục nào, bấm **Đạt** hoặc
-  **Trả lại…** kèm lý do.
-- **Cần làm** — quá hạn trước (chữ đỏ "Quá hạn N giờ"), rồi hôm nay, rồi sắp tới.
-  Checklist mở ca, đóng ca, vệ sinh ATTP **chỉ hiện khi bạn đứng đúng ca đã công bố**:
-  nghỉ được duyệt thì việc của ca đó không tới bạn. Việc quản lý giao tận tay ghi
-  "Giao bởi …".
-- Mở một việc: bấm **Nhận việc** để người giao biết việc đã tới tay; chạm từng mục
-  checklist để tích — lưu ngay, mất sóng thì mục tự bỏ tích và báo lỗi. Cả ca làm
-  chung một checklist, mỗi mục ghi tên người tích.
+  lý ca nghiệm thu checklist mở ca); không cần đang đứng ca. Mở việc, xem ai tích mục
+  nào, bấm **Đạt** hoặc **Trả lại…** kèm lý do ("Cần làm lại gì"). Quản lý không được
+  chỉ định đích danh thì nghiệm thu ở Office, không ở đây.
+- **Cần làm** — quá hạn trước (viền và chữ đỏ "Quá hạn N phút / giờ / ngày"), rồi hôm
+  nay, rồi sắp tới. Checklist mở ca, đóng ca, vệ sinh ATTP **chỉ hiện khi bạn đứng đúng
+  ca đã công bố**: nghỉ được duyệt thì việc của ca đó không tới bạn; checklist chỉ hiện
+  từ hôm qua trở đi. Việc quản lý giao tận tay ghi "Giao bởi …".
+- Mở một việc giao tận tay: bấm **Nhận việc** để người giao biết việc đã tới tay
+  (checklist ca không có nút này). Chạm từng mục checklist để tích — lưu ngay, mất sóng
+  thì mục tự bỏ tích và báo "Chưa lưu được: …". Cả ca làm chung một checklist, mỗi mục
+  ghi tên người tích.
 - **Nộp nghiệm thu** (hoặc **Báo xong** nếu việc không cần nghiệm thu). Còn mục chưa
-  tích thì phải ghi lý do mới nộp được. Bị trả lại thì việc quay về "Cần làm" kèm
-  lý do ở đầu việc.
-- **Đã nộp gần đây** — việc 7 ngày qua: chờ nghiệm thu hay đã xong.
-- **Báo cáo cần nộp** — báo cáo ca của ghế bạn giữ (vd. báo cáo ca bếp của bếp trưởng).
-  Chữ đã gõ giữ trong máy cho tới khi nộp xong. Báo cáo có số tiền (cuối ngày, giao ca)
-  hiện ở đây để nhắc nhưng **nộp ở máy của quán**.
-- **Báo sự cố** (nút cuối màn) — loại, mức, chuyện gì, đã làm gì ngay. Có người bị
-  thương, cháy nổ, ngộ độc thì gọi quản lý và cấp cứu trước, báo ở đây sau.
+  tích thì phải ghi lý do mới nộp được. Ai trong ca cũng nộp được; hai người bấm cùng
+  lúc thì người sau thấy "Việc vừa được người cùng ca nộp". Bị trả lại thì việc quay về
+  "Cần làm", đầu việc ghi "Bị trả lại: …".
+- **Đã nộp gần đây** — tối đa 6 việc vừa nộp: chờ nghiệm thu hay đã xong.
+- **Báo sự cố** (nút cuối màn) — loại, mức (mặc định Trung bình), chuyện gì, chi tiết
+  (không bắt buộc), đã làm gì ngay. Giờ xảy ra lấy lúc bấm; chưa đính kèm ảnh được, và
+  chưa có màn xem lại sự cố mình đã báo. Có người bị thương, cháy nổ, ngộ độc thì gọi
+  quản lý và cấp cứu trước, báo ở đây sau.
 
 **Thông báo (N13):** thông báo, quyết định, quy định đã ký ban hành gửi tới bạn.
 
@@ -93,7 +108,8 @@ không sửa ngược, sai sẽ được cộng/trừ ở kỳ sau."*
 - Tài liệu đính kèm mở bằng link (tab mới). Văn bản bị thu hồi tự biến khỏi danh
   sách.
 - Quyết định bổ nhiệm/điều chuyển về chính bạn cũng tới đây; chức danh ở đầu màn
-  đổi theo ngày hiệu lực.
+  đổi theo ngày hiệu lực (ngày hiệu lực ở tương lai thì đổi ở lần app hỏi lại đầu tiên
+  sau ngày đó).
 
 **KPI của tôi (N14):** mỗi kỳ đánh giá một thẻ — điểm (_tạm tính_ khi kỳ còn chạy),
 hạng A–D trên thanh than hồng, và nhãn **Cần tự đánh giá** khi tới lượt bạn.
